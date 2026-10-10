@@ -6,8 +6,22 @@ from scripts.seed_catalog import seed
 
 REPO_DATA = Path(__file__).parent.parent / "data"
 
+# Fixed catalog for DB tests, so they do not depend on what data/ currently holds.
+SMALL_PRODUCTS = """Emporio Armani,Stronger With You Intensely
+Dior,Sauvage Eau de Parfum
+Yves Saint Laurent,Y Eau de Parfum
+"""
+SMALL_ALIASES = """Stronger With You Intensely,stronger with you intensely
+Stronger With You Intensely,stw intensely
+Stronger With You Intensely,stw intense
+Sauvage Eau de Parfum,sauvage edp
+Sauvage Eau de Parfum,dior sauvage
+Y Eau de Parfum,ysl y edp
+Y Eau de Parfum,ysl y
+"""
 
-def write_csvs(tmp_path: Path, products: str, aliases: str) -> Path:
+
+def write_csvs(tmp_path: Path, products: str = SMALL_PRODUCTS, aliases: str = SMALL_ALIASES) -> Path:
     (tmp_path / "products.csv").write_text("brand,name\n" + products)
     (tmp_path / "aliases.csv").write_text("product_name,alias\n" + aliases)
     return tmp_path
@@ -22,12 +36,17 @@ def catalog(engine) -> list[tuple]:
         )))
 
 
-def test_seed_is_idempotent(db):
-    seed(REPO_DATA)
+def test_seed_is_idempotent(db, tmp_path):
+    seed(write_csvs(tmp_path))
     first = catalog(db)
-    seed(REPO_DATA)
+    seed(write_csvs(tmp_path))
     assert catalog(db) == first
     assert len({row[0] for row in first}) == 3
+
+
+def test_repo_catalog_seeds_cleanly(db):
+    stats = seed(REPO_DATA)
+    assert stats["active_products_total"] > 0 and stats["aliases_total"] > 0
 
 
 def test_aliases_are_normalized(db, tmp_path):
@@ -37,7 +56,7 @@ def test_aliases_are_normalized(db, tmp_path):
 
 
 def test_replacing_list_deactivates_products_and_drops_seed_aliases(db, tmp_path):
-    seed(REPO_DATA)
+    seed(write_csvs(tmp_path))
     with db.begin() as c:  # an alias learned from the dashboard must survive
         c.execute(text(
             "INSERT INTO product_aliases (product_id, alias_text, normalized_alias, source) "

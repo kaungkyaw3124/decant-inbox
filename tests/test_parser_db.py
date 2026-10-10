@@ -9,7 +9,7 @@ from app.parser import rules
 from app.parser.worker import run_batch
 from scripts.reparse_all import reparse_all
 from scripts.seed_catalog import seed
-from tests.test_seed_catalog import REPO_DATA
+from tests.test_seed_catalog import write_csvs
 
 NOW = datetime(2026, 10, 10, 12, 0, tzinfo=UTC)
 
@@ -27,8 +27,8 @@ def results(engine) -> list[tuple]:
         )))
 
 
-def test_worker_parses_new_messages_once(db):
-    seed(REPO_DATA)
+def test_worker_parses_new_messages_once(db, tmp_path):
+    seed(write_csvs(tmp_path))
     add_message(1, "stw intensely ၅ ml ဝယ်ချင်လို့ပါ")
     add_message(2, "5ml stronger with you intensely ရှိလား")
     assert run_batch() == 2
@@ -40,8 +40,8 @@ def test_worker_parses_new_messages_once(db):
     assert all(r[4:] == ("rules", rules.PARSER_VERSION, True) for r in results(db))
 
 
-def test_reparse_keeps_history_and_only_adds_changes(db, monkeypatch):
-    seed(REPO_DATA)
+def test_reparse_keeps_history_and_only_adds_changes(db, tmp_path, monkeypatch):
+    seed(write_csvs(tmp_path))
     add_message(1, "stw intensely ၅ ml ဝယ်ချင်လို့ပါ")
     add_message(2, "aventus 10ml ရှိလား")  # not in the catalog yet
     run_batch()
@@ -62,8 +62,8 @@ def test_reparse_keeps_history_and_only_adds_changes(db, monkeypatch):
     assert len(results(db)) == 5
 
 
-def test_reparse_never_replaces_human_result(db):
-    seed(REPO_DATA)
+def test_reparse_never_replaces_human_result(db, tmp_path):
+    seed(write_csvs(tmp_path))
     add_message(1, "stw intensely 5ml")
     run_batch()
     with db.begin() as c:
@@ -76,8 +76,8 @@ def test_reparse_never_replaces_human_result(db):
     assert [r[4] for r in results(db) if r[6]] == ["human"]
 
 
-def test_reparse_dry_run_writes_nothing(db):
-    seed(REPO_DATA)
+def test_reparse_dry_run_writes_nothing(db, tmp_path):
+    seed(write_csvs(tmp_path))
     add_message(1, "stw intensely 5ml ရှိလား")
     assert reparse_all(dry_run=True)["new"] == 1
     assert results(db) == []
