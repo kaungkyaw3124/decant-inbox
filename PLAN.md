@@ -10,8 +10,8 @@ Read CLAUDE.md first. This file tracks where we are.
 | 2 | Telethon listener + history import | ✅ Done (30-day import run, listener live) |
 | 3 | Rule-based parser + tests | ✅ Done (worker live; needs real catalog + labelled samples) |
 | 3b | AI fallback (optional) | ⬜ Not started |
-| 4 | Dashboard + Tailscale (private access) | 🟡 Dashboard running on 127.0.0.1:8080; owner: create login + run Tailscale script |
-| 5 | Run 24/7, backups, health page | ⬜ Not started |
+| 4 | Dashboard + Tailscale (private access) | ✅ Dashboard verified by owner via SSH tunnel (2026-10-11). Tailscale (phone access) still optional |
+| 5 | Run 24/7, backups, health page | ⬜ NEXT: required before new features |
 
 ## Phase 0 checklist
 - [x] Step 0: rollback safety net scripts in ~/hardening/
