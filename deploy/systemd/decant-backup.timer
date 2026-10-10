@@ -1,0 +1,12 @@
+[Unit]
+Description=Decant Inbox: run the database backup every night
+
+[Timer]
+# 03:00 Myanmar time (server clock is UTC). Persistent: if the server was off at
+# 03:00, the backup runs right after it comes back.
+OnCalendar=*-*-* 03:00 Asia/Yangon
+Persistent=true
+RandomizedDelaySec=5min
+
+[Install]
+WantedBy=timers.target

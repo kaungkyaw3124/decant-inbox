@@ -7,14 +7,13 @@ import sys
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, Form, Request
-from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
-from sqlalchemy import text
 from sqlalchemy.orm import Session
 from starlette.middleware.sessions import SessionMiddleware
 
 from app.core.config import get_settings
-from app.web import catalog, inbox
+from app.web import catalog, health, inbox
 from app.web.auth import LoginRequired, authenticate, locked_out, login, verify_csrf
 from app.web.deps import get_db, templates
 
@@ -34,6 +33,7 @@ app.add_middleware(
 app.mount("/static", StaticFiles(directory=Path(__file__).parent / "static"), name="static")
 app.include_router(inbox.router)
 app.include_router(catalog.router)
+app.include_router(health.router)
 
 
 @app.exception_handler(LoginRequired)
@@ -80,9 +80,3 @@ def login_submit(
 def logout(request: Request):
     request.session.clear()
     return RedirectResponse("/login", status_code=303)
-
-
-@app.get("/healthz", response_class=PlainTextResponse)
-def healthz(db: Session = Depends(get_db)):
-    db.execute(text("SELECT 1"))
-    return "ok"

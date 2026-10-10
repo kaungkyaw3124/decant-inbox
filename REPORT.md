@@ -202,3 +202,29 @@ Short entries from the VPS Claude Code session, newest last.
   Docker socket. Phase 5 will decide (docker group or systemd user units).
 - Needed from owner: `.venv/bin/python -m scripts.create_user <name>` (in an SSH session),
   then `sudo bash scripts/setup_tailscale.sh`.
+
+## 2026-10-11 — Phase 5: services, backups, health (reboot test pending)
+- systemd **user** units in deploy/systemd/ (decant-listener, decant-parser, decant-web,
+  decant-backup.service + .timer), installed by scripts/install_services.sh (no sudo; re-run
+  after code or unit changes). Restart=always, RestartSec=10, no start limit, so they also
+  wait out Postgres starting after them at boot. Logs: `journalctl --user -u decant-…`.
+  User units (not system units) so code deploys/restarts never need sudo; boot start
+  needs linger (root, once).
+- Found: the hand-started (nohup) listener and worker had died silently after the last
+  terminal session ended (last log 18:47). Ran import_history --days 2 with the listener
+  stopped: 0 new rows, so nothing was missed.
+- Heartbeats: new table service_heartbeats (migration 7d06122535bc, round-trip tested);
+  listener beats every 60s while connected, worker every 30s.
+- Health: /healthz (no login; only names + ok/FAIL; 200 or 503) and /health page (login;
+  details): database, listener (<3 min), parser (<2 min), parse queue (oldest unparsed
+  <5 min), backup (newest <26 h), disk (>=10% free), last message time.
+- Backup: scripts/backup_db.py: pg_dump -Fc to backups/ (dir 700, files 600, git-ignored),
+  written as .partial, checked with pg_restore --list, then renamed; keeps newest 14.
+  Timer daily 03:00 Asia/Yangon (20:30 UTC), Persistent=true.
+- Verified: pytest 106 passed, 2 skipped (real pg_dump test: client not installed yet;
+  owner samples). Services active; kill -9 of each -> restarted (NRestarts=1) within ~10s;
+  /healthz: everything ok except backup (no pg_dump yet).
+- Needed from owner: `sudo sh -c 'apt-get update -q && apt-get install -y
+  postgresql-client-18 && loginctl enable-linger administrator'`, then the first
+  backup run, then a reboot test.
+- Not done: off-server backup copies (backups are on the same disk as the DB).

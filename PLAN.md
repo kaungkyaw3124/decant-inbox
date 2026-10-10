@@ -11,7 +11,7 @@ Read CLAUDE.md first. This file tracks where we are.
 | 3 | Rule-based parser + tests | ✅ Done (worker live; needs real catalog + labelled samples) |
 | 3b | AI fallback (optional) | ⬜ Not started |
 | 4 | Dashboard + Tailscale (private access) | ✅ Dashboard verified by owner via SSH tunnel (2026-10-11). Tailscale (phone access) still optional |
-| 5 | Run 24/7, backups, health page | ⬜ NEXT: required before new features |
+| 5 | Run 24/7, backups, health page | 🟡 systemd user services live + crash-restart tested; owner: sudo command + reboot test |
 
 ## Phase 0 checklist
 - [x] Step 0: rollback safety net scripts in ~/hardening/

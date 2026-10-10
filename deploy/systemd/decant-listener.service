@@ -1,0 +1,18 @@
+[Unit]
+Description=Decant Inbox: Telegram listener (read-only)
+# Postgres runs in Docker (restart: unless-stopped). A user unit cannot order itself
+# after system units, so if the DB is not up yet the service exits and is restarted.
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+WorkingDirectory=%h/telegram-product-requests
+ExecStart=%h/telegram-product-requests/.venv/bin/python -m app.listener.main
+Restart=always
+RestartSec=10
+Environment=PYTHONUNBUFFERED=1
+UMask=0077
+NoNewPrivileges=yes
+
+[Install]
+WantedBy=default.target

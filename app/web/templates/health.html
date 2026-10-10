@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Health · Decant Inbox{% endblock %}
+{% block content %}
+<section class="card">
+  <h1>{% if checks | selectattr("ok", "false") | list %}Something needs attention{% else %}All systems OK{% endif %}</h1>
+  <table>
+    <tbody>
+    {% for c in checks %}
+      <tr><td>{{ "✅" if c.ok else "❌" }}</td><th>{{ c.name }}</th><td>{{ c.detail }}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  <p class="muted small">Last message received: {{ last_message }} · {{ total }} messages stored.</p>
+</section>
+<section class="card muted small">
+  <p>Services restart on their own. If one stays red, on the server run
+  <code>systemctl --user status decant-listener decant-parser decant-web</code> and
+  <code>journalctl --user -u decant-listener -n 50</code>.</p>
+</section>
+{% endblock %}

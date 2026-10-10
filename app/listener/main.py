@@ -10,10 +10,12 @@ import sys
 from telethon import events
 
 from app.core.db import SessionLocal
+from app.core.heartbeat import beat
 from app.listener.client import make_client, secure_session_file
 from app.listener.save import IncomingMessage, from_telethon, save_message
 
 log = logging.getLogger("listener")
+HEARTBEAT_SECONDS = 60
 
 
 def _save(msg: IncomingMessage) -> bool:
@@ -41,8 +43,23 @@ async def main() -> None:
             # Never let one bad message stop the listener; import_history fills gaps.
             log.exception("failed to handle message id=%s", event.message.id)
 
+    async def heartbeat() -> None:
+        while True:
+            if client.is_connected():
+                try:
+                    await asyncio.to_thread(beat, "listener", "connected")
+                except Exception:
+                    log.exception("heartbeat failed")
+            await asyncio.sleep(HEARTBEAT_SECONDS)
+
     log.info("listening for new private messages")
-    await client.run_until_disconnected()
+    heartbeat_task = asyncio.create_task(heartbeat())
+    try:
+        # Returns when the connection is lost for good; the process then exits and
+        # systemd restarts it (catch_up=True fetches what arrived meanwhile).
+        await client.run_until_disconnected()
+    finally:
+        heartbeat_task.cancel()
 
 
 if __name__ == "__main__":

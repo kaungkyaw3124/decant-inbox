@@ -13,6 +13,7 @@ import time
 from sqlalchemy.exc import IntegrityError
 
 from app.core.db import SessionLocal
+from app.core.heartbeat import beat
 from app.models import Message
 from app.parser.rules import PARSER_VERSION
 from app.parser.service import load_aliases, parse_message, unparsed_message_ids
@@ -20,6 +21,7 @@ from scripts.reparse_all import reparse_all
 
 log = logging.getLogger("parser")
 BATCH = 200
+HEARTBEAT_SECONDS = 30
 _failed: set[int] = set()  # retried after a restart, so one bad row cannot block the queue
 
 
@@ -67,7 +69,11 @@ def main() -> None:
 
     log.info("parser worker started (%s)", PARSER_VERSION)
     fingerprint = None
+    last_beat = 0.0
     while True:
+        if time.monotonic() - last_beat >= HEARTBEAT_SECONDS:
+            beat("parser", PARSER_VERSION)
+            last_beat = time.monotonic()
         fingerprint = reparse_if_catalog_changed(fingerprint)
         parsed = run_batch()
         if parsed:
