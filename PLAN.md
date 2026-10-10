@@ -2,6 +2,14 @@
 
 Read CLAUDE.md first. This file tracks where we are.
 
+## RESUME HERE (2026-10-11, 02:20, owner went to sleep)
+- Phases 1-4 done and verified by owner. Phase 5 in progress: systemd user services
+  done; next = Cloudflare quick tunnel + TUNNEL_URL, backups, status script, owner's
+  sudo command (linger), reboot test. See "Phase 5 spec" below.
+- New session start: read CLAUDE.md, this file, and the last entries of REPORT.md.
+- If the listener was down overnight, run import_history (stop the listener first)
+  to fill the gap; Telegram keeps the messages, so nothing is lost.
+
 ## Status
 | Phase | What | Status |
 |---|---|---|
