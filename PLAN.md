@@ -5,8 +5,8 @@ Read CLAUDE.md first. This file tracks where we are.
 ## Status
 | Phase | What | Status |
 |---|---|---|
-| 0 | VPS hardening, Tailscale, Docker, GitHub | 🟡 In progress (step 0 prepared; waiting for SSH key test) |
-| 1 | Database models, migration, seed products/aliases | ⬜ Not started |
+| 0 | VPS hardening, Docker, GitHub | ✅ Closed (rest of security deferred) |
+| 1 | Database models, migration, seed products/aliases | 🟡 In progress |
 | 2 | Telethon listener + history import | ⬜ Not started |
 | 3 | Rule-based parser + tests | ⬜ Not started |
 | 3b | AI fallback (optional) | ⬜ Not started |
@@ -23,14 +23,16 @@ Read CLAUDE.md first. This file tracks where we are.
 - Moved to Phase 4: Tailscale + compose web service on 127.0.0.1:8080
   (not needed until there is a dashboard to open)
 
-## NEXT (speed plan, agreed 2026-10-10)
-1. Step 2, then steps 3+4 as one script. Owner runs each with sudo.
-2. Start Phase 1 right away. If data/products.csv and data/aliases.csv are not
-   there yet, create them with 3 example rows (YSL Stronger With You Intensely,
-   with aliases from CLAUDE.md) so models, migration and seed can be built and
-   tested now. The owner replaces them with the real list later; the seed must be
-   safe to re-run (upsert, no duplicates).
-3. Then Phase 2 (owner provides api_id/api_hash in .env and types the login code).
+## NEXT (owner decision 2026-10-10: no more security work now — build the project)
+- Phase 0 is CLOSED. Do not start any more hardening, firewall, SSH or update work.
+  Deferred to later (owner will ask): auto-updates (apt-daily.timer is masked),
+  re-checking the SSH drop-in, Tailscale (Phase 4).
+- Do not ask the owner to run sudo unless a project step truly needs it
+  (e.g. installing python3-venv or Docker packages); bundle it into one command.
+1. Finish Phase 1: venv, migration, seed twice (idempotent), tests, push.
+2. Go straight on to Phase 2 code (listener + history import). The owner will add
+   TG_API_ID / TG_API_HASH to .env and type the login code when you are ready.
+3. Then Phase 3 (parser), Phase 4 (dashboard + Tailscale), Phase 5.
 
 ## Owner inputs needed
 - [ ] data/products.csv (`brand,name`): top 10–20 perfumes to start
