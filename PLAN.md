@@ -34,6 +34,14 @@ Read CLAUDE.md first. This file tracks where we are.
    TG_API_ID / TG_API_HASH to .env and type the login code when you are ready.
 3. Then Phase 3 (parser), Phase 4 (dashboard + Tailscale), Phase 5.
 
+## Test data (added by planning chat, 2026-10-11)
+- data/products.csv + data/aliases.csv: 20 popular decant perfumes with English and
+  Burmese nicknames. TEST catalog only; the owner replaces it later.
+- tests/fixtures/synthetic_messages.csv: 32 made-up messages (no customer data, safe
+  to commit) with expected intent/product/size. Checked against rules-1: 32/32.
+- To do (VPS): re-seed, reparse_all, and add a test that runs the parser over the
+  fixture (same columns as data/sample_messages.csv) so it runs on every pytest.
+
 ## Owner inputs needed
 - [ ] data/products.csv (`brand,name`): top 10–20 perfumes to start
 - [ ] data/aliases.csv (`product_name,alias`)
