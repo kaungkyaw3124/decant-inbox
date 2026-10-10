@@ -27,3 +27,11 @@ Short entries from the VPS Claude Code session, newest last.
 - Problems: GitHub rejects the deploy key (`Permission denied (publickey)`), and the
   repo is still readable anonymously (API returns 200), so it is still PUBLIC.
 - Needed from owner: add the deploy key to THIS repo with write access, and make it private.
+
+## 2026-10-10 — Git push to GitHub (unblocked)
+- Did: owner re-added the deploy key; pushed main (de6775f..6891923).
+- Verified: `ssh -T` -> "Hi kaungkyaw3124/decant-inbox! You've successfully authenticated";
+  `git status` shows main in sync with origin/main.
+- Problems: GitHub API still reports `"visibility": "public"` and anonymous
+  `git ls-remote` works, so the repo is NOT private yet.
+- Needed from owner: Settings -> General -> Danger Zone -> Change visibility -> Private.

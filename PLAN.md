@@ -21,7 +21,7 @@ Read CLAUDE.md first. This file tracks where we are.
 - [ ] Step 3: fail2ban (sshd jail)
 - [ ] Step 4: unattended security upgrades
 - [ ] Step 5: Tailscale installed; owner's phone + laptop joined
-- [ ] Project pushed to GitHub (no secrets committed)
+- [x] Project pushed to GitHub (no secrets committed)
 - [ ] compose.yaml prepared for the web service on 127.0.0.1:8080 (built in Phase 4)
 
 ## Owner inputs needed
