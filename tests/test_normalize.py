@@ -13,6 +13,8 @@ from app.parser.normalize import normalize
         ("၁၀ မီလီလီတာ", "10 ml"),
         ("၃ မီလီ", "3 ml"),
         ("  Sauvage\tEDP  ", "sauvage edp"),
+        # Zawgyi input is converted to Unicode.
+        ("stw intensely ၅ ml ဝယ္ခ်င္လို႔ပါ", "stw intensely 5 ml ဝယ်ချင်လို့ပါ"),
     ],
 )
 def test_normalize(raw: str, expected: str) -> None:

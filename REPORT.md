@@ -128,3 +128,38 @@ Short entries from the VPS Claude Code session, newest last.
   three entry points exit with a clear message and create nothing.
 - Not verified yet: anything against real Telegram (needs owner credentials + login).
 - Needed from owner: TG_API_ID + TG_API_HASH in .env; then run the login and type the code.
+
+## 2026-10-10 — Phase 2 verified live; Phase 3 done (rule parser + worker)
+- Phase 2 against real Telegram (counts only, no text shown):
+  - Dry run, 30 days: 1 chat, 17 messages scanned, 5 kept, 0 written.
+    Low count checked: only 5 private user dialogs had any activity in the last
+    30 days (56 older, 1 bot), so it is real, not a filter bug.
+  - Real import: 5 new rows; second run: 0 new (idempotent). DB: 1 customer, 5 messages.
+  - Live listener started: `nohup .venv/bin/python -m app.listener.main >> logs/listener.log`.
+- Phase 3:
+  - normalize.py: Zawgyi -> Unicode (myanmar-tools detector, p > 0.95, python-myanmar
+    converter). Catalog re-seeded so aliases use the new normalization.
+  - rules.py (`rules-1`, pure functions): intent keywords (priority buy > ask_price >
+    ask_stock); size `N ml`; quantity (`2 ခု`, `3ဗူး`, `x2`, `2 pcs`); product by exact alias
+    (longest first, not glued to other Latin letters) then rapidfuzz partial_ratio >= 88
+    (aliases >= 5 chars). Same alias on two products -> no product, needs review. Two
+    products in one message -> first one, needs review.
+  - Confidence: intent 0.3 + product (exact 0.5 / fuzzy 0.35 / multiple 0.25) + size 0.2;
+    -0.15 for several sizes. No intent but product/size -> `unknown`, capped at 0.5.
+    Nothing found -> `other`, 0.7. Needs review below 0.6 (`NEEDS_REVIEW_BELOW`).
+  - service.py: shared by worker and reparse; re-normalizes messages.normalized_text;
+    adds a new row only if outcome or parser_version changed; never replaces a `human` result.
+  - worker.py: polls every 5s for messages without a current result; started with
+    `nohup .venv/bin/python -m app.parser.worker >> logs/parser.log`. Logs ids/counts only.
+  - scripts/reparse_all.py (`--dry-run`), scripts/export_samples.py (writes the git-ignored
+    data/sample_messages.csv, mode 600, pre-filled with the parser's guess for labelling).
+  - logs/ added to .gitignore.
+- Verified: pytest 59 passed, 1 skipped (sample-label test, no labelled file yet). Real data:
+  5 parsed, all `other` (expected: catalog is still the 3 example products); reparse_all ->
+  unchanged=5.
+- Not done / limits: both services run under nohup, so they stop on reboot (restart
+  policies are Phase 5). Do not run import_history while the listener runs (they share the
+  Telethon session file; stop the listener first). The intent keyword list is a first guess
+  until real labelled samples exist.
+- Needed from owner: real data/products.csv + aliases.csv (then `python -m scripts.seed_catalog`
+  and `python -m scripts.reparse_all`); label exported samples.

@@ -7,8 +7,8 @@ Read CLAUDE.md first. This file tracks where we are.
 |---|---|---|
 | 0 | VPS hardening, Docker, GitHub | ✅ Closed (rest of security deferred) |
 | 1 | Database models, migration, seed products/aliases | ✅ Done |
-| 2 | Telethon listener + history import | 🟡 In progress |
-| 3 | Rule-based parser + tests | ⬜ Not started |
+| 2 | Telethon listener + history import | ✅ Done (30-day import run, listener live) |
+| 3 | Rule-based parser + tests | ✅ Done (worker live; needs real catalog + labelled samples) |
 | 3b | AI fallback (optional) | ⬜ Not started |
 | 4 | Dashboard + Tailscale (private access) | ⬜ Not started |
 | 5 | Run 24/7, backups, health page | ⬜ Not started |
@@ -37,8 +37,9 @@ Read CLAUDE.md first. This file tracks where we are.
 ## Owner inputs needed
 - [ ] data/products.csv (`brand,name`): top 10–20 perfumes to start
 - [ ] data/aliases.csv (`product_name,alias`)
-- [ ] api_id + api_hash from my.telegram.org, typed into .env on the server only
-- [ ] data/sample_messages.csv (after Phase 2 history import), kept OUT of git
+- [x] api_id + api_hash from my.telegram.org, typed into .env on the server only
+- [ ] data/sample_messages.csv, kept OUT of git: run `.venv/bin/python -m scripts.export_samples`,
+      correct the intent/product/size_ml columns, then `.venv/bin/pytest tests/test_parser_samples.py`
 
 ## Later (not v1)
 AI fallback → inventory in ml per bottle + supplies → orders & statuses →

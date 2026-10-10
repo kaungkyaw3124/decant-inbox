@@ -10,6 +10,7 @@ secrets/
 data/sample_messages.csv
 data/exports/
 backups/
+logs/
 *.sql
 *.dump
 
