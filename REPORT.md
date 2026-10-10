@@ -47,3 +47,39 @@ Short entries from the VPS Claude Code session, newest last.
   NAT rewrites 10066 -> 22) and nothing listens on 10066. Removal handed to owner:
   `sudo ufw delete allow 10066/tcp`; confirm in the Step 2 entry.
 - Needed from owner: repo is still public (see previous entry).
+
+## 2026-10-10 — Step 2 + Steps 3+4: scripts ready (owner runs with sudo)
+- Did: `~/hardening/step2-ssh.sh`: drop-in `/etc/ssh/sshd_config.d/00-hardening.conf`
+  (key only, no root, AllowUsers administrator, MaxAuthTries 3, no X11). It loads before
+  `50-cloud-init.conf` (which sets `PasswordAuthentication yes`); Include is the first
+  active line of sshd_config, so the drop-in wins. Validates with `sshd -t` + `sshd -T`
+  (incl. `port 22`) before reload; 10-min rollback armed.
+- Changed: rollback now only removes the SSH drop-in; it no longer disables ufw
+  (step 1 is proven).
+- Did: `~/hardening/step34-fail2ban-autoupdates.sh`: fail2ban sshd jail (systemd backend,
+  aggressive mode, 5 tries / 10 min, 1h ban growing to 1w), unattended security upgrades
+  (no auto-reboot), plus `python3-venv` (needed for Phase 1 on the host).
+- Verified so far: both scripts pass `bash -n`. Not run yet.
+- Needed from owner: `sudo ufw delete allow 10066/tcp`, then run step 2, test, cancel
+  timer; then run steps 3+4. Repo is still public.
+
+## 2026-10-10 — Phase 1 (in progress): models, seed, example data
+- Did: app/core (config via .env, db, Base with naming convention), app/models
+  (customers, messages + message_reviews, catalog, parsing, users per CLAUDE.md),
+  app/parser/normalize.py (digits, units, case, spaces; Zawgyi comes in Phase 3),
+  Alembic config, scripts/seed_catalog.py, example data/products.csv + aliases.csv.
+- Design choices:
+  - enum-like columns are VARCHAR + CHECK (easier to extend than PG enums);
+  - external ids are strings (Viber ids are not integers);
+  - one current parse result per message enforced by a partial unique index;
+  - message_reviews: one row per message (current state), not history;
+  - alias uniqueness is (product_id, normalized_alias); the same alias on two products
+    is allowed and treated as ambiguous by the parser.
+  - seed is idempotent; CSV is the source of truth: products not in CSV -> active=false,
+    seed aliases not in CSV -> deleted, learned aliases untouched. So replacing the
+    example rows with the real list later cleans up the examples.
+- Verified: all modules compile; 7 normalize cases pass (system python).
+- Problems: no venv yet (python3-venv missing), so the migration, seed run and pytest
+  wait until steps 3+4 run. Host Python is 3.14; containers will use 3.12 per CLAUDE.md.
+- Note: PLAN says "YSL Stronger With You Intensely"; Stronger With You is an Emporio
+  Armani perfume, so the example row uses brand "Emporio Armani". Owner replaces it anyway.
