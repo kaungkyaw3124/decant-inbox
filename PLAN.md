@@ -15,7 +15,7 @@ Read CLAUDE.md first. This file tracks where we are.
 
 ## Phase 0 checklist
 - [x] Step 0: rollback safety net scripts in ~/hardening/
-- [ ] Owner's SSH key login tested on port 10066
+- [x] Owner's SSH key login tested on port 10066
 - [ ] Step 1: ufw (allow 22/tcp + tailscale0; remove old 443 rule)
 - [ ] Step 2: SSH hardening drop-in (no passwords, no root login)
 - [ ] Step 3: fail2ban (sshd jail)
