@@ -6,8 +6,8 @@ Read CLAUDE.md first. This file tracks where we are.
 | Phase | What | Status |
 |---|---|---|
 | 0 | VPS hardening, Docker, GitHub | ✅ Closed (rest of security deferred) |
-| 1 | Database models, migration, seed products/aliases | 🟡 In progress |
-| 2 | Telethon listener + history import | ⬜ Not started |
+| 1 | Database models, migration, seed products/aliases | ✅ Done |
+| 2 | Telethon listener + history import | 🟡 In progress |
 | 3 | Rule-based parser + tests | ⬜ Not started |
 | 3b | AI fallback (optional) | ⬜ Not started |
 | 4 | Dashboard + Tailscale (private access) | ⬜ Not started |

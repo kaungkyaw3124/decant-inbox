@@ -83,3 +83,25 @@ Short entries from the VPS Claude Code session, newest last.
   wait until steps 3+4 run. Host Python is 3.14; containers will use 3.12 per CLAUDE.md.
 - Note: PLAN says "YSL Stronger With You Intensely"; Stronger With You is an Emporio
   Armani perfume, so the example row uses brand "Emporio Armani". Owner replaces it anyway.
+
+## 2026-10-10 — Phase 1 done: venv, migration, seed, tests
+- Did: venv `.venv` (Python 3.14 on host). python3-venv is not installed (the steps 3+4
+  script stopped early, likely at the masked apt-daily.timer), so I created the venv
+  `--without-pip` and bootstrapped pip 26.2.1 from its PyPI wheel (sha256 checked
+  against PyPI). No sudo needed. Pinned requirements.txt.
+- Did: Alembic migration `cee9169656b3` (v1 initial schema, 7 tables) applied to
+  product_requests. Seeded the example catalog. Added tests/test_seed_catalog.py
+  (runs in a throwaway `product_requests_test` DB, dropped afterwards).
+- Verified:
+  - `alembic check` -> "No new upgrade operations detected" (models == DB);
+    downgrade base -> upgrade head round-trip works.
+  - Seed run twice: same output (3 products, 7 aliases) and identical table snapshot
+    (same ids, no duplicates).
+  - `pytest`: 11 passed (7 normalize + 4 seed: idempotent, alias normalization,
+    replacing the list deactivates old products / drops old seed aliases / keeps
+    learned aliases, unknown product name rolls back).
+  - Real DB untouched by tests (still 3 products, 7 aliases).
+- Phase 0 state seen on the server (no action, Phase 0 closed): sshd drop-in
+  00-hardening.conf exists, fail2ban active.
+- How to verify: `.venv/bin/alembic current` -> cee9169656b3 (head);
+  `.venv/bin/python -m scripts.seed_catalog`; `.venv/bin/pytest -q`.
