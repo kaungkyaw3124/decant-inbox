@@ -105,3 +105,26 @@ Short entries from the VPS Claude Code session, newest last.
   00-hardening.conf exists, fail2ban active.
 - How to verify: `.venv/bin/alembic current` -> cee9169656b3 (head);
   `.venv/bin/python -m scripts.seed_catalog`; `.venv/bin/pytest -q`.
+
+## 2026-10-10 — Phase 2 (code done; waiting for owner login)
+- Did: app/listener/
+  - save.py: one filter + save path shared by live listener and history import.
+    Keeps only private, incoming, text messages from real users; drops outgoing,
+    groups, channels, bots, Saved Messages, Telegram support and 777000 (the account
+    that sends login codes, so codes are never stored). Media without caption is
+    skipped. Upserts the customer (refreshes username/name) and inserts the message
+    with ON CONFLICT DO NOTHING (idempotent). Stores raw_text unchanged plus
+    normalized_text. Writes only customers + messages.
+  - client.py: Telethon client; session at secrets/telegram.session (dir 700, file
+    600); catch_up=True to fetch updates missed while down.
+  - login.py: one-time interactive login (owner types phone, code, 2FA).
+  - main.py: live listener; logs only ids, never text or credentials; one bad message
+    does not stop it.
+  - import_history.py: `--days N` (default 30), `--dry-run`; all folders incl. archived;
+    re-runnable to fill gaps.
+- Verified: pytest 24 passed (new: 10 ignore cases, keep case, save idempotency +
+  customer update, and a read-only guard test that fails if listener code calls any
+  send/edit/delete/forward/pin/mark-read method). Without TG_API_ID/TG_API_HASH, all
+  three entry points exit with a clear message and create nothing.
+- Not verified yet: anything against real Telegram (needs owner credentials + login).
+- Needed from owner: TG_API_ID + TG_API_HASH in .env; then run the login and type the code.

@@ -37,4 +37,4 @@ def db(migrated_db):
 
     yield engine
     with engine.begin() as c:
-        c.execute(text("TRUNCATE products, product_aliases RESTART IDENTITY CASCADE"))
+        c.execute(text("TRUNCATE products, product_aliases, customers, messages RESTART IDENTITY CASCADE"))

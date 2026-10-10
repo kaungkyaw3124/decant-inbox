@@ -1,5 +1,6 @@
-# Pinned versions verified on 2026-10-10 (Phase 1).
+# Pinned versions verified on 2026-10-10 (Phases 1-2).
 SQLAlchemy==2.0.54
+Telethon==1.45.0
 alembic==1.20.0
 psycopg[binary]==3.3.6
 pydantic-settings==2.15.0
