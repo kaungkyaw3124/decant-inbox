@@ -30,3 +30,6 @@ venv/
 
 # Claude Code local settings
 .claude/settings.local.json
+
+# Current Cloudflare quick-tunnel address
+TUNNEL_URL

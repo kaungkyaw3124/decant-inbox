@@ -34,6 +34,27 @@ Read CLAUDE.md first. This file tracks where we are.
    TG_API_ID / TG_API_HASH to .env and type the login code when you are ready.
 3. Then Phase 3 (parser), Phase 4 (dashboard + Tailscale), Phase 5.
 
+## Phase 5 spec (agreed 2026-10-11)
+Owner wants to open the dashboard from any device with internet, no app, and avoid
+Tailscale (VPN-like traffic is often blocked in Myanmar). Decision: Cloudflare QUICK
+TUNNEL (free, random *.trycloudflare.com URL, no domain, no inbound ports).
+1. Run 24/7: listener, parser worker, web and the tunnel as services that start on
+   boot and restart on crash (systemd system units or user units with linger; give
+   the owner ONE sudo command if needed). Stop the current nohup processes first.
+2. Tunnel: cloudflared binary (official release; ~/.local/bin is fine, no sudo needed)
+   running `cloudflared tunnel --url http://127.0.0.1:8080`. Parse the
+   https://*.trycloudflare.com URL from its log and write it to TUNNEL_URL in the
+   project folder (git-ignored) every time it starts. Owner reads it via SSH.
+3. Web behind the tunnel: trust CF-Connecting-IP / X-Forwarded-For from 127.0.0.1 only,
+   so the login lockout counts the real client IP; keep the Secure cookie (HTTPS via
+   Cloudflare). Login lockout stays.
+4. Daily pg_dump backup (keep 14 days) in backups/ (git-ignored), plus a restore note.
+5. Health: /healthz already exists; a tiny status script prints services + TUNNEL_URL.
+6. Prove it: owner reboots the VPS; everything returns on its own; new URL in TUNNEL_URL.
+Fallback access stays: SSH tunnel `ssh -p 10066 -L 8080:127.0.0.1:8080 ...`.
+Later option: a real/DuckDNS domain with a named tunnel or direct HTTPS for a fixed URL.
+Do NOT send the URL via the owner's Telegram account (account is read-only).
+
 ## Test data (added by planning chat, 2026-10-11)
 - data/products.csv + data/aliases.csv: 20 popular decant perfumes with English and
   Burmese nicknames. TEST catalog only; the owner replaces it later.
