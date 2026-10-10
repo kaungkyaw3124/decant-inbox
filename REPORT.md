@@ -35,3 +35,15 @@ Short entries from the VPS Claude Code session, newest last.
 - Problems: GitHub API still reports `"visibility": "public"` and anonymous
   `git ls-remote` works, so the repo is NOT private yet.
 - Needed from owner: Settings -> General -> Danger Zone -> Change visibility -> Private.
+
+## 2026-10-10 — Step 1: firewall (ufw)
+- Did: owner ran `~/hardening/step1-firewall.sh` (17:12 UTC): rollback armed, default
+  deny incoming / allow outgoing, allow 22/tcp + in on tailscale0, removed 443/tcp,
+  enabled ufw. Owner then cancelled the rollback timer and deleted the old 80/tcp rule.
+- Verified: /etc/ufw/ufw.conf `ENABLED=yes`; fresh key login via port 10066 accepted
+  at 17:12:38 (publickey); rollback timer gone; sshd still on 22; Postgres still
+  127.0.0.1:5432 only.
+- Old 10066/tcp rule: unused. All SSH connections arrive on internal port 22 (provider
+  NAT rewrites 10066 -> 22) and nothing listens on 10066. Removal handed to owner:
+  `sudo ufw delete allow 10066/tcp`; confirm in the Step 2 entry.
+- Needed from owner: repo is still public (see previous entry).
