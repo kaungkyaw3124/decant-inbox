@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block content %}
+<form method="get" action="/" class="filters">
+  <input type="search" name="q" value="{{ f.q }}" placeholder="Search text or customer" aria-label="Search">
+  <select name="status" aria-label="Status">
+    {% for s in statuses %}<option value="{{ s }}" {% if f.status == s %}selected{% endif %}>{{ s | capitalize }}</option>{% endfor %}
+    <option value="all" {% if f.status == "all" %}selected{% endif %}>Any status</option>
+  </select>
+  <select name="intent" aria-label="Intent">
+    <option value="requests" {% if f.intent == "requests" %}selected{% endif %}>Requests (not “other”)</option>
+    <option value="all" {% if f.intent == "all" %}selected{% endif %}>All intents</option>
+    {% for i in intents %}<option value="{{ i }}" {% if f.intent == i %}selected{% endif %}>{{ i | replace("_", " ") }}</option>{% endfor %}
+  </select>
+  <select name="product" aria-label="Product">
+    <option value="">Any product</option>
+    {% for p in products %}<option value="{{ p.id }}" {% if f.product == p.id %}selected{% endif %}>{{ p.name }}{% if not p.active %} (inactive){% endif %}</option>{% endfor %}
+  </select>
+  <label class="check"><input type="checkbox" name="needs_review" value="1" {% if f.needs_review %}checked{% endif %}> Needs review</label>
+  <label class="check"><input type="checkbox" name="show_ignored" value="1" {% if f.show_ignored %}checked{% endif %}> Ignored customers</label>
+  <button class="primary">Filter</button>
+  <a href="/" class="reset">Reset</a>
+</form>
+
+{% if rows %}
+<ul class="rows">
+  {% for row in rows %}{% with m=row.m, c=row.c, r=row.r, p=row.p, status=row.status, needs_review=row.needs_review %}{% include "_row.html" %}{% endwith %}{% endfor %}
+</ul>
+{% else %}
+<p class="empty">No messages match these filters.</p>
+{% endif %}
+
+<nav class="pager">
+  {% if newer_url %}<a href="{{ newer_url }}">← Newer</a>{% endif %}
+  {% if older_url %}<a href="{{ older_url }}">Older →</a>{% endif %}
+</nav>
+{% endblock %}

@@ -16,6 +16,7 @@ from app.core.db import SessionLocal
 from app.models import Message
 from app.parser.rules import PARSER_VERSION
 from app.parser.service import load_aliases, parse_message, unparsed_message_ids
+from scripts.reparse_all import reparse_all
 
 log = logging.getLogger("parser")
 BATCH = 200
@@ -43,6 +44,21 @@ def run_batch() -> int:
     return done
 
 
+def catalog_fingerprint() -> int:
+    with SessionLocal() as session:
+        return hash(frozenset(load_aliases(session)))
+
+
+def reparse_if_catalog_changed(last: int | None) -> int:
+    """Products/aliases edited in the dashboard (or re-seeded) -> re-parse everything.
+    Also runs once at start, to catch changes made while the worker was down."""
+    current = catalog_fingerprint()
+    if current != last:
+        stats = reparse_all()
+        log.info("catalog changed, re-parsed: %s", dict(stats))
+    return current
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--once", action="store_true", help="parse what is pending, then exit")
@@ -50,7 +66,9 @@ def main() -> None:
     args = parser.parse_args()
 
     log.info("parser worker started (%s)", PARSER_VERSION)
+    fingerprint = None
     while True:
+        fingerprint = reparse_if_catalog_changed(fingerprint)
         parsed = run_batch()
         if parsed:
             log.info("parsed %d messages", parsed)

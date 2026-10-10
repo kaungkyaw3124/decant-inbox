@@ -163,3 +163,42 @@ Short entries from the VPS Claude Code session, newest last.
   until real labelled samples exist.
 - Needed from owner: real data/products.csv + aliases.csv (then `python -m scripts.seed_catalog`
   and `python -m scripts.reparse_all`); label exported samples.
+
+## 2026-10-11 — Test catalog + fixture test; Phase 4 dashboard (Tailscale waits on owner)
+- Test data: re-seeded (20 products, 57 aliases); reparse_all -> 5 unchanged (still `other`).
+  tests/test_parser_samples.py now also runs tests/fixtures/synthetic_messages.csv on every
+  pytest: 33/33 pass. Seed/DB tests now use their own small catalog instead of data/,
+  so replacing the catalog CSVs can't break them.
+- Migration 500de2fa8725: products.source (seed|manual). Seed only deactivates `seed`
+  products, so products added in the dashboard survive a re-seed. Round-trip
+  (down/up) tested; `alembic check` clean.
+- Worker: re-parses everything when the active catalog (aliases) changes, and once at
+  start. So the dashboard only edits the catalog and the worker stays the only writer of
+  rules results; human results are never replaced.
+- app/web (FastAPI + Jinja2 + htmx 2.0.4 vendored, npm integrity checked):
+  - login (argon2 hashes, signed session cookie: HttpOnly, SameSite=Lax, Secure, 30 days;
+    10 failed tries per username -> 15 min block), CSRF token on every POST, CSP
+    `'self'` only, no-store, no access log (search terms are customer text).
+  - inbox: newest first; filters status (default new), intent (default "requests" =
+    hides `other`), product, needs review, ignored customers, search (raw, normalized,
+    customer name); Done/Ignore/Undo buttons per row (htmx); 50 per page.
+  - message: raw + normalized text, current result, edit (new row, method=human,
+    confidence 1.0) with optional "save as alias" (learned), status + note,
+    ignore customer, parse history.
+  - products: list with alias/message counts, search, add product (manual); product page:
+    activate/deactivate, add alias, delete learned aliases (CSV aliases only via CSV),
+    "shared" warning when an alias belongs to two products.
+  - /healthz (DB check, no login) for Phase 5.
+- scripts/create_user.py (password typed at prompt), scripts/setup_tailscale.sh.
+- Running: `nohup .venv/bin/uvicorn app.web.main:app --host 127.0.0.1 --port 8080
+  --no-access-log >> logs/web.log`; listening on 127.0.0.1:8080 only. WEB_SECRET_KEY generated
+  into .env (not printed).
+- Verified: pytest 103 passed, 1 skipped (9 web tests: login required, wrong password,
+  missing CSRF -> 403, filters, Burmese-digit search, htmx review, human edit + alias,
+  ignore customer, open-redirect blocked, products/aliases, manual product survives
+  re-seed, logout). Live: /healthz ok; / -> 303 /login.
+- Not verified: rendering in a real phone browser (no browser on the VPS); Tailscale.
+- Note: running the web on the host, not compose: the `administrator` user can't reach the
+  Docker socket. Phase 5 will decide (docker group or systemd user units).
+- Needed from owner: `.venv/bin/python -m scripts.create_user <name>` (in an SSH session),
+  then `sudo bash scripts/setup_tailscale.sh`.

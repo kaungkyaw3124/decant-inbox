@@ -1,0 +1,10 @@
+{% if r %}
+  <span class="badge intent-{{ r.intent }}">{{ r.intent | replace("_", " ") }}</span>
+  {% if p %}<span class="badge product">{{ p.name }}</span>{% endif %}
+  {% if r.size_ml %}<span class="badge">{{ r.size_ml }} ml</span>{% endif %}
+  {% if r.quantity and r.quantity > 1 %}<span class="badge">× {{ r.quantity }}</span>{% endif %}
+  {% if r.method == "human" %}<span class="badge human">edited</span>{% endif %}
+{% else %}
+  <span class="badge">not parsed yet</span>
+{% endif %}
+{% if needs_review %}<span class="badge warn">needs review</span>{% endif %}

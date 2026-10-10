@@ -2,8 +2,9 @@
 
 Safe to re-run: products are upserted on (brand, name) and seed aliases on
 (product_id, normalized_alias). The CSVs are the source of truth for the seed:
-- products missing from products.csv are set active=false (never deleted;
-  messages and parse results may reference them),
+- seed products missing from products.csv are set active=false (never deleted;
+  messages and parse results may reference them); products added in the
+  dashboard (source='manual') are left alone unless the CSV lists them,
 - aliases with source='seed' missing from aliases.csv are deleted.
 Learned aliases (source='learned') are never touched.
 
@@ -40,12 +41,13 @@ def seed(data_dir: Path) -> dict[str, int]:
         if keys:
             session.execute(
                 insert(Product)
-                .values([{"brand": b, "name": n, "active": True} for b, n in sorted(keys)])
-                .on_conflict_do_update(index_elements=["brand", "name"], set_={"active": True})
+                .values([{"brand": b, "name": n, "active": True, "source": "seed"} for b, n in sorted(keys)])
+                .on_conflict_do_update(index_elements=["brand", "name"],
+                                       set_={"active": True, "source": "seed"})
             )
         deactivated = session.execute(
             update(Product)
-            .where(Product.active, tuple_(Product.brand, Product.name).not_in(keys or {("", "")}))
+            .where(Product.active, Product.source == "seed", tuple_(Product.brand, Product.name).not_in(keys or {("", "")}))
             .values(active=False)
         ).rowcount
 

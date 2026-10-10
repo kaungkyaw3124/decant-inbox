@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block title %}Message · Decant Inbox{% endblock %}
+{% block content %}
+<p><a href="{{ back }}">← Back to inbox</a></p>
+
+<section class="card">
+  <div class="meta">
+    <span class="who">{{ c.display_name or "Customer" }}{% if c.username %} · @{{ c.username }}{% endif %}</span>
+    <time>{{ m.received_at | local_time("%d %b %Y %H:%M") }}</time>
+  </div>
+  <p class="text big">{{ m.raw_text }}</p>
+  {% if m.normalized_text and m.normalized_text != m.raw_text %}
+  <p class="muted small">Normalized: {{ m.normalized_text }}</p>
+  {% endif %}
+  <div class="badges">{% set needs_review = r is none or (r.method != "human" and r.confidence < needs_review_below) %}{% include "_badges.html" %}
+    {% if r and r.method != "human" %}<span class="muted small">confidence {{ "%.2f" | format(r.confidence) }}</span>{% endif %}
+  </div>
+</section>
+
+<section class="card">
+  <h2>Status: {{ status }}</h2>
+  {% if review and review.reviewed_at %}<p class="muted small">by {{ reviewer.username if reviewer else "?" }}, {{ review.reviewed_at | local_time }}</p>{% endif %}
+  <form method="post" action="/messages/{{ m.id }}/review" class="stack">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <input type="hidden" name="back" value="{{ back }}">
+    <label>Note <textarea name="note" rows="2">{{ review.note if review and review.note else "" }}</textarea></label>
+    <div class="buttons">
+      {% for s in statuses %}
+      <button name="status" value="{{ s }}" {% if s == status %}class="primary"{% endif %}>{{ "Mark " ~ s if s != "new" else "Back to new" }}</button>
+      {% endfor %}
+    </div>
+  </form>
+</section>
+
+<section class="card">
+  <h2>Correct the parse</h2>
+  <form method="post" action="/messages/{{ m.id }}/parse" class="stack">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <input type="hidden" name="back" value="{{ back }}">
+    <div class="grid">
+      <label>Intent
+        <select name="intent">
+          {% for i in intents %}<option value="{{ i }}" {% if r and r.intent == i %}selected{% endif %}>{{ i | replace("_", " ") }}</option>{% endfor %}
+        </select>
+      </label>
+      <label>Product
+        <select name="product_id">
+          <option value="">— none —</option>
+          {% for prod in products %}<option value="{{ prod.id }}" {% if r and r.product_id == prod.id %}selected{% endif %}>{{ prod.brand }} · {{ prod.name }}{% if not prod.active %} (inactive){% endif %}</option>{% endfor %}
+        </select>
+      </label>
+      <label>Size (ml) <input name="size_ml" inputmode="numeric" pattern="[0-9]*" value="{{ r.size_ml if r and r.size_ml else '' }}"></label>
+      <label>Quantity <input name="quantity" inputmode="numeric" pattern="[0-9]*" value="{{ r.quantity if r else 1 }}"></label>
+    </div>
+    <label>Save as alias (optional): the words in this message that name the product
+      <input name="alias" placeholder="e.g. ဆော်ဗေ့">
+    </label>
+    <button class="primary">Save correction</button>
+  </form>
+</section>
+
+<section class="card">
+  <h2>Customer</h2>
+  <p>{{ c.display_name or "—" }}{% if c.username %} · @{{ c.username }}{% endif %} <span class="muted small">({{ c.channel }} id {{ c.external_user_id }})</span></p>
+  <form method="post" action="/customers/{{ c.id }}/ignored">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <input type="hidden" name="back" value="{{ request.url.path }}?back={{ back | urlencode }}">
+    {% if c.ignored %}
+    <p class="muted small">Ignored: their messages are hidden from the inbox (still saved).</p>
+    <button name="ignored" value="0">Stop ignoring</button>
+    {% else %}
+    <button name="ignored" value="1" class="quiet">Ignore this customer (friends, family, spam)</button>
+    {% endif %}
+  </form>
+</section>
+
+<details class="card">
+  <summary>Parse history ({{ history | length }})</summary>
+  <table>
+    <thead><tr><th>When</th><th>By</th><th>Intent</th><th>Product</th><th>Size</th><th>Qty</th><th>Conf.</th></tr></thead>
+    <tbody>
+    {% for h, hp in history %}
+      <tr {% if h.is_current %}class="current"{% endif %}>
+        <td>{{ h.created_at | local_time }}</td><td>{{ h.method }} {{ h.parser_version if h.method != "human" else "" }}</td>
+        <td>{{ h.intent }}</td><td>{{ hp.name if hp else "—" }}</td><td>{{ h.size_ml or "—" }}</td><td>{{ h.quantity }}</td>
+        <td>{{ "%.2f" | format(h.confidence) }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</details>
+{% endblock %}

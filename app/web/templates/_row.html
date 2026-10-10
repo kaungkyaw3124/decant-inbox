@@ -1,0 +1,19 @@
+<li class="row status-{{ status }}" id="msg-{{ m.id }}">
+  <a class="row-main" href="/messages/{{ m.id }}?back={{ back | default('/') | urlencode }}">
+    <div class="meta">
+      <span class="who">{{ c.display_name or ("@" ~ c.username if c.username else "Customer " ~ c.external_user_id) }}</span>
+      <time>{{ m.received_at | local_time }}</time>
+    </div>
+    <p class="text">{{ m.raw_text }}</p>
+    <div class="badges">{% include "_badges.html" %}</div>
+  </a>
+  <div class="row-actions">
+    {% if status == "new" %}
+      <button hx-post="/messages/{{ m.id }}/review" hx-vals='{"status": "done"}' hx-target="#msg-{{ m.id }}" hx-swap="outerHTML">Done</button>
+      <button hx-post="/messages/{{ m.id }}/review" hx-vals='{"status": "ignored"}' hx-target="#msg-{{ m.id }}" hx-swap="outerHTML" class="quiet">Ignore</button>
+    {% else %}
+      <span class="state">{{ status }}</span>
+      <button hx-post="/messages/{{ m.id }}/review" hx-vals='{"status": "new"}' hx-target="#msg-{{ m.id }}" hx-swap="outerHTML" class="quiet">Undo</button>
+    {% endif %}
+  </div>
+</li>

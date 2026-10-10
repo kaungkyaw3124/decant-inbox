@@ -24,6 +24,12 @@ class Settings(BaseSettings):
     tg_api_hash: SecretStr | None = None
     tg_session_path: Path = BASE_DIR / "secrets" / "telegram"  # Telethon adds ".session"
 
+    # Dashboard (Phase 4). Secret signs the session cookie; generate with
+    # python -c "import secrets; print(secrets.token_urlsafe(48))"
+    web_secret_key: SecretStr | None = None
+    web_cookie_secure: bool = True  # served over HTTPS by `tailscale serve`
+    timezone: str = "Asia/Yangon"
+
     @property
     def database_url(self) -> URL:
         return URL.create(

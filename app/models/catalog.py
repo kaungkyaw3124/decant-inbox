@@ -6,16 +6,21 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.core.base import Base, created_at_column
 
 ALIAS_SOURCES = ("seed", "learned")
+PRODUCT_SOURCES = ("seed", "manual")  # manual = added in the dashboard; the CSV seed leaves it alone
 
 
 class Product(Base):
     __tablename__ = "products"
-    __table_args__ = (UniqueConstraint("brand", "name"),)
+    __table_args__ = (
+        UniqueConstraint("brand", "name"),
+        CheckConstraint(f"source IN {PRODUCT_SOURCES}", name="source"),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     brand: Mapped[str] = mapped_column(String(255))
     name: Mapped[str] = mapped_column(String(255))
     active: Mapped[bool] = mapped_column(Boolean, server_default=true(), default=True)
+    source: Mapped[str] = mapped_column(String(16), server_default="seed", default="seed")
     created_at: Mapped[datetime] = created_at_column()
 
 

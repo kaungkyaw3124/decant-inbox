@@ -81,3 +81,20 @@ def test_reparse_dry_run_writes_nothing(db, tmp_path):
     add_message(1, "stw intensely 5ml ရှိလား")
     assert reparse_all(dry_run=True)["new"] == 1
     assert results(db) == []
+
+
+def test_worker_reparses_when_catalog_changes(db, tmp_path):
+    from app.parser.worker import reparse_if_catalog_changed
+
+    seed(write_csvs(tmp_path))
+    add_message(1, "aventus 10ml ရှိလား")
+    run_batch()
+    fp = reparse_if_catalog_changed(None)
+    assert reparse_if_catalog_changed(fp) == fp  # no change -> nothing to do
+    with db.begin() as c:  # alias added in the dashboard
+        c.execute(text(
+            "INSERT INTO product_aliases (product_id, alias_text, normalized_alias, source) "
+            "SELECT id, 'aventus', 'aventus', 'learned' FROM products WHERE brand = 'Dior'"
+        ))
+    assert reparse_if_catalog_changed(fp) != fp
+    assert [r[2] for r in results(db) if r[6]] == ["Sauvage Eau de Parfum"]

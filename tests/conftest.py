@@ -8,6 +8,7 @@ from app.core.config import get_settings
 
 TEST_DB = get_settings().db_name + "_test"
 os.environ["DB_NAME"] = TEST_DB  # must be set before app.core.db is imported
+os.environ["WEB_SECRET_KEY"] = "test-only-secret-key"
 get_settings.cache_clear()
 
 
@@ -37,4 +38,4 @@ def db(migrated_db):
 
     yield engine
     with engine.begin() as c:
-        c.execute(text("TRUNCATE products, product_aliases, customers, messages RESTART IDENTITY CASCADE"))
+        c.execute(text("TRUNCATE products, product_aliases, customers, messages, users RESTART IDENTITY CASCADE"))

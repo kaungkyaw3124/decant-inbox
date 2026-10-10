@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}{{ product.name }} · Decant Inbox{% endblock %}
+{% block content %}
+<p><a href="/products">← All products</a></p>
+<section class="card">
+  <h1>{{ product.name }}</h1>
+  <p class="muted">{{ product.brand }} · {{ "active" if product.active else "inactive" }} · {{ "from CSV" if product.source == "seed" else "added here" }}</p>
+  <p><a href="/?intent=all&status=all&product={{ product.id }}">See messages for this product →</a></p>
+  <form method="post" action="/products/{{ product.id }}/active">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    {% if product.active %}
+      <button name="active" value="0" class="quiet">Deactivate (stop matching it)</button>
+    {% else %}
+      <button name="active" value="1">Activate</button>
+    {% endif %}
+  </form>
+</section>
+
+<section class="card">
+  <h2>Aliases</h2>
+  <p class="muted small">Words customers use for this product. The parser re-checks all messages within a few seconds after a change; your manual corrections are kept.</p>
+  <ul class="aliases">
+  {% for a in aliases %}
+    <li>
+      <span>{{ a.alias_text }}</span>
+      {% if a.normalized_alias in shared %}<span class="badge warn" title="Also an alias of another product, so the parser cannot decide">shared</span>{% endif %}
+      {% if a.source == "learned" %}
+      <form method="post" action="/products/{{ product.id }}/aliases/{{ a.id }}/delete" class="inline">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <button class="link danger" aria-label="Delete alias {{ a.alias_text }}">delete</button>
+      </form>
+      {% else %}<span class="muted small">CSV</span>{% endif %}
+    </li>
+  {% else %}
+    <li class="muted">No aliases yet.</li>
+  {% endfor %}
+  </ul>
+  <form method="post" action="/products/{{ product.id }}/aliases" class="inline-form">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <input name="alias" placeholder="New alias, e.g. ဆော်ဗေ့" required aria-label="New alias">
+    <button class="primary">Add alias</button>
+  </form>
+</section>
+{% endblock %}

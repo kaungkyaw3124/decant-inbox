@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="htmx-config" content='{"includeIndicatorStyles": false}'>
+<title>{% block title %}Decant Inbox{% endblock %}</title>
+<link rel="stylesheet" href="/static/style.css">
+<script src="/static/htmx-2.0.4.min.js" defer></script>
+</head>
+<body hx-headers='{"X-CSRF-Token": "{{ csrf }}"}'>
+{% if request.session.get("user_id") %}
+<header class="top">
+  <a class="brand" href="/">Decant Inbox</a>
+  <nav>
+    <a href="/" {% if path == "/" %}aria-current="page"{% endif %}>Inbox</a>
+    <a href="/products" {% if path.startswith("/products") %}aria-current="page"{% endif %}>Products</a>
+    <form method="post" action="/logout" class="inline">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <button class="link">Log out</button>
+    </form>
+  </nav>
+</header>
+{% endif %}
+<main>
+{% if flash %}<p class="flash" role="status">{{ flash }}</p>{% endif %}
+{% block content %}{% endblock %}
+</main>
+</body>
+</html>
