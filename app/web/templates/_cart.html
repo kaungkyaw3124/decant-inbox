@@ -1,0 +1,90 @@
+{# Cart panel. Needs: c, order, cart (CartView|None), next_step, payment_problems, contact_phone, products, sizes, item_size, tab #}
+{% set status_label = {"cart": "🛒 cart", "confirmed": "✅ confirmed", "waiting_payment": "💳 waiting for payment",
+                       "photo_received": "📷 payment photo received"} %}
+<section class="card cart-pane {% if tab != 'cart' %}phone-hidden{% endif %}" id="cart">
+  <h2>Cart {% if order %}<span class="badge">{{ status_label.get(order.status, order.status) }}</span>{% endif %}</h2>
+
+  {% if next_step %}
+    <div class="next-step">
+      {% if next_step.wait %}<p class="muted">⏳ {{ next_step.label }}</p>
+      {% elif next_step.href %}<a class="button primary" href="{{ next_step.href }}">Next: {{ next_step.label }}</a>
+      {% else %}
+      <form method="post" action="{{ next_step.post }}" class="inline">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <button class="primary">Next: {{ next_step.label }}</button>
+      </form>
+      {% endif %}
+    </div>
+  {% endif %}
+
+  {% if cart and not cart.empty %}
+  <table class="cart-items">
+    <tbody>
+    {% for i, p in cart.lines %}
+      <tr {% if i.unit_price_mmk is none %}class="problem-row"{% endif %}>
+        <td>{{ p.name }} <span class="muted small">{{ item_size(i, p) }}</span></td>
+        <td class="num">{% if i.unit_price_mmk is none %}<span class="problem-text">no price</span>{% else %}{{ format_mmk(i.unit_price_mmk * i.quantity) }}{% endif %}</td>
+        <td>
+          <form method="post" action="/chats/{{ c.id }}/cart/items/{{ i.id }}/remove" class="inline">
+            <input type="hidden" name="csrf" value="{{ csrf }}">
+            <button class="link danger" aria-label="Remove {{ p.name }}">✕</button>
+          </form>
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+    <tfoot><tr><th>Total</th><th class="num">{{ format_mmk(cart.total) }} ကျပ်</th><th></th></tr></tfoot>
+  </table>
+  {% if cart.unpriced %}
+    <p class="problem-text small">No price for {{ cart.unpriced | join(", ") }}: add it in the price list, then
+      <form method="post" action="/chats/{{ c.id }}/cart/refresh-prices" class="inline"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="link">refresh prices</button></form>.</p>
+  {% endif %}
+  {% else %}
+  <p class="muted small">No open cart. Add items with the one-tap buttons on buy messages, or below.</p>
+  {% endif %}
+
+  <details {% if not cart or cart.empty %}open{% endif %}>
+    <summary class="small">Add an item</summary>
+    <form method="post" action="/chats/{{ c.id }}/cart/add" class="grid add-item">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <label>Product
+        <select name="product_id" required>
+          <option value="">—</option>
+          {% for p in products %}<option value="{{ p.id }}">{{ p.name }} · {{ p.brand }}</option>{% endfor %}
+        </select>
+      </label>
+      <label>Size
+        <select name="size" required>
+          {% for s in sizes %}<option value="{{ s }}">{{ s }}ml</option>{% endfor %}
+          <option value="full">full bottle</option>
+        </select>
+      </label>
+      <label>Qty <input name="quantity" type="number" min="1" max="20" value="1"></label>
+      <button>Add</button>
+    </form>
+  </details>
+
+  {% if order %}
+  <form method="post" action="/chats/{{ c.id }}/cart/contact" class="stack contact">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <label>Address <textarea name="address" rows="2" maxlength="500">{{ order.address or "" }}</textarea></label>
+    {% if not order.address and c.address %}
+      <p class="small">Last time: <b>{{ c.address }}</b></p>
+      <button formaction="/chats/{{ c.id }}/cart/same-address">Same address as last time</button>
+    {% endif %}
+    <label>Phone <input name="phone" value="{{ contact_phone }}" inputmode="tel" maxlength="20"></label>
+    <button>Save address & phone</button>
+  </form>
+
+  {% if order.status in ("confirmed", "waiting_payment") and payment_problems %}
+    <p class="small problem-text">Payment info not possible yet: {{ payment_problems | join(" ") }}</p>
+  {% endif %}
+
+  <div class="buttons cart-actions">
+    {% if order.status == "cart" and cart and not cart.empty %}
+    <form method="post" action="/chats/{{ c.id }}/cart/confirm" class="inline"><input type="hidden" name="csrf" value="{{ csrf }}"><button>Mark confirmed</button></form>
+    {% endif %}
+    <form method="post" action="/chats/{{ c.id }}/cart/cancel" class="inline"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="link danger">Cancel cart</button></form>
+  </div>
+  {% endif %}
+</section>

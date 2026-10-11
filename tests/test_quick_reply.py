@@ -13,7 +13,7 @@ from tests.test_web import client, log_in  # noqa: F401  (fixture)
 
 
 def button(html: str, message_id: int) -> str | None:
-    m = re.search(rf'action="/messages/{message_id}/quick-price".*?name="expect" value="([^"]+)"', html, re.S)
+    m = re.search(rf'action="/messages/{message_id}/quick".*?name="expect" value="([^"]+)"', html, re.S)
     return m.group(1) if m else None
 
 
@@ -36,9 +36,12 @@ def test_when_the_button_is_offered(client, db):  # noqa: F811
     log_in(client)
     setup_messages(db)
     page = client.get("/?intent=all").text
-    for ext in ("101", "102", "105", "1"):  # 105 and 1 are buy messages: offered too (until cart)
+    for ext in ("101", "102", "105"):  # 105 = buy: "Add to cart + send list"
         assert button(page, msg_id(db, ext)), ext
-    for ext in ("103", "104", "3"):  # 3ml has no price, out of stock, unknown "aventus"
+    assert "🛒 Add to cart + send list" in page
+    # 103: 3ml has no price, 104: out of stock, 3: unknown "aventus",
+    # 1: a buy message older than 24 h (cart actions only for recent messages)
+    for ext in ("103", "104", "3", "1"):
         assert button(page, msg_id(db, ext)) is None, ext
     assert 'title="မင်္ဂလာပါ။\nStronger With You Intensely 5ml က 18,000 ကျပ်ပါ။' in page  # full text on hover
     assert "မင်္ဂလာပါ။ · Stronger With You Intensely 5ml က 18,000" in page  # one-line preview
@@ -52,7 +55,7 @@ def test_one_tap_queue_undo_and_send(client, db):  # noqa: F811
     mid = msg_id(db, "101")
     expect = button(client.get("/").text, mid)
 
-    r = client.post(f"/messages/{mid}/quick-price", data={"csrf": token, "expect": expect},
+    r = client.post(f"/messages/{mid}/quick", data={"csrf": token, "expect": expect},
                     headers={"HX-Request": "true"})
     assert r.status_code == 200 and "Sending in" in r.text and "Undo" in r.text and 'hx-trigger="every 3s"' in r.text
     with db.connect() as c:
@@ -60,18 +63,18 @@ def test_one_tap_queue_undo_and_send(client, db):  # noqa: F811
             "SELECT status, send_after - created_at, previous_review_status, reply_kind FROM outbox")).one()
         assert (status, prev, kind) == ("queued", "new", "price") and timedelta(seconds=9) < send_after <= timedelta(seconds=11)
         assert c.execute(text("SELECT status FROM message_reviews WHERE message_id = :m"), {"m": mid}).scalar() == "done"
-        assert c.execute(text("SELECT action FROM audit_log")).scalar() == "outbox.quick_price"
+        assert c.execute(text("SELECT action FROM audit_log")).scalar() == "quick.price"
 
     # the listener does not send before the 10 s are over
     fake = FakeClient()
     assert asyncio.run(sender.send_next(fake, sender.RateLimiter())) is False and fake.sent == []
 
     # second tap (other tab) is refused: a reply was just queued
-    r = client.post(f"/messages/{mid}/quick-price", data={"csrf": token, "expect": expect})
+    r = client.post(f"/messages/{mid}/quick", data={"csrf": token, "expect": expect})
     assert scalar(db, "SELECT count(*) FROM outbox") == 1
 
-    oid = scalar(db, "SELECT id FROM outbox")
-    r = client.post(f"/outbox/{oid}/undo", data={"csrf": token}, headers={"HX-Request": "true"})
+    aid = scalar(db, "SELECT id FROM quick_actions")
+    r = client.post(f"/quick/{aid}/undo", data={"csrf": token}, headers={"HX-Request": "true"})
     assert "💬 Reply price" in r.text  # offered again
     with db.connect() as c:
         assert c.execute(text("SELECT status FROM outbox")).scalar() == "cancelled"
@@ -79,13 +82,15 @@ def test_one_tap_queue_undo_and_send(client, db):  # noqa: F811
 
     # tap again, let the 10 s pass, the listener sends it; undo is now too late
     expect = button(client.get("/").text, mid)
-    client.post(f"/messages/{mid}/quick-price", data={"csrf": token, "expect": expect})
+    client.post(f"/messages/{mid}/quick", data={"csrf": token, "expect": expect})
     with db.begin() as c:
         c.execute(text("UPDATE outbox SET send_after = now() - interval '1 second' WHERE status = 'queued'"))
     assert asyncio.run(sender.send_next(fake, sender.RateLimiter())) is True
     assert fake.sent == [(51, "မင်္ဂလာပါ။\nStronger With You Intensely 5ml က 18,000 ကျပ်ပါ။ မှာယူချင်ရင် ပြောပေးပါနော်။")]
     oid = scalar(db, "SELECT id FROM outbox WHERE status = 'sent'")
-    client.post(f"/outbox/{oid}/undo", data={"csrf": token})
+    aid = scalar(db, "SELECT id FROM quick_actions WHERE outbox_id = :o", o=oid)
+    r = client.post(f"/quick/{aid}/undo", data={"csrf": token})
+    assert "Too late to undo" in r.text
     assert scalar(db, "SELECT status FROM outbox WHERE id = :i", i=oid) == "sent"
     assert "✓ price reply sent" in client.get("/?status=all").text
 
@@ -96,7 +101,7 @@ def test_changed_price_is_refused(client, db):  # noqa: F811
     mid = msg_id(db, "101")
     expect = button(client.get("/").text, mid)
     run_import(xlsx(["Emporio Armani", "Stronger With You Intensely", 19000], header=["brand", "name", "5ml"]))
-    r = client.post(f"/messages/{mid}/quick-price", data={"csrf": token, "expect": expect})
+    r = client.post(f"/messages/{mid}/quick", data={"csrf": token, "expect": expect})
     assert "the reply changed" in r.text
     assert scalar(db, "SELECT count(*) FROM outbox") == 0
     assert scalar(db, "SELECT count(*) FROM message_reviews") == 0

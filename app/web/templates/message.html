@@ -17,11 +17,11 @@
   </div>
 </section>
 
-{% if quick or quick_outbox %}
+{% if quick or quick_action %}
 <section class="card quick-card">
   <h2>Quick reply</h2>
   {% with in_row = false %}{% include "_quick.html" %}{% endwith %}
-  {% if quick %}<p class="muted small">Sent {{ undo_seconds }} s after the tap; you can undo until then. Marks this message done.</p>{% endif %}
+  {% if quick %}<p class="muted small">{% if quick.text %}Sent {{ undo_seconds }} s after the tap; you can undo until then. {% endif %}Marks this message done.{% if quick.text and quick.note %} {{ quick.note }}{% endif %}</p>{% endif %}
 </section>
 {% endif %}
 

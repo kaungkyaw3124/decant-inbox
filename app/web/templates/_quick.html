@@ -1,34 +1,43 @@
-{# One-tap price reply. Needs: m, quick, quick_outbox, in_row (bool), optional quick_error. #}
+{# One-tap action. Needs: m, quick (Suggestion), quick_action ((QuickAction, Outbox|None)), in_row, optional quick_error. #}
 {% set target = 'hx-target="#msg-' ~ m.id ~ '" hx-swap="outerHTML"' if in_row else '' %}
+{% set kind_done = {"price": "price reply", "cart_add": "added + cart list", "cart_remove": "removed + cart list",
+                    "cart_list": "cart list", "confirm": "confirmed", "address": "address saved"} %}
 <div class="quick">
   {% if quick_error %}<p class="error small" role="alert">{{ quick_error }}</p>{% endif %}
-  {% set o = quick_outbox %}
-  {% if o %}
-    {% if o.status == "queued" and o.send_after > now() %}
-      <span class="small" data-send-at="{{ o.send_after.isoformat() }}" title="{{ o.text }}">Sending in {{ ((o.send_after - now()).total_seconds()) | round | int }} s</span>
-      <form method="post" action="/outbox/{{ o.id }}/undo" class="inline" data-undo
-            {% if in_row %}hx-post="/outbox/{{ o.id }}/undo" {{ target | safe }}{% endif %}>
+  {% if quick_action %}
+    {% set a, o = quick_action %}
+    {% set undo_form %}
+      <form method="post" action="/quick/{{ a.id }}/undo" class="inline" data-undo
+            {% if in_row %}hx-post="/quick/{{ a.id }}/undo" {{ target | safe }}{% endif %}>
         <input type="hidden" name="csrf" value="{{ csrf }}">
         <input type="hidden" name="back" value="{{ back | default('/') }}">
         <button class="primary">Undo</button>
       </form>
-    {% elif o.status in ("queued", "sending") %}
+    {% endset %}
+    {% if o and o.status == "queued" and o.send_after > now() %}
+      <span class="small" data-send-at="{{ o.send_after.isoformat() }}" title="{{ o.text }}">Sending in {{ ((o.send_after - now()).total_seconds()) | round | int }} s</span>
+      {{ undo_form }}
+    {% elif o and o.status in ("queued", "sending") %}
       <span class="small muted" title="{{ o.text }}">💬 sending…</span>
-    {% elif o.status == "sent" %}
-      <span class="small done-text" title="{{ o.text }}">✓ price reply sent</span>
-    {% elif o.status == "failed" %}
+    {% elif o and o.status == "sent" %}
+      <span class="small done-text" title="{{ o.text }}">✓ {{ kind_done[a.kind] }} sent</span>
+    {% elif o and o.status == "failed" %}
       <span class="small error">✖ not sent: {{ o.error }}</span>
       <a class="small" href="/chats/{{ m.customer_id }}#reply">open chat</a>
+    {% elif not o %}
+      <span class="small done-text">✓ {{ kind_done[a.kind] }}</span>
+      {% if (now() - a.created_at).total_seconds() < 60 %}{{ undo_form }}{% endif %}
     {% endif %}
   {% elif quick %}
-    <form method="post" action="/messages/{{ m.id }}/quick-price" class="inline"
-          {% if in_row %}hx-post="/messages/{{ m.id }}/quick-price" {{ target | safe }}{% endif %}>
+    <form method="post" action="/messages/{{ m.id }}/quick" class="inline"
+          {% if in_row %}hx-post="/messages/{{ m.id }}/quick" {{ target | safe }}{% endif %}>
       <input type="hidden" name="csrf" value="{{ csrf }}">
       <input type="hidden" name="expect" value="{{ quick.fingerprint }}">
       <input type="hidden" name="back" value="{{ back | default('/') }}">
-      <button class="primary" title="{{ quick.text }}">💬 Reply price</button>
+      <button class="primary" title="{{ quick.tooltip }}">{{ quick.label }}</button>
     </form>
-    <p class="quick-preview small muted" title="{{ quick.text }}">{{ quick.preview }}</p>
-    {% if not in_row %}<a class="small" href="{{ quick.edit_url }}">Edit before send</a>{% endif %}
+    <p class="quick-preview small muted" title="{{ quick.tooltip }}">{{ quick.preview }}</p>
+    {% if quick.text and quick.note %}<p class="quick-preview small">{{ quick.note }}</p>{% endif %}
+    {% if not in_row and quick.edit_url %}<a class="small" href="{{ quick.edit_url }}">Edit before send</a>{% endif %}
   {% endif %}
 </div>

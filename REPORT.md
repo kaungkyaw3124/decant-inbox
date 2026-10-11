@@ -427,3 +427,47 @@ Short entries from the VPS Claude Code session, newest last.
   changed=9, run changed=9, second dry run unchanged=9. Live now: "good girl 10 ml ပေးပါ" ->
   buy 1.0; the 3-item "hawas ice" message -> buy, 3 items, needs review (unknown product).
   /healthz all ok.
+
+## 2026-10-12 — v2 Step 4: cart, one-tap cart actions, address/phone, payment info
+- DB (migration a8830ff00f3e, applied live after backup, round-trip tested): `orders`
+  (status cart/confirmed/waiting_payment/photo_received/paid/delivered/cancelled/abandoned,
+  order_no for Step 5, total, address, phone, list_sent_at, confirmed_at,
+  payment_info_sent_at; ONE open cart per customer, enforced by a unique index),
+  `order_items` (price at the time it was added, kept when removed: removed_at),
+  `quick_actions` (every one-tap action with exact undo data). outbox.reply_kind +
+  cart / ask_address / payment_info. The earlier one-tap price reply was carried over.
+- One-tap actions (app/orders/actions.py), one per message, with 10 s Undo when a reply is
+  sent (60 s Undo for actions that send nothing):
+  ask_price/ask_stock -> 💬 Reply price · buy -> 🛒 Add to cart + send list ·
+  remove -> ➖ Remove + send list · done -> 💬 Send cart list ·
+  confirm -> ✅ Confirm cart (+ ask address & phone when unknown; when the customer has a
+  saved address and phone it only confirms, and the cart offers "Same address as last time") ·
+  address -> 📍 Save address (+ 💳 send payment info when everything is ready).
+  Only offered when certain: every item known (not guessed), priced, in stock; message in
+  the last 24 h and newer than the customer's last one-tap action; no reply of theirs still
+  waiting in the outbox. The button preview is made by running the action in a savepoint
+  and rolling it back, so the preview IS what the tap does; the tap is refused if anything
+  changed. Undo reverses items, cart status, address/phone (order and customer) and the
+  message status; cancelling the queued reply in the chat does the same.
+- Cart panel in the chat (phone: tabs Chat / Cart; laptop: beside the thread): items with
+  ✕, total, red "no price" (+ "refresh prices"), add item (product, size or full, qty;
+  100ml of a 100ml bottle = full), address + phone (saved on the order AND the customer),
+  "Same address as last time", Mark confirmed, Cancel cart, and one highlighted NEXT step:
+  Send cart list -> Customer agreed: mark confirmed -> Same address / Ask for address &
+  phone -> Send payment info -> Waiting for the payment screenshot.
+  Reply tabs: Custom, Price, Cart list, Ask address, Payment info (editable as always).
+- Payment info only when: cart confirmed, every item priced, address + phone present, at
+  least one active payment method (otherwise red reasons, no Send). Text = item lines +
+  total + active methods + footer; no Order ID, no delivery fee. Sending it -> waiting_payment.
+  Changing items of a confirmed/waiting cart -> back to "cart" (needs a new confirmation).
+- Idle carts (cart/confirmed, untouched 3 days) -> abandoned (parser worker, every 10 min).
+- Chats list shows the cart status badge.
+- Data fix (migration 70a237588133): 10 outgoing messages imported in Step 2 had been parsed
+  by the then-running old worker; their results are no longer current (kept as history).
+  Nothing read them (every reader filters incoming), but now the data is clean.
+- Verified: pytest 190 passed, 1 skipped (4 new end-to-end tests: buy -> undo -> buy ->
+  remove -> confirm+ask -> address+payment info -> undo -> again, with exact texts sent through
+  the fake Telegram client; same address next time + payment info via editor; payment info
+  blockers, full-bottle rule, re-confirm after change, cancel; abandoning idle carts).
+  Live: services restarted (tunnel untouched), /healthz all ok. No live message currently
+  shows a one-tap button (nothing would go to a real customer by accident).

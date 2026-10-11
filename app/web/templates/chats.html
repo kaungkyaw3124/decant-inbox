@@ -17,6 +17,8 @@
       <div class="badges">
         {% if m.direction == "in" %}<span class="badge warn">waiting for reply</span>{% endif %}
         {% if c.ignored %}<span class="badge">ignored</span>{% endif %}
+        {% set st = carts.get(c.id) %}
+        {% if st %}<span class="badge">{{ {"cart": "🛒 cart", "confirmed": "✅ confirmed", "waiting_payment": "💳 waiting payment", "photo_received": "📷 payment photo"}[st] }}</span>{% endif %}
       </div>
     </a>
   </li>

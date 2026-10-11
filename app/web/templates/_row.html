@@ -1,4 +1,4 @@
-{% set waiting = quick_outbox and quick_outbox.status in ("queued", "sending") %}
+{% set waiting = quick_action and quick_action[1] and quick_action[1].status in ("queued", "sending") %}
 <li class="row status-{{ status }}" id="msg-{{ m.id }}"{% if waiting %} hx-get="/messages/{{ m.id }}/row" hx-trigger="every 3s" hx-swap="outerHTML"{% endif %}>
   <a class="row-main" href="/messages/{{ m.id }}?back={{ back | default('/') | urlencode }}">
     <div class="meta">
@@ -9,7 +9,7 @@
     <div class="badges">{% include "_badges.html" %}</div>
   </a>
   <div class="row-actions">
-    {% if quick or quick_outbox or quick_error %}{% with in_row = true %}{% include "_quick.html" %}{% endwith %}{% endif %}
+    {% if quick or quick_action or quick_error %}{% with in_row = true %}{% include "_quick.html" %}{% endwith %}{% endif %}
     {% if status == "new" %}
       <button hx-post="/messages/{{ m.id }}/review" hx-vals='{"status": "done"}' hx-target="#msg-{{ m.id }}" hx-swap="outerHTML">Done</button>
       <button hx-post="/messages/{{ m.id }}/review" hx-vals='{"status": "ignored"}' hx-target="#msg-{{ m.id }}" hx-swap="outerHTML" class="quiet">Ignore</button>

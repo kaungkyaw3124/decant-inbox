@@ -4,6 +4,7 @@ The dashboard never talks to Telegram: "Send" only adds an outbox row, and the l
 (the one process with the Telegram session) sends it. Photos are downloaded by the
 listener when an admin taps "Show photo".
 """
+import re
 import secrets
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -14,14 +15,18 @@ from sqlalchemy import exists, func, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
-from app.models import AuditLog, Customer, MediaDownload, Message, Outbox, Product, User
+from app.models import (
+    AuditLog, Customer, MediaDownload, Message, Order, OrderItem, Outbox, Product, QuickAction, User,
+)
+from app.models.orders import OPEN_STATUSES
 from app.models.outbox import MAX_TEXT, MEDIA_DIR
+from app.orders import actions, cart
 from app.pricing.prices import current_prices
 from app.replies import compose
 from app.replies import templates as replies
 from app.web.auth import current_user, verify_csrf
 from app.web.deps import get_db, templates
-from app.web.inbox import flash, upsert_review
+from app.web.inbox import flash
 
 router = APIRouter(dependencies=[Depends(current_user), Depends(verify_csrf)])
 THREAD_SIZE = 100
@@ -58,8 +63,10 @@ def chat_list(request: Request, show_ignored: str = "", page: int = 1, db: Sessi
     if not show_ignored:
         query = query.where(Customer.ignored.is_(False))
     rows = db.execute(query.limit(LIST_SIZE + 1).offset((page - 1) * LIST_SIZE)).all()
+    carts = dict(db.execute(select(Order.customer_id, Order.status).where(
+        Order.status.in_(OPEN_STATUSES), Order.customer_id.in_([c.id for c, _ in rows]))).all())
     return templates.TemplateResponse(request, "chats.html", {
-        "rows": rows[:LIST_SIZE], "show_ignored": bool(show_ignored), "page": page,
+        "rows": rows[:LIST_SIZE], "show_ignored": bool(show_ignored), "page": page, "carts": carts,
         "more": len(rows) > LIST_SIZE,
     })
 
@@ -111,17 +118,64 @@ def chat(request: Request, customer_id: int, db: Session = Depends(get_db)):
             if not items:
                 result.problems.append("Choose at least one product.")
         result.text = compose.with_greeting(result.text, texts, greet)
+    elif mode in ("cart", "ask_address", "payment_info"):
+        order = cart.open_cart(db, customer_id)
+        if order is None or cart.view(db, order).empty:
+            result.problems.append("The cart is empty.")
+        elif mode == "cart":
+            result.text = cart.cart_text(db, order, texts)
+        elif mode == "ask_address":
+            result.text = texts["ask_address"]
+        else:
+            result.problems = cart.payment_problems(db, order, customer)
+            result.text = "" if result.problems else cart.payment_text(db, order, texts)
+        result.text = compose.with_greeting(result.text, texts, greet)
     else:
         mode = "custom"
         result.text = texts["greeting"] + "\n" if greet else ""
     products = db.scalars(select(Product).where(Product.active).order_by(Product.brand, Product.name)).all()
     sizes = sorted({p.size_ml for ps in current_prices(db).values() for p in ps if p.size_ml})
     return templates.TemplateResponse(request, "chat.html", {
-        **thread_context(db, customer), "mode": mode, "result": result, "greet": greet,
+        **thread_context(db, customer), **cart_context(db, customer), "mode": mode, "result": result,
+        "greet": greet, "tab": request.query_params.get("tab", "chat"),
         "items": items + [compose.PriceItem(0, "all")] * (compose.MAX_PRICE_ITEMS - len(items)),
         "products": products, "sizes": sizes, "can_send": has_written(db, customer_id),
         "key": secrets.token_urlsafe(16), "tg_link": telegram_link(customer), "max_text": MAX_TEXT,
     })
+
+
+def next_step(db: Session, customer: Customer, order, view) -> dict | None:
+    """The one highlighted button for this conversation."""
+    if order is None or view.empty:
+        return None
+    url = f"/chats/{customer.id}"
+    if order.status == "cart":
+        if order.list_sent_at is None or order.updated_at > order.list_sent_at:
+            return {"label": "Send cart list", "href": f"{url}?compose=cart#reply"}
+        return {"label": "Customer agreed: mark confirmed", "post": f"{url}/cart/confirm"}
+    if order.status == "confirmed":
+        missing = cart.missing_contact(order, customer)
+        if "address" in missing and customer.address and "phone" not in missing:
+            return {"label": "Use same address as last time", "post": f"{url}/cart/same-address"}
+        if missing:
+            return {"label": "Ask for address & phone", "href": f"{url}?compose=ask_address#reply"}
+        if not cart.payment_problems(db, order, customer):
+            return {"label": "Send payment info", "href": f"{url}?compose=payment_info#reply"}
+        return None
+    if order.status == "waiting_payment":
+        return {"label": "Waiting for the payment screenshot", "wait": True}
+    return None
+
+
+def cart_context(db: Session, customer: Customer) -> dict:
+    order = cart.open_cart(db, customer.id)
+    view = cart.view(db, order) if order else None
+    return {
+        "order": order, "cart": view, "next_step": next_step(db, customer, order, view),
+        "payment_problems": cart.payment_problems(db, order, customer) if order else [],
+        "contact_phone": (order.phone if order and order.phone else customer.phone) or "",
+        "item_size": cart.item_size,
+    }
 
 
 @router.get("/chats/{customer_id}/thread", response_class=HTMLResponse)
@@ -134,13 +188,20 @@ def send(request: Request, customer_id: int, text: str = Form(""), reply_kind: s
          key: str = Form(...), db: Session = Depends(get_db), user: User = Depends(current_user)):
     get_customer(db, customer_id)
     text = text.replace("\r\n", "\n").strip()
-    if reply_kind not in ("custom", "price"):
+    if reply_kind not in ("custom", "price", "cart", "ask_address", "payment_info"):
         raise HTTPException(400, "Unknown reply kind")
     if not has_written(db, customer_id):
         raise HTTPException(400, "This customer has never messaged us; we never message first.")
     if not text or len(text) > MAX_TEXT:
         flash(request, f"Not sent: the message must be 1-{MAX_TEXT} characters.")
         return RedirectResponse(f"/chats/{customer_id}?compose={reply_kind}", status_code=303)
+    customer = db.get(Customer, customer_id)
+    order = cart.open_cart(db, customer_id, lock=True) if reply_kind in ("cart", "payment_info") else None
+    if reply_kind == "payment_info":
+        problems = cart.payment_problems(db, order, customer) if order else ["The cart is empty."]
+        if problems:
+            flash(request, "Not sent: " + " ".join(problems))
+            return RedirectResponse(f"/chats/{customer_id}?compose=payment_info#reply", status_code=303)
     outbox_id = db.scalar(insert(Outbox).values(
         customer_id=customer_id, text=text, reply_kind=reply_kind, status="queued",
         idempotency_key=key[:64], created_by=user.id,
@@ -148,6 +209,10 @@ def send(request: Request, customer_id: int, text: str = Form(""), reply_kind: s
     if outbox_id is None:
         flash(request, "Already queued (sent twice by mistake?).")
     else:
+        if reply_kind == "cart" and order is not None:
+            order.list_sent_at = datetime.now(UTC)
+        elif reply_kind == "payment_info":
+            cart.payment_info_sent(db, order, customer)
         db.add(AuditLog(user_id=user.id, action="outbox.queue", details={
             "outbox_id": outbox_id, "customer_id": customer_id, "reply_kind": reply_kind, "chars": len(text)}))
         db.commit()
@@ -188,9 +253,14 @@ def cancel(request: Request, customer_id: int, outbox_id: int, db: Session = Dep
         if row.status != "queued":
             flash(request, "Too late: it is being sent.")
             return RedirectResponse(f"/chats/{customer_id}#bottom", status_code=303)
+    action = db.scalar(select(QuickAction).where(QuickAction.outbox_id == outbox_id, QuickAction.undone_at.is_(None)))
+    if action is not None and row.status == "queued":  # a one-tap reply: same as Undo (cart too)
+        actions.undo(db, action, user)
     row.status = "cancelled"
-    if row.source_message_id:  # a one-tap reply: same as Undo, restore the message status
-        upsert_review(db, row.source_message_id, row.previous_review_status or "new", None, user)
+    if action is None and row.reply_kind == "payment_info":  # it never went out: still "confirmed"
+        order = cart.open_cart(db, customer_id)
+        if order is not None and order.status == "waiting_payment":
+            order.status, order.payment_info_sent_at = "confirmed", None
     db.add(AuditLog(user_id=user.id, action="outbox.cancel", details={"outbox_id": outbox_id}))
     db.commit()
     flash(request, "Cancelled.")
@@ -222,3 +292,114 @@ def media(message_id: int, db: Session = Depends(get_db)):
     if media_type is None or not path.is_file():
         raise HTTPException(404, "Photo file missing")
     return FileResponse(path, media_type=media_type)
+
+
+# ---------- cart panel (admin taps; nothing is sent from here) ----------
+
+def _cart_redirect(customer_id: int) -> RedirectResponse:
+    return RedirectResponse(f"/chats/{customer_id}?tab=cart#cart", status_code=303)
+
+
+def _log(db: Session, user: User, action: str, **details) -> None:
+    db.add(AuditLog(user_id=user.id, action=action, details=details))
+
+
+@router.post("/chats/{customer_id}/cart/add")
+def cart_add(request: Request, customer_id: int, product_id: int = Form(...), size: str = Form(...),
+             quantity: int = Form(1), db: Session = Depends(get_db), user: User = Depends(current_user)):
+    get_customer(db, customer_id)
+    if db.get(Product, product_id) is None or not (size == "full" or (size.isdigit() and 0 < int(size) < 1000)):
+        raise HTTPException(400, "Choose a product and a size")
+    order = cart.open_cart(db, customer_id, create=True, lock=True)
+    wanted = cart.WantedItem(product_id, None if size == "full" else int(size), size == "full",
+                             max(1, min(quantity, cart.MAX_QTY)))
+    cart.add_items(db, order, [wanted], None)
+    _log(db, user, "cart.add", order_id=order.id, product_id=product_id, size=size, quantity=wanted.quantity)
+    db.commit()
+    unpriced = cart.view(db, order).unpriced
+    flash(request, "Added." + (f" No price yet for {', '.join(unpriced)}." if unpriced else ""))
+    return _cart_redirect(customer_id)
+
+
+@router.post("/chats/{customer_id}/cart/items/{item_id}/remove")
+def cart_remove(request: Request, customer_id: int, item_id: int, db: Session = Depends(get_db),
+                user: User = Depends(current_user)):
+    order = cart.open_cart(db, customer_id, lock=True)
+    item = db.get(OrderItem, item_id)
+    if order is None or item is None or item.order_id != order.id:
+        raise HTTPException(404, "Not in the cart")
+    cart.remove_item_ids(db, order, [item_id])
+    _log(db, user, "cart.remove", order_id=order.id, item_id=item_id)
+    db.commit()
+    flash(request, "Removed.")
+    return _cart_redirect(customer_id)
+
+
+def _open_order(db: Session, customer_id: int):
+    order = cart.open_cart(db, customer_id, lock=True)
+    if order is None:
+        raise HTTPException(404, "No open cart")
+    return order
+
+
+@router.post("/chats/{customer_id}/cart/confirm")
+def cart_confirm(request: Request, customer_id: int, db: Session = Depends(get_db),
+                 user: User = Depends(current_user)):
+    order = _open_order(db, customer_id)
+    if cart.view(db, order).empty or order.status != "cart":
+        raise HTTPException(400, "Nothing to confirm")
+    cart.confirm(db, order)
+    _log(db, user, "cart.confirm", order_id=order.id)
+    db.commit()
+    flash(request, "Marked confirmed.")
+    return _cart_redirect(customer_id)
+
+
+@router.post("/chats/{customer_id}/cart/contact")
+def cart_contact(request: Request, customer_id: int, address: str = Form(""), phone: str = Form(""),
+                 db: Session = Depends(get_db), user: User = Depends(current_user)):
+    customer = get_customer(db, customer_id)
+    order = _open_order(db, customer_id)
+    address = address.replace("\r\n", "\n").strip()[:500] or None
+    phone = re.sub(r"[^\d+]", "", phone)[:20] or None
+    cart.set_contact(db, order, customer, address, phone)
+    _log(db, user, "cart.contact", order_id=order.id)
+    db.commit()
+    flash(request, "Address and phone saved (also for next time).")
+    return _cart_redirect(customer_id)
+
+
+@router.post("/chats/{customer_id}/cart/same-address")
+def cart_same_address(request: Request, customer_id: int, db: Session = Depends(get_db),
+                      user: User = Depends(current_user)):
+    customer = get_customer(db, customer_id)
+    order = _open_order(db, customer_id)
+    if not customer.address:
+        raise HTTPException(400, "No saved address")
+    cart.set_contact(db, order, customer, customer.address, None)
+    _log(db, user, "cart.same_address", order_id=order.id)
+    db.commit()
+    flash(request, "Using the same address as last time.")
+    return _cart_redirect(customer_id)
+
+
+@router.post("/chats/{customer_id}/cart/refresh-prices")
+def cart_refresh(request: Request, customer_id: int, db: Session = Depends(get_db),
+                 user: User = Depends(current_user)):
+    order = _open_order(db, customer_id)
+    filled = cart.refill_prices(db, order)
+    _log(db, user, "cart.refresh_prices", order_id=order.id, filled=filled)
+    db.commit()
+    flash(request, f"{filled} price(s) filled in." if filled else "No new prices found.")
+    return _cart_redirect(customer_id)
+
+
+@router.post("/chats/{customer_id}/cart/cancel")
+def cart_cancel(request: Request, customer_id: int, db: Session = Depends(get_db),
+                user: User = Depends(current_user)):
+    order = _open_order(db, customer_id)
+    cart.cancel(db, order)
+    _log(db, user, "cart.cancel", order_id=order.id)
+    db.commit()
+    flash(request, "Cart cancelled.")
+    return _cart_redirect(customer_id)

@@ -131,3 +131,17 @@ main.wide { max-width: 1200px; }
 .quick-preview { margin: 0; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .quick-card .quick-preview { max-width: 100%; white-space: normal; }
 .done-text { color: var(--done); }
+.side { display: grid; gap: 14px; align-content: start; }
+.phone-tabs { display: none; }
+@media (max-width: 899px) {
+  .phone-tabs { display: flex; }
+  .phone-hidden { display: none; }
+}
+@media (min-width: 900px) { .reply-pane { position: static; } .side { position: sticky; top: 64px; } }
+.next-step { margin: 0 0 12px; }
+.cart-items td, .cart-items th { padding: 6px 4px; }
+.cart-items tfoot th { border-bottom: 0; }
+tr.problem-row td { background: var(--bad-bg); }
+.add-item { grid-template-columns: 2fr 1fr 70px auto; align-items: end; margin-top: 8px; }
+.contact { margin-top: 12px; }
+.cart-actions { margin-top: 10px; justify-content: space-between; }

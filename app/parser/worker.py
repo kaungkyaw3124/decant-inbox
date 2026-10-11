@@ -15,6 +15,7 @@ from sqlalchemy.exc import IntegrityError
 from app.core.db import SessionLocal
 from app.core.heartbeat import beat
 from app.models import Message
+from app.orders import cart
 from app.parser.rules import PARSER_VERSION
 from app.parser.service import load_aliases, load_full_sizes, parse_message, unparsed_message_ids
 from scripts.reparse_all import reparse_all
@@ -22,6 +23,7 @@ from scripts.reparse_all import reparse_all
 log = logging.getLogger("parser")
 BATCH = 200
 HEARTBEAT_SECONDS = 30
+HOUSEKEEPING_SECONDS = 600
 _failed: set[int] = set()  # retried after a restart, so one bad row cannot block the queue
 
 
@@ -62,6 +64,14 @@ def reparse_if_catalog_changed(last: int | None) -> int:
     return current
 
 
+def housekeeping() -> None:
+    """Carts idle for 3 days -> abandoned (DB-only chore; this worker runs 24/7 anyway)."""
+    with SessionLocal.begin() as session:
+        abandoned = cart.abandon_idle(session)
+    if abandoned:
+        log.info("abandoned %d idle carts", abandoned)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--once", action="store_true", help="parse what is pending, then exit")
@@ -70,8 +80,11 @@ def main() -> None:
 
     log.info("parser worker started (%s)", PARSER_VERSION)
     fingerprint = None
-    last_beat = 0.0
+    last_beat = last_chores = 0.0
     while True:
+        if time.monotonic() - last_chores >= HOUSEKEEPING_SECONDS:
+            housekeeping()
+            last_chores = time.monotonic()
         if time.monotonic() - last_beat >= HEARTBEAT_SECONDS:
             beat("parser", PARSER_VERSION)
             last_beat = time.monotonic()

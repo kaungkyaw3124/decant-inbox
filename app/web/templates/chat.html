@@ -11,15 +11,28 @@
   <a class="button" href="{{ tg_link }}">Open in Telegram</a>
 </header>
 
+<nav class="tabs phone-tabs" aria-label="View">
+  <a href="/chats/{{ c.id }}" {% if tab != "cart" %}aria-current="page"{% endif %}>Chat</a>
+  <a href="/chats/{{ c.id }}?tab=cart#cart" {% if tab == "cart" %}aria-current="page"{% endif %}>Cart{% if cart and not cart.empty %} ({{ cart.lines|length }}){% endif %}</a>
+</nav>
+
 <div class="chat-layout">
-  <section class="card chat-pane">
+  <section class="card chat-pane {% if tab == 'cart' %}phone-hidden{% endif %}">
     {% include "_thread.html" %}
   </section>
 
-  <section class="card reply-pane" id="reply">
+  <div class="side">
+  {% include "_cart.html" %}
+
+  <section class="card reply-pane {% if tab == 'cart' %}phone-hidden{% endif %}" id="reply">
     <nav class="tabs" aria-label="Reply type">
       <a href="/chats/{{ c.id }}?compose=custom#reply" {% if mode == "custom" %}aria-current="page"{% endif %}>Custom</a>
       <a href="/chats/{{ c.id }}?compose=price#reply" {% if mode == "price" %}aria-current="page"{% endif %}>Price</a>
+      {% if cart and not cart.empty %}
+      <a href="/chats/{{ c.id }}?compose=cart#reply" {% if mode == "cart" %}aria-current="page"{% endif %}>Cart list</a>
+      <a href="/chats/{{ c.id }}?compose=ask_address#reply" {% if mode == "ask_address" %}aria-current="page"{% endif %}>Ask address</a>
+      <a href="/chats/{{ c.id }}?compose=payment_info#reply" {% if mode == "payment_info" %}aria-current="page"{% endif %}>Payment info</a>
+      {% endif %}
     </nav>
 
     {% if not can_send %}
@@ -55,7 +68,7 @@
     {% for p in result.problems %}<p class="flash bad" role="alert">{{ p }}</p>{% endfor %}
     {% for n in result.notes %}<p class="flash warnbox">{{ n }}</p>{% endfor %}
 
-    {% if mode == "custom" or (result.text and not result.problems) %}
+    {% if mode == "custom" or (result.text.strip() and not result.problems) %}
     <form method="post" action="/chats/{{ c.id }}/send" class="stack">
       <input type="hidden" name="csrf" value="{{ csrf }}">
       <input type="hidden" name="key" value="{{ key }}">
@@ -69,5 +82,6 @@
     {% endif %}
     {% endif %}
   </section>
+  </div>
 </div>
 {% endblock %}

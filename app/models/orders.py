@@ -1,0 +1,78 @@
+from datetime import datetime
+from typing import Any
+
+from sqlalchemy import (
+    Boolean, CheckConstraint, DateTime, ForeignKey, Index, Integer, String, Text, false, func, text,
+)
+from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.orm import Mapped, mapped_column
+
+from app.core.base import Base, created_at_column
+
+# cart -> confirmed -> waiting_payment -> photo_received -> paid -> delivered (docs/SPEC-orders.md)
+ORDER_STATUSES = ("cart", "confirmed", "waiting_payment", "photo_received", "paid", "delivered",
+                  "cancelled", "abandoned")
+OPEN_STATUSES = ("cart", "confirmed", "waiting_payment", "photo_received")
+QUICK_KINDS = ("price", "cart_add", "cart_remove", "cart_list", "confirm", "address")
+
+
+class Order(Base):
+    """A cart until paid; the Order ID (order_no) is given when a payment is approved (Step 5)."""
+
+    __tablename__ = "orders"
+    __table_args__ = (
+        CheckConstraint(f"status IN {ORDER_STATUSES}", name="status"),
+        # one open cart per customer
+        Index("uq_orders_open_per_customer", "customer_id", unique=True,
+              postgresql_where=text(f"status IN {OPEN_STATUSES}")),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    customer_id: Mapped[int] = mapped_column(ForeignKey("customers.id"), index=True)
+    status: Mapped[str] = mapped_column(String(20), server_default="cart", default="cart")
+    order_no: Mapped[int | None] = mapped_column(Integer, unique=True)
+    total_mmk: Mapped[int] = mapped_column(Integer, server_default="0", default=0)  # priced items only
+    address: Mapped[str | None] = mapped_column(Text)  # for this order (copied to the customer)
+    phone: Mapped[str | None] = mapped_column(String(20))
+    list_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))  # last cart list reply
+    confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    payment_info_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))  # cancelled/abandoned
+    created_at: Mapped[datetime] = created_at_column()
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(),
+                                                 default=func.now())  # last change: idle carts expire
+
+
+class OrderItem(Base):
+    """Removed items are kept (removed_at) so the history of the cart stays visible."""
+
+    __tablename__ = "order_items"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    order_id: Mapped[int] = mapped_column(ForeignKey("orders.id"), index=True)
+    product_id: Mapped[int] = mapped_column(ForeignKey("products.id"))
+    size_ml: Mapped[int | None] = mapped_column(Integer)  # None with is_full_bottle
+    is_full_bottle: Mapped[bool] = mapped_column(Boolean, server_default=false(), default=False)
+    quantity: Mapped[int] = mapped_column(Integer, server_default="1", default=1)
+    unit_price_mmk: Mapped[int | None] = mapped_column(Integer)  # price when added; None = no price yet
+    source_message_id: Mapped[int | None] = mapped_column(ForeignKey("messages.id"))
+    created_at: Mapped[datetime] = created_at_column()
+    removed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class QuickAction(Base):
+    """A one-tap action on a customer message, with what is needed to undo it exactly."""
+
+    __tablename__ = "quick_actions"
+    __table_args__ = (CheckConstraint(f"kind IN {QUICK_KINDS}", name="kind"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    message_id: Mapped[int] = mapped_column(ForeignKey("messages.id"), index=True)
+    customer_id: Mapped[int] = mapped_column(ForeignKey("customers.id"))
+    kind: Mapped[str] = mapped_column(String(20))
+    order_id: Mapped[int | None] = mapped_column(ForeignKey("orders.id"))
+    outbox_id: Mapped[int | None] = mapped_column(ForeignKey("outbox.id"))
+    undo: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
+    created_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+    created_at: Mapped[datetime] = created_at_column()
+    undone_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

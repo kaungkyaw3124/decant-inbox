@@ -7,7 +7,7 @@ from app.core.base import Base, created_at_column
 from app.core.config import BASE_DIR
 
 OUTBOX_STATUSES = ("queued", "sending", "sent", "failed", "cancelled")
-REPLY_KINDS = ("custom", "price")
+REPLY_KINDS = ("custom", "price", "cart", "ask_address", "payment_info")
 DOWNLOAD_STATUSES = ("queued", "done", "failed")
 UNDO_SECONDS = 10
 MAX_TEXT = 4096  # Telegram's limit for one message
