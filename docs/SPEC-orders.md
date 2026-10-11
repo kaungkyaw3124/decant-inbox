@@ -25,6 +25,22 @@ bottom, one at a time, report in REPORT.md after each.
 - Photos: store metadata only (message id, grouped_id, file size, mime). Download a photo
   ONLY when an admin opens it, into secrets/media/ (dir 700, git-ignored). Never auto-download.
 
+## One-tap quick replies (owner request 2026-10-12)
+- On the message page AND on each inbox row: when the parse is ready for a quick reply
+  (ask_price/ask_stock, product known, size known or "all sizes", every price present),
+  show a button "💬 Reply price" that queues the price reply in ONE tap (no editor).
+  The button shows the exact text on hover/long-press (title/tooltip) and a one-line
+  preview under it.
+- Safety: one-tap replies wait 10 s in the outbox with an "Undo" toast/button; after
+  10 s the listener sends it. (Principle 2 "preview before send" is relaxed only for
+  these one-tap template replies; the editor stays available via "Edit before send".)
+- Not shown (fall back to the chat editor) when: product/size unknown, a price is
+  missing, confidence below NEEDS_REVIEW_BELOW, or an outbox reply to that customer is
+  already queued in the last 60 s.
+- After queueing, the message is marked "done" automatically (undo restores status).
+- The same one-tap pattern will be used for later quick replies (out of stock, ask for
+  address, payment info) when their data is complete.
+
 ## Price list (Excel import/export)
 One row per perfume:
 
