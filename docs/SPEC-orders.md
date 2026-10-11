@@ -41,6 +41,16 @@ bottom, one at a time, report in REPORT.md after each.
 - The same one-tap pattern will be used for later quick replies (out of stock, ask for
   address, payment info) when their data is complete.
 
+## Parser fixes found in live test (2026-10-12) — do in Step 3
+- Buy keywords must allow the polite particle in the middle: ယူ(ပါ)?မယ်, ဝယ်(ပါ)?မယ်,
+  မှာ(ပါ)?မယ်, ယူ(ပါ)?ရစေ; also `ပေးပါ` / `ပေးပါနော်` = buy WHEN a product or size is present
+  (but `ပို့ပေးပါ` = address). Live examples that failed:
+  "good girl 10 ml ပေးပါ" -> buy, Good Girl, 10ml (was unknown)
+  "Good girl 5ml, swy 10ml, hawas ice 10ml ယူပါမယ်" -> buy, 3 items, 3rd unknown product
+  "hawas ice" (was unknown, 1 item).
+- Until the cart (Step 4) exists, the one-tap "Reply price" button is ALSO offered for
+  intent=buy (it sends the price/list so the customer gets an answer).
+
 ## Price list (Excel import/export)
 One row per perfume:
 
