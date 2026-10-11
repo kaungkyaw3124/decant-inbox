@@ -310,7 +310,7 @@ def _describe(row: SheetRow, product: Product | None, current: dict[int | None, 
                          else f"{label}: {_money(old_price)} → {_money(new_price)}")
     if row.in_stock is not None and old_stock and old_stock != {row.in_stock}:
         lines.append(f"in stock: {'yes' if True in old_stock else 'no'} → {'yes' if row.in_stock else 'no'}")
-    elif row.in_stock is False and product is None:
+    elif row.in_stock is False and not old_stock:
         lines.append("in stock: no")
     return lines
 
