@@ -17,6 +17,44 @@
 </section>
 
 <section class="card">
+  <h2>Prices</h2>
+  {% if prices %}
+  <table class="prices">
+    <thead><tr><th>Size</th><th>Price (ကျပ်)</th><th>Stock</th><th>Since</th></tr></thead>
+    <tbody>
+    {% for p in prices %}
+      <tr {% if not p.in_stock %}class="inactive"{% endif %}>
+        <td>{{ size_label(p.size_ml, product.full_size_ml) }}</td>
+        <td class="num">{{ format_mmk(p.price_mmk) }}</td>
+        <td>{% if p.in_stock %}in stock{% else %}<span class="badge warn">out of stock</span>{% endif %}</td>
+        <td class="muted small">{{ p.effective_from|local_time("%d %b %Y") }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="problem-text">No prices yet.</p>
+  {% endif %}
+  <p class="muted small">Prices come from the <a href="/prices">price list (Excel)</a>.</p>
+  {% if history %}
+  <details>
+    <summary class="small">Price history</summary>
+    <table>
+      <thead><tr><th>When</th><th>Size</th><th>Price</th><th>Stock</th></tr></thead>
+      <tbody>
+      {% for h in history %}
+        <tr><td class="small">{{ h.effective_from|local_time("%d %b %Y %H:%M") }}</td>
+          <td>{{ size_label(h.size_ml, product.full_size_ml) }}</td>
+          <td class="num">{{ format_mmk(h.price_mmk) if h.price_mmk else "not sold" }}</td>
+          <td>{{ "yes" if h.in_stock else "no" }}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </details>
+  {% endif %}
+</section>
+
+<section class="card">
   <h2>Aliases</h2>
   <p class="muted small">Words customers use for this product. The parser re-checks all messages within a few seconds after a change; your manual corrections are kept.</p>
   <ul class="aliases">

@@ -6,8 +6,9 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
-from app.models import ParseResult, Product, ProductAlias
+from app.models import ParseResult, Product, ProductAlias, ProductPrice
 from app.parser.normalize import normalize
+from app.pricing.prices import current_prices
 from app.web.auth import current_user, verify_csrf
 from app.web.deps import get_db, templates
 from app.web.inbox import flash
@@ -42,7 +43,8 @@ def products(request: Request, q: str = "", db: Session = Depends(get_db)):
             | Product.brand.icontains(q.strip(), autoescape=True)
             | Product.id.in_(matching)
         )
-    return templates.TemplateResponse(request, "products.html", {"rows": db.execute(query).all(), "q": q})
+    return templates.TemplateResponse(request, "products.html", {
+        "rows": db.execute(query).all(), "q": q, "prices": current_prices(db)})
 
 
 @router.post("")
@@ -75,8 +77,11 @@ def product_detail(request: Request, product_id: int, db: Session = Depends(get_
             ProductAlias.normalized_alias.in_([a.normalized_alias for a in aliases]),
             ProductAlias.product_id != product_id)
     ))
+    history = db.scalars(select(ProductPrice).where(ProductPrice.product_id == product_id)
+                         .order_by(ProductPrice.effective_from.desc(), ProductPrice.id.desc()).limit(50)).all()
     return templates.TemplateResponse(request, "product.html", {
         "product": product, "aliases": aliases, "shared": shared,
+        "prices": current_prices(db, [product_id]).get(product_id, []), "history": history,
     })
 
 

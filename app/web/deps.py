@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.core.db import SessionLocal
+from app.pricing.prices import format_mmk, size_label
 
 
 def csrf_token(request: Request) -> str:
@@ -39,3 +40,4 @@ def local_time(value: datetime | None, fmt: str = "%d %b %H:%M") -> str:
 
 
 templates.env.filters["local_time"] = local_time
+templates.env.globals.update(format_mmk=format_mmk, size_label=size_label)

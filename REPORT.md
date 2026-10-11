@@ -259,3 +259,40 @@ Short entries from the VPS Claude Code session, newest last.
 - status.sh: all services active, every /healthz check ok (backup now ok), TUNNEL_URL set.
 - Postgres container has restart: unless-stopped; docker/containerd enabled at boot.
 - Next: owner reboots; after it, check scripts/status.sh shows everything ok + a new URL.
+
+## 2026-10-11 — v2 Step 1: price list (Excel import/export) + Settings
+- DB (migration 4fb30f3b315c, applied live after a fresh backup; downgrade/upgrade round-trip
+  tested): `product_prices` (append-only history: product, size_ml NULL = full bottle,
+  is_full_bottle, price_mmk NULL = "no longer sold", in_stock, effective_from, created_by),
+  `products.full_size_ml`, products.source gains `excel`, `payment_methods`,
+  `reply_templates` (only edited texts; defaults in app/replies/templates.py), `audit_log`.
+- Prices page (/prices): **Download current prices (.xlsx)** (all active products, incl. ones
+  added in the dashboard; sizes 2/5/10ml + any other sold size; Help sheet) and **Upload** ->
+  preview -> **Confirm**. Nothing is written before Confirm (the preview carries the parsed
+  file in a signed hidden field, valid 1 h; Confirm refuses if prices changed meanwhile).
+  Preview shows: price changes (old → new), new products, "not sure which product" rows
+  (fuzzy match; you must pick: update X / new product / skip), products not in the file
+  (left alone), problems in red (bad price, bad yes/no, duplicate row, formula without saved
+  value...) which block Confirm, and ignored columns as warnings.
+- Rules: empty cell = size not sold; a size column missing from the file = unchanged;
+  in_stock empty = unchanged; a newly sold size gets the perfume's stock. Prices accept
+  `18000`, `18,000`, `18,000 ကျပ်`, Burmese digits. Excel's stock is one flag per perfume.
+- Product list shows prices per size (+ "out of stock" / red "no prices"); product page shows
+  current prices and price history.
+- Settings (/settings): payment methods (add, edit, active on/off, delete) and all 17 reply
+  templates from the spec, each with its allowed {placeholders}, a live example, validation
+  (unknown placeholders refused) and "reset to default". All changes go to audit_log.
+- Sample file: **data/sample_prices.xlsx** — TEST prices (not real) for the 20 products
+  (Born in Roma = out of stock, Luna Rossa Carbon has no 2ml). Rebuild:
+  `.venv/bin/python -m scripts.make_sample_prices`.
+- New deps: openpyxl 3.1.5, defusedxml 0.7.1 (safe XML parsing). Upload max 2 MB / 2000 rows.
+- Verified: pytest 134 passed, 1 skipped (22 new tests: reading cells, errors, preview writes
+  nothing, apply + history, removal/stock, new/ambiguous products, export→import round trip
+  = no changes, web upload/confirm/tamper/stale preview, settings + validation + audit).
+  Live: services restarted, /healthz all ok.
+- Not done (by design, later steps): sending replies, cart, per-size stock editing in the
+  dashboard (only via Excel for now), owner-only permissions (any logged-in user can import
+  and edit Settings). data/products.csv + seed_catalog still work but Excel is now the main list.
+- How to verify: Prices → Upload `data/sample_prices.xlsx` → preview shows 20 changed → Confirm
+  → Products shows prices. Then Download, change a price / empty a cell / type "abc" in Excel,
+  upload again and check the preview. Settings → add KPay → edit a reply.

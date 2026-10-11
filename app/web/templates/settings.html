@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}Settings · Decant Inbox{% endblock %}
+{% block content %}
+<h1>Settings</h1>
+
+<section class="card stack" id="payment-methods">
+  <h2>Payment methods</h2>
+  <p class="muted small">Active methods are listed in the payment info message to customers.</p>
+  {% for m in methods %}
+  <form method="post" action="/settings/payment-methods/{{ m.id }}" class="method {% if not m.active %}inactive{% endif %}">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <div class="grid">
+      <label>Name <input name="name" value="{{ m.name }}" required maxlength="64"></label>
+      <label>Account number <input name="account_number" value="{{ m.account_number }}" required maxlength="64"></label>
+      <label>Account name <input name="account_name" value="{{ m.account_name }}" required maxlength="128"></label>
+    </div>
+    <div class="buttons">
+      <label class="check"><input type="checkbox" name="active" value="1" {% if m.active %}checked{% endif %}> Active</label>
+      <button class="primary">Save</button>
+      <button class="link danger" formaction="/settings/payment-methods/{{ m.id }}/delete">delete</button>
+    </div>
+  </form>
+  {% else %}
+  <p class="problem-text">No payment methods yet. Add at least one before sending payment info.</p>
+  {% endfor %}
+  <form method="post" action="/settings/payment-methods" class="stack add-method">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <h3>Add payment method</h3>
+    <div class="grid">
+      <label>Name <input name="name" placeholder="KPay" required maxlength="64"></label>
+      <label>Account number <input name="account_number" placeholder="09…" required maxlength="64"></label>
+      <label>Account name <input name="account_name" required maxlength="128"></label>
+    </div>
+    <button class="primary">Add</button>
+  </form>
+</section>
+
+<section class="card stack">
+  <h2>Reply templates</h2>
+  <p class="muted small">Texts the dashboard suggests when you reply to a customer. You can still edit each message before it is sent. Words in {braces} are filled in automatically.</p>
+  {% for t in templates %}
+  <form method="post" action="/settings/templates/{{ t.def.key }}" class="template {% if t.error %}has-error{% endif %}" id="t-{{ t.def.key }}">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <label>{{ t.def.label }}{% if t.customized %} <span class="badge">edited</span>{% endif %}
+      <textarea name="text" rows="{{ [t.text.count('\n') + 2, 2]|max }}" maxlength="2000">{{ t.text }}</textarea>
+    </label>
+    {% if t.error %}<p class="error" role="alert">{{ t.error }}</p>{% endif %}
+    <p class="muted small">
+      {% if t.def.example %}Placeholders: {% for name in t.def.example %}<code>{{ "{" ~ name ~ "}" }}</code>{% if not loop.last %} {% endif %}{% endfor %}{% else %}No placeholders.{% endif %}
+    </p>
+    {% if t.def.example and t.example %}<p class="example small">{{ t.example }}</p>{% endif %}
+    <div class="buttons">
+      <button class="primary">Save</button>
+      {% if t.customized %}<button class="link" formaction="/settings/templates/{{ t.def.key }}/reset">reset to default</button>{% endif %}
+    </div>
+  </form>
+  {% endfor %}
+</section>
+{% endblock %}

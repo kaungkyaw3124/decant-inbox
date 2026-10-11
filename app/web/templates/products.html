@@ -7,18 +7,20 @@
 </form>
 
 <table class="products">
-  <thead><tr><th>Brand</th><th>Product</th><th>Aliases</th><th>Messages</th><th></th></tr></thead>
+  <thead><tr><th>Brand</th><th>Product</th><th>Prices (ကျပ်)</th><th>Aliases</th><th>Messages</th><th></th></tr></thead>
   <tbody>
   {% for p, n_alias, n_msg in rows %}
     <tr {% if not p.active %}class="inactive"{% endif %}>
       <td>{{ p.brand }}</td>
       <td><a href="/products/{{ p.id }}">{{ p.name }}</a></td>
+      <td class="small">{% for pr in prices.get(p.id, []) %}<span class="nowrap">{{ size_label(pr.size_ml, p.full_size_ml) }} {{ format_mmk(pr.price_mmk) }}</span>{% if not loop.last %} · {% endif %}{% else %}<span class="problem-text">no prices</span>{% endfor %}
+        {% if prices.get(p.id) and not prices[p.id]|selectattr("in_stock")|list %}<span class="badge warn">out of stock</span>{% endif %}</td>
       <td>{{ n_alias }}</td>
       <td><a href="/?intent=all&status=all&product={{ p.id }}">{{ n_msg }}</a></td>
       <td class="muted small">{% if not p.active %}inactive{% endif %}{% if p.source == "manual" %} added here{% endif %}</td>
     </tr>
   {% else %}
-    <tr><td colspan="5" class="empty">No products.</td></tr>
+    <tr><td colspan="6" class="empty">No products.</td></tr>
   {% endfor %}
   </tbody>
 </table>
@@ -31,6 +33,6 @@
     <label>Name <input name="name" required></label>
   </div>
   <button class="primary">Add</button>
-  <p class="muted small">The main list lives in data/products.csv on the server. Products added here are kept when it is re-seeded.</p>
+  <p class="muted small">The main list is the <a href="/prices">price list (Excel)</a>; a new row there also adds a product. Products added here are included in the Excel download.</p>
 </form>
 {% endblock %}

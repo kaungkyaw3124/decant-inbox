@@ -1,12 +1,13 @@
 from datetime import datetime
 
-from sqlalchemy import Boolean, CheckConstraint, ForeignKey, String, UniqueConstraint, true
+from sqlalchemy import Boolean, CheckConstraint, ForeignKey, Integer, String, UniqueConstraint, true
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.base import Base, created_at_column
 
 ALIAS_SOURCES = ("seed", "learned")
-PRODUCT_SOURCES = ("seed", "manual")  # manual = added in the dashboard; the CSV seed leaves it alone
+PRODUCT_SOURCES = ("seed", "manual", "excel")  # manual = added in the dashboard, excel = added by a
+# price-list import; the CSV seed leaves both alone
 
 
 class Product(Base):
@@ -14,6 +15,7 @@ class Product(Base):
     __table_args__ = (
         UniqueConstraint("brand", "name"),
         CheckConstraint(f"source IN {PRODUCT_SOURCES}", name="source"),
+        CheckConstraint("full_size_ml IS NULL OR full_size_ml > 0", name="full_size_positive"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -21,6 +23,7 @@ class Product(Base):
     name: Mapped[str] = mapped_column(String(255))
     active: Mapped[bool] = mapped_column(Boolean, server_default=true(), default=True)
     source: Mapped[str] = mapped_column(String(16), server_default="seed", default="seed")
+    full_size_ml: Mapped[int | None] = mapped_column(Integer)  # bottle size, from the price list
     created_at: Mapped[datetime] = created_at_column()
 
 

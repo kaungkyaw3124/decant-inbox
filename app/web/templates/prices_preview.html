@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block title %}Check prices · Decant Inbox{% endblock %}
+{% block content %}
+<p><a href="/prices">← Price list</a></p>
+<h1>Check before saving</h1>
+<p class="muted small">{{ filename }} · {{ sheet.rows|length }} perfumes. Nothing is saved yet.</p>
+{% if error %}<p class="flash bad" role="alert">{{ error }}</p>{% endif %}
+
+{% if sheet.errors %}
+<section class="card problem">
+  <h2>Fix these in the file, then upload again</h2>
+  <ul>{% for e in sheet.errors %}<li>{{ e }}</li>{% endfor %}</ul>
+</section>
+{% endif %}
+{% if sheet.warnings %}
+<section class="card notice">
+  <h2>Please check</h2>
+  <ul>{% for w in sheet.warnings %}<li>{{ w }}</li>{% endfor %}</ul>
+</section>
+{% endif %}
+
+<p class="badges">
+  <span class="badge">{{ plan.count("changed") }} changed</span>
+  <span class="badge">{{ plan.count("new") }} new</span>
+  <span class="badge {% if plan.count('ambiguous') %}warn{% endif %}">{{ plan.count("ambiguous") }} to decide</span>
+  <span class="badge">{{ plan.count("same") }} no change</span>
+</p>
+
+<form method="post" action="/prices/import/confirm" class="stack">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  {% if payload %}<input type="hidden" name="payload" value="{{ payload }}">{% endif %}
+
+  {% for r in plan.rows if r.status == "ambiguous" %}
+  {% if loop.first %}<h2>Not sure which product</h2>{% endif %}
+  <section class="card notice">
+    <p><b>{{ r.row.brand }} {{ r.row.name }}</b> <span class="muted small">row {{ r.row.row }}</span></p>
+    {% if r.changes %}<ul class="small">{% for c in r.changes %}<li>{{ c }}</li>{% endfor %}</ul>{% endif %}
+    <label>This is
+      <select name="choice_{{ r.row.row }}" required>
+        <option value="" {% if not choices.get(r.row.row) %}selected{% endif %}>— choose —</option>
+        {% for pid, label in r.candidates %}
+        <option value="{{ pid }}" {% if choices.get(r.row.row) == pid|string %}selected{% endif %}>{{ label }} (update it)</option>
+        {% endfor %}
+        <option value="new" {% if choices.get(r.row.row) == "new" %}selected{% endif %}>a new product</option>
+        <option value="skip" {% if choices.get(r.row.row) == "skip" %}selected{% endif %}>skip this row</option>
+      </select>
+    </label>
+  </section>
+  {% endfor %}
+
+  {% for r in plan.rows if r.status == "new" %}
+  {% if loop.first %}<h2>New products</h2>{% endif %}
+  <section class="card">
+    <p><b>{{ r.row.brand }} {{ r.row.name }}</b> <span class="muted small">row {{ r.row.row }}</span></p>
+    <ul class="small">{% for c in r.changes %}<li>{{ c }}</li>{% else %}<li class="muted">no prices</li>{% endfor %}</ul>
+    <label>
+      <select name="choice_{{ r.row.row }}">
+        <option value="new" {% if choices.get(r.row.row, "new") == "new" %}selected{% endif %}>Add as new product</option>
+        <option value="skip" {% if choices.get(r.row.row) == "skip" %}selected{% endif %}>Skip this row</option>
+      </select>
+    </label>
+  </section>
+  {% endfor %}
+
+  {% for r in plan.rows if r.status == "changed" %}
+  {% if loop.first %}<h2>Changes</h2>{% endif %}
+  <section class="card">
+    <p><b>{{ r.row.brand }} {{ r.row.name }}</b> <span class="muted small">row {{ r.row.row }}</span></p>
+    <ul class="small">
+      {% if r.reactivate %}<li>product is inactive → will be activated</li>{% endif %}
+      {% for c in r.changes %}<li>{{ c }}</li>{% endfor %}
+    </ul>
+  </section>
+  {% endfor %}
+
+  {% if plan.untouched %}
+  <details class="card">
+    <summary>{{ plan.untouched|length }} products not in this file (left as they are)</summary>
+    <ul class="small">{% for name in plan.untouched %}<li>{{ name }}</li>{% endfor %}</ul>
+  </details>
+  {% endif %}
+
+  {% if payload %}
+  <div class="buttons sticky-actions">
+    <button class="primary">Confirm and save</button>
+    <a class="button" href="/prices">Cancel</a>
+  </div>
+  {% else %}
+  <p class="flash bad">Can't save: fix the problems above in the file and upload it again.</p>
+  {% endif %}
+</form>
+{% endblock %}
