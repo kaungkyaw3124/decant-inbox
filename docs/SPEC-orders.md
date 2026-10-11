@@ -246,11 +246,11 @@ Step 5. Step 6 is then only the "wanted but not stocked" report.
 ### A. Faster auto replies (configurable)
 - Live test: the auto reply came ~20-60 s after the customer's message (15 s quiet window
   + random 8-20 s delay + worker polling). Owner wants faster.
-- New Settings (Settings page, "Auto-reply speed"): quiet_window_s (default 5),
-  delay_min_s (default 3), delay_max_s (default 8). Allowed ranges: quiet 0-30,
-  delay 2-60, min <= max. Show a note: "Shorter = faster, but looks more like a bot".
+- New Settings (Settings page, "Auto-reply speed"): quiet_window_s (default 1),
+  delay_min_s (default 2), delay_max_s (default 3). OWNER WANTS ~3 s TOTAL.
+  Allowed ranges: quiet 0-30, delay 1-60, min <= max. Show a note: "Shorter = faster, but looks more like a bot".
 - Worker reacts to new messages quickly: wake on new message (LISTEN/NOTIFY or poll 1 s)
-  instead of ~5 s polling, so the total is about quiet + delay (~8-13 s by default).
+  instead of ~5 s polling, so the total is about quiet + delay (~3 s by default).
 ### B. Skip the separate "confirm" step: the list asks for the phone directly
 - New flow: buy -> cart list + total + ask phone -> phone -> ask address -> address ->
   payment info.
@@ -266,6 +266,14 @@ Step 5. Step 6 is then only the "wanted but not stocked" report.
   a new phone/address in the reply replaces/adds as usual.
 - If the customer changes items after giving a phone: send the new list (ending asks only
   for what is still missing; if nothing is missing, the returning-customer ending).
+
+### C. More items later = add to the same cart (owner 2026-10-12)
+- A new buy message while the customer has an open cart ADDS the items to that cart
+  (never replaces it; same product+size already in the cart -> quantity +1 only if the
+  customer says so, otherwise keep one line) and auto-sends the UPDATED list + total
+  (ending asks for whatever is still missing).
+- If the new message has an unknown item: no auto reply; it goes to "Needs you"; after the
+  admin resolves it, the items are added and the updated list is sent automatically.
 
 ## Build steps (one at a time)
 - Step 1: Price list: product_prices, Excel import (preview/confirm) + export, price shown on
