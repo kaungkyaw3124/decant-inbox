@@ -76,6 +76,11 @@ Do NOT send the URL via the owner's Telegram account (account is read-only).
 - [ ] data/sample_messages.csv, kept OUT of git: run `.venv/bin/python -m scripts.export_samples`,
       correct the intent/product/size_ml columns, then `.venv/bin/pytest tests/test_parser_samples.py`
 
+## Backlog (owner asked to be reminded)
+- After the reply + payment feature: DAILY SALES dashboard (sales per day, revenue,
+  cost, profit per perfume, best sellers). Needs cost prices (bottle cost / ml).
+- Fixed domain for the dashboard (instead of the changing trycloudflare.com URL).
+
 ## Later (not v1)
 AI fallback → inventory in ml per bottle + supplies → orders & statuses →
 payments → Viber → reports. Each is a new module with its own tables.
