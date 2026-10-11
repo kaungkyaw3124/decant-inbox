@@ -2,14 +2,11 @@
 
 Read CLAUDE.md first. This file tracks where we are.
 
-## RESUME HERE (2026-10-11, 02:20, owner went to sleep)
-- Phases 1-4 done and verified by owner. Phase 5: services, tunnel (decant-tunnel ->
-  TUNNEL_URL), client-IP lockout and scripts/status.sh done (2026-10-11 16:45 UTC).
-  Owner sudo done (pg client 18, Linger=yes); first backup ok and restore-tested.
-  Still open: owner reboot test. See "Phase 5 spec" below.
-- New session start: read CLAUDE.md, this file, and the last entries of REPORT.md.
-- If the listener was down overnight, run import_history (stop the listener first)
-  to fill the gap; Telegram keeps the messages, so nothing is lost.
+## RESUME HERE (updated 2026-10-11 23:20)
+- v1 COMPLETE. Phases 1-5 done; reboot test passed (all services back on their own,
+  /healthz all ok, backup ok, new TUNNEL_URL written).
+- Next: owner chooses the next feature; the planning chat writes its spec here first.
+- Owner checks: `bash scripts/status.sh` (services, health, backup, current public URL).
 
 ## Status
 | Phase | What | Status |
@@ -20,7 +17,7 @@ Read CLAUDE.md first. This file tracks where we are.
 | 3 | Rule-based parser + tests | ✅ Done (worker live; needs real catalog + labelled samples) |
 | 3b | AI fallback (optional) | ⬜ Not started |
 | 4 | Dashboard + Tailscale (private access) | ✅ Dashboard verified by owner via SSH tunnel (2026-10-11). Tailscale (phone access) still optional |
-| 5 | Run 24/7, backups, health page | 🟡 services + Cloudflare quick tunnel live; first backup done + restore-tested, linger on; waiting: owner reboot test |
+| 5 | Run 24/7, backups, health page | ✅ Done: reboot test passed 2026-10-11 (all services back, health ok, new tunnel URL) |
 
 ## Phase 0 checklist
 - [x] Step 0: rollback safety net scripts in ~/hardening/
