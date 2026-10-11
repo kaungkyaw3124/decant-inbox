@@ -1,13 +1,13 @@
 from datetime import datetime
 
 from sqlalchemy import (
-    Boolean, CheckConstraint, Float, ForeignKey, Index, Integer, String, text,
+    Boolean, CheckConstraint, Float, ForeignKey, Index, Integer, String, false, text,
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.base import Base, created_at_column
 
-INTENTS = ("buy", "ask_stock", "ask_price", "other", "unknown")
+INTENTS = ("buy", "ask_stock", "ask_price", "other", "unknown", "remove", "confirm", "done", "address")
 PARSE_METHODS = ("rules", "ai", "human")
 
 
@@ -36,3 +36,21 @@ class ParseResult(Base):
     parser_version: Mapped[str] = mapped_column(String(32))
     is_current: Mapped[bool] = mapped_column(Boolean)
     created_at: Mapped[datetime] = created_at_column()
+    phone: Mapped[str | None] = mapped_column(String(20))  # Myanmar mobile found in the text
+
+
+class ParseItem(Base):
+    """One product line of a parse result (rules-2: "good girl 5ml, swy 10ml"). The first
+    item is also copied to parse_results.product_id/size_ml/quantity for v1 readers."""
+
+    __tablename__ = "parse_items"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    parse_result_id: Mapped[int] = mapped_column(ForeignKey("parse_results.id"), index=True)
+    position: Mapped[int] = mapped_column(Integer)
+    product_id: Mapped[int | None] = mapped_column(ForeignKey("products.id"))
+    size_ml: Mapped[int | None] = mapped_column(Integer)  # None with is_full_bottle = full bottle
+    is_full_bottle: Mapped[bool] = mapped_column(Boolean, server_default=false(), default=False)
+    quantity: Mapped[int] = mapped_column(Integer, server_default="1", default=1)
+    unknown_text: Mapped[str | None] = mapped_column(String(255))  # named, but not in our catalog
+    from_context: Mapped[bool] = mapped_column(Boolean, server_default=false(), default=False)

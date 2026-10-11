@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Boolean, String, UniqueConstraint, false
+from sqlalchemy import Boolean, ForeignKey, String, Text, UniqueConstraint, false
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.base import Base, created_at_column
@@ -17,3 +17,7 @@ class Customer(Base):
     display_name: Mapped[str | None] = mapped_column(String(255))
     ignored: Mapped[bool] = mapped_column(Boolean, server_default=false(), default=False)
     created_at: Mapped[datetime] = created_at_column()
+    # Contact details (v2). phone: newest number the parser found in their messages.
+    phone: Mapped[str | None] = mapped_column(String(20))
+    phone_message_id: Mapped[int | None] = mapped_column(ForeignKey("messages.id", use_alter=True))
+    address: Mapped[str | None] = mapped_column(Text)  # set by an admin (Step 4)

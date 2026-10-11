@@ -59,7 +59,8 @@ def run_checks(db: Session) -> list[Check]:
             checks.append(Check(name, age <= max_age, f"last heartbeat {ago(age)} ({h.details or ''})"))
 
     has_result = exists().where(and_(ParseResult.message_id == Message.id, ParseResult.is_current))
-    count, oldest = db.execute(select(func.count(), func.min(Message.created_at)).where(~has_result)).one()
+    count, oldest = db.execute(select(func.count(), func.min(Message.created_at))
+                               .where(~has_result, Message.direction == "in")).one()  # ours are never parsed
     checks.append(Check(
         "parse queue", count == 0 or now - oldest <= MAX_UNPARSED_AGE,
         "empty" if count == 0 else f"{count} waiting, oldest {ago(now - oldest)}",

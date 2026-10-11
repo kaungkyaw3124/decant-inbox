@@ -13,7 +13,7 @@ from sqlalchemy import select
 from app.core.db import SessionLocal
 from app.models import Message
 from app.parser.rules import PARSER_VERSION
-from app.parser.service import load_aliases, parse_message
+from app.parser.service import load_aliases, load_full_sizes, parse_message
 
 CHUNK = 500
 
@@ -23,6 +23,7 @@ def reparse_all(dry_run: bool = False) -> Counter:
     last_id = 0
     with SessionLocal() as session:
         aliases = load_aliases(session)
+        full_sizes = load_full_sizes(session)
     while True:
         session = SessionLocal()
         try:
@@ -33,7 +34,7 @@ def reparse_all(dry_run: bool = False) -> Counter:
             if not messages:
                 return stats
             for message in messages:
-                stats[parse_message(session, message, aliases)] += 1
+                stats[parse_message(session, message, aliases, full_sizes)] += 1
             last_id = messages[-1].id
             session.rollback() if dry_run else session.commit()
         finally:

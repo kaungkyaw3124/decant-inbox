@@ -9,7 +9,9 @@ from sqlalchemy import and_, or_, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session, aliased
 
-from app.models import AuditLog, Customer, Message, MessageReview, Outbox, ParseResult, Product, ProductAlias, User
+from app.models import (
+    AuditLog, Customer, Message, MessageReview, Outbox, ParseItem, ParseResult, Product, ProductAlias, User,
+)
 from app.models.messages import REVIEW_STATUSES
 from app.models.parsing import INTENTS
 from app.parser.normalize import normalize
@@ -61,7 +63,9 @@ def inbox_query(f: dict):
     elif f["intent"] in INTENTS:
         q = q.where(cur.intent == f["intent"])
     if f["product"]:
-        q = q.where(cur.product_id == f["product"])
+        in_items = select(ParseItem.id).where(ParseItem.parse_result_id == cur.id,
+                                              ParseItem.product_id == f["product"]).exists()
+        q = q.where(or_(cur.product_id == f["product"], in_items))
     if f["needs_review"]:
         q = q.where(or_(cur.id.is_(None),
                         and_(cur.method != "human", cur.confidence < NEEDS_REVIEW_BELOW)))
@@ -82,16 +86,27 @@ def row_context(message, customer, result, product, review, quick_info: dict | N
         "m": message, "c": customer, "r": result, "p": product,
         "status": review.status if review else "new",
         "needs_review": result is None or (result.method != "human" and result.confidence < NEEDS_REVIEW_BELOW),
-        **(quick_info or {"quick": None, "quick_outbox": None}),
+        **(quick_info or {"quick": None, "quick_outbox": None, "items": []}),
     }
+
+
+def load_items(db: Session, result_ids: list[int]) -> dict[int, list[tuple[ParseItem, Product | None]]]:
+    out: dict[int, list] = {}
+    if result_ids:
+        for item, product in db.execute(
+                select(ParseItem, Product).outerjoin(Product, Product.id == ParseItem.product_id)
+                .where(ParseItem.parse_result_id.in_(result_ids)).order_by(ParseItem.position)):
+            out.setdefault(item.parse_result_id, []).append((item, product))
+    return out
 
 
 def quick_infos(db: Session, rows, texts: dict[str, str] | None = None) -> dict[int, dict]:
     """Per message: the one-tap price reply it can get (quick) or already got (quick_outbox)."""
     texts = texts or replies.load(db)
     made = quick.pending_quick(db, [r[0].id for r in rows])
+    items = load_items(db, [r[2].id for r in rows if r[2] is not None])
     return {
-        m.id: {"quick_outbox": made.get(m.id),
+        m.id: {"quick_outbox": made.get(m.id), "items": items.get(r.id, []) if r else [],
                "quick": None if m.id in made or c.ignored else quick.quick_price_reply(db, m, r, texts)}
         for m, c, r, *_ in rows
     }
@@ -166,7 +181,7 @@ def message_detail(request: Request, message_id: int, back: str = "/", db: Sessi
 def edit_parse(
     request: Request, message_id: int,
     intent: str = Form(...), product_id: str = Form(""), size_ml: str = Form(""),
-    quantity: str = Form("1"), alias: str = Form(""), back: str = Form("/"),
+    quantity: str = Form("1"), full_bottle: str = Form(""), alias: str = Form(""), back: str = Form("/"),
     db: Session = Depends(get_db),
 ):
     get_message(db, message_id)
@@ -175,15 +190,21 @@ def edit_parse(
     pid = int(product_id) if product_id.isdigit() else None
     if pid is not None and db.get(Product, pid) is None:
         raise HTTPException(400, "Unknown product")
-    size = int(size_ml) if size_ml.strip().isdigit() and 0 < int(size_ml) < 1000 else None
+    full = full_bottle == "1"
+    size = None if full else int(size_ml) if size_ml.strip().isdigit() and 0 < int(size_ml) < 1000 else None
     qty = int(quantity) if quantity.strip().isdigit() and 0 < int(quantity) < 100 else 1
 
     db.execute(update(ParseResult).where(ParseResult.message_id == message_id, ParseResult.is_current)
                .values(is_current=False))
     db.flush()
-    db.add(ParseResult(message_id=message_id, intent=intent, product_id=pid, size_ml=size,
-                       quantity=qty, confidence=1.0, method="human",
-                       parser_version=HUMAN_VERSION, is_current=True))
+    result = ParseResult(message_id=message_id, intent=intent, product_id=pid, size_ml=size,
+                         quantity=qty, confidence=1.0, method="human",
+                         parser_version=HUMAN_VERSION, is_current=True)
+    db.add(result)
+    db.flush()
+    if pid is not None or size is not None or full:  # a correction is one item
+        db.add(ParseItem(parse_result_id=result.id, position=0, product_id=pid, size_ml=size,
+                         is_full_bottle=full, quantity=qty))
     note = "Saved."
     alias_norm = normalize(alias)
     if alias_norm and pid is not None:

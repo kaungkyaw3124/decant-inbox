@@ -77,8 +77,13 @@ def test_alias_not_matched_inside_longer_word():
     assert p("ysl yellow ရှိလား").product_id is None
 
 
-def test_two_products_takes_first_but_needs_review():
+def test_two_products_split_into_items():  # rules-2: "နဲ့" separates items
     r = p("dior sauvage နဲ့ stw intensely ဝယ်ချင်")
+    assert r.product_id == SAUVAGE and [i.product_id for i in r.items] == [SAUVAGE, STW]
+
+
+def test_two_products_in_one_part_takes_first_but_needs_review():
+    r = p("dior sauvage stw intensely ဝယ်ချင်")
     assert r.product_id == SAUVAGE and r.needs_review
 
 

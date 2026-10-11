@@ -119,7 +119,7 @@ def insert_message(session: Session, msg: ChatMessage, customer_id: int) -> tupl
             external_message_id=msg.external_message_id,
             customer_id=customer_id,
             raw_text=msg.text,
-            normalized_text=normalize(msg.text),
+            normalized_text=normalize(msg.text, keep_newlines=True),
             received_at=msg.received_at,
             direction=msg.direction,
             kind=msg.kind,

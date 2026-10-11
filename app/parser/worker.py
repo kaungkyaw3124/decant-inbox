@@ -16,7 +16,7 @@ from app.core.db import SessionLocal
 from app.core.heartbeat import beat
 from app.models import Message
 from app.parser.rules import PARSER_VERSION
-from app.parser.service import load_aliases, parse_message, unparsed_message_ids
+from app.parser.service import load_aliases, load_full_sizes, parse_message, unparsed_message_ids
 from scripts.reparse_all import reparse_all
 
 log = logging.getLogger("parser")
@@ -32,11 +32,12 @@ def run_batch() -> int:
         if not ids:
             return 0
         aliases = load_aliases(session)  # reloaded per batch: dashboard may add aliases
+        full_sizes = load_full_sizes(session)
     done = 0
     for message_id in ids:
         try:
             with SessionLocal.begin() as session:
-                parse_message(session, session.get(Message, message_id), aliases)
+                parse_message(session, session.get(Message, message_id), aliases, full_sizes)
             done += 1
         except IntegrityError:
             log.info("message=%s already parsed by another process", message_id)
@@ -48,7 +49,7 @@ def run_batch() -> int:
 
 def catalog_fingerprint() -> int:
     with SessionLocal() as session:
-        return hash(frozenset(load_aliases(session)))
+        return hash((frozenset(load_aliases(session)), frozenset(load_full_sizes(session).items())))
 
 
 def reparse_if_catalog_changed(last: int | None) -> int:

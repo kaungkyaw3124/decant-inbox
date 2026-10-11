@@ -7,7 +7,7 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy import exists, select
 from sqlalchemy.orm import Session
 
-from app.models import Message, Outbox, ParseResult, Product
+from app.models import Message, Outbox, ParseItem, ParseResult, Product
 from app.pricing.prices import current_prices, format_mmk, size_label
 from app.replies.templates import render
 
@@ -100,17 +100,18 @@ def recent_requests(session: Session, customer_id: int, now: datetime | None = N
     the default selection for a price reply."""
     since = (now or datetime.now(UTC)) - CONTEXT_WINDOW
     rows = session.execute(
-        select(ParseResult.product_id, ParseResult.size_ml)
+        select(ParseItem.product_id, ParseItem.size_ml, ParseItem.is_full_bottle)
+        .join(ParseResult, ParseResult.id == ParseItem.parse_result_id)
         .join(Message, Message.id == ParseResult.message_id)
         .where(Message.customer_id == customer_id, Message.direction == "in", Message.received_at >= since,
-               ParseResult.is_current, ParseResult.product_id.is_not(None))
-        .order_by(Message.received_at.desc(), Message.id.desc())
+               ParseResult.is_current, ParseItem.product_id.is_not(None))
+        .order_by(Message.received_at.desc(), Message.id.desc(), ParseItem.position)
     ).all()
     items: list[PriceItem] = []
-    for product_id, size_ml in rows:
+    for product_id, size_ml, full in rows:
         if any(i.product_id == product_id for i in items):
             continue
-        items.append(PriceItem(product_id, str(size_ml) if size_ml else "all"))
+        items.append(PriceItem(product_id, "full" if full else str(size_ml) if size_ml else "all"))
         if len(items) == MAX_PRICE_ITEMS:
             break
     return items

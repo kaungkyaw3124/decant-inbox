@@ -1,7 +1,8 @@
 """One-tap quick replies (docs/SPEC-orders.md "One-tap quick replies").
 
 A quick price reply is offered only when everything is certain: a customer's message
-parsed as ask_price/ask_stock/buy with a known product, a known size (or none = all sizes),
+parsed as ask_price/ask_stock/buy where every item (up to 3) has a known product named in
+this message (not guessed from context) and a known size (or none = all sizes, or full),
 confident (or corrected by a human), every price present and in stock, and nothing sent
 or queued to that customer in the last 60 s. Otherwise the admin uses the chat editor.
 The text is fixed when the button is shown; the server re-builds it on tap and refuses
@@ -14,7 +15,7 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy import exists, select
 from sqlalchemy.orm import Session
 
-from app.models import Message, Outbox, ParseResult
+from app.models import Message, Outbox, ParseItem, ParseResult
 from app.parser.rules import NEEDS_REVIEW_BELOW
 from app.replies import compose
 
@@ -54,6 +55,23 @@ def recently_replied(session: Session, customer_id: int, now: datetime) -> bool:
         Outbox.created_at >= now - RECENT_REPLY))))
 
 
+def price_items(session: Session, result: ParseResult) -> list[compose.PriceItem] | None:
+    """The result's items as price-reply items, or None if any of them is uncertain."""
+    rows = session.scalars(select(ParseItem).where(ParseItem.parse_result_id == result.id)
+                           .order_by(ParseItem.position)).all()
+    if not rows and result.product_id is not None:  # a result without item rows
+        rows = [ParseItem(product_id=result.product_id, size_ml=result.size_ml, is_full_bottle=False,
+                          unknown_text=None, from_context=False)]
+    items: list[compose.PriceItem] = []
+    for r in rows:
+        if r.product_id is None or r.unknown_text or r.from_context:
+            return None
+        item = compose.PriceItem(r.product_id, "full" if r.is_full_bottle else str(r.size_ml) if r.size_ml else "all")
+        if item not in items:
+            items.append(item)
+    return items if 0 < len(items) <= compose.MAX_PRICE_ITEMS else None
+
+
 def quick_price_reply(session: Session, message: Message, result: ParseResult | None,
                       texts: dict[str, str], now: datetime | None = None) -> QuickReply | None:
     now = now or datetime.now(UTC)
@@ -64,11 +82,13 @@ def quick_price_reply(session: Session, message: Message, result: ParseResult | 
         return None
     if pending_quick(session, [message.id]) or recently_replied(session, message.customer_id, now):
         return None
-    size = str(result.size_ml) if result.size_ml else "all"
-    composed = compose.price_reply(session, [compose.PriceItem(result.product_id, size)], texts)
+    items = price_items(session, result)
+    if items is None:
+        return None
+    composed = compose.price_reply(session, items, texts)
     if composed.problems or composed.notes or not composed.text:  # missing price / out of stock
         return None
     text = compose.with_greeting(composed.text, texts, compose.needs_greeting(session, message.customer_id, now))
-    edit_url = (f"/chats/{message.customer_id}?compose=price&make=1"
-                f"&p1={result.product_id}&s1={size}#reply")
+    params = "".join(f"&p{n}={i.product_id}&s{n}={i.size}" for n, i in enumerate(items, 1))
+    edit_url = f"/chats/{message.customer_id}?compose=price&make=1{params}#reply"
     return QuickReply(text, fingerprint(text), edit_url)

@@ -54,6 +54,20 @@ def test_healthz_reports_each_part(web):
     assert set(r.text.split()) >= {"listener:", "parser:", "backup:", "ok"}
 
 
+def test_parse_queue_ignores_our_outgoing_messages(web, db):
+    from datetime import UTC, datetime
+
+    from sqlalchemy import text
+
+    from tests.test_messaging import add
+
+    client, _ = web
+    add(1, "18,000 ကျပ်ပါ", direction="out", when=datetime(2026, 1, 1, tzinfo=UTC))
+    with db.begin() as c:  # pretend it was stored long ago: never parsed, must not count
+        c.execute(text("UPDATE messages SET created_at = now() - interval '1 hour'"))
+    assert "parse queue: ok" in client.get("/healthz").text
+
+
 def test_health_page_needs_login(web):
     client, _ = web
     assert client.get("/health", follow_redirects=False).status_code == 303

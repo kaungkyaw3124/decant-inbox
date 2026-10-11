@@ -1,33 +1,57 @@
-message_id,text,intent,product,size_ml
-s01,5ml stronger with you intensely ရှိလား,ask_stock,Stronger With You Intensely,5
-s02,stw intensely ၅ ml ဝယ်ချင်လို့ပါ,buy,Stronger With You Intensely,5
-s03,swy intensely ၅မီလီ ယူမယ်,buy,Stronger With You Intensely,5
-s04,strongerwithyou 10ml ဘယ်လောက်လဲ,ask_price,Stronger With You,10
-s05,Intensely 10 ml ရှိသေးလား,ask_stock,Stronger With You Intensely,10
-s06,dior sauvage 10ml ဝယ်ချင်တယ်,buy,Sauvage Eau de Parfum,10
-s07,Sauvage Elixir ၅ml ဈေးဘယ်လောက်လဲ,ask_price,Sauvage Elixir,5
-s08,ဆော်ဗေ့ ၁၀ မီလီ ရလား,ask_stock,Sauvage Eau de Parfum,10
-s09,BDC 5ml order မယ်,buy,Bleu de Chanel Eau de Parfum,5
-s10,blue de chanel 10ml ရှိလား,ask_stock,Bleu de Chanel Eau de Parfum,10
-s11,ဘလူးဒီချန်နယ် ၅ ml ယူချင်ပါတယ်,buy,Bleu de Chanel Eau de Parfum,5
-s12,acqua di gio profumo 10ml price?,ask_price,Acqua di Gio Profumo,10
-s13,ADG 5ml ရလား,ask_stock,Acqua di Gio Profumo,5
-s14,YSL Y edp 10ml ဝယ်မယ်,buy,Y Eau de Parfum,10
-s15,libre 5ml ဘယ်လောက်လဲ,ask_price,Libre,5
-s16,versace eros ၁၀ml မှာမယ်,buy,Eros,10
-s17,1 million 5ml ရှိလား,ask_stock,1 Million,5
-s18,le male elixir 10ml ယူမယ်,buy,Le Male Elixir,10
-s19,Ultra male 5ml available?,ask_stock,Ultra Male,5
-s20,creed aventus 5ml ဘယ်လောက်,ask_price,Aventus,5
-s21,BR540 ၂မီလီ ဝယ်ချင်တယ်,buy,Baccarat Rouge 540,2
-s22,baccarat rouge 540 5ml ရှိသေးလား,ask_stock,Baccarat Rouge 540,5
-s23,ombre leather 10ml order,buy,Ombre Leather,10
-s24,born in roma intense 5ml ဈေး,ask_price,Born in Roma Uomo Intense,5
-s25,luna rossa carbon 10ml ရလား,ask_stock,Luna Rossa Carbon,10
-s26,good girl 5ml ယူမယ်နော်,buy,Good Girl,5
-s27,LVB 10ml ဘယ်လောက်ပါလဲ,ask_price,La Vie Est Belle,10
-s28,miss dior 5 ml ဝယ်ချင်ပါတယ်,buy,Miss Dior,5
-s29,မင်္ဂလာပါ,other,,
-s30,ငွေလွှဲပြီးပါပြီ,other,,
-s31,sauvage ရှိလား,ask_stock,Sauvage Eau de Parfum,
-s32,10ml ဘယ်လောက်လဲ,ask_price,,10
+message_id,text,intent,product,size_ml,items,phone
+s01,5ml stronger with you intensely ရှိလား,ask_stock,Stronger With You Intensely,5,,
+s02,stw intensely ၅ ml ဝယ်ချင်လို့ပါ,buy,Stronger With You Intensely,5,,
+s03,swy intensely ၅မီလီ ယူမယ်,buy,Stronger With You Intensely,5,,
+s04,strongerwithyou 10ml ဘယ်လောက်လဲ,ask_price,Stronger With You,10,,
+s05,Intensely 10 ml ရှိသေးလား,ask_stock,Stronger With You Intensely,10,,
+s06,dior sauvage 10ml ဝယ်ချင်တယ်,buy,Sauvage Eau de Parfum,10,,
+s07,Sauvage Elixir ၅ml ဈေးဘယ်လောက်လဲ,ask_price,Sauvage Elixir,5,,
+s08,ဆော်ဗေ့ ၁၀ မီလီ ရလား,ask_stock,Sauvage Eau de Parfum,10,,
+s09,BDC 5ml order မယ်,buy,Bleu de Chanel Eau de Parfum,5,,
+s10,blue de chanel 10ml ရှိလား,ask_stock,Bleu de Chanel Eau de Parfum,10,,
+s11,ဘလူးဒီချန်နယ် ၅ ml ယူချင်ပါတယ်,buy,Bleu de Chanel Eau de Parfum,5,,
+s12,acqua di gio profumo 10ml price?,ask_price,Acqua di Gio Profumo,10,,
+s13,ADG 5ml ရလား,ask_stock,Acqua di Gio Profumo,5,,
+s14,YSL Y edp 10ml ဝယ်မယ်,buy,Y Eau de Parfum,10,,
+s15,libre 5ml ဘယ်လောက်လဲ,ask_price,Libre,5,,
+s16,versace eros ၁၀ml မှာမယ်,buy,Eros,10,,
+s17,1 million 5ml ရှိလား,ask_stock,1 Million,5,,
+s18,le male elixir 10ml ယူမယ်,buy,Le Male Elixir,10,,
+s19,Ultra male 5ml available?,ask_stock,Ultra Male,5,,
+s20,creed aventus 5ml ဘယ်လောက်,ask_price,Aventus,5,,
+s21,BR540 ၂မီလီ ဝယ်ချင်တယ်,buy,Baccarat Rouge 540,2,,
+s22,baccarat rouge 540 5ml ရှိသေးလား,ask_stock,Baccarat Rouge 540,5,,
+s23,ombre leather 10ml order,buy,Ombre Leather,10,,
+s24,born in roma intense 5ml ဈေး,ask_price,Born in Roma Uomo Intense,5,,
+s25,luna rossa carbon 10ml ရလား,ask_stock,Luna Rossa Carbon,10,,
+s26,good girl 5ml ယူမယ်နော်,buy,Good Girl,5,,
+s27,LVB 10ml ဘယ်လောက်ပါလဲ,ask_price,La Vie Est Belle,10,,
+s28,miss dior 5 ml ဝယ်ချင်ပါတယ်,buy,Miss Dior,5,,
+s29,မင်္ဂလာပါ,other,,,,
+s30,ငွေလွှဲပြီးပါပြီ,other,,,,
+s31,sauvage ရှိလား,ask_stock,Sauvage Eau de Parfum,,,
+s32,10ml ဘယ်လောက်လဲ,ask_price,,10,,
+s33,good girl 10 ml ပေးပါ,buy,Good Girl,10,Good Girl 10,
+s34,"Good girl 5ml, swy 10ml, hawas ice 10ml ယူပါမယ်",buy,Good Girl,5,Good Girl 5; Stronger With You 10; ?hawas ice 10,
+s35,hawas ice ရှိလား,ask_stock,,,?hawas ice,
+s36,swy 5ml နဲ့ 10ml ယူမယ်,buy,Stronger With You,5,Stronger With You 5; Stronger With You 10,
+s37,"aventus 5ml
+br540 2ml ဝယ်ပါမယ်",buy,Aventus,5,Aventus 5; Baccarat Rouge 540 2,
+s38,aventus full size ဘယ်လောက်လဲ,ask_price,Aventus,,Aventus full,
+s39,bdc ဗူးလိုက် ယူပါရစေ,buy,Bleu de Chanel Eau de Parfum,,Bleu de Chanel Eau de Parfum full,
+s40,ysl y edp 100ml မှာပါမယ်,buy,Y Eau de Parfum,,Y Eau de Parfum full,
+s41,eros + 1 million 10ml ယူမယ်,buy,Eros,,Eros; 1 Million 10,
+s42,la vie est belle 5ml ပေးပါနော်,buy,La Vie Est Belle,5,La Vie Est Belle 5,
+s43,good girl ၂ ခု 5ml ယူမယ်,buy,Good Girl,5,Good Girl 5 x2,
+s44,good girl မယူတော့ဘူး,remove,Good Girl,,Good Girl,
+s45,aventus ဖြုတ်ပေးပါ,remove,Aventus,,Aventus,
+s46,miss dior 10ml cancel,remove,Miss Dior,10,Miss Dior 10,
+s47,ဒါပဲ,done,,,,
+s48,ဒါပါပဲ ရှင့်,done,,,,
+s49,ok,confirm,,,,
+s50,ဟုတ်ကဲ့ အဆင်ပြေပါတယ်,confirm,,,,
+s51,ဗဟန်း ကိုပို့ပေးပါ,address,,,,
+s52,"အမှတ် ၁၂, ဗိုလ်ချုပ်လမ်း, စမ်းချောင်း ၀၉ ၇၇၇ ၁၂၃ ၄၅၆",address,,,,09777123456
+s53,+959 4500 12345,address,,,,09450012345
+s54,bahan township ကိုပို့ပေးပါနော်,address,,,,
+s55,10ml ပေးပါ,buy,,10,? 10,

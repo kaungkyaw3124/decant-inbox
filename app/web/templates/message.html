@@ -60,6 +60,8 @@
       <label>Size (ml) <input name="size_ml" inputmode="numeric" pattern="[0-9]*" value="{{ r.size_ml if r and r.size_ml else '' }}"></label>
       <label>Quantity <input name="quantity" inputmode="numeric" pattern="[0-9]*" value="{{ r.quantity if r else 1 }}"></label>
     </div>
+    <label class="check"><input type="checkbox" name="full_bottle" value="1" {% if items and items[0][0].is_full_bottle %}checked{% endif %}> Full bottle</label>
+    {% if items|length > 1 %}<p class="muted small">This message has {{ items|length }} items; saving a correction keeps only this one.</p>{% endif %}
     <label>Save as alias (optional): the words in this message that name the product
       <input name="alias" placeholder="e.g. ဆော်ဗေ့">
     </label>

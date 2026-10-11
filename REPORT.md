@@ -382,3 +382,48 @@ Short entries from the VPS Claude Code session, newest last.
   really reply to that customer.
 - Note: with the default inbox filter (status = new) a replied message disappears on the
   next reload because it is "done"; Undo stays available on the message page until sent.
+
+## 2026-10-12 — Reply price for intent=buy + v2 Step 3: parser rules-2
+- Spec: "Parser fixes found in live test" (pulled b27c411).
+- Quick reply: "💬 Reply price" is now also offered for intent=buy (until the cart exists);
+  deployed first as its own commit.
+- Live check of the one-tap send: outbox #1 (price reply, quick) queued 18:48:40 UTC, sent
+  18:48:51 UTC — the 10 s wait works on the real account.
+- Parser rules-2 (app/parser/rules.py, PARSER_VERSION rules-2):
+  - Multi-item: split on `,` (not inside 18,000) `၊` `။` `+` `&` new line `နဲ့` `နှင့်` `and`;
+    each part -> product + size(s) + qty. "swy 5ml နဲ့ 10ml" -> 2 items of the same product.
+  - Buy words with the polite particle: ယူ(ပါ)?မယ်, ဝယ်(ပါ)?မယ်, မှာ(ပါ)?မယ်, ယူ(ပါ)?ရစေ;
+    `ပေးပါ`/`ပေးပါနော်` = buy only when a product or size is named; `ပို့ပေးပါ` = address.
+  - Full bottle: full / full size / full bottle / fullbottle / ဗူးလိုက် / အပြည့်, or size ==
+    the product's bottle size (from the price list).
+  - New intents: remove, confirm, done, address (township list in Burmese + English,
+    လိပ်စာ, လမ်း, ရပ်ကွက်, မြို့နယ်, ...). Order: remove > buy > price > stock > polite buy >
+    address > done > confirm. A phone number alone = address.
+  - Phone: 09…, +959…, 959…, Burmese digits, spaces/dashes -> "09…". Saved on the customer
+    (customers.phone; the newest message with a number wins, also on reparse).
+  - Context: a size with no product -> the customer's last product in the previous 24 h,
+    marked "(from previous message)" (lower confidence; never used by one-tap replies).
+  - Unknown product text (Latin words left after removing sizes/intents/fillers, e.g.
+    "hawas ice") kept on the item as unknown_text -> shown as "❓ hawas ice", needs review.
+    Burmese-only unknown names are not detected (limitation).
+- DB (migration a815398921a7, applied live after backup, round-trip tested): parse_items
+  (one row per item: product, size, full bottle, qty, unknown_text, from_context); intents
+  check extended; parse_results.phone; customers.phone / phone_message_id / address
+  (address is for Step 4). Existing results got one item each. parse_results keeps the first
+  item in product_id/size_ml/quantity (v1 meaning unchanged).
+- normalize(keep_newlines=True) for message text only (items can be split on new lines);
+  aliases, search and Excel names are normalized exactly as before.
+- Dashboard: badges show every item ("Good Girl · 5ml", "❓ hawas ice · 10ml",
+  "Sauvage · full", "(from previous message)", "📞 09…"); product filter also finds 2nd/3rd
+  items; the edit form has a "Full bottle" box and warns that a correction keeps one item.
+- One-tap reply now covers all items (up to 3, one line each); hidden if any item is unknown,
+  guessed from context, unpriced or out of stock. Chat "Price" editor pre-fills from items.
+- Bug fixed (from Step 2): /healthz "parse queue" counted our outgoing messages (never
+  parsed) and went FAIL once new ones were older than 5 min. Now only incoming count.
+- Fixture tests/fixtures/synthetic_messages.csv: +23 rows (s33-s55) incl. both live examples,
+  new columns items + phone. tests/test_parser_v2_db.py: items stored, context, phone
+  (newest wins), reparse stable, human edit = 1 item, multi-item quick reply.
+- Verified: pytest 186 passed, 1 skipped. Reparse on live (parser stopped): dry run
+  changed=9, run changed=9, second dry run unchanged=9. Live now: "good girl 10 ml ပေးပါ" ->
+  buy 1.0; the 3-item "hawas ice" message -> buy, 3 items, needs review (unknown product).
+  /healthz all ok.
