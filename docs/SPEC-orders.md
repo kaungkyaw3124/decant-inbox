@@ -180,6 +180,68 @@ image_hash, transaction_id UNIQUE, amount, method, decision, reason, decided_by,
 - Every customer reply in this flow gets exactly one suggested next action, so the admin
   just taps through: list -> confirm -> phone -> address -> payment info.
 
+## Step 4c — AUTO MODE (owner decision 2026-10-12; overrides Principle 1 for the cases below)
+The owner wants to mostly MONITOR. When the system is certain, it replies by itself; the
+admin only handles what the system cannot decide (unknown items, payment approval).
+
+### What is automatic (only when certain)
+Same certainty rules as today's one-tap buttons (exact alias match, not fuzzy, not guessed
+from context; priced; in stock; customer not ignored; message < 24 h; nothing of theirs
+still queued). The SAME code path as the one-tap button runs, just without the tap:
+- ask_price / ask_stock (all items known) -> price reply
+- buy (all items known) -> add to cart + cart list + total
+- remove -> remove + new list
+- done -> cart list
+- confirm -> confirm + ask for the next missing thing (phone first, then address)
+- phone(s) -> save + ask address (or payment info if address known)
+- address -> save + payment info (when cart confirmed, priced, phone present, a payment
+  method active)
+- After the admin APPROVES a payment (Step 5) -> confirmation message is sent automatically.
+NEVER automatic: payment approval/rejection, anything with an unknown/fuzzy/guessed item,
+intent other/unknown, photos, messages from ignored customers, chats where the owner is
+typing by hand (see pause below).
+
+### Unknown items (admin resolves, then the flow continues automatically)
+- A buy/price message with ANY unknown item: the system does NOT reply yet. The message goes
+  to a "🟡 Needs you" queue at the top of the inbox with the unknown item highlighted.
+- Admin resolves each unknown item with one of:
+  1. "It's in my list" -> pick the product (searchable, fuzzy suggestions first) and size ->
+     the customer's text is SAVED AS A LEARNED ALIAS (so next time it is automatic).
+  2. "New product" -> quick form (brand, name, price for the asked size, other sizes
+     optional, in stock) -> product + price + alias saved.
+  3. "We don't have it" -> item dropped; the reply will include
+     `{name} ကတော့ လောလောဆယ် မရှိသေးပါဘူးနော်။`
+- When every item of the message is resolved, the system continues AUTOMATICALLY with the
+  normal reply (price reply or add-to-cart + list), exactly as if the message had been
+  recognised. No partial-cart reply is needed in auto mode (the Step 4b partial button
+  stays available as a manual option).
+- Learned aliases apply immediately to later messages (reparse is not needed for new ones).
+
+### Safety (protect the Telegram account and the customers)
+- Global switch in the header: "Auto-reply: ON / OFF" (default OFF until the owner turns
+  it on; state shown on every page). OFF = today's one-tap behaviour.
+- Human-like delay: each auto reply waits a random 8-20 s in the outbox (shown in the
+  chat with Cancel). Existing rate limits stay (1 / 3 s, 20 / min); add 300 auto replies /
+  day cap -> then fall back to one-tap.
+- Owner pause: if the owner sends a message to a chat by hand (from the phone, not via the
+  dashboard), auto-reply pauses for THAT chat for 2 hours (badge "Paused — you're replying
+  by hand", button "Resume auto").
+- Per-customer switch: "Never auto-reply to this customer" (for friends/family).
+- Only replies to customers who wrote first; never more than ONE auto reply per incoming
+  message; if two customer messages arrive within 15 s, wait and handle them together
+  (latest state wins) to avoid double replies.
+- Every auto action is in audit_log with "auto" as actor and is undoable from the chat the
+  same way as a tap (until sent).
+
+### Monitoring screen
+- Inbox top: "🟡 Needs you (N)" (unknown items, payments to check, failed sends, paused
+  chats with new messages) then "🤖 Handled automatically (last 24 h)" as a compact feed.
+- Chat: auto replies marked with a small 🤖.
+
+### Build order change
+Step 4c (this section, including the unknown-item resolution from Step 6) comes BEFORE
+Step 5. Step 6 is then only the "wanted but not stocked" report.
+
 ## Build steps (one at a time)
 - Step 1: Price list: product_prices, Excel import (preview/confirm) + export, price shown on
   product pages. Settings: payment methods, reply templates (defaults above).
@@ -190,5 +252,6 @@ image_hash, transaction_id UNIQUE, amount, method, decision, reason, decided_by,
 - Step 4: Cart + quick replies (add/remove/list, address/phone, payment info).
 - Step 4b: partial carts with unknown items + step-by-step phone/address collection,
   multiple phones (see section above).
+- Step 4c: AUTO MODE + unknown-item resolution with learned aliases (section above).
 - Step 5: Payment check + Order ID + confirmation message.
 - Step 6: Unknown product flow + "wanted but not stocked" list.
