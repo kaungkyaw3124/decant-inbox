@@ -242,6 +242,31 @@ typing by hand (see pause below).
 Step 4c (this section, including the unknown-item resolution from Step 6) comes BEFORE
 Step 5. Step 6 is then only the "wanted but not stocked" report.
 
+## Step 4d — owner feedback after first live auto test (2026-10-12)
+### A. Faster auto replies (configurable)
+- Live test: the auto reply came ~20-60 s after the customer's message (15 s quiet window
+  + random 8-20 s delay + worker polling). Owner wants faster.
+- New Settings (Settings page, "Auto-reply speed"): quiet_window_s (default 5),
+  delay_min_s (default 3), delay_max_s (default 8). Allowed ranges: quiet 0-30,
+  delay 2-60, min <= max. Show a note: "Shorter = faster, but looks more like a bot".
+- Worker reacts to new messages quickly: wake on new message (LISTEN/NOTIFY or poll 1 s)
+  instead of ~5 s polling, so the total is about quiet + delay (~8-13 s by default).
+### B. Skip the separate "confirm" step: the list asks for the phone directly
+- New flow: buy -> cart list + total + ask phone -> phone -> ask address -> address ->
+  payment info.
+- cart_list template ending changes from `အဆင်ပြေရင် confirm လုပ်ပေးပါနော်။` to
+  `ဝယ်ယူမယ်ဆိုရင် ဖုန်းနံပါတ် ပို့ပေးပါနော်။` (when no phone is saved for this customer).
+- A phone message while the cart is still "cart" = the customer agrees: mark confirmed,
+  save phone(s), ask address (or payment info if the address is known).
+- An address message (with or without phone) while "cart" = also counts as agreement
+  (then ask whatever is still missing).
+- "confirm" words (ok / အဆင်ပြေတယ် / ဟုတ်ကဲ့) still work: confirm + ask the next missing thing.
+- Returning customer (phone AND address saved): list ends with
+  `ဖုန်း {phones}၊ လိပ်စာ {address} ကိုပဲ ပို့ပေးရမလား။` -> "confirm" words -> payment info;
+  a new phone/address in the reply replaces/adds as usual.
+- If the customer changes items after giving a phone: send the new list (ending asks only
+  for what is still missing; if nothing is missing, the returning-customer ending).
+
 ## Build steps (one at a time)
 - Step 1: Price list: product_prices, Excel import (preview/confirm) + export, price shown on
   product pages. Settings: payment methods, reply templates (defaults above).
@@ -253,5 +278,6 @@ Step 5. Step 6 is then only the "wanted but not stocked" report.
 - Step 4b: partial carts with unknown items + step-by-step phone/address collection,
   multiple phones (see section above).
 - Step 4c: AUTO MODE + unknown-item resolution with learned aliases (section above).
+- Step 4d: faster configurable auto speed; list asks for phone directly (section above).
 - Step 5: Payment check + Order ID + confirmation message.
 - Step 6: Unknown product flow + "wanted but not stocked" list.
