@@ -1,6 +1,6 @@
 import secrets
 from collections.abc import Iterator
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -40,4 +40,4 @@ def local_time(value: datetime | None, fmt: str = "%d %b %H:%M") -> str:
 
 
 templates.env.filters["local_time"] = local_time
-templates.env.globals.update(format_mmk=format_mmk, size_label=size_label)
+templates.env.globals.update(format_mmk=format_mmk, size_label=size_label, now=lambda: datetime.now(UTC))

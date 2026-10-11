@@ -126,3 +126,8 @@ main.wide { max-width: 1200px; }
 .photo { display: grid; gap: 6px; }
 .flash.warnbox { background: var(--warn-bg); color: var(--warn); }
 .pick-row { grid-template-columns: 2fr 1fr; }
+.quick { display: grid; gap: 4px; justify-items: start; }
+.row-actions .quick { justify-items: end; text-align: right; max-width: 220px; }
+.quick-preview { margin: 0; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.quick-card .quick-preview { max-width: 100%; white-space: normal; }
+.done-text { color: var(--done); }

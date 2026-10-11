@@ -21,7 +21,7 @@ from app.replies import compose
 from app.replies import templates as replies
 from app.web.auth import current_user, verify_csrf
 from app.web.deps import get_db, templates
-from app.web.inbox import flash
+from app.web.inbox import flash, upsert_review
 
 router = APIRouter(dependencies=[Depends(current_user), Depends(verify_csrf)])
 THREAD_SIZE = 100
@@ -189,6 +189,8 @@ def cancel(request: Request, customer_id: int, outbox_id: int, db: Session = Dep
             flash(request, "Too late: it is being sent.")
             return RedirectResponse(f"/chats/{customer_id}#bottom", status_code=303)
     row.status = "cancelled"
+    if row.source_message_id:  # a one-tap reply: same as Undo, restore the message status
+        upsert_review(db, row.source_message_id, row.previous_review_status or "new", None, user)
     db.add(AuditLog(user_id=user.id, action="outbox.cancel", details={"outbox_id": outbox_id}))
     db.commit()
     flash(request, "Cancelled.")

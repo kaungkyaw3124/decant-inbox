@@ -23,7 +23,7 @@
 
 {% if rows %}
 <ul class="rows">
-  {% for row in rows %}{% with m=row.m, c=row.c, r=row.r, p=row.p, status=row.status, needs_review=row.needs_review %}{% include "_row.html" %}{% endwith %}{% endfor %}
+  {% for row in rows %}{% with m=row.m, c=row.c, r=row.r, p=row.p, status=row.status, needs_review=row.needs_review, quick=row.quick, quick_outbox=row.quick_outbox %}{% include "_row.html" %}{% endwith %}{% endfor %}
 </ul>
 {% else %}
 <p class="empty">No messages match these filters.</p>

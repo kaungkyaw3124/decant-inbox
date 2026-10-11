@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.base import Base, created_at_column
@@ -9,6 +9,7 @@ from app.core.config import BASE_DIR
 OUTBOX_STATUSES = ("queued", "sending", "sent", "failed", "cancelled")
 REPLY_KINDS = ("custom", "price")
 DOWNLOAD_STATUSES = ("queued", "done", "failed")
+UNDO_SECONDS = 10
 MAX_TEXT = 4096  # Telegram's limit for one message
 MEDIA_DIR = BASE_DIR / "secrets" / "media"  # downloaded photos (dir 700, git-ignored)
 
@@ -36,6 +37,10 @@ class Outbox(Base):
     created_at: Mapped[datetime] = created_at_column()
     sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     sent_message_id: Mapped[int | None] = mapped_column(ForeignKey("messages.id"))
+    # One-tap quick replies wait UNDO_SECONDS here so the admin can undo; editor replies go now.
+    send_after: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), default=func.now())
+    source_message_id: Mapped[int | None] = mapped_column(ForeignKey("messages.id"), index=True)  # quick reply to
+    previous_review_status: Mapped[str | None] = mapped_column(String(16))  # restored by Undo
 
 
 class MediaDownload(Base):

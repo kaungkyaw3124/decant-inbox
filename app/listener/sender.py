@@ -13,7 +13,7 @@ from collections import deque
 from datetime import UTC, datetime
 from pathlib import Path
 
-from sqlalchemy import exists, select
+from sqlalchemy import exists, func, select
 from telethon import errors
 from telethon.tl import types
 
@@ -57,7 +57,8 @@ def claim_next() -> tuple[int, int, str, str] | None:
     """Take the oldest queued row and mark it "sending". Returns (outbox id, customer id,
     telegram user id, text), or None. Rows failing the safety checks are marked failed."""
     with SessionLocal.begin() as s:
-        row = s.scalar(select(Outbox).where(Outbox.status == "queued").order_by(Outbox.id)
+        row = s.scalar(select(Outbox).where(Outbox.status == "queued", Outbox.send_after <= func.now())
+                       .order_by(Outbox.id)
                        .limit(1).with_for_update(skip_locked=True))
         if row is None:
             return None

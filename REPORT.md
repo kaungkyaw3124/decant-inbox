@@ -354,3 +354,31 @@ Short entries from the VPS Claude Code session, newest last.
   Price -> Make price reply -> check text -> Send. Within ~5 s the bubble turns into a normal
   sent message and the reply appears in Telegram. Also try Custom, and send a photo to test
   "Show photo".
+
+## 2026-10-12 — One-tap quick replies: "💬 Reply price" with 10 s Undo
+- Spec: docs/SPEC-orders.md "One-tap quick replies" (pulled 4ce2553).
+- DB (migration ec736787bcb9, applied live after backup, round-trip tested): outbox.send_after
+  (the listener only takes rows whose time has come), source_message_id,
+  previous_review_status (for Undo).
+- app/replies/quick.py decides when the button is shown: incoming message, current parse
+  ask_price/ask_stock, product known, size known (or none = all sizes), confidence >=
+  NEEDS_REVIEW_BELOW (or a human correction), every price present and in stock, no reply to
+  that customer queued/sent in the last 60 s, no quick reply already made for that message,
+  customer not ignored. Otherwise: no button (use the chat editor).
+- Button on inbox rows and on the message page; hover/long-press shows the exact text,
+  one line preview under it; message page also has "Edit before send" (opens the chat's
+  Price editor with the same product/size). The 6 h greeting rule applies.
+- Tap -> outbox row with send_after = now + 10 s, message marked done, audit
+  outbox.quick_price. The row/page shows "Sending in N s" + Undo (countdown in
+  static/quick.js), then "sending…", then "✓ price reply sent" (inbox row refreshes itself).
+  Undo (or Cancel in the chat) -> cancelled + previous review status restored; after the
+  listener took it: "Too late to undo". The server rebuilds the text on tap and refuses
+  ("the reply changed") if it differs from what the button showed (e.g. a price changed).
+- Verified: pytest 158 passed, 1 skipped (4 new: when it is offered/hidden, tap -> queued
+  10 s + done, listener waits, double tap refused, undo restores, sent after 10 s, undo too
+  late, changed price refused, recent reply / low confidence hide it). Live: services
+  restarted (tunnel untouched), /healthz all ok, quick.js served.
+- Live data: 1 real customer message currently qualifies for the button. Tapping it would
+  really reply to that customer.
+- Note: with the default inbox filter (status = new) a replied message disappears on the
+  next reload because it is "done"; Undo stays available on the message page until sent.

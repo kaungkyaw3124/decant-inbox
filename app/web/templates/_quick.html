@@ -1,0 +1,34 @@
+{# One-tap price reply. Needs: m, quick, quick_outbox, in_row (bool), optional quick_error. #}
+{% set target = 'hx-target="#msg-' ~ m.id ~ '" hx-swap="outerHTML"' if in_row else '' %}
+<div class="quick">
+  {% if quick_error %}<p class="error small" role="alert">{{ quick_error }}</p>{% endif %}
+  {% set o = quick_outbox %}
+  {% if o %}
+    {% if o.status == "queued" and o.send_after > now() %}
+      <span class="small" data-send-at="{{ o.send_after.isoformat() }}" title="{{ o.text }}">Sending in {{ ((o.send_after - now()).total_seconds()) | round | int }} s</span>
+      <form method="post" action="/outbox/{{ o.id }}/undo" class="inline" data-undo
+            {% if in_row %}hx-post="/outbox/{{ o.id }}/undo" {{ target | safe }}{% endif %}>
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <input type="hidden" name="back" value="{{ back | default('/') }}">
+        <button class="primary">Undo</button>
+      </form>
+    {% elif o.status in ("queued", "sending") %}
+      <span class="small muted" title="{{ o.text }}">💬 sending…</span>
+    {% elif o.status == "sent" %}
+      <span class="small done-text" title="{{ o.text }}">✓ price reply sent</span>
+    {% elif o.status == "failed" %}
+      <span class="small error">✖ not sent: {{ o.error }}</span>
+      <a class="small" href="/chats/{{ m.customer_id }}#reply">open chat</a>
+    {% endif %}
+  {% elif quick %}
+    <form method="post" action="/messages/{{ m.id }}/quick-price" class="inline"
+          {% if in_row %}hx-post="/messages/{{ m.id }}/quick-price" {{ target | safe }}{% endif %}>
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <input type="hidden" name="expect" value="{{ quick.fingerprint }}">
+      <input type="hidden" name="back" value="{{ back | default('/') }}">
+      <button class="primary" title="{{ quick.text }}">💬 Reply price</button>
+    </form>
+    <p class="quick-preview small muted" title="{{ quick.text }}">{{ quick.preview }}</p>
+    {% if not in_row %}<a class="small" href="{{ quick.edit_url }}">Edit before send</a>{% endif %}
+  {% endif %}
+</div>

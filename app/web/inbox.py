@@ -1,5 +1,6 @@
 """Inbox, message detail, human edits of parse results, review status, ignore customer."""
-from datetime import UTC, datetime
+import secrets
+from datetime import UTC, datetime, timedelta
 from urllib.parse import quote, urlencode
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
@@ -8,11 +9,14 @@ from sqlalchemy import and_, or_, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session, aliased
 
-from app.models import Customer, Message, MessageReview, ParseResult, Product, ProductAlias, User
+from app.models import AuditLog, Customer, Message, MessageReview, Outbox, ParseResult, Product, ProductAlias, User
 from app.models.messages import REVIEW_STATUSES
 from app.models.parsing import INTENTS
 from app.parser.normalize import normalize
+from app.models.outbox import UNDO_SECONDS
 from app.parser.rules import NEEDS_REVIEW_BELOW
+from app.replies import quick
+from app.replies import templates as replies
 from app.web.auth import current_user, verify_csrf
 from app.web.deps import get_db, templates
 
@@ -73,12 +77,32 @@ def inbox_query(f: dict):
     return q.order_by(Message.received_at.desc(), Message.id.desc())
 
 
-def row_context(message, customer, result, product, review) -> dict:
+def row_context(message, customer, result, product, review, quick_info: dict | None = None) -> dict:
     return {
         "m": message, "c": customer, "r": result, "p": product,
         "status": review.status if review else "new",
         "needs_review": result is None or (result.method != "human" and result.confidence < NEEDS_REVIEW_BELOW),
+        **(quick_info or {"quick": None, "quick_outbox": None}),
     }
+
+
+def quick_infos(db: Session, rows, texts: dict[str, str] | None = None) -> dict[int, dict]:
+    """Per message: the one-tap price reply it can get (quick) or already got (quick_outbox)."""
+    texts = texts or replies.load(db)
+    made = quick.pending_quick(db, [r[0].id for r in rows])
+    return {
+        m.id: {"quick_outbox": made.get(m.id),
+               "quick": None if m.id in made or c.ignored else quick.quick_price_reply(db, m, r, texts)}
+        for m, c, r, *_ in rows
+    }
+
+
+def row_by_id(db: Session, message_id: int) -> dict:
+    row = db.execute(inbox_query({
+        "status": "all", "intent": "all", "product": None, "needs_review": False,
+        "show_ignored": True, "q": "",
+    }).where(Message.id == message_id)).one()
+    return row_context(*row, quick_infos(db, [row])[message_id])
 
 
 @router.get("/", response_class=HTMLResponse)
@@ -94,13 +118,14 @@ def inbox(
     }
     page = max(page, 1)
     rows = db.execute(inbox_query(f).limit(PAGE_SIZE + 1).offset((page - 1) * PAGE_SIZE)).all()
+    infos = quick_infos(db, rows[:PAGE_SIZE])
     params = {k: v for k, v in request.query_params.items() if k != "page"}
 
     def page_url(n: int) -> str:
         return "/?" + urlencode({**params, "page": n})
 
     return templates.TemplateResponse(request, "inbox.html", {
-        "rows": [row_context(*r) for r in rows[:PAGE_SIZE]], "f": f,
+        "rows": [row_context(*r, infos[r[0].id]) for r in rows[:PAGE_SIZE]], "f": f,
         "newer_url": page_url(page - 1) if page > 1 else None,
         "older_url": page_url(page + 1) if len(rows) > PAGE_SIZE else None,
         "back": "/?" + request.url.query if request.url.query else "/",
@@ -125,8 +150,11 @@ def message_detail(request: Request, message_id: int, back: str = "/", db: Sessi
     current = next(((r, p) for r, p in history if r.is_current), (None, None))
     review = db.scalar(select(MessageReview).where(MessageReview.message_id == message_id))
     reviewer = db.get(User, review.reviewed_by) if review and review.reviewed_by else None
+    customer = db.get(Customer, message.customer_id)
+    info = quick_infos(db, [(message, customer, current[0])])[message_id]
     return templates.TemplateResponse(request, "message.html", {
-        "m": message, "c": db.get(Customer, message.customer_id),
+        **info, "undo_seconds": UNDO_SECONDS,
+        "m": message, "c": customer,
         "r": current[0], "p": current[1], "history": history,
         "review": review, "reviewer": reviewer, "status": review.status if review else "new",
         "intents": INTENTS, "statuses": REVIEW_STATUSES, "products": products_for_select(db),
@@ -174,6 +202,11 @@ def edit_parse(
 
 
 def set_review(db: Session, message_id: int, status: str, note: str | None, user: User) -> None:
+    upsert_review(db, message_id, status, note, user)
+    db.commit()
+
+
+def upsert_review(db: Session, message_id: int, status: str, note: str | None, user: User) -> None:
     if status not in REVIEW_STATUSES:
         raise HTTPException(400, "Unknown status")
     values = {"message_id": message_id, "status": status, "reviewed_by": user.id,
@@ -184,7 +217,6 @@ def set_review(db: Session, message_id: int, status: str, note: str | None, user
     db.execute(stmt.on_conflict_do_update(
         index_elements=["message_id"], set_={k: v for k, v in values.items() if k != "message_id"}
     ))
-    db.commit()
 
 
 @router.post("/messages/{message_id}/review")
@@ -195,11 +227,7 @@ def review_message(
     get_message(db, message_id)
     set_review(db, message_id, status, note, user)
     if request.headers.get("hx-request"):  # inbox quick button: re-render just this row
-        row = db.execute(inbox_query({
-            "status": "all", "intent": "all", "product": None, "needs_review": False,
-            "show_ignored": True, "q": "",
-        }).where(Message.id == message_id)).one()
-        return templates.TemplateResponse(request, "_row.html", row_context(*row))
+        return templates.TemplateResponse(request, "_row.html", row_by_id(db, message_id))
     flash(request, f"Marked {status}.")
     return RedirectResponse(detail_url(message_id, back), status_code=303)
 
@@ -217,3 +245,73 @@ def ignore_customer(
     flash(request, "Customer ignored: their messages are hidden from the inbox."
           if customer.ignored else "Customer no longer ignored.")
     return RedirectResponse(safe_back(back, "/"), status_code=303)
+
+
+@router.get("/messages/{message_id}/row", response_class=HTMLResponse)
+def message_row(request: Request, message_id: int, db: Session = Depends(get_db)):
+    """One inbox row (htmx refresh while a quick reply is waiting or sending)."""
+    get_message(db, message_id)
+    return templates.TemplateResponse(request, "_row.html", row_by_id(db, message_id))
+
+
+@router.post("/messages/{message_id}/quick-price")
+def quick_price(
+    request: Request, message_id: int, expect: str = Form(...), back: str = Form("/"),
+    db: Session = Depends(get_db), user: User = Depends(current_user),
+):
+    """One tap: queue the price reply (sent after UNDO_SECONDS) and mark the message done."""
+    message = get_message(db, message_id)
+    result = db.scalar(select(ParseResult).where(ParseResult.message_id == message_id, ParseResult.is_current))
+    db.execute(select(Customer.id).where(Customer.id == message.customer_id).with_for_update())  # one tap at a time
+    reply = quick.quick_price_reply(db, message, result, replies.load(db))
+    if reply is None or reply.fingerprint != expect:
+        db.rollback()
+        note = "Not sent: the reply changed (price, parse or another reply just now). Check and try again."
+        if request.headers.get("hx-request"):
+            ctx = row_by_id(db, message_id)
+            return templates.TemplateResponse(request, "_row.html", {**ctx, "quick_error": note})
+        flash(request, note)
+        return RedirectResponse(detail_url(message_id, back), status_code=303)
+    review = db.scalar(select(MessageReview).where(MessageReview.message_id == message_id))
+    outbox = Outbox(
+        customer_id=message.customer_id, text=reply.text, reply_kind="price", status="queued",
+        idempotency_key=f"quick-{message_id}-{secrets.token_urlsafe(8)}", created_by=user.id,
+        send_after=datetime.now(UTC) + timedelta(seconds=UNDO_SECONDS),
+        source_message_id=message_id, previous_review_status=review.status if review else "new",
+    )
+    db.add(outbox)
+    db.flush()
+    upsert_review(db, message_id, "done", None, user)
+    db.add(AuditLog(user_id=user.id, action="outbox.quick_price", details={
+        "outbox_id": outbox.id, "message_id": message_id, "customer_id": message.customer_id,
+        "chars": len(reply.text)}))
+    db.commit()
+    if request.headers.get("hx-request"):
+        return templates.TemplateResponse(request, "_row.html", row_by_id(db, message_id))
+    flash(request, f"Price reply queued: sent in {UNDO_SECONDS} s unless you undo. Marked done.")
+    return RedirectResponse(detail_url(message_id, back), status_code=303)
+
+
+@router.post("/outbox/{outbox_id}/undo")
+def undo_quick(
+    request: Request, outbox_id: int, back: str = Form("/"),
+    db: Session = Depends(get_db), user: User = Depends(current_user),
+):
+    """Cancel a one-tap reply the listener has not taken yet and restore the review status."""
+    row = db.scalar(select(Outbox).where(Outbox.id == outbox_id).with_for_update())  # waits for a claim
+    if row is None or row.source_message_id is None:
+        raise HTTPException(404, "Not found")
+    if row.status == "queued":
+        row.status = "cancelled"
+        upsert_review(db, row.source_message_id, row.previous_review_status or "new", None, user)
+        db.add(AuditLog(user_id=user.id, action="outbox.undo", details={"outbox_id": outbox_id}))
+        db.commit()
+        note = "Undone: not sent."
+    else:
+        db.rollback()
+        note = "Too late to undo: it has already been sent."
+    if request.headers.get("hx-request"):
+        ctx = row_by_id(db, row.source_message_id)
+        return templates.TemplateResponse(request, "_row.html", {**ctx, "quick_error": note if row.status != "cancelled" else ""})
+    flash(request, note)
+    return RedirectResponse(detail_url(row.source_message_id, back), status_code=303)

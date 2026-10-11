@@ -9,7 +9,9 @@ Read CLAUDE.md first. This file tracks where we are.
 - v2 Step 1 (price list + Excel + Settings) DONE and live; sample prices imported, test
   payment methods KPay/AYA Pay (Test Shop) added.
 - v2 Step 2 (messaging core) DONE and deployed; waiting for the owner's first live send test
-  (see REPORT.md). NEXT: Step 3 (parser rules-2) after owner OK.
+  (see REPORT.md).
+- One-tap quick replies ("💬 Reply price", 10 s Undo) DONE and deployed; waiting for the
+  owner's live test. NEXT: Step 3 (parser rules-2) after owner OK.
 - Owner checks: `bash scripts/status.sh`.
 
 ## Status

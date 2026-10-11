@@ -17,6 +17,14 @@
   </div>
 </section>
 
+{% if quick or quick_outbox %}
+<section class="card quick-card">
+  <h2>Quick reply</h2>
+  {% with in_row = false %}{% include "_quick.html" %}{% endwith %}
+  {% if quick %}<p class="muted small">Sent {{ undo_seconds }} s after the tap; you can undo until then. Marks this message done.</p>{% endif %}
+</section>
+{% endif %}
+
 <section class="card">
   <h2>Status: {{ status }}</h2>
   {% if review and review.reviewed_at %}<p class="muted small">by {{ reviewer.username if reviewer else "?" }}, {{ review.reviewed_at | local_time }}</p>{% endif %}
