@@ -22,6 +22,7 @@ Undo reverses exactly what the action changed (stored in quick_actions.undo).
 """
 import hashlib
 import json
+import re
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -44,6 +45,8 @@ from app.replies.templates import render
 CONTEXT_WINDOW = timedelta(hours=24)
 UNDO_WITHOUT_REPLY = timedelta(seconds=60)  # actions that send nothing can be undone this long
 MIN_ADDRESS_LETTERS = 12  # a longer leftover counts as an address even without address words
+# "one more of the same": only then does a product+size already in the cart get +qty
+MORE_RE = re.compile(r"ထပ်|(?<![a-z])(?:more|another|again|extra)(?![a-z])|\+\s*1")
 
 
 class Refused(Exception):
@@ -158,9 +161,9 @@ def _ask_next(session: Session, order: Order, texts: dict[str, str]) -> tuple[st
 
 def _apply(session: Session, message: Message, result: ParseResult, texts: dict[str, str],
            address_override: str | None = None) -> Outcome | None:
-    outcome = _apply_items(session, message, result, texts, address_override)
     dropped = _not_stocked_lines(session, message, result, texts)
-    if not dropped:
+    outcome = _apply_items(session, message, result, texts, address_override, dropped)
+    if not dropped or (outcome is not None and outcome.kind == "cart_add"):  # cart_add placed them itself
         return outcome
     if outcome is None:
         if any(i.product_id or i.unknown_text for i in _remaining(session, message, result)):
@@ -184,7 +187,7 @@ def _not_stocked_lines(session: Session, message: Message, result: ParseResult, 
 
 
 def _apply_items(session: Session, message: Message, result: ParseResult, texts: dict[str, str],
-                 address_override: str | None) -> Outcome | None:
+                 address_override: str | None, dropped: list[str]) -> Outcome | None:
     intent = result.intent
     customer = session.get(Customer, message.customer_id)
     items = _remaining(session, message, result)
@@ -207,7 +210,7 @@ def _apply_items(session: Session, message: Message, result: ParseResult, texts:
 
     order = cart.open_cart(session, customer.id)
     if intent == "buy":
-        return _buy(session, message, customer, order, items, texts)
+        return _buy(session, message, customer, order, items, texts, dropped)
     if order is None or order.status not in ("cart", "confirmed", "waiting_payment"):
         return None
     before = _order_state(order)
@@ -230,9 +233,7 @@ def _apply_items(session: Session, message: Message, result: ParseResult, texts:
                        "", order.id, {"order": before})
     if intent == "confirm" and order.status == "cart":
         cart.confirm(session, order)
-        if cart.missing_contact(order) and cart.has_saved_contact(session, order, customer):
-            return Outcome("confirm", "✅ Confirm cart", None, None,
-                           "Then in the cart: same phone & address as last time?", order.id, {"order": before})
+        cart.use_saved_contact(session, order, customer)  # "ok" to "same phone & address?" (returning)
         text, reply_kind, suffix = _ask_next(session, order, texts)
         return Outcome("confirm", "✅ Confirm" + suffix, text, reply_kind, "Cart confirmed.", order.id,
                        {"order": before})
@@ -245,7 +246,7 @@ def _apply_items(session: Session, message: Message, result: ParseResult, texts:
 
 
 def _buy(session: Session, message: Message, customer: Customer, order: Order | None,
-         items: list[ParseItem], texts: dict[str, str]) -> Outcome | None:
+         items: list[ParseItem], texts: dict[str, str], dropped: list[str]) -> Outcome | None:
     """Add what we know; unknown and unpriced items become red rows named in the reply;
     out-of-stock items are not added (out-of-stock line instead)."""
     if not items or any(i.from_context or (not i.product_id and not i.unknown_text) for i in items):
@@ -267,13 +268,15 @@ def _buy(session: Session, message: Message, customer: Customer, order: Order | 
     if order.status not in ("cart", "confirmed", "waiting_payment"):
         return None
     before = _order_state(order)
-    changed = cart.add_items(session, order, add, message.id)
+    more = bool(MORE_RE.search(message.normalized_text or ""))
+    changed = cart.add_items(session, order, add, message.id, more=more)
     order.list_sent_at = datetime.now(UTC)
-    lines = [cart.cart_text(session, order, texts)]
+    notes = []
     for w in out_of_stock:
         product = session.get(Product, w.product_id)
-        lines.append(render(texts["out_of_stock"], product=product.name,
+        notes.append(render(texts["out_of_stock"], product=product.name,
                             size=size_label(None if w.is_full_bottle else w.size_ml, product.full_size_ml)))
+    lines = [cart.cart_text(session, order, texts, notes + dropped)]
     view = cart.view(session, order)
     partial = sellable < len(items)
     label = (f"🛒 Add {sellable} known item{'s' if sellable > 1 else ''} + send list" if partial
@@ -292,6 +295,9 @@ def _contact(session: Session, message: Message, customer: Customer, order: Orde
     send payment info when everything is ready."""
     undo = {"order": before, "customer": {"address": customer.address},
             "phones": [list(r) for r in cart.phone_rows(session, customer.id)]}
+    agreed = order.status == "cart"  # Step 4d: a phone or address while "cart" = the customer agrees
+    if agreed:
+        cart.confirm(session, order)
     added = cart.add_phones(session, order, customer, phones, message.id) if phones else []
     phones_new_on_order = bool(set(order.phones or []) - set(before["phones"]))
     new_address = address if address and address != order.address else None
@@ -299,10 +305,12 @@ def _contact(session: Session, message: Message, customer: Customer, order: Orde
         cart.set_address(session, order, customer, new_address)
     if not phones_new_on_order and not new_address:
         return None  # nothing new
+    if order.status == "confirmed":  # a returning customer: keep the saved part they didn't change
+        cart.use_saved_contact(session, order, customer)
     shown_phones = ", ".join(added or [p for p in order.phones if p in phones])
     parts = ([f"📞 Save phone{'s' if len(phones) > 1 else ''}"] if phones_new_on_order else []) + (
         ["📍 Save address"] if new_address else [])
-    label, text, reply_kind = " & ".join(parts), None, None
+    label, text, reply_kind = ("✅ " if agreed else "") + " & ".join(parts), None, None
     if order.status == "confirmed":
         if phones_new_on_order and not new_address and not order.address:
             text = render(texts["phone_saved_ask_address"], phones=shown_phones)
@@ -315,7 +323,8 @@ def _contact(session: Session, message: Message, customer: Customer, order: Orde
         label += " + reply"
     saved = ", ".join(x for x in (shown_phones if phones_new_on_order else "", new_address or "") if x)
     problems = cart.view(session, order).problems
-    note = f"Saves: {saved}." + (f" Still to check before payment: {', '.join(problems)}." if problems else "")
+    note = (("Counts as agreement: cart confirmed. " if agreed else "") + f"Saves: {saved}."
+            + (f" Still to check before payment: {', '.join(problems)}." if problems else ""))
     return Outcome("contact", label, text, reply_kind, note, order.id, undo, address=new_address)
 
 

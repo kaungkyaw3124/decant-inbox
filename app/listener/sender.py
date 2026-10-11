@@ -181,7 +181,7 @@ async def download_next(client) -> bool:
     return True
 
 
-async def run_forever(client, poll_seconds: float = 2.0) -> None:
+async def run_forever(client, poll_seconds: float = 0.5) -> None:
     """Outbox + downloads loop, inside the listener (the one process with the session)."""
     limiter = RateLimiter()
     while True:

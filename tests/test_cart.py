@@ -155,9 +155,10 @@ def test_partial_cart(shop, db):
     assert items(db) == [("Stronger With You Intensely", 5, False, 1, 18000),
                          ("Sauvage Eau de Parfum", 3, False, 1, None), ("?hawas ice", 10, False, 1, None)]
     assert deliver(db) == ["မင်္ဂလာပါ။\n• Stronger With You Intensely 5ml – 18,000 ကျပ်\n"
-                           "စုစုပေါင်း 18,000 ကျပ်ပါ။ အဆင်ပြေရင် confirm လုပ်ပေးပါနော်။\n"
+                           "စုစုပေါင်း 18,000 ကျပ်ပါ။\n"
                            "hawas ice 10ml, Sauvage Eau de Parfum 3ml ကိုတော့ စစ်ပြီး ပြန်ပြောပေးပါမယ်နော်။\n"
-                           "Y Eau de Parfum 5ml လောလောဆယ် ကုန်နေပါတယ်နော်။"]
+                           "Y Eau de Parfum 5ml လောလောဆယ် ကုန်နေပါတယ်နော်။\n"
+                           "ဝယ်ယူမယ်ဆိုရင် ဖုန်းနံပါတ် ပို့ပေးပါနော်။"]
     cid = customer_id(db, "95")
     page = client.get(f"/chats/{cid}?tab=cart").text
     assert "❓ hawas ice" in page and "not in product list" in page and "no price" in page
@@ -190,10 +191,18 @@ def test_same_phone_and_address_next_time(shop, db):
         c.execute(text("INSERT INTO customer_phones (customer_id, phone, position) VALUES (:c, '09111222333', 1)"),
                   {"c": cid})
     tap(client, token, say(db, 1, "stw intensely 10ml ယူမယ်", customer="92"))
-    deliver(db)
+    assert deliver(db)[0].endswith("ဖုန်း 09111222333၊ လိပ်စာ No. 5, Sanchaung ကိုပဲ ပို့ပေးရမလား။")
     ok = say(db, 2, "ဟုတ်ကဲ့", customer="92")
-    assert button(client, ok)[0] == "✅ Confirm cart"  # saved info exists: the admin decides
+    assert button(client, ok)[0] == "✅ Confirm + 💳 send payment info"  # "yes, same as last time"
     tap(client, token, ok)
+    assert deliver(db)[0].endswith(PAYMENT_FOOTER)
+    assert order_row(db, "92")[:4] == ("waiting_payment", 33000, "No. 5, Sanchaung", ["09111222333"])
+
+    # the cart panel offers the same when the admin confirms by hand
+    client.post(f"/chats/{cid}/cart/cancel", data={"csrf": token})
+    stw = scalar(db, "SELECT id FROM products WHERE name = 'Stronger With You Intensely'")
+    client.post(f"/chats/{cid}/cart/add", data={"csrf": token, "product_id": str(stw), "size": "10"})
+    client.post(f"/chats/{cid}/cart/confirm", data={"csrf": token})
     page = client.get(f"/chats/{cid}?tab=cart").text
     assert "Next: Same phone &amp; address as last time" in page and "09111222333" in page
     client.post(f"/chats/{cid}/cart/same-contact", data={"csrf": token})

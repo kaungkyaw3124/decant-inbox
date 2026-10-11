@@ -75,7 +75,8 @@ def housekeeping() -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--once", action="store_true", help="parse what is pending, then exit")
-    parser.add_argument("--interval", type=float, default=5.0, help="seconds between polls")
+    # 1 s: auto replies should go out ~3 s after the customer's message (Step 4d)
+    parser.add_argument("--interval", type=float, default=1.0, help="seconds between polls")
     args = parser.parse_args()
 
     log.info("parser worker started (%s)", PARSER_VERSION)

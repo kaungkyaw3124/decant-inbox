@@ -9,9 +9,10 @@ Runs in the parser worker (database only). Extra rules on top of the one-tap one
   the last 2 h, unless the admin pressed "Resume auto");
 - every product named exactly (alias match), none guessed, fuzzy or unknown;
 - nothing answered after the message already (by hand or otherwise);
-- the customer has been quiet for 15 s (several quick messages: handled one by one, each
-  seeing the latest state; the "reply still queued" rule stops double replies);
-- a random 8-20 s delay in the outbox (human-like, Cancel in the chat);
+- the customer has been quiet for a moment (Settings "Auto-reply speed", default 1 s; several
+  quick messages are handled one by one, each seeing the latest state; the "reply still
+  queued" rule stops double replies);
+- a random delay in the outbox (default 2-3 s; Cancel in the chat);
 - at most 300 auto replies a day, then one-tap again;
 - at most one auto decision per incoming message (auto_runs).
 Never automatic: photos, intents other/unknown, unknown items (those go to "Needs you").
@@ -31,10 +32,11 @@ from app.replies import templates as replies
 
 log = logging.getLogger("auto")
 SETTING = "auto_reply"
+SPEED_SETTING = "auto_speed"
+DEFAULT_SPEED = {"quiet_s": 1, "delay_min_s": 2, "delay_max_s": 3}  # ~3 s from message to reply
+SPEED_LIMITS = {"quiet_s": (0, 30), "delay_min_s": (1, 60), "delay_max_s": (1, 60)}
 AUTO_INTENTS = ("ask_price", "ask_stock", "buy", "remove", "done", "confirm", "address")
 CERTAIN_MATCHES = ("exact", "inherited", "human")
-DELAY_SECONDS = (8, 20)
-QUIET_SECONDS = 15
 PAUSE_AFTER_HAND_REPLY = timedelta(hours=2)
 LINK_GRACE = timedelta(seconds=30)  # a dashboard send is linked to its outbox row within ms
 DAILY_CAP = 300
@@ -55,6 +57,23 @@ def enabled(session: Session) -> bool:
 def set_enabled(session: Session, on: bool, user: User | None) -> None:
     value = {"enabled": on, "since": datetime.now(UTC).isoformat()} if on else {"enabled": False}
     stmt = insert(AppSetting).values(key=SETTING, value=value, updated_by=user.id if user else None)
+    session.execute(stmt.on_conflict_do_update(index_elements=["key"], set_={
+        "value": stmt.excluded.value, "updated_by": stmt.excluded.updated_by, "updated_at": func.now()}))
+
+
+def speed(session: Session) -> dict[str, int]:
+    row = session.get(AppSetting, SPEED_SETTING)
+    return {**DEFAULT_SPEED, **(row.value if row else {})}
+
+
+def set_speed(session: Session, values: dict[str, int], user: User | None) -> None:
+    """ValueError if outside the allowed ranges or min > max."""
+    for key, (low, high) in SPEED_LIMITS.items():
+        if not low <= values[key] <= high:
+            raise ValueError(f"{key} must be {low}-{high} s")
+    if values["delay_min_s"] > values["delay_max_s"]:
+        raise ValueError("The shortest delay can't be longer than the longest")
+    stmt = insert(AppSetting).values(key=SPEED_SETTING, value=values, updated_by=user.id if user else None)
     session.execute(stmt.on_conflict_do_update(index_elements=["key"], set_={
         "value": stmt.excluded.value, "updated_by": stmt.excluded.updated_by, "updated_at": func.now()}))
 
@@ -133,9 +152,10 @@ def decide(session: Session, message: Message, now: datetime) -> str | None:
     if any(i.product_id and (i.from_context or (i.match not in CERTAIN_MATCHES and result.method != "human"))
            for i in items):
         return _skip(session, message.id, "product not named exactly")
+    pace = speed(session)
     latest_in = session.scalar(select(func.max(Message.received_at)).where(
         Message.customer_id == customer.id, Message.direction == "in"))
-    if now - latest_in < timedelta(seconds=QUIET_SECONDS):
+    if now - latest_in < timedelta(seconds=pace["quiet_s"]):
         return None  # more messages may be coming: wait for the customer to finish
     if session.scalar(select(exists().where(Outbox.customer_id == customer.id,
                                             Outbox.status.in_(("queued", "sending"))))):
@@ -146,7 +166,7 @@ def decide(session: Session, message: Message, now: datetime) -> str | None:
         return _skip(session, message.id, "no certain reply")
     if suggestion.text and sent_today(session, now) >= DAILY_CAP:
         return _skip(session, message.id, f"daily limit of {DAILY_CAP} auto replies")
-    delay = timedelta(seconds=random.randint(*DELAY_SECONDS))
+    delay = timedelta(seconds=random.uniform(pace["delay_min_s"], pace["delay_max_s"]))
     try:
         action = actions.perform(session, message, suggestion.fingerprint, None, texts, delay=delay)
     except actions.Refused as exc:

@@ -80,9 +80,12 @@ def normalize_wanted(session: Session, item: WantedItem) -> WantedItem:
     return item
 
 
-def add_items(session: Session, order: Order, wanted: list[WantedItem], source_message_id: int | None) -> list[int]:
-    """Add items (same product+size again -> one line with the quantities added up).
-    Returns new item ids, and -id for lines this replaced (for undo)."""
+def add_items(session: Session, order: Order, wanted: list[WantedItem], source_message_id: int | None,
+              more: bool = True) -> list[int]:
+    """Add items to the cart (never replaces it). The same product+size again: quantities
+    added up when `more` (the admin's own add, or the customer said ထပ် / more), otherwise
+    the line stays as it is (a customer repeating their order). Returns new item ids, and
+    -id for lines this replaced (for undo)."""
     changed = []
     for w in (normalize_wanted(session, w) for w in wanted):
         existing = None
@@ -91,6 +94,8 @@ def add_items(session: Session, order: Order, wanted: list[WantedItem], source_m
                 OrderItem.order_id == order.id, OrderItem.removed_at.is_(None), OrderItem.product_id == w.product_id,
                 OrderItem.size_ml.is_(None) if w.is_full_bottle else OrderItem.size_ml == w.size_ml,
                 OrderItem.is_full_bottle == w.is_full_bottle))
+        if existing is not None and not more:
+            continue  # already in the cart: keep one line
         quantity = min((existing.quantity if existing else 0) + w.quantity, MAX_QTY)
         if existing is not None:
             existing.removed_at = datetime.now(UTC)  # a new line keeps the undo simple and exact
@@ -302,11 +307,24 @@ def item_lines(session: Session, order: Order, texts: dict[str, str]) -> list[st
             for i, p in view(session, order).lines if p is not None and i.unit_price_mmk is not None]
 
 
-def cart_text(session: Session, order: Order, texts: dict[str, str]) -> str:
+def cart_text(session: Session, order: Order, texts: dict[str, str], notes: list[str] | None = None) -> str:
+    """Items, total, items we must check, and the next question (Step 4d: the list asks for
+    the phone directly; then the address; a returning customer is asked to confirm the
+    saved phone and address)."""
     cart = view(session, order)
     lines = item_lines(session, order, texts) + [render(texts["cart_total"], total=format_mmk(cart.total))]
     if cart.problems:
         lines.append(render(texts["unknown_items_note"], names=", ".join(cart.problems)))
+    lines += notes or []  # e.g. out of stock / we don't have it: before the question
+    customer = session.get(Customer, order.customer_id)
+    phones = order.phones or customer_phones(session, customer.id)
+    address = order.address or customer.address
+    if not phones:
+        lines.append(texts["cart_ask_phone"])
+    elif not address:
+        lines.append(texts["ask_address"])
+    else:
+        lines.append(render(texts["cart_returning"], phones=", ".join(phones), address=address))
     return "\n".join(lines)
 
 

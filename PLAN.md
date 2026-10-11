@@ -16,8 +16,9 @@ Read CLAUDE.md first. This file tracks where we are.
 - v2 Step 4 (cart, one-tap cart actions, address/phone, payment info) DONE and deployed.
 - v2 Step 4b (partial carts, phone first then address, up to 3 phones, same phone & address
   next time) DONE and deployed; waiting for the owner's end-to-end test (REPORT.md).
-- v2 Step 4c (AUTO MODE + unknown-item resolution) DONE and deployed with auto-reply OFF;
-  waiting for the owner's test (REPORT.md). NEXT: Step 5 (payment check + Order ID).
+- v2 Step 4c (AUTO MODE + unknown-item resolution) DONE; owner switched auto ON 2026-10-11 20:01 UTC.
+- v2 Step 4d (~3 s auto replies, list asks for phone, phone/address = agreement, returning
+  customer ending, later buys add to the cart) DONE and deployed. NOW: Step 5.
 - Owner checks: `bash scripts/status.sh`.
 
 ## Status

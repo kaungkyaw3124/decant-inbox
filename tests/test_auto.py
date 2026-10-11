@@ -61,11 +61,11 @@ def test_auto_reply_after_quiet_once_per_message(shop, db):
     now = datetime.now(UTC)
     add(3001, "stw intensely 5ml ဘယ်လောက်လဲ", customer="91", when=now)
     run_batch()
-    assert auto.run_once(now + timedelta(seconds=5)) == {}  # customer may still be typing
-    assert auto.run_once(now + timedelta(seconds=16)) == {"replied": 1}
+    assert auto.run_once(now + timedelta(seconds=0.5)) == {}  # customer may still be typing (quiet 1 s)
+    assert auto.run_once(now + timedelta(seconds=1.5)) == {"replied": 1}
     (body, status, created_by, delay), = outbox(db)
     assert body.startswith("မင်္ဂလာပါ။\nStronger With You Intensely 5ml က 18,000 ကျပ်ပါ။")
-    assert status == "queued" and created_by is None and timedelta(seconds=8) <= delay <= timedelta(seconds=20)
+    assert status == "queued" and created_by is None and timedelta(seconds=2) <= delay <= timedelta(seconds=3)
     assert auto.run_once(now + timedelta(seconds=60)) == {} and len(outbox(db)) == 1  # one reply per message
     with db.connect() as c:
         assert c.execute(text("SELECT user_id, details->>'actor' FROM audit_log WHERE action = 'auto.price'")).one() \
@@ -80,27 +80,24 @@ def test_whole_order_flow_automatic(shop, db):
     switch_on(db)
     say(1, "stw intensely 5ml, sauvage edp 10ml ယူပါမယ်")
     auto.run_once()
-    say(2, "ok")
-    auto.run_once()  # waits: the cart list is still in the outbox
-    sent = deliver(db)
+    say(2, "good girl 5ml ကော")  # unknown in the small test catalog: waits for the admin
     auto.run_once()
-    sent += deliver(db)
-    say(3, "09 777 123 456")
+    sent = deliver(db)
+    say(3, "09 777 123 456")  # phone while "cart" = the customer agrees
     auto.run_once()
     sent += deliver(db)
     say(4, "အမှတ် ၁၂, ဗဟန်း ကိုပို့ပေးပါ")
     auto.run_once()
     sent += deliver(db)
     assert [s.splitlines()[-1] for s in sent] == [
-        "စုစုပေါင်း 56,000 ကျပ်ပါ။ အဆင်ပြေရင် confirm လုပ်ပေးပါနော်။",
-        "ဆက်သွယ်ရန် ဖုန်းနံပါတ် ပို့ပေးပါနော်။",
+        "ဝယ်ယူမယ်ဆိုရင် ဖုန်းနံပါတ် ပို့ပေးပါနော်။",
         "ဖုန်းနံပါတ် 09777123456 ရပါပြီ။ ပို့ပေးရမယ့် လိပ်စာ ပို့ပေးပါနော်။",
         "ငွေလွှဲပြီးရင် transaction id ပါတဲ့ screenshot ပို့ပေးပါနော်။",
     ]
     with db.connect() as c:
         assert c.execute(text("SELECT status, address, phones FROM orders")).one() == \
             ("waiting_payment", "အမှတ် 12, ဗဟန်း", ["09777123456"])
-        assert c.execute(text("SELECT count(*) FROM quick_actions WHERE auto")).scalar() == 4  # one per message
+        assert c.execute(text("SELECT count(*) FROM quick_actions WHERE auto")).scalar() == 3  # one per message
 
 
 def test_safety_rules(shop, db, monkeypatch):
@@ -181,7 +178,8 @@ def test_unknown_items_need_you_then_continue(shop, db):
         "မင်္ဂလာပါ။\nStronger With You Intensely 5ml က 18,000 ကျပ်ပါ။ မှာယူချင်ရင် ပြောပေးပါနော်။\n"
         "hawas ice ကတော့ လောလောဆယ် မရှိသေးပါဘူးနော်။",
         "မင်္ဂလာပါ။\nHawas Ice 10ml က 25,000 ကျပ်ပါ။ မှာယူချင်ရင် ပြောပေးပါနော်။",
-        "မင်္ဂလာပါ။\n• Sauvage Eau de Parfum 5ml – 20,000 ကျပ်\nစုစုပေါင်း 20,000 ကျပ်ပါ။ အဆင်ပြေရင် confirm လုပ်ပေးပါနော်။",
+        "မင်္ဂလာပါ။\n• Sauvage Eau de Parfum 5ml – 20,000 ကျပ်\nစုစုပေါင်း 20,000 ကျပ်ပါ။\n"
+        "ဝယ်ယူမယ်ဆိုရင် ဖုန်းနံပါတ် ပို့ပေးပါနော်။",
     ])
     with db.connect() as c:
         assert c.execute(text("SELECT resolution, count(*) FROM unknown_requests GROUP BY 1 ORDER BY 1")).all() == \
@@ -209,3 +207,50 @@ def test_cancel_auto_reply_from_chat(shop, db):
     auto.run_once()
     assert len(outbox(db)) == 1  # cancelled by the admin: auto does not try again
     assert re.search(r"Auto-reply: <b>(ON|OFF)</b>", page)
+
+
+def test_step_4d_more_items_returning_customer_and_speed(shop, db):
+    client, token = shop
+    switch_on(db)
+    say(1, "stw intensely 5ml ယူမယ်")
+    auto.run_once()
+    deliver(db)
+    say(2, "sauvage edp 10ml လည်း ယူမယ်")  # more later: added to the same cart, updated list
+    auto.run_once()
+    say(3, "stw intensely 5ml ယူမယ်နော်")  # repeated: stays one line
+    sent = deliver(db)
+    auto.run_once()
+    sent += deliver(db)
+    say(4, "stw intensely 5ml ထပ်ယူမယ်")  # "ထပ်" = one more
+    auto.run_once()
+    sent += deliver(db)
+    assert sent[0] == ("• Stronger With You Intensely 5ml – 18,000 ကျပ်\n• Sauvage Eau de Parfum 10ml – 38,000 ကျပ်\n"
+                       "စုစုပေါင်း 56,000 ကျပ်ပါ။\nဝယ်ယူမယ်ဆိုရင် ဖုန်းနံပါတ် ပို့ပေးပါနော်။")
+    assert "စုစုပေါင်း 56,000" in sent[1]
+    assert "Stronger With You Intensely 5ml × 2 – 36,000 ကျပ်" in sent[2] and "စုစုပေါင်း 74,000" in sent[2]
+
+    # address first (no phone yet) = agreement too; then the phone -> payment info
+    say(5, "အမှတ် ၅, စမ်းချောင်း ကိုပို့ပေးပါ")
+    auto.run_once()
+    assert deliver(db) == ["ဆက်သွယ်ရန် ဖုန်းနံပါတ် ပို့ပေးပါနော်။"]
+    say(6, "09 777 123 456")
+    auto.run_once()
+    assert deliver(db)[0].endswith("ငွေလွှဲပြီးရင် transaction id ပါတဲ့ screenshot ပို့ပေးပါနော်။")
+
+    # the same customer orders again: list asks to confirm the saved phone & address
+    client.post(f"/chats/{customer_id(db, '91')}/cart/cancel", data={"csrf": token})
+    say(7, "sauvage edp 5ml ယူမယ်")
+    auto.run_once()
+    assert deliver(db)[0].endswith("ဖုန်း 09777123456၊ လိပ်စာ အမှတ် 5, စမ်းချောင်း ကိုပဲ ပို့ပေးရမလား။")
+    say(8, "ဟုတ်ကဲ့")
+    auto.run_once()
+    assert deliver(db)[0].startswith("• Sauvage Eau de Parfum 5ml – 20,000 ကျပ်\nစုစုပေါင်း 20,000 ကျပ်ပါ။\nKPay")
+
+    # speed settings
+    assert 'name="quiet_s" type="number" min="0" max="30" value="1"' in client.get("/settings").text
+    r = client.post("/settings/auto-speed", data={"csrf": token, "quiet_s": "2", "delay_min_s": "5",
+                                                  "delay_max_s": "4"})
+    assert r.status_code == 400 and "be longer than the longest" in r.text
+    client.post("/settings/auto-speed", data={"csrf": token, "quiet_s": "0", "delay_min_s": "1", "delay_max_s": "1"})
+    with SessionLocal() as s:
+        assert auto.speed(s) == {"quiet_s": 0, "delay_min_s": 1, "delay_max_s": 1}

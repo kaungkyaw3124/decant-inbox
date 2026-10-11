@@ -3,6 +3,19 @@
 {% block content %}
 <h1>Settings</h1>
 
+<form method="post" action="/settings/auto-speed" class="card stack" id="auto-speed">
+  <h2>🤖 Auto-reply speed</h2>
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <p class="muted small">Time from the customer's message to an automatic reply ≈ quiet + delay. Shorter = faster, but looks more like a bot.</p>
+  {% if speed_error %}<p class="error" role="alert">{{ speed_error }}</p>{% endif %}
+  <div class="grid">
+    <label>Wait for the customer to stop typing (s) <input name="quiet_s" type="number" min="{{ speed_limits.quiet_s[0] }}" max="{{ speed_limits.quiet_s[1] }}" value="{{ speed.quiet_s }}" required></label>
+    <label>Shortest delay (s) <input name="delay_min_s" type="number" min="{{ speed_limits.delay_min_s[0] }}" max="{{ speed_limits.delay_min_s[1] }}" value="{{ speed.delay_min_s }}" required></label>
+    <label>Longest delay (s) <input name="delay_max_s" type="number" min="{{ speed_limits.delay_max_s[0] }}" max="{{ speed_limits.delay_max_s[1] }}" value="{{ speed.delay_max_s }}" required></label>
+  </div>
+  <button class="primary">Save speed</button>
+</form>
+
 <section class="card stack" id="payment-methods">
   <h2>Payment methods</h2>
   <p class="muted small">Active methods are listed in the payment info message to customers.</p>

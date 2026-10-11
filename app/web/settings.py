@@ -6,6 +6,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
 from app.models import AuditLog, PaymentMethod, ReplyTemplate, User
+from app.orders import auto
 from app.replies import templates as replies
 from app.web.auth import current_user, verify_csrf
 from app.web.deps import get_db, templates
@@ -27,8 +28,9 @@ def _page(request: Request, db: Session, errors: dict[str, str] | None = None,
         rows.append({"def": t, "text": (drafts or {}).get(t.key, texts[t.key]), "example": example,
                      "customized": t.key in customized, "error": (errors or {}).get(t.key)})
     methods = db.scalars(select(PaymentMethod).order_by(PaymentMethod.sort_order, PaymentMethod.id)).all()
-    return templates.TemplateResponse(request, "settings.html", {"methods": methods, "templates": rows},
-                                      status_code=status_code)
+    return templates.TemplateResponse(request, "settings.html", {
+        "methods": methods, "templates": rows, "speed": auto.speed(db), "speed_limits": auto.SPEED_LIMITS,
+        "speed_error": (errors or {}).get("speed")}, status_code=status_code)
 
 
 def _method_fields(name: str, account_number: str, account_name: str) -> dict[str, str]:
@@ -123,3 +125,19 @@ def reset_template(request: Request, key: str, db: Session = Depends(get_db), us
     db.commit()
     flash(request, "Reply reset to the default text.")
     return RedirectResponse(f"/settings#t-{key}", status_code=303)
+
+
+@router.post("/auto-speed")
+def save_speed(request: Request, quiet_s: str = Form(""), delay_min_s: str = Form(""), delay_max_s: str = Form(""),
+               db: Session = Depends(get_db), user: User = Depends(current_user)):
+    try:
+        values = {"quiet_s": int(quiet_s), "delay_min_s": int(delay_min_s), "delay_max_s": int(delay_max_s)}
+        auto.set_speed(db, values, user)
+    except ValueError as exc:
+        db.rollback()
+        return _page(request, db, errors={"speed": str(exc) if "must" in str(exc) or "longer" in str(exc)
+                                          else "Whole seconds only."}, status_code=400)
+    _log(db, user, "auto.speed", **values)
+    db.commit()
+    flash(request, "Auto-reply speed saved.")
+    return RedirectResponse("/settings#auto-speed", status_code=303)

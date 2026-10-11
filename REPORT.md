@@ -551,3 +551,24 @@ Short entries from the VPS Claude Code session, newest last.
   Live: re-parse changed=5 unchanged=5, /healthz all ok, auto_reply = OFF.
 - Note: when ON, auto mode answers EVERY customer who writes (not only the test account)
   if the message is certain. Friends/family: "Never auto-reply" in their chat first.
+
+## 2026-10-12 — v2 Step 4d: ~3 s auto replies, list asks for the phone, more items later
+- Spec: "Step 4d" (pulled e8b2342). No migration (speed defaults live in code).
+- A. Speed: Settings "🤖 Auto-reply speed" (app_settings auto_speed): quiet (default 1 s,
+  0-30), delay min/max (default 2-3 s, 1-60, min <= max) with the "looks more like a bot"
+  note. Parser worker polls every 1 s (was 5 s), outbox sender every 0.5 s (was 2 s), so a
+  reply goes out ~3-4 s after the customer's message. Chose 1 s polling over LISTEN/NOTIFY
+  (allowed by the spec; simpler, services stay independent).
+- B. The list asks directly: cart_total is now just the total; the list ends with
+  `cart_ask_phone` (no phone known) / `ask_address` (phone but no address) /
+  `cart_returning` ("ဖုန်း {phones}၊ လိပ်စာ {address} ကိုပဲ ပို့ပေးရမလား။", both saved).
+  A phone or address message while the cart is "cart" counts as agreement (confirmed + saved
+  + ask what is missing / payment info); confirm words fill in the saved phone & address and
+  go on (returning customer: "ဟုတ်ကဲ့" -> payment info). Out-of-stock / "we don't have it"
+  lines now come before the closing question.
+- C. Later buy messages add to the open cart (never replace) and send the updated list; the
+  same product+size again keeps one line unless the customer says ထပ် / more / another / +1.
+  Unknown items still wait in "Needs you" and continue automatically after resolving.
+- Verified: pytest 198 passed, 1 skipped (updated cart/auto tests to the new flow + new test:
+  adds later, repeat keeps one line, ထပ် = +1, address-first agreement, returning customer
+  "ဟုတ်ကဲ့" -> payment info, speed settings + validation). Live: restarted, /healthz ok.
