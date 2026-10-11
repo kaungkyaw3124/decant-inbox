@@ -2,11 +2,11 @@
 
 Read CLAUDE.md first. This file tracks where we are.
 
-## RESUME HERE (updated 2026-10-11 23:20)
-- v1 COMPLETE. Phases 1-5 done; reboot test passed (all services back on their own,
-  /healthz all ok, backup ok, new TUNNEL_URL written).
-- Next: owner chooses the next feature; the planning chat writes its spec here first.
-- Owner checks: `bash scripts/status.sh` (services, health, backup, current public URL).
+## RESUME HERE (updated 2026-10-12 00:20)
+- v1 COMPLETE (Phases 1-5, reboot test passed).
+- NOW: feature v2 "Replies, Cart, Payment check, Orders". Full spec: docs/SPEC-orders.md.
+  Build its steps 1-6 one at a time; report after each in REPORT.md and update this note.
+- Owner checks: `bash scripts/status.sh`.
 
 ## Status
 | Phase | What | Status |
@@ -17,6 +17,7 @@ Read CLAUDE.md first. This file tracks where we are.
 | 3 | Rule-based parser + tests | ✅ Done (worker live; needs real catalog + labelled samples) |
 | 3b | AI fallback (optional) | ⬜ Not started |
 | 4 | Dashboard + Tailscale (private access) | ✅ Dashboard verified by owner via SSH tunnel (2026-10-11). Tailscale (phone access) still optional |
+| 6 | v2: replies, cart, payment check, orders (docs/SPEC-orders.md) | ⬜ Step 1 next |
 | 5 | Run 24/7, backups, health page | ✅ Done: reboot test passed 2026-10-11 (all services back, health ok, new tunnel URL) |
 
 ## Phase 0 checklist
