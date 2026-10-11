@@ -7,7 +7,7 @@ StartLimitIntervalSec=0
 [Service]
 Type=simple
 WorkingDirectory=%h/telegram-product-requests
-ExecStart=%h/telegram-product-requests/.venv/bin/uvicorn app.web.main:app --host 127.0.0.1 --port 8080 --no-access-log
+ExecStart=%h/telegram-product-requests/.venv/bin/uvicorn app.web.main:app --host 127.0.0.1 --port 8080 --no-access-log --no-proxy-headers
 Restart=always
 RestartSec=10
 Environment=PYTHONUNBUFFERED=1

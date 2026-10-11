@@ -19,10 +19,13 @@ from app.web.deps import get_db
 hasher = PasswordHasher()
 _DUMMY_HASH = hasher.hash("timing-equalizer")
 
-# Brute-force brake per username (in memory; resets on restart).
-MAX_FAILURES = 10
+# Brute-force brake (in memory; resets on restart), per client IP and per username.
+# The per-username limit is higher so one attacker can't lock the owner out alone.
+MAX_FAILURES_PER_IP = 10
+MAX_FAILURES_PER_USER = 30
 FAILURE_WINDOW = 15 * 60
 _failures: dict[str, list[float]] = defaultdict(list)
+LOCAL_PEERS = {"127.0.0.1", "::1"}
 
 
 class LoginRequired(Exception):
@@ -34,25 +37,47 @@ def hash_password(password: str) -> str:
     return hasher.hash(password)
 
 
-def locked_out(username: str) -> bool:
+def client_ip(request: Request) -> str:
+    """Real client IP. Behind the Cloudflare tunnel every request comes from cloudflared on
+    127.0.0.1 and Cloudflare sets CF-Connecting-IP (clients can't override it). The header
+    is trusted only from a local peer; uvicorn runs with --no-proxy-headers."""
+    peer = request.client.host if request.client else ""
+    if peer in LOCAL_PEERS:
+        cf_ip = request.headers.get("cf-connecting-ip", "").strip()
+        if cf_ip:
+            return cf_ip
+    return peer
+
+
+def _recent(key: str) -> int:
     now = time.monotonic()
-    _failures[username] = [t for t in _failures[username] if now - t < FAILURE_WINDOW]
-    return len(_failures[username]) >= MAX_FAILURES
+    _failures[key] = [t for t in _failures[key] if now - t < FAILURE_WINDOW]
+    if not _failures[key]:
+        del _failures[key]
+        return 0
+    return len(_failures[key])
 
 
-def authenticate(db: Session, username: str, password: str) -> User | None:
+def locked_out(username: str, ip: str) -> bool:
+    return (_recent(f"ip:{ip}") >= MAX_FAILURES_PER_IP
+            or _recent(f"user:{username}") >= MAX_FAILURES_PER_USER)
+
+
+def authenticate(db: Session, username: str, password: str, ip: str) -> User | None:
     username = username.strip().lower()
-    if locked_out(username):
+    if locked_out(username, ip):
         return None
     user = db.query(User).filter(User.username == username).one_or_none()
     try:
         hasher.verify(user.password_hash if user else _DUMMY_HASH, password)
     except (VerifyMismatchError, InvalidHashError):
-        _failures[username].append(time.monotonic())
+        now = time.monotonic()
+        _failures[f"ip:{ip}"].append(now)
+        _failures[f"user:{username}"].append(now)
         return None
     if user is None:
         return None
-    _failures.pop(username, None)
+    _failures.pop(f"ip:{ip}", None)
     return user
 
 

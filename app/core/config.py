@@ -27,7 +27,7 @@ class Settings(BaseSettings):
     # Dashboard (Phase 4). Secret signs the session cookie; generate with
     # python -c "import secrets; print(secrets.token_urlsafe(48))"
     web_secret_key: SecretStr | None = None
-    web_cookie_secure: bool = True  # served over HTTPS by `tailscale serve`
+    web_cookie_secure: bool = True  # HTTPS via the Cloudflare tunnel (localhost over SSH also counts)
     timezone: str = "Asia/Yangon"
 
     @property

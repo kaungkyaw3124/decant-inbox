@@ -1,6 +1,8 @@
-"""Dashboard app. Listens on 127.0.0.1:8080 only; `tailscale serve` adds HTTPS.
+"""Dashboard app. Listens on 127.0.0.1:8080 only; the Cloudflare quick tunnel
+(scripts/tunnel.py) adds public HTTPS, an SSH tunnel is the fallback.
 
-Usage: .venv/bin/uvicorn app.web.main:app --host 127.0.0.1 --port 8080 --no-access-log
+Usage: .venv/bin/uvicorn app.web.main:app --host 127.0.0.1 --port 8080 --no-access-log --no-proxy-headers
+(client IP comes from CF-Connecting-IP via auth.client_ip, not from uvicorn's proxy headers)
 (no access log: inbox search terms are customer text and must not be logged)
 """
 import sys
@@ -14,7 +16,7 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from app.core.config import get_settings
 from app.web import catalog, health, inbox
-from app.web.auth import LoginRequired, authenticate, locked_out, login, verify_csrf
+from app.web.auth import LoginRequired, authenticate, client_ip, locked_out, login, verify_csrf
 from app.web.deps import get_db, templates
 
 settings = get_settings()
@@ -66,9 +68,10 @@ def login_submit(
     request: Request, username: str = Form(...), password: str = Form(...), next: str = Form("/"),
     db: Session = Depends(get_db),
 ):
-    user = authenticate(db, username, password)
+    ip = client_ip(request)
+    user = authenticate(db, username, password, ip)
     if user is None:
-        error = ("Too many failed attempts. Wait 15 minutes." if locked_out(username.strip().lower())
+        error = ("Too many failed attempts. Wait 15 minutes." if locked_out(username.strip().lower(), ip)
                  else "Wrong username or password.")
         return templates.TemplateResponse(request, "login.html",
                                           {"next": inbox.safe_back(next, "/"), "error": error}, status_code=401)

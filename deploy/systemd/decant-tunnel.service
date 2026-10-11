@@ -1,0 +1,17 @@
+[Unit]
+Description=Decant Inbox: Cloudflare quick tunnel to the dashboard (URL in TUNNEL_URL)
+# Needs the network; if it is not up yet, cloudflared exits and is restarted.
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+WorkingDirectory=%h/telegram-product-requests
+ExecStart=%h/telegram-product-requests/.venv/bin/python -m scripts.tunnel
+Restart=always
+RestartSec=10
+Environment=PYTHONUNBUFFERED=1
+UMask=0077
+NoNewPrivileges=yes
+
+[Install]
+WantedBy=default.target

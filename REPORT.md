@@ -228,3 +228,23 @@ Short entries from the VPS Claude Code session, newest last.
   postgresql-client-18 && loginctl enable-linger administrator'`, then the first
   backup run, then a reboot test.
 - Not done: off-server backup copies (backups are on the same disk as the DB).
+
+## 2026-10-11 — Phase 5: Cloudflare quick tunnel, client-IP lockout, status script
+- Owner's sudo command had NOT taken effect: postgresql-client-18 not installed (nothing in
+  apt history), Linger=no. So the first backup could not run yet; /healthz still shows
+  `backup: FAIL` (everything else ok).
+- cloudflared 2026.10.0 official release in ~/.local/bin, SHA-256 checked against the
+  release notes. scripts/tunnel.py runs `cloudflared tunnel --no-autoupdate --url
+  http://127.0.0.1:8080`, passes the log to the journal, writes the trycloudflare.com URL to
+  TUNNEL_URL (mode 600, atomic, git-ignored), deletes it when cloudflared stops.
+  New unit decant-tunnel (Restart=always), added to install_services.sh.
+- Web: uvicorn runs with --no-proxy-headers; auth.client_ip trusts CF-Connecting-IP only
+  from a 127.0.0.1/::1 peer. Lockout is now 10 failures / 15 min per client IP plus 30 per
+  username (all IPs), so one attacker can't lock the owner out. Secure cookie kept.
+- scripts/status.sh: services, linger, /healthz, newest backup, TUNNEL_URL, SSH fallback.
+- Verified: pytest 111 passed, 2 skipped (5 new tests: URL parsing, file mode, header trust,
+  per-IP and per-user lockout). Over the internet: tunnel /login 200, / -> 303 /login,
+  cookie `httponly; samesite=lax; secure`; kill -9 cloudflared -> restarted (NRestarts=1),
+  new URL written, old URL dead.
+- Not verified live: that CF-Connecting-IP carries the real phone IP (covered by unit test).
+- Needed from owner: the sudo command again, then first backup, then reboot.

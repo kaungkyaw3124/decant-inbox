@@ -5,7 +5,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 UNIT_DIR="$HOME/.config/systemd/user"
-SERVICES=(decant-listener decant-parser decant-web)
+SERVICES=(decant-listener decant-parser decant-web decant-tunnel)
 
 mkdir -p "$UNIT_DIR"
 install -m 0644 deploy/systemd/*.service deploy/systemd/*.timer "$UNIT_DIR/"
