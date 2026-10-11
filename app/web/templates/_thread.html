@@ -1,0 +1,51 @@
+<div id="thread" class="thread" {% if polling %}hx-get="/chats/{{ c.id }}/thread" hx-trigger="every 4s" hx-swap="outerHTML"{% endif %}>
+{% for m in messages %}
+  <div class="bubble {{ m.direction }}" id="m{{ m.id }}">
+    {% if m.kind == "photo" %}
+      {% set d = downloads.get(m.id) %}
+      <div class="photo">
+        {% if m.grouped_id and albums.get(m.grouped_id, 0) > 1 %}<span class="badge warn">several photos sent together</span>{% endif %}
+        {% if d and d.status == "done" %}
+          <a href="/media/{{ m.id }}" target="_blank" rel="noopener"><img src="/media/{{ m.id }}" alt="Photo from the chat" class="thumb"></a>
+        {% elif d and d.status == "queued" %}
+          <span class="muted small">Loading photo…</span>
+        {% else %}
+          {% if d and d.status == "failed" %}<p class="error small">Could not load: {{ d.error }}</p>{% endif %}
+          <form method="post" action="/messages/{{ m.id }}/photo" class="inline">
+            <input type="hidden" name="csrf" value="{{ csrf }}">
+            <button>📷 Show photo{% if m.media_size %} ({{ (m.media_size / 1024) | round | int }} KB){% endif %}</button>
+          </form>
+        {% endif %}
+      </div>
+    {% elif m.kind == "other" and not m.raw_text %}
+      <span class="muted small">(sticker, voice or file — open Telegram to see it)</span>
+    {% endif %}
+    {% if m.raw_text %}<p class="text">{{ m.raw_text }}</p>{% endif %}
+    <div class="bubble-meta">
+      {% if m.direction == "in" %}<a href="/messages/{{ m.id }}?back=/chats/{{ c.id }}">details</a> · {% endif %}
+      <time>{{ m.received_at | local_time }}</time>
+    </div>
+  </div>
+{% else %}
+  <p class="empty">No messages.</p>
+{% endfor %}
+{% for o in pending %}
+  <div class="bubble out pending status-{{ o.status }}">
+    <p class="text">{{ o.text }}</p>
+    <div class="bubble-meta">
+      {% if o.status == "queued" %}⏳ queued{% if o.error %} · {{ o.error }}{% endif %}
+      {% elif o.status == "sending" and o.id in stuck %}<span class="error">⚠ unknown: check Telegram whether it arrived</span>
+      {% elif o.status == "sending" %}sending…
+      {% elif o.status == "failed" %}<span class="error">✖ not sent: {{ o.error }}</span>{% endif %}
+    </div>
+    {% if o.status == "failed" or o.status == "queued" or o.id in stuck %}
+    <form method="post" class="buttons">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      {% if o.status == "failed" %}<button formaction="/chats/{{ c.id }}/outbox/{{ o.id }}/retry">Try again</button>{% endif %}
+      <button class="link danger" formaction="/chats/{{ c.id }}/outbox/{{ o.id }}/cancel">{{ "Cancel" if o.status == "queued" else "Dismiss" }}</button>
+    </form>
+    {% endif %}
+  </div>
+{% endfor %}
+<span id="bottom"></span>
+</div>

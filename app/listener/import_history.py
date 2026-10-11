@@ -1,4 +1,4 @@
-"""Import incoming private messages from the last N days. Idempotent: re-running
+"""Import private messages (incoming and our outgoing, photo metadata) from the last N days. Idempotent: re-running
 skips messages already saved, so it also fills gaps after listener downtime.
 
 Usage: .venv/bin/python -m app.listener.import_history --days 30 [--dry-run]
@@ -10,7 +10,7 @@ from datetime import UTC, datetime, timedelta
 
 from app.core.db import SessionLocal
 from app.listener.client import make_client, secure_session_file
-from app.listener.save import TELEGRAM_SERVICE_USER_ID, from_telethon, save_message
+from app.listener.save import from_telethon, is_customer_chat, save_message
 
 
 async def run(days: int, dry_run: bool) -> None:
@@ -24,14 +24,14 @@ async def run(days: int, dry_run: bool) -> None:
     try:
         async for dialog in client.iter_dialogs():  # all folders, incl. archived
             user = dialog.entity
-            if not dialog.is_user or user.bot or user.is_self or user.id == TELEGRAM_SERVICE_USER_ID:
+            if not dialog.is_user or not is_customer_chat(user):
                 continue
             if dialog.date and dialog.date < cutoff:
                 continue  # no activity in the window
             batch = []
             async for message in client.iter_messages(dialog, offset_date=cutoff, reverse=True):
                 totals["seen"] += 1
-                msg = from_telethon(message, user)  # private chat: sender is the peer
+                msg = from_telethon(message, user)
                 if msg is not None:
                     batch.append(msg)
             if not batch:
@@ -41,7 +41,7 @@ async def run(days: int, dry_run: bool) -> None:
             if not dry_run:
                 with SessionLocal.begin() as session:
                     totals["new"] += sum(save_message(session, m) for m in batch)
-            print(f"chat {user.id}: {len(batch)} incoming text messages")
+            print(f"chat {user.id}: {len(batch)} messages")
     finally:
         await client.disconnect()
     mode = "DRY RUN, nothing saved" if dry_run else "saved"

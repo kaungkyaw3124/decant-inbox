@@ -1,13 +1,15 @@
 from datetime import datetime
 
 from sqlalchemy import (
-    CheckConstraint, DateTime, ForeignKey, Index, String, Text, UniqueConstraint,
+    BigInteger, CheckConstraint, DateTime, ForeignKey, Index, String, Text, UniqueConstraint,
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.base import Base, created_at_column
 
 REVIEW_STATUSES = ("new", "done", "ignored")
+DIRECTIONS = ("in", "out")
+KINDS = ("text", "photo", "other")
 
 
 class Message(Base):
@@ -17,6 +19,9 @@ class Message(Base):
     __table_args__ = (
         UniqueConstraint("channel", "external_chat_id", "external_message_id"),  # idempotent imports
         Index("ix_messages_received_at", "received_at"),
+        Index("ix_messages_customer_received", "customer_id", "received_at"),
+        CheckConstraint(f"direction IN {DIRECTIONS}", name="direction"),
+        CheckConstraint(f"kind IN {KINDS}", name="kind"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -24,10 +29,16 @@ class Message(Base):
     external_chat_id: Mapped[str] = mapped_column(String(64))
     external_message_id: Mapped[str] = mapped_column(String(64))
     customer_id: Mapped[int] = mapped_column(ForeignKey("customers.id"), index=True)
-    raw_text: Mapped[str] = mapped_column(Text)
+    raw_text: Mapped[str] = mapped_column(Text)  # caption for photos, "" if none
     normalized_text: Mapped[str | None] = mapped_column(Text)
-    received_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    received_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))  # sent time for "out"
     created_at: Mapped[datetime] = created_at_column()
+    direction: Mapped[str] = mapped_column(String(3), server_default="in", default="in")  # out = from us
+    kind: Mapped[str] = mapped_column(String(8), server_default="text", default="text")
+    # Photo metadata only; the file is downloaded when an admin opens it (media_downloads).
+    grouped_id: Mapped[str | None] = mapped_column(String(32))  # album: photos sent together
+    media_size: Mapped[int | None] = mapped_column(BigInteger)
+    media_mime: Mapped[str | None] = mapped_column(String(64))
 
 
 class MessageReview(Base):

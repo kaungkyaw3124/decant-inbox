@@ -22,7 +22,7 @@ def load_aliases(session: Session) -> list[Alias]:
 
 def unparsed_message_ids(session: Session, limit: int, skip: set[int] = frozenset()) -> list[int]:
     has_result = exists().where(ParseResult.message_id == Message.id, ParseResult.is_current)
-    query = select(Message.id).where(~has_result)
+    query = select(Message.id).where(~has_result, Message.direction == "in")  # only customers' messages
     if skip:
         query = query.where(Message.id.not_in(skip))
     return list(session.scalars(query.order_by(Message.id).limit(limit)))

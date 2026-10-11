@@ -101,3 +101,28 @@ code { font-size: .85em; background: var(--bg); padding: 1px 4px; border-radius:
 td.num { text-align: right; font-variant-numeric: tabular-nums; }
 .nowrap { white-space: nowrap; }
 .sticky-actions { position: sticky; bottom: 0; background: var(--bg); padding: 10px 0; }
+main.wide { max-width: 1200px; }
+.tabs { display: flex; gap: 4px; margin-bottom: 12px; border-bottom: 1px solid var(--line); }
+.tabs a { padding: 8px 14px; text-decoration: none; color: var(--muted); border-bottom: 2px solid transparent; }
+.tabs a[aria-current] { color: var(--text); font-weight: 600; border-bottom-color: var(--accent); }
+.chat-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.chat-head h1 { margin: 0; }
+.chat-layout { display: grid; gap: 14px; }
+@media (min-width: 900px) {
+  .chat-layout { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); align-items: start; }
+  .reply-pane { position: sticky; top: 64px; }
+  .chat-pane { max-height: calc(100vh - 200px); overflow-y: auto; }
+}
+.thread { display: flex; flex-direction: column; gap: 8px; }
+.bubble { max-width: 85%; padding: 8px 12px; border-radius: 12px; background: var(--bg); border: 1px solid var(--line); }
+.bubble.in { align-self: flex-start; }
+.bubble.out { align-self: flex-end; background: var(--flash); }
+.bubble.pending { border-style: dashed; }
+.bubble.status-failed { border-color: var(--danger); background: var(--bad-bg); }
+.bubble .text { margin: 0; }
+.bubble-meta { font-size: .75rem; color: var(--muted); text-align: right; margin-top: 2px; }
+.bubble .buttons { margin-top: 6px; justify-content: flex-end; }
+.thumb { max-width: 220px; max-height: 260px; border-radius: 8px; display: block; }
+.photo { display: grid; gap: 6px; }
+.flash.warnbox { background: var(--warn-bg); color: var(--warn); }
+.pick-row { grid-template-columns: 2fr 1fr; }

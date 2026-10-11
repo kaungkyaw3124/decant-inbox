@@ -14,6 +14,7 @@
   <a class="brand" href="/">Decant Inbox</a>
   <nav>
     <a href="/" {% if path == "/" %}aria-current="page"{% endif %}>Inbox</a>
+    <a href="/chats" {% if path.startswith("/chats") %}aria-current="page"{% endif %}>Chats</a>
     <a href="/products" {% if path.startswith("/products") %}aria-current="page"{% endif %}>Products</a>
     <a href="/prices" {% if path.startswith("/prices") %}aria-current="page"{% endif %}>Prices</a>
     <a href="/settings" {% if path.startswith("/settings") %}aria-current="page"{% endif %}>Settings</a>
@@ -25,7 +26,7 @@
   </nav>
 </header>
 {% endif %}
-<main>
+<main class="{% block main_class %}{% endblock %}">
 {% if flash %}<p class="flash" role="status">{{ flash }}</p>{% endif %}
 {% block content %}{% endblock %}
 </main>

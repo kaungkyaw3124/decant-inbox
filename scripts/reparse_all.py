@@ -27,7 +27,8 @@ def reparse_all(dry_run: bool = False) -> Counter:
         session = SessionLocal()
         try:
             messages = list(session.scalars(
-                select(Message).where(Message.id > last_id).order_by(Message.id).limit(CHUNK)
+                select(Message).where(Message.id > last_id, Message.direction == "in")
+                .order_by(Message.id).limit(CHUNK)
             ))
             if not messages:
                 return stats

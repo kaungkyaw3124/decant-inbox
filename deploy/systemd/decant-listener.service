@@ -1,5 +1,5 @@
 [Unit]
-Description=Decant Inbox: Telegram listener (read-only)
+Description=Decant Inbox: Telegram listener + outbox sender (sends only admin-queued replies)
 # Postgres runs in Docker (restart: unless-stopped). A user unit cannot order itself
 # after system units, so if the DB is not up yet the service exits and is restarted.
 StartLimitIntervalSec=0

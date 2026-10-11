@@ -2,12 +2,14 @@
 
 Read CLAUDE.md first. This file tracks where we are.
 
-## RESUME HERE (updated 2026-10-12 01:40 Yangon)
+## RESUME HERE (updated 2026-10-12 01:55 Yangon)
 - v1 COMPLETE (Phases 1-5, reboot test passed).
 - NOW: feature v2 "Replies, Cart, Payment check, Orders". Full spec: docs/SPEC-orders.md.
   Build its steps 1-6 one at a time; report after each in REPORT.md and update this note.
-- v2 Step 1 (price list + Excel + Settings) DONE and live; owner to try data/sample_prices.xlsx
-  and add payment methods. NEXT: Step 2 (messaging core) after owner OK.
+- v2 Step 1 (price list + Excel + Settings) DONE and live; sample prices imported, test
+  payment methods KPay/AYA Pay (Test Shop) added.
+- v2 Step 2 (messaging core) DONE and deployed; waiting for the owner's first live send test
+  (see REPORT.md). NEXT: Step 3 (parser rules-2) after owner OK.
 - Owner checks: `bash scripts/status.sh`.
 
 ## Status
@@ -20,7 +22,7 @@ Read CLAUDE.md first. This file tracks where we are.
 | 3b | AI fallback (optional) | ⬜ Not started |
 | 4 | Dashboard + Tailscale (private access) | ✅ Dashboard verified by owner via SSH tunnel (2026-10-11). Tailscale (phone access) still optional |
 | 5 | Run 24/7, backups, health page | ✅ Done: reboot test passed 2026-10-11 (all services back, health ok, new tunnel URL) |
-| 6 | v2: replies, cart, payment check, orders (docs/SPEC-orders.md) | 🟡 Step 1 done (price list, Excel, Settings); Step 2 next |
+| 6 | v2: replies, cart, payment check, orders (docs/SPEC-orders.md) | 🟡 Steps 1-2 done (price list, Excel, Settings; outbox sender, chats, replies); Step 3 next |
 
 ## Phase 0 checklist
 - [x] Step 0: rollback safety net scripts in ~/hardening/

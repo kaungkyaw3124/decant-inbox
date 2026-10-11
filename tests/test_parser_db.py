@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 from sqlalchemy import text
 
 from app.core.db import SessionLocal
-from app.listener.save import IncomingMessage, save_message
+from app.listener.save import ChatMessage, save_message
 from app.parser import rules
 from app.parser.worker import run_batch
 from scripts.reparse_all import reparse_all
@@ -16,7 +16,7 @@ NOW = datetime(2026, 10, 10, 12, 0, tzinfo=UTC)
 
 def add_message(msg_id: int, body: str) -> None:
     with SessionLocal.begin() as s:
-        save_message(s, IncomingMessage("42", str(msg_id), "42", None, "Ko", body, NOW))
+        save_message(s, ChatMessage("42", str(msg_id), "42", None, "Ko", body, NOW))
 
 
 def results(engine) -> list[tuple]:

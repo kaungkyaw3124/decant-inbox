@@ -107,8 +107,15 @@ compose.yaml  .env (NEVER commit)  .env.example  PLAN.md
 - Update the "Status" section of PLAN.md when a step is finished.
 
 ## Hard rules
-- Telegram account is READ-ONLY. Never send, edit, delete, or mark-read messages.
-- Only private chats; ignore groups, channels, bots, and outgoing messages.
+- Telegram account (changed by docs/SPEC-orders.md, v2): the server may SEND a text message
+  to a private chat ONLY as the result of an admin click in the dashboard (outbox table ->
+  listener -> app/listener/sender.py, max 1 msg / 3 s and 20 / min). Never edit, delete,
+  forward, pin, or mark-read. Never message a chat that has not messaged us first.
+  Only the listener process uses the Telethon session; web code never imports Telethon
+  (tests/test_listener_readonly.py enforces this).
+- Only private chats with real users; ignore groups, channels, bots. Our own outgoing
+  messages are saved too (direction=out). Photos: metadata only; download a photo only when
+  an admin opens it, into secrets/media/ (dir 700, git-ignored).
 - Never print, log, or commit api_hash, session files, .env, or API keys.
 - The owner types the Telegram login code into the interactive prompt themselves.
 - Small steps, tests for the parser, explain how to verify each phase.

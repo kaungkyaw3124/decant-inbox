@@ -46,6 +46,7 @@ def inbox_query(f: dict):
         .outerjoin(cur, and_(cur.message_id == Message.id, cur.is_current))
         .outerjoin(Product, Product.id == cur.product_id)
         .outerjoin(MessageReview, MessageReview.message_id == Message.id)
+        .where(Message.direction == "in")
     )
     if f["status"] == "new":
         q = q.where(or_(MessageReview.id.is_(None), MessageReview.status == "new"))

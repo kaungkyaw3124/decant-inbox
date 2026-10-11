@@ -32,7 +32,6 @@ def test_keeps_incoming_private_text_from_user():
 @pytest.mark.parametrize(
     ("msg", "sender"),
     [
-        (message(out=True), user()),                                    # outgoing
         (message(peer=types.PeerChat(7)), user()),                      # group
         (message(peer=types.PeerChannel(7)), user()),                   # channel
         (message(), user(bot=True)),                                    # bot
@@ -46,6 +45,11 @@ def test_keeps_incoming_private_text_from_user():
 )
 def test_ignores_everything_else(msg, sender):
     assert from_telethon(msg, sender) is None
+
+
+def test_keeps_outgoing_as_direction_out():  # v2: the conversation view needs our replies too
+    msg = from_telethon(message(out=True), user())
+    assert msg.direction == "out" and msg.external_user_id == "42"
 
 
 def test_save_is_idempotent_and_updates_customer(db):

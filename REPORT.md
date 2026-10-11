@@ -296,3 +296,61 @@ Short entries from the VPS Claude Code session, newest last.
 - How to verify: Prices → Upload `data/sample_prices.xlsx` → preview shows 20 changed → Confirm
   → Products shows prices. Then Download, change a price / empty a cell / type "abc" in Excel,
   upload again and check the preview. Settings → add KPay → edit a reply.
+
+## 2026-10-11 — v2: sample prices imported + test payment methods (live DB)
+- Pulled (already up to date). Backup taken first (product_requests_2026-10-11T1812Z.dump).
+- Preview of data/sample_prices.xlsx (same code as the Prices page): 20 changed, 0 new,
+  0 to decide, 0 errors, 0 warnings. Found and fixed a preview gap: "in stock: no" was not
+  shown for products without earlier prices (Born in Roma); now it is.
+- Applied: 20 products updated, 79 price rows written (Luna Rossa Carbon has no 2ml).
+  Re-preview of the same file: 20 "no change". Audit log: prices.import, by
+  "claude-code (owner request)".
+- Payment methods added: KPay 09000000001 (Test Shop), AYA Pay 09000000002 (Test Shop), both
+  active (audit: payment_method.add).
+
+## 2026-10-11 — v2 Step 2: messaging core (outbox sender, chats, Custom + Price reply)
+- DB (migration 12016f356809, applied live after backup; round-trip tested; downgrade refuses
+  once outgoing/photo rows exist, so raw messages are never mixed up): messages.direction
+  (in|out), kind (text|photo|other), grouped_id, media_size, media_mime;
+  `outbox` (queued -> sending -> sent | failed | cancelled, error, attempts, idempotency key,
+  created_by, sent_message_id); `media_downloads` (photo download requests).
+- Listener (app/listener): saves incoming AND our outgoing messages (from the dashboard or the
+  phone), photo metadata only (also images sent as files; albums via grouped_id; stickers,
+  voice, files = "other"). New app/listener/sender.py runs inside the listener (the only
+  process with the session): sends queued replies with a rate limit (1 per 3 s, 20 per min),
+  FloodWait -> wait and keep queued, any error -> failed with the reason. Before sending it
+  re-checks: Telegram customer, has messaged us before, 1-4096 characters. A crash during a
+  send leaves the row "sending" (never re-sent automatically); after 2 min the chat shows
+  "unknown: check Telegram". Photos are downloaded only when an admin taps "Show photo", into
+  secrets/media/ (dir 700, files 600, max 10 MB).
+- Parser + inbox: only incoming messages (outgoing are never parsed or listed).
+- Dashboard: **Chats** (newest activity first, "waiting for reply" when the last message is
+  theirs) and the **conversation view**: thread (in + out, photos on demand, album warning,
+  queued/failed replies with Try again / Cancel, auto-refresh while something is pending),
+  "Open in Telegram" link, reply panel with tabs **Custom** and **Price**. Price: up to 3
+  products + size (all sizes / a size / full bottle), pre-filled from what the customer asked
+  in the last 24 h, built from the reply templates and current prices; out of stock -> the
+  out-of-stock reply (yellow note); size/product without a price -> red, Send hidden. Every
+  reply is shown in an editable box first. Greeting `မင်္ဂလာပါ။` is pre-filled only if we
+  haven't messaged them in 6 h. Double-tap on Send queues once. All queue/retry/cancel/photo
+  actions are in audit_log. Laptop: thread | reply side by side; phone: stacked.
+  Message detail page links to "Open chat and reply".
+- CLAUDE.md hard rules updated to the spec's sending rule. Guard test now: only
+  sender.py may call send_message (exactly once); nothing in the listener edits, deletes,
+  forwards, pins or marks read; nothing outside app/listener imports Telethon.
+- History backfill (listener stopped, import_history --days 30): 2 chats, 10 new rows (our
+  past outgoing messages). Live DB now: 7 in/text, 9 out/text, 1 out/other.
+- Verified: pytest 154 passed, 1 skipped (19 new: capture of out/photo/album/file/sticker,
+  rate limiter, send success + duplicate event, never-message-first, FloodWait, errors,
+  photo download + file modes, price reply cases, greeting rule, 24 h context, chat pages,
+  send/double-tap/cancel, price compose, photo request/serving incl. path traversal).
+  Services restarted (tunnel untouched, URL unchanged); /healthz all ok; listener log
+  "outbox sender running".
+- NOT verified live: an actual send through Telegram (I did not message any real chat).
+- Note: Telegram usually shows a chat as read on the phone once we reply in it; that's
+  Telegram's own behaviour, we never call mark-read.
+- Needed from owner — first live test: from a second Telegram account (or a friend), message
+  the shop account "stw intensely 5ml ရှိလား"; in the dashboard open Chats -> that chat ->
+  Price -> Make price reply -> check text -> Send. Within ~5 s the bubble turns into a normal
+  sent message and the reply appears in Telegram. Also try Custom, and send a photo to test
+  "Show photo".

@@ -7,7 +7,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import text
 
 from app.core.db import SessionLocal
-from app.listener.save import IncomingMessage, save_message
+from app.listener.save import ChatMessage, save_message
 from app.models import User
 from app.parser.worker import run_batch
 from app.web.auth import hash_password
@@ -20,7 +20,7 @@ PASSWORD = "correct horse battery"
 
 def add_message(msg_id: int, body: str, user_id: str = "42") -> None:
     with SessionLocal.begin() as s:
-        save_message(s, IncomingMessage(user_id, str(msg_id), user_id, None, f"User {user_id}", body, NOW))
+        save_message(s, ChatMessage(user_id, str(msg_id), user_id, None, f"User {user_id}", body, NOW))
 
 
 def csrf(client: TestClient, path: str = "/login") -> str:

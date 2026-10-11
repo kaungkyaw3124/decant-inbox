@@ -1,4 +1,6 @@
-"""Live listener: saves new incoming private messages as they arrive.
+"""Live listener: saves new private messages (incoming and our own outgoing) as they
+arrive, and runs the outbox sender + photo downloads (app/listener/sender.py), because
+only one process may use the Telegram session.
 
 Usage: .venv/bin/python -m app.listener.main
 Logs only ids and counts, never message text or credentials.
@@ -12,13 +14,14 @@ from telethon import events
 from app.core.db import SessionLocal
 from app.core.heartbeat import beat
 from app.listener.client import make_client, secure_session_file
-from app.listener.save import IncomingMessage, from_telethon, save_message
+from app.listener import sender
+from app.listener.save import ChatMessage, from_telethon, save_message
 
 log = logging.getLogger("listener")
 HEARTBEAT_SECONDS = 60
 
 
-def _save(msg: IncomingMessage) -> bool:
+def _save(msg: ChatMessage) -> bool:
     with SessionLocal.begin() as session:
         return save_message(session, msg)
 
@@ -30,14 +33,14 @@ async def main() -> None:
         sys.exit("Not logged in. Run: .venv/bin/python -m app.listener.login")
     secure_session_file()
 
-    @client.on(events.NewMessage(incoming=True, func=lambda e: e.is_private))
+    @client.on(events.NewMessage(func=lambda e: e.is_private))  # in and out
     async def on_message(event: events.NewMessage.Event) -> None:
         try:
-            msg = from_telethon(event.message, await event.get_sender())
+            msg = from_telethon(event.message, await event.get_chat())
             if msg is None:
                 return
             inserted = await asyncio.to_thread(_save, msg)
-            log.info("%s chat=%s msg=%s", "saved" if inserted else "duplicate",
+            log.info("%s %s chat=%s msg=%s", "saved" if inserted else "duplicate", msg.direction,
                      msg.external_chat_id, msg.external_message_id)
         except Exception:
             # Never let one bad message stop the listener; import_history fills gaps.
@@ -52,14 +55,16 @@ async def main() -> None:
                     log.exception("heartbeat failed")
             await asyncio.sleep(HEARTBEAT_SECONDS)
 
-    log.info("listening for new private messages")
+    log.info("listening for new private messages; outbox sender running")
     heartbeat_task = asyncio.create_task(heartbeat())
+    sender_task = asyncio.create_task(sender.run_forever(client))
     try:
         # Returns when the connection is lost for good; the process then exits and
         # systemd restarts it (catch_up=True fetches what arrived meanwhile).
         await client.run_until_disconnected()
     finally:
         heartbeat_task.cancel()
+        sender_task.cancel()
 
 
 if __name__ == "__main__":

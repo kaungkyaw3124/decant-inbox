@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block title %}{{ c.display_name or "Chat" }} · Decant Inbox{% endblock %}
+{% block main_class %}wide{% endblock %}
+{% block content %}
+<p><a href="/chats">← Chats</a></p>
+<header class="chat-head card">
+  <div>
+    <h1>{{ c.display_name or ("@" ~ c.username if c.username else "Customer") }}</h1>
+    <p class="muted small">{% if c.username %}@{{ c.username }} · {% endif %}{{ c.channel }} id {{ c.external_user_id }}{% if c.ignored %} · ignored{% endif %}</p>
+  </div>
+  <a class="button" href="{{ tg_link }}">Open in Telegram</a>
+</header>
+
+<div class="chat-layout">
+  <section class="card chat-pane">
+    {% include "_thread.html" %}
+  </section>
+
+  <section class="card reply-pane" id="reply">
+    <nav class="tabs" aria-label="Reply type">
+      <a href="/chats/{{ c.id }}?compose=custom#reply" {% if mode == "custom" %}aria-current="page"{% endif %}>Custom</a>
+      <a href="/chats/{{ c.id }}?compose=price#reply" {% if mode == "price" %}aria-current="page"{% endif %}>Price</a>
+    </nav>
+
+    {% if not can_send %}
+    <p class="problem-text">This customer has never messaged us, so we can't message them.</p>
+    {% else %}
+
+    {% if mode == "price" %}
+    <form method="get" action="/chats/{{ c.id }}#reply" class="stack price-pick">
+      <input type="hidden" name="compose" value="price">
+      <input type="hidden" name="make" value="1">
+      {% for item in items %}
+      <div class="grid pick-row">
+        <label>Product {{ loop.index }}
+          <select name="p{{ loop.index }}">
+            <option value="">—</option>
+            {% for p in products %}<option value="{{ p.id }}" {% if p.id == item.product_id %}selected{% endif %}>{{ p.name }} · {{ p.brand }}</option>{% endfor %}
+          </select>
+        </label>
+        <label>Size
+          <select name="s{{ loop.index }}">
+            <option value="all" {% if item.size == "all" %}selected{% endif %}>all sizes</option>
+            {% for s in sizes %}<option value="{{ s }}" {% if item.size == s|string %}selected{% endif %}>{{ s }}ml</option>{% endfor %}
+            <option value="full" {% if item.size == "full" %}selected{% endif %}>full bottle</option>
+          </select>
+        </label>
+      </div>
+      {% endfor %}
+      <button>Make price reply</button>
+      <p class="muted small">Pre-filled from what the customer asked in the last 24 h.</p>
+    </form>
+    {% endif %}
+
+    {% for p in result.problems %}<p class="flash bad" role="alert">{{ p }}</p>{% endfor %}
+    {% for n in result.notes %}<p class="flash warnbox">{{ n }}</p>{% endfor %}
+
+    {% if mode == "custom" or (result.text and not result.problems) %}
+    <form method="post" action="/chats/{{ c.id }}/send" class="stack">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <input type="hidden" name="key" value="{{ key }}">
+      <input type="hidden" name="reply_kind" value="{{ mode }}">
+      <label>Message (you can edit it)
+        <textarea name="text" rows="{{ [result.text.count('\n') + 3, 4]|max }}" maxlength="{{ max_text }}" required>{{ result.text }}</textarea>
+      </label>
+      {% if greet %}<p class="muted small">Starts with the greeting: we haven't messaged them in the last 6 hours.</p>{% endif %}
+      <button class="primary">Send</button>
+    </form>
+    {% endif %}
+    {% endif %}
+  </section>
+</div>
+{% endblock %}

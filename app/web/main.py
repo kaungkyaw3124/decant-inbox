@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 from starlette.middleware.sessions import SessionMiddleware
 
 from app.core.config import get_settings
-from app.web import catalog, health, inbox, prices, settings as settings_pages
+from app.web import catalog, chats, health, inbox, prices, settings as settings_pages
 from app.web.auth import LoginRequired, authenticate, client_ip, locked_out, login, verify_csrf
 from app.web.deps import get_db, templates
 
@@ -35,6 +35,7 @@ app.add_middleware(
 app.mount("/static", StaticFiles(directory=Path(__file__).parent / "static"), name="static")
 app.include_router(inbox.router)
 app.include_router(catalog.router)
+app.include_router(chats.router)
 app.include_router(prices.router)
 app.include_router(settings_pages.router)
 app.include_router(health.router)

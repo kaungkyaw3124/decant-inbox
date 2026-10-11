@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Chats · Decant Inbox{% endblock %}
+{% block content %}
+<form method="get" action="/chats" class="filters">
+  <label class="check"><input type="checkbox" name="show_ignored" value="1" {% if show_ignored %}checked{% endif %}> Show ignored customers</label>
+  <button>Apply</button>
+</form>
+<ul class="rows">
+{% for c, m in rows %}
+  <li class="row">
+    <a class="row-main" href="/chats/{{ c.id }}">
+      <div class="meta">
+        <span class="who">{{ c.display_name or ("@" ~ c.username if c.username else "Customer " ~ c.external_user_id) }}</span>
+        <time>{{ m.received_at | local_time }}</time>
+      </div>
+      <p class="text">{% if m.direction == "out" %}<span class="muted">You: </span>{% endif %}{% if m.kind == "photo" %}📷 {% endif %}{{ m.raw_text or ("Photo" if m.kind == "photo" else "(sticker / file)") }}</p>
+      <div class="badges">
+        {% if m.direction == "in" %}<span class="badge warn">waiting for reply</span>{% endif %}
+        {% if c.ignored %}<span class="badge">ignored</span>{% endif %}
+      </div>
+    </a>
+  </li>
+{% else %}
+  <li class="empty">No chats yet.</li>
+{% endfor %}
+</ul>
+<nav class="pager">
+  {% if page > 1 %}<a href="/chats?page={{ page - 1 }}{% if show_ignored %}&show_ignored=1{% endif %}">← Newer</a>{% else %}<span></span>{% endif %}
+  {% if more %}<a href="/chats?page={{ page + 1 }}{% if show_ignored %}&show_ignored=1{% endif %}">Older →</a>{% endif %}
+</nav>
+{% endblock %}
