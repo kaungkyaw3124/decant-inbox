@@ -7,7 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models import AuditLog, Customer, Message, Outbox, Product, QuickAction, User
-from app.orders import auto, unknown
+from app.orders import auto, payments, unknown
 from app.web.auth import current_user, verify_csrf
 from app.web.deps import get_db
 from app.web.inbox import detail_url, flash, safe_back
@@ -152,9 +152,11 @@ def needs_you(db: Session) -> dict:
             paused.append((customer, until))
     customers = {c.id: c for c in db.scalars(select(Customer).where(
         Customer.id.in_([m.customer_id for m in unknown_msgs])))}
-    return {"unknown": [(m, customers[m.customer_id], unknown.open_unknowns(db, m)) for m in unknown_msgs],
+    to_check = payments.to_check(db)
+    return {"payments": to_check,
+            "unknown": [(m, customers[m.customer_id], unknown.open_unknowns(db, m)) for m in unknown_msgs],
             "failed": failed, "paused": paused,
-            "count": len(unknown_msgs) + len(failed) + len(paused)}
+            "count": len(to_check) + len(unknown_msgs) + len(failed) + len(paused)}
 
 
 def handled_feed(db: Session, limit: int = 30) -> list:

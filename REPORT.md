@@ -572,3 +572,35 @@ Short entries from the VPS Claude Code session, newest last.
 - Verified: pytest 198 passed, 1 skipped (updated cart/auto tests to the new flow + new test:
   adds later, repeat keeps one line, ထပ် = +1, address-first agreement, returning customer
   "ဟုတ်ကဲ့" -> payment info, speed settings + validation). Live: restarted, /healthz ok.
+
+## 2026-10-12 — v2 Step 5: payment check, Order ID, confirmation message
+- DB (migration fb7294a9950e, applied live after backup, round-trip tested): `payment_checks`
+  (order, photo message, photo_count, image_hash, transaction_id, amount, method, decision
+  pending/several/approved/rejected/not_payment, reason, reply outbox, decided_by/at),
+  orders.paid_at, sequence order_no_seq starting at 1001, media_downloads.sha256 (the
+  listener hashes every downloaded photo), outbox reply kind `payment`.
+- Spec conflict, decided: the data model says transaction_id UNIQUE, but the flow says a
+  reused transaction ID is a warning with a second confirm. A unique index would make that
+  impossible, so it is an index + warning (as the flow says).
+- Parser worker: payments.scan() each second: a photo from a customer whose order is waiting
+  for payment (sent after the payment info) -> pending check, order "photo_received".
+  Same album or a 2nd photo within 60 s -> "several": nothing downloaded, nothing queued.
+  Photos sent before the payment info are not payments. Auto mode never decides payments.
+- Dashboard: "Payments (N)" badge in the nav, payments listed first in "🟡 Needs you", cart
+  panel "💳 Check the payment screenshot". Payment card (/payments/{id}): items, expected
+  total, phones, address, screenshot (downloaded only when the card is opened, tap to zoom),
+  transaction ID (required), amount received (pre-filled with the total), method.
+  ✅ Approve: needs the screenshot loaded + transaction ID; warnings (transaction ID already
+  used, same image as an earlier check, amount ≠ total) -> "Approve anyway" second confirm.
+  -> Order #1001…, status paid, confirmation `order_confirmed` (all phones, address) queued
+  10 s (Cancel in the chat). ❌ Reject: money not received / wrong screenshot / amount too
+  low (asks for the rest = total - amount received) -> back to waiting payment. 🚫 Not a
+  payment: nothing sent. Several photos: "Ask for one screenshot" (`several_photos`).
+  No way to mark paid without a screenshot.
+- Tests: reset app_settings and the Order ID sequence between tests (isolation).
+- Verified: pytest 203 passed, 1 skipped (5 new: approve with loading/required/warning +
+  second confirm -> #1001 and exact confirmation text; reused transaction ID + same image
+  warnings on the next order -> #1002; reject wrong amount (remaining 3,000) and new
+  screenshot + not a payment; several photos -> no download, ask for one, then a single
+  one is checked; auto mode never touches payments; photos before payment info ignored).
+  Live: /healthz ok; no order waiting for payment right now (orders: 1 cancelled, 1 cart).

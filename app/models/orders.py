@@ -17,6 +17,11 @@ OPEN_STATUSES = ("cart", "confirmed", "waiting_payment", "photo_received")
 QUICK_KINDS = ("price", "cart_add", "cart_remove", "cart_list", "confirm", "address", "contact", "not_stocked")
 UNKNOWN_RESOLUTIONS = ("mapped", "new_product", "not_stocked")
 AUTO_STATUSES = ("replied", "skipped")
+# pending: one screenshot to check · several: more than one photo (ask for one) ·
+# approved -> order paid · rejected -> back to waiting payment · not_payment: dismissed
+CHECK_DECISIONS = ("pending", "several", "approved", "rejected", "not_payment")
+REJECT_REASONS = ("not_received", "wrong_screenshot", "wrong_amount")
+FIRST_ORDER_NO = 1001
 MAX_PHONES = 3
 
 
@@ -42,6 +47,7 @@ class Order(Base):
     confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     payment_info_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))  # cancelled/abandoned
+    paid_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = created_at_column()
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(),
                                                  default=func.now())  # last change: idle carts expire
@@ -121,6 +127,34 @@ class UnknownRequest(Base):
     product_id: Mapped[int | None] = mapped_column(ForeignKey("products.id"))
     resolved_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
     resolved_at: Mapped[datetime] = created_at_column()
+
+
+class PaymentCheck(Base):
+    """A payment screenshot to check. The admin types the transaction ID from their own
+    KPay/AYA history; approving gives the order its Order ID. A reused transaction ID or
+    image is a warning (second confirm), not a database rule."""
+
+    __tablename__ = "payment_checks"
+    __table_args__ = (
+        CheckConstraint(f"decision IN {CHECK_DECISIONS}", name="decision"),
+        CheckConstraint(f"reason IS NULL OR reason IN {REJECT_REASONS}", name="reason"),
+        Index("ix_payment_checks_transaction_id", "transaction_id"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    order_id: Mapped[int] = mapped_column(ForeignKey("orders.id"), index=True)
+    message_id: Mapped[int] = mapped_column(ForeignKey("messages.id"), unique=True)  # the (first) photo
+    photo_count: Mapped[int] = mapped_column(Integer, server_default="1", default=1)
+    image_hash: Mapped[str | None] = mapped_column(String(64), index=True)  # sha256 of the downloaded file
+    transaction_id: Mapped[str | None] = mapped_column(String(64))
+    amount_mmk: Mapped[int | None] = mapped_column(Integer)
+    method: Mapped[str | None] = mapped_column(String(64))
+    decision: Mapped[str] = mapped_column(String(16), server_default="pending", default="pending")
+    reason: Mapped[str | None] = mapped_column(String(32))
+    outbox_id: Mapped[int | None] = mapped_column(ForeignKey("outbox.id"))  # confirmation / reject / "one photo" reply
+    decided_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = created_at_column()
 
 
 class AutoRun(Base):

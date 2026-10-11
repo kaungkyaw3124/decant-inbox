@@ -5,6 +5,8 @@
 <section class="card cart-pane {% if tab != 'cart' %}phone-hidden{% endif %}" id="cart">
   <h2>Cart {% if order %}<span class="badge">{{ status_label.get(order.status, order.status) }}</span>{% endif %}</h2>
 
+  {% if order and order.order_no %}<p><b>Order #{{ order.order_no }}</b></p>{% endif %}
+  {% if pending_check %}<p><a class="button primary" href="/payments/{{ pending_check.id }}">💳 Check the payment screenshot</a></p>{% endif %}
   {% if next_step %}
     <div class="next-step">
       {% if next_step.wait %}<p class="muted">⏳ {{ next_step.label }}</p>

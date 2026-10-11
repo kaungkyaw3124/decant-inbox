@@ -158,3 +158,4 @@ tr.problem-row td { background: var(--bad-bg); }
 .unknown-item h3 { font-size: 1rem; margin: 0; }
 .paused { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 @media (max-width: 560px) { .top { flex-wrap: wrap; } }
+.shot { max-width: 100%; max-height: 70vh; border-radius: 8px; display: block; }

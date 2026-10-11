@@ -1,0 +1,9 @@
+<div id="shot" {% if not shot or shot.status == "queued" %}hx-get="/payments/{{ check.id }}/shot" hx-trigger="every 2s" hx-swap="outerHTML"{% endif %}>
+  {% if shot and shot.status == "done" %}
+    <a href="/media/{{ check.message_id }}" target="_blank" rel="noopener" title="Tap to zoom"><img src="/media/{{ check.message_id }}" alt="Payment screenshot" class="shot"></a>
+  {% elif shot and shot.status == "failed" %}
+    <p class="error">Could not load the screenshot: {{ shot.error }}</p>
+  {% else %}
+    <p class="muted">Loading the screenshot…</p>
+  {% endif %}
+</div>

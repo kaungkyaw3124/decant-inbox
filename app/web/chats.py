@@ -16,7 +16,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
 from app.models import (
-    AuditLog, Customer, MediaDownload, Message, Order, OrderItem, Outbox, Product, QuickAction, User,
+    AuditLog, Customer, MediaDownload, Message, Order, OrderItem, Outbox, PaymentCheck, Product, QuickAction, User,
 )
 from app.models.orders import MAX_PHONES, OPEN_STATUSES
 from app.models.outbox import MAX_TEXT, MEDIA_DIR
@@ -175,6 +175,8 @@ def next_step(db: Session, customer: Customer, order, view) -> dict | None:
         return None  # red rows in the cart explain what to fix
     if order.status == "waiting_payment":
         return {"label": "Waiting for the payment screenshot", "wait": True}
+    if order.status == "photo_received":
+        return {"label": "Check the payment screenshot", "href": "/payments"}
     return None
 
 
@@ -186,6 +188,9 @@ def cart_context(db: Session, customer: Customer, texts: dict[str, str]) -> dict
         "payment_problems": cart.payment_problems(db, order, customer) if order else [],
         "saved_phones": cart.customer_phones(db, customer.id), "max_phones": MAX_PHONES,
         "contact_hint": actions.contact_suggestion(db, customer.id, texts) if order else None,
+        "pending_check": db.scalar(select(PaymentCheck).where(
+            PaymentCheck.order_id == order.id, PaymentCheck.decision.in_(("pending", "several")),
+            PaymentCheck.outbox_id.is_(None))) if order else None,
         "item_size": cart.item_size,
     }
 

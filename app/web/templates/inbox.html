@@ -8,6 +8,11 @@
   <h2>🟡 Needs you ({{ needs_you.count }})</h2>
   {% if not needs_you.count %}<p class="muted small">Nothing waiting for you.</p>{% endif %}
   <ul class="feed">
+  {% for check, order, c in needs_you.payments %}
+    <li><a href="/payments/{{ check.id }}"><b>💳 {{ c.display_name or c.username or "Customer" }}</b>:
+      {{ "several photos — ask for one" if check.decision == "several" else "payment screenshot to check" }}</a>
+      <span class="small muted">{{ format_mmk(order.total_mmk) }} ကျပ်</span></li>
+  {% endfor %}
   {% for m, c, items in needs_you.unknown %}
     <li><a href="/messages/{{ m.id }}"><b>{{ c.display_name or c.username or "Customer" }}</b>: {{ m.raw_text | truncate(70) }}</a>
       <span class="badge warn">❓ {{ items | map(attribute="text") | join(", ") }}</span>

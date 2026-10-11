@@ -21,6 +21,7 @@
   </form>
   <nav>
     <a href="/" {% if path == "/" %}aria-current="page"{% endif %}>Inbox</a>
+    <a href="/payments" {% if path.startswith("/payments") %}aria-current="page"{% endif %}>Payments{% if payments_open %} <span class="badge warn">{{ payments_open }}</span>{% endif %}</a>
     <a href="/chats" {% if path.startswith("/chats") %}aria-current="page"{% endif %}>Chats</a>
     <a href="/products" {% if path.startswith("/products") %}aria-current="page"{% endif %}>Products</a>
     <a href="/prices" {% if path.startswith("/prices") %}aria-current="page"{% endif %}>Prices</a>

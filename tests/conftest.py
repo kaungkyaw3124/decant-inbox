@@ -38,4 +38,6 @@ def db(migrated_db):
 
     yield engine
     with engine.begin() as c:
-        c.execute(text("TRUNCATE products, product_aliases, customers, messages, users, service_heartbeats, payment_methods, reply_templates, audit_log RESTART IDENTITY CASCADE"))
+        c.execute(text("TRUNCATE products, product_aliases, customers, messages, users, service_heartbeats, "
+                       "payment_methods, reply_templates, audit_log, app_settings RESTART IDENTITY CASCADE"))
+        c.execute(text("ALTER SEQUENCE order_no_seq RESTART WITH 1001"))

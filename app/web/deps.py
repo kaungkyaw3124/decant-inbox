@@ -20,14 +20,14 @@ def csrf_token(request: Request) -> str:
 
 
 def _template_context(request: Request) -> dict:
-    auto_on = False
-    if request.session.get("user_id"):  # the switch is shown on every page
-        from app.orders import auto  # late import: avoids an import cycle at startup
+    auto_on, payments_open = False, 0
+    if request.session.get("user_id"):  # the switch and the payments badge are on every page
+        from app.orders import auto, payments  # late import: avoids an import cycle at startup
 
         with SessionLocal() as session:
-            auto_on = auto.enabled(session)
+            auto_on, payments_open = auto.enabled(session), payments.count_open(session)
     return {"csrf": csrf_token(request), "flash": request.session.pop("flash", None),
-            "path": request.url.path, "auto_on": auto_on}
+            "path": request.url.path, "auto_on": auto_on, "payments_open": payments_open}
 
 
 templates = Jinja2Templates(

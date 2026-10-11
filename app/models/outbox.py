@@ -7,7 +7,7 @@ from app.core.base import Base, created_at_column
 from app.core.config import BASE_DIR
 
 OUTBOX_STATUSES = ("queued", "sending", "sent", "failed", "cancelled")
-REPLY_KINDS = ("custom", "price", "cart", "ask_address", "ask_phone", "contact", "payment_info")
+REPLY_KINDS = ("custom", "price", "cart", "ask_address", "ask_phone", "contact", "payment_info", "payment")
 DOWNLOAD_STATUSES = ("queued", "done", "failed")
 UNDO_SECONDS = 10
 MAX_TEXT = 4096  # Telegram's limit for one message
@@ -52,6 +52,7 @@ class MediaDownload(Base):
     message_id: Mapped[int] = mapped_column(ForeignKey("messages.id"), primary_key=True)
     status: Mapped[str] = mapped_column(String(16), server_default="queued", default="queued")
     path: Mapped[str | None] = mapped_column(String(255))  # file name inside secrets/media/
+    sha256: Mapped[str | None] = mapped_column(String(64))  # same screenshot sent twice?
     error: Mapped[str | None] = mapped_column(Text)
     requested_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
     requested_at: Mapped[datetime] = created_at_column()

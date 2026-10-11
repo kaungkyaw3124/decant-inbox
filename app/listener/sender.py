@@ -7,6 +7,7 @@ Also downloads a photo when an admin asks to see it (read-only).
 Logs ids and counts only, never message text.
 """
 import asyncio
+import hashlib
 import logging
 import time
 from collections import deque
@@ -149,11 +150,11 @@ def claim_download() -> tuple[int, str, str, str] | None:
         return msg.id, msg.external_chat_id, msg.external_message_id, msg.media_mime
 
 
-def finish_download(message_id: int, path: str | None, error: str | None) -> None:
+def finish_download(message_id: int, path: str | None, error: str | None, sha256: str | None = None) -> None:
     with SessionLocal.begin() as s:
         row = s.get(MediaDownload, message_id)
         row.status = "done" if path else "failed"
-        row.path, row.error, row.done_at = path, error, datetime.now(UTC)
+        row.path, row.error, row.done_at, row.sha256 = path, error, datetime.now(UTC), sha256
 
 
 async def download_next(client) -> bool:
@@ -173,7 +174,8 @@ async def download_next(client) -> bool:
             Path(result or target).unlink(missing_ok=True)
             raise ValueError("download failed or too big")
         Path(result).chmod(0o600)
-        await asyncio.to_thread(finish_download, message_id, Path(result).name, None)
+        digest = hashlib.sha256(Path(result).read_bytes()).hexdigest()
+        await asyncio.to_thread(finish_download, message_id, Path(result).name, None, digest)
         log.info("photo downloaded message=%s", message_id)
     except Exception as exc:
         await asyncio.to_thread(finish_download, message_id, None, f"{type(exc).__name__}: {exc}"[:300])

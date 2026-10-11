@@ -15,7 +15,7 @@ from sqlalchemy.exc import IntegrityError
 from app.core.db import SessionLocal
 from app.core.heartbeat import beat
 from app.models import Message
-from app.orders import auto, cart
+from app.orders import auto, cart, payments
 from app.parser.rules import PARSER_VERSION
 from app.parser.service import load_aliases, load_full_sizes, parse_message, unparsed_message_ids
 from scripts.reparse_all import reparse_all
@@ -64,6 +64,17 @@ def reparse_if_catalog_changed(last: int | None) -> int:
     return current
 
 
+def scan_payments() -> None:
+    """Payment screenshots -> payment checks (Step 5)."""
+    try:
+        with SessionLocal.begin() as session:
+            found = payments.scan(session)
+        if found:
+            log.info("payment photos: %d new/changed checks", found)
+    except Exception:
+        log.exception("payment scan failed")
+
+
 def housekeeping() -> None:
     """Carts idle for 3 days -> abandoned (DB-only chore; this worker runs 24/7 anyway)."""
     with SessionLocal.begin() as session:
@@ -94,6 +105,7 @@ def main() -> None:
         if parsed:
             log.info("parsed %d messages", parsed)
             continue  # there may be more
+        scan_payments()
         auto.run_once()  # auto mode (does nothing while it is switched off)
         if args.once:
             return
