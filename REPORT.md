@@ -248,3 +248,14 @@ Short entries from the VPS Claude Code session, newest last.
   new URL written, old URL dead.
 - Not verified live: that CF-Connecting-IP carries the real phone IP (covered by unit test).
 - Needed from owner: the sudo command again, then first backup, then reboot.
+
+## 2026-10-11 — Phase 5: first backup, ready for reboot test
+- Owner ran the sudo command: pg_dump 18.6 installed, Linger=yes.
+- First backup: product_requests_2026-10-11T1643Z.dump (27 KiB, mode 600). Restore test:
+  restored into a scratch DB `restore_check`; row counts match live (messages 7, customers 2,
+  parse_results 7, products 20); scratch DB dropped. Also ran via `systemctl --user start
+  decant-backup` -> Result=success. Next timer run 20:30 UTC (03:00 Yangon).
+- pytest tests/test_ops.py: 4 passed (real pg_dump test no longer skipped).
+- status.sh: all services active, every /healthz check ok (backup now ok), TUNNEL_URL set.
+- Postgres container has restart: unless-stopped; docker/containerd enabled at boot.
+- Next: owner reboots; after it, check scripts/status.sh shows everything ok + a new URL.
