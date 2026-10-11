@@ -38,14 +38,14 @@ def test_items_context_and_phone(client, db):  # noqa: F811  (client seeds the s
     assert items(db, "202") == [("Stronger With You Intensely", 10, False, 1, None, True)]
     assert items(db, "203") == [(None, 10, False, 1, None, False)]
     with db.connect() as c:
-        assert c.execute(text("SELECT phone FROM customers WHERE external_user_id = '61'")).scalar() == "09111222333"
-        assert c.execute(text("SELECT intent FROM parse_results r JOIN messages m ON m.id = r.message_id "
-                              "WHERE m.external_message_id = '204'")).scalar() == "address"
+        assert c.execute(text("SELECT intent, phone FROM parse_results r JOIN messages m ON m.id = r.message_id "
+                              "WHERE m.external_message_id = '204' AND r.is_current")).one() == ("address", "09111222333")
+        # Step 4b: the parser only finds numbers; an admin tap saves them on the customer
+        assert c.execute(text("SELECT phone FROM customers WHERE external_user_id = '61'")).scalar() is None
 
-    # reparse: nothing changes, the newer phone still wins
+    # reparse: nothing changes
     stats = reparse_all()
     assert stats["changed"] == 0 and stats["new"] == 0
-    assert scalar(db, "SELECT phone FROM customers WHERE external_user_id = '61'") == "09111222333"
 
     log_in(client)
     page = client.get("/?intent=all&status=all").text

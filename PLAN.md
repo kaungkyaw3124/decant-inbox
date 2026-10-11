@@ -13,8 +13,9 @@ Read CLAUDE.md first. This file tracks where we are.
 - One-tap quick replies ("💬 Reply price", 10 s Undo) DONE; live send verified
   2026-10-11 18:48 UTC (queued -> sent after 11 s). Also offered for intent=buy (until cart).
 - v2 Step 3 (parser rules-2) DONE and verified by owner.
-- v2 Step 4 (cart, one-tap cart actions, address/phone, payment info) DONE and deployed;
-  waiting for the owner's end-to-end test from the second account (REPORT.md).
+- v2 Step 4 (cart, one-tap cart actions, address/phone, payment info) DONE and deployed.
+- v2 Step 4b (partial carts, phone first then address, up to 3 phones, same phone & address
+  next time) DONE and deployed; waiting for the owner's end-to-end test (REPORT.md).
   NEXT: Step 5 (payment check + Order ID) after owner OK.
 - Owner checks: `bash scripts/status.sh`.
 
@@ -28,7 +29,7 @@ Read CLAUDE.md first. This file tracks where we are.
 | 3b | AI fallback (optional) | ⬜ Not started |
 | 4 | Dashboard + Tailscale (private access) | ✅ Dashboard verified by owner via SSH tunnel (2026-10-11). Tailscale (phone access) still optional |
 | 5 | Run 24/7, backups, health page | ✅ Done: reboot test passed 2026-10-11 (all services back, health ok, new tunnel URL) |
-| 6 | v2: replies, cart, payment check, orders (docs/SPEC-orders.md) | 🟡 Steps 1-4 done (price list, Excel, Settings; outbox sender, chats, replies, one-tap; parser rules-2; cart + payment info); Step 5 next |
+| 6 | v2: replies, cart, payment check, orders (docs/SPEC-orders.md) | 🟡 Steps 1-4 done (price list, Excel, Settings; outbox sender, chats, replies, one-tap; parser rules-2; cart + payment info; 4b partial carts + phones); Step 5 next |
 
 ## Phase 0 checklist
 - [x] Step 0: rollback safety net scripts in ~/hardening/

@@ -2,9 +2,10 @@ from datetime import datetime
 from typing import Any
 
 from sqlalchemy import (
-    Boolean, CheckConstraint, DateTime, ForeignKey, Index, Integer, String, Text, false, func, text,
+    Boolean, CheckConstraint, DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint, false, func,
+    text,
 )
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.base import Base, created_at_column
@@ -13,7 +14,8 @@ from app.core.base import Base, created_at_column
 ORDER_STATUSES = ("cart", "confirmed", "waiting_payment", "photo_received", "paid", "delivered",
                   "cancelled", "abandoned")
 OPEN_STATUSES = ("cart", "confirmed", "waiting_payment", "photo_received")
-QUICK_KINDS = ("price", "cart_add", "cart_remove", "cart_list", "confirm", "address")
+QUICK_KINDS = ("price", "cart_add", "cart_remove", "cart_list", "confirm", "address", "contact")
+MAX_PHONES = 3
 
 
 class Order(Base):
@@ -33,7 +35,7 @@ class Order(Base):
     order_no: Mapped[int | None] = mapped_column(Integer, unique=True)
     total_mmk: Mapped[int] = mapped_column(Integer, server_default="0", default=0)  # priced items only
     address: Mapped[str | None] = mapped_column(Text)  # for this order (copied to the customer)
-    phone: Mapped[str | None] = mapped_column(String(20))
+    phones: Mapped[list[str]] = mapped_column(ARRAY(String(20)), server_default="{}", default=list)  # copy
     list_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))  # last cart list reply
     confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     payment_info_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
@@ -47,10 +49,13 @@ class OrderItem(Base):
     """Removed items are kept (removed_at) so the history of the cart stays visible."""
 
     __tablename__ = "order_items"
+    __table_args__ = (CheckConstraint("product_id IS NOT NULL OR unknown_text IS NOT NULL",
+                                      name="product_or_unknown"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
     order_id: Mapped[int] = mapped_column(ForeignKey("orders.id"), index=True)
-    product_id: Mapped[int] = mapped_column(ForeignKey("products.id"))
+    product_id: Mapped[int | None] = mapped_column(ForeignKey("products.id"))  # None = unknown_text
+    unknown_text: Mapped[str | None] = mapped_column(String(255))  # asked for, not in our list: blocks payment
     size_ml: Mapped[int | None] = mapped_column(Integer)  # None with is_full_bottle
     is_full_bottle: Mapped[bool] = mapped_column(Boolean, server_default=false(), default=False)
     quantity: Mapped[int] = mapped_column(Integer, server_default="1", default=1)
@@ -58,6 +63,20 @@ class OrderItem(Base):
     source_message_id: Mapped[int | None] = mapped_column(ForeignKey("messages.id"))
     created_at: Mapped[datetime] = created_at_column()
     removed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class CustomerPhone(Base):
+    """A customer's phone numbers (max 3, first = main), saved when an admin taps "Save phone"."""
+
+    __tablename__ = "customer_phones"
+    __table_args__ = (UniqueConstraint("customer_id", "phone"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    customer_id: Mapped[int] = mapped_column(ForeignKey("customers.id"), index=True)
+    phone: Mapped[str] = mapped_column(String(20))
+    position: Mapped[int] = mapped_column(Integer)
+    source_message_id: Mapped[int | None] = mapped_column(ForeignKey("messages.id"))
+    created_at: Mapped[datetime] = created_at_column()
 
 
 class QuickAction(Base):

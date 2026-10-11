@@ -18,9 +18,11 @@ from sqlalchemy.orm import Session
 from app.models import (
     AuditLog, Customer, MediaDownload, Message, Order, OrderItem, Outbox, Product, QuickAction, User,
 )
-from app.models.orders import OPEN_STATUSES
+from app.models.orders import MAX_PHONES, OPEN_STATUSES
 from app.models.outbox import MAX_TEXT, MEDIA_DIR
 from app.orders import actions, cart
+from app.parser.normalize import normalize
+from app.parser.rules import find_phones
 from app.pricing.prices import current_prices
 from app.replies import compose
 from app.replies import templates as replies
@@ -118,14 +120,14 @@ def chat(request: Request, customer_id: int, db: Session = Depends(get_db)):
             if not items:
                 result.problems.append("Choose at least one product.")
         result.text = compose.with_greeting(result.text, texts, greet)
-    elif mode in ("cart", "ask_address", "payment_info"):
+    elif mode in ("cart", "ask_address", "ask_phone", "payment_info"):
         order = cart.open_cart(db, customer_id)
         if order is None or cart.view(db, order).empty:
             result.problems.append("The cart is empty.")
         elif mode == "cart":
             result.text = cart.cart_text(db, order, texts)
-        elif mode == "ask_address":
-            result.text = texts["ask_address"]
+        elif mode in ("ask_address", "ask_phone"):
+            result.text = texts[mode]
         else:
             result.problems = cart.payment_problems(db, order, customer)
             result.text = "" if result.problems else cart.payment_text(db, order, texts)
@@ -136,7 +138,7 @@ def chat(request: Request, customer_id: int, db: Session = Depends(get_db)):
     products = db.scalars(select(Product).where(Product.active).order_by(Product.brand, Product.name)).all()
     sizes = sorted({p.size_ml for ps in current_prices(db).values() for p in ps if p.size_ml})
     return templates.TemplateResponse(request, "chat.html", {
-        **thread_context(db, customer), **cart_context(db, customer), "mode": mode, "result": result,
+        **thread_context(db, customer), **cart_context(db, customer, texts), "mode": mode, "result": result,
         "greet": greet, "tab": request.query_params.get("tab", "chat"),
         "items": items + [compose.PriceItem(0, "all")] * (compose.MAX_PRICE_ITEMS - len(items)),
         "products": products, "sizes": sizes, "can_send": has_written(db, customer_id),
@@ -145,7 +147,8 @@ def chat(request: Request, customer_id: int, db: Session = Depends(get_db)):
 
 
 def next_step(db: Session, customer: Customer, order, view) -> dict | None:
-    """The one highlighted button for this conversation."""
+    """The one highlighted button for this conversation: list -> confirm -> phone ->
+    address -> payment info (the system decides what to ask next, phone first)."""
     if order is None or view.empty:
         return None
     url = f"/chats/{customer.id}"
@@ -154,26 +157,29 @@ def next_step(db: Session, customer: Customer, order, view) -> dict | None:
             return {"label": "Send cart list", "href": f"{url}?compose=cart#reply"}
         return {"label": "Customer agreed: mark confirmed", "post": f"{url}/cart/confirm"}
     if order.status == "confirmed":
-        missing = cart.missing_contact(order, customer)
-        if "address" in missing and customer.address and "phone" not in missing:
-            return {"label": "Use same address as last time", "post": f"{url}/cart/same-address"}
-        if missing:
-            return {"label": "Ask for address & phone", "href": f"{url}?compose=ask_address#reply"}
+        missing = cart.missing_contact(order)
+        if missing and cart.has_saved_contact(db, order, customer):
+            return {"label": "Same phone & address as last time", "post": f"{url}/cart/same-contact"}
+        if "phone" in missing:
+            return {"label": "Ask for phone", "href": f"{url}?compose=ask_phone#reply"}
+        if "address" in missing:
+            return {"label": "Ask for address", "href": f"{url}?compose=ask_address#reply"}
         if not cart.payment_problems(db, order, customer):
             return {"label": "Send payment info", "href": f"{url}?compose=payment_info#reply"}
-        return None
+        return None  # red rows in the cart explain what to fix
     if order.status == "waiting_payment":
         return {"label": "Waiting for the payment screenshot", "wait": True}
     return None
 
 
-def cart_context(db: Session, customer: Customer) -> dict:
+def cart_context(db: Session, customer: Customer, texts: dict[str, str]) -> dict:
     order = cart.open_cart(db, customer.id)
     view = cart.view(db, order) if order else None
     return {
         "order": order, "cart": view, "next_step": next_step(db, customer, order, view),
         "payment_problems": cart.payment_problems(db, order, customer) if order else [],
-        "contact_phone": (order.phone if order and order.phone else customer.phone) or "",
+        "saved_phones": cart.customer_phones(db, customer.id), "max_phones": MAX_PHONES,
+        "contact_hint": actions.contact_suggestion(db, customer.id, texts) if order else None,
         "item_size": cart.item_size,
     }
 
@@ -188,7 +194,7 @@ def send(request: Request, customer_id: int, text: str = Form(""), reply_kind: s
          key: str = Form(...), db: Session = Depends(get_db), user: User = Depends(current_user)):
     get_customer(db, customer_id)
     text = text.replace("\r\n", "\n").strip()
-    if reply_kind not in ("custom", "price", "cart", "ask_address", "payment_info"):
+    if reply_kind not in ("custom", "price", "cart", "ask_address", "ask_phone", "payment_info"):
         raise HTTPException(400, "Unknown reply kind")
     if not has_written(db, customer_id):
         raise HTTPException(400, "This customer has never messaged us; we never message first.")
@@ -212,7 +218,7 @@ def send(request: Request, customer_id: int, text: str = Form(""), reply_kind: s
         if reply_kind == "cart" and order is not None:
             order.list_sent_at = datetime.now(UTC)
         elif reply_kind == "payment_info":
-            cart.payment_info_sent(db, order, customer)
+            cart.payment_info_sent(db, order)
         db.add(AuditLog(user_id=user.id, action="outbox.queue", details={
             "outbox_id": outbox_id, "customer_id": customer_id, "reply_kind": reply_kind, "chars": len(text)}))
         db.commit()
@@ -355,31 +361,66 @@ def cart_confirm(request: Request, customer_id: int, db: Session = Depends(get_d
     return _cart_redirect(customer_id)
 
 
-@router.post("/chats/{customer_id}/cart/contact")
-def cart_contact(request: Request, customer_id: int, address: str = Form(""), phone: str = Form(""),
+@router.post("/chats/{customer_id}/cart/address")
+def cart_address(request: Request, customer_id: int, address: str = Form(""),
                  db: Session = Depends(get_db), user: User = Depends(current_user)):
     customer = get_customer(db, customer_id)
     order = _open_order(db, customer_id)
-    address = address.replace("\r\n", "\n").strip()[:500] or None
-    phone = re.sub(r"[^\d+]", "", phone)[:20] or None
-    cart.set_contact(db, order, customer, address, phone)
-    _log(db, user, "cart.contact", order_id=order.id)
+    cart.set_address(db, order, customer, address.replace("\r\n", "\n").strip()[:500] or None)
+    _log(db, user, "cart.address", order_id=order.id)
     db.commit()
-    flash(request, "Address and phone saved (also for next time).")
+    flash(request, "Address saved (also for next time).")
     return _cart_redirect(customer_id)
 
 
-@router.post("/chats/{customer_id}/cart/same-address")
-def cart_same_address(request: Request, customer_id: int, db: Session = Depends(get_db),
+@router.post("/chats/{customer_id}/cart/phones")
+def cart_phone_add(request: Request, customer_id: int, phone: str = Form(""),
+                   db: Session = Depends(get_db), user: User = Depends(current_user)):
+    customer = get_customer(db, customer_id)
+    order = _open_order(db, customer_id)
+    phones = find_phones(normalize(phone))
+    if not phones:
+        flash(request, "Not a Myanmar mobile number (09…).")
+    elif not cart.add_phones(db, order, customer, phones[:1], None):
+        flash(request, f"Already saved, or {MAX_PHONES} numbers already: remove one first.")
+    else:
+        _log(db, user, "cart.phone_add", order_id=order.id)
+        flash(request, "Phone added.")
+    db.commit()
+    return _cart_redirect(customer_id)
+
+
+@router.post("/chats/{customer_id}/cart/phones/{position}/{move}")
+def cart_phone_change(request: Request, customer_id: int, position: int, move: str,
+                      db: Session = Depends(get_db), user: User = Depends(current_user)):
+    """move: remove | up (make it the first number, used first on the order)."""
+    customer = get_customer(db, customer_id)
+    order = _open_order(db, customer_id)
+    rows = cart.phone_rows(db, customer_id)
+    if not 0 <= position < len(rows) or move not in ("remove", "up"):
+        raise HTTPException(400, "No such phone")
+    row = rows.pop(position)
+    if move == "up":
+        rows.insert(max(position - 1, 0), row)
+    cart.set_customer_phones(db, customer, rows)
+    order.phones = cart.customer_phones(db, customer_id)
+    cart.touch(db, order)
+    _log(db, user, f"cart.phone_{move}", order_id=order.id)
+    db.commit()
+    return _cart_redirect(customer_id)
+
+
+@router.post("/chats/{customer_id}/cart/same-contact")
+def cart_same_contact(request: Request, customer_id: int, db: Session = Depends(get_db),
                       user: User = Depends(current_user)):
     customer = get_customer(db, customer_id)
     order = _open_order(db, customer_id)
-    if not customer.address:
-        raise HTTPException(400, "No saved address")
-    cart.set_contact(db, order, customer, customer.address, None)
-    _log(db, user, "cart.same_address", order_id=order.id)
+    if not cart.has_saved_contact(db, order, customer):
+        raise HTTPException(400, "Nothing saved from last time")
+    cart.use_saved_contact(db, order, customer)
+    _log(db, user, "cart.same_contact", order_id=order.id)
     db.commit()
-    flash(request, "Using the same address as last time.")
+    flash(request, "Using the same phone & address as last time.")
     return _cart_redirect(customer_id)
 
 

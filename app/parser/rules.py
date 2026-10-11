@@ -133,13 +133,21 @@ def find_quantity(text: str) -> int:
     return qty if qty > 0 else 1
 
 
+def find_phones(text: str) -> list[str]:
+    """All Myanmar mobile numbers, as 09xxxxxxxx, in order, without duplicates."""
+    phones = []
+    for m in _PHONE_RE.finditer(text):
+        digits = re.sub(r"\D", "", m.group(0))
+        phone = "0" + digits[2:] if digits.startswith("95") else digits
+        if phone not in phones:
+            phones.append(phone)
+    return phones
+
+
 def find_phone(text: str) -> str | None:
     """First Myanmar mobile number, as 09xxxxxxxx."""
-    m = _PHONE_RE.search(text)
-    if not m:
-        return None
-    digits = re.sub(r"\D", "", m.group(0))
-    return "0" + digits[2:] if digits.startswith("95") else digits
+    phones = find_phones(text)
+    return phones[0] if phones else None
 
 
 def _exact_spans(text: str, alias: str) -> list[tuple[int, int]]:

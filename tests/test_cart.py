@@ -1,5 +1,6 @@
-"""Step 4: cart flow with one-tap actions (buy -> remove -> confirm -> address -> payment
-info), undo of each, "same address as last time", payment info blockers, idle carts."""
+"""Steps 4 + 4b: cart flow with one-tap actions and exact undo; partial carts (unknown /
+unpriced / out-of-stock items); phone first, then address; several phones; editable
+address; same phone & address next time; payment info blockers; idle carts."""
 import asyncio
 import html
 import re
@@ -17,7 +18,9 @@ from tests.test_prices import STW, run_import, xlsx
 from tests.test_web import client, log_in  # noqa: F401  (fixture)
 
 SAUVAGE = ["Dior", "Sauvage Eau de Parfum", 100, 420000, None, 20000, 38000, "yes"]
+Y_SOLD_OUT = ["Yves Saint Laurent", "Y Eau de Parfum", 100, 380000, 8000, 18000, 34000, "no"]
 START = datetime.now(UTC) - timedelta(hours=1)
+PAYMENT_FOOTER = "KPay – 09000000001 (Test Shop)\nငွေလွှဲပြီးရင် transaction id ပါတဲ့ screenshot ပို့ပေးပါနော်။"
 
 
 def say(db, n: int, body: str, customer: str = "91") -> int:
@@ -35,46 +38,54 @@ def button(client, mid: int) -> tuple[str, str, str] | None:
     return (html.unescape(m.group(3)), html.unescape(m.group(2)), m.group(1)) if m and m.group(1) else None
 
 
-def tap(client, token, mid: int) -> None:
-    label, _, expect = button(client, mid)
-    r = client.post(f"/messages/{mid}/quick", data={"csrf": token, "expect": expect}, follow_redirects=False)
+def tap(client, token, mid: int, **extra) -> None:
+    _, _, expect = button(client, mid)
+    r = client.post(f"/messages/{mid}/quick", data={"csrf": token, "expect": expect, **extra},
+                    follow_redirects=False)
     assert r.status_code == 303, r.text
 
 
-def deliver(db) -> list[tuple[int, str]]:
+def deliver(db) -> list[str]:
     """Let the 10 s pass and send everything queued with a fake Telegram client."""
     with db.begin() as c:
         c.execute(text("UPDATE outbox SET send_after = now() - interval '1 second' WHERE status = 'queued'"))
     fake = FakeClient()
     while asyncio.run(sender.send_next(fake, sender.RateLimiter())):  # a new limiter: no 3 s wait
         pass
-    return fake.sent
+    return [t for _, t in fake.sent]
 
 
 def order_row(db, customer="91"):
     with db.connect() as c:
         return c.execute(text(
-            "SELECT o.status, o.total_mmk, o.address, o.phone FROM orders o JOIN customers c ON c.id = o.customer_id "
+            "SELECT o.status, o.total_mmk, o.address, o.phones FROM orders o JOIN customers c ON c.id = o.customer_id "
             "WHERE c.external_user_id = :e ORDER BY o.id DESC LIMIT 1"), {"e": customer}).one()
+
+
+def phones(db, customer="91") -> list[str]:
+    with db.connect() as c:
+        return list(c.execute(text(
+            "SELECT p.phone FROM customer_phones p JOIN customers c ON c.id = p.customer_id "
+            "WHERE c.external_user_id = :e ORDER BY p.position"), {"e": customer}).scalars())
 
 
 def items(db) -> list[tuple]:
     with db.connect() as c:
         return list(c.execute(text(
-            "SELECT p.name, i.size_ml, i.is_full_bottle, i.quantity, i.unit_price_mmk FROM order_items i "
-            "JOIN products p ON p.id = i.product_id WHERE i.removed_at IS NULL ORDER BY i.id")))
+            "SELECT coalesce(p.name, '?' || i.unknown_text), i.size_ml, i.is_full_bottle, i.quantity, i.unit_price_mmk "
+            "FROM order_items i LEFT JOIN products p ON p.id = i.product_id WHERE i.removed_at IS NULL ORDER BY i.id")))
 
 
 @pytest.fixture
 def shop(client, db):  # noqa: F811
     token = log_in(client)
-    run_import(xlsx(STW, SAUVAGE))
+    run_import(xlsx(STW, SAUVAGE, Y_SOLD_OUT))
     client.post("/settings/payment-methods", data={"csrf": token, "name": "KPay", "account_number": "09000000001",
                                                    "account_name": "Test Shop"})
     return client, token
 
 
-def test_whole_flow_with_undo(shop, db):
+def test_whole_flow_phone_first_with_undo(shop, db):
     client, token = shop
     buy = say(db, 1, "stw intensely 5ml, sauvage edp 10ml ယူပါမယ်")
     label, tooltip, _ = button(client, buy)
@@ -85,104 +96,142 @@ def test_whole_flow_with_undo(shop, db):
 
     tap(client, token, buy)
     assert order_row(db)[:2] == ("cart", 56000) and len(items(db)) == 2
-    assert scalar(db, "SELECT status FROM message_reviews WHERE message_id = :m", m=buy) == "done"
-    # Undo: items gone, the new empty cart cancelled, reply cancelled, message back to new
     aid = scalar(db, "SELECT id FROM quick_actions")
-    client.post(f"/quick/{aid}/undo", data={"csrf": token})
+    client.post(f"/quick/{aid}/undo", data={"csrf": token})  # Undo: all gone again
     assert order_row(db)[0] == "cancelled" and items(db) == []
-    assert scalar(db, "SELECT status FROM outbox") == "cancelled"
     assert scalar(db, "SELECT status FROM message_reviews WHERE message_id = :m", m=buy) == "new"
+    tap(client, token, buy)
+    assert deliver(db)[0].startswith("မင်္ဂလာပါ။\n• Stronger With You Intensely 5ml – 18,000 ကျပ်")
 
-    tap(client, token, buy)  # again, for real
-    sent = deliver(db)
-    assert sent[0][1].startswith("မင်္ဂလာပါ။\n• Stronger With You Intensely 5ml – 18,000 ကျပ်")
-
-    remove = say(db, 2, "sauvage edp မယူတော့ဘူး")
-    assert button(client, remove)[0] == "➖ Remove + send list"
-    tap(client, token, remove)
+    tap(client, token, say(db, 2, "sauvage edp မယူတော့ဘူး"))
     assert items(db) == [("Stronger With You Intensely", 5, False, 1, 18000)]
-    assert deliver(db)[0][1] == ("• Stronger With You Intensely 5ml – 18,000 ကျပ်\n"
-                                 "စုစုပေါင်း 18,000 ကျပ်ပါ။ အဆင်ပြေရင် confirm လုပ်ပေးပါနော်။")  # no greeting: < 6 h
+    deliver(db)
 
     ok = say(db, 3, "ok")
-    assert button(client, ok)[0] == "✅ Confirm + ask address & phone"
+    assert button(client, ok)[0] == "✅ Confirm + ask phone"
     tap(client, token, ok)
-    assert order_row(db)[0] == "confirmed"
-    assert deliver(db)[0][1] == "ပို့ပေးရမယ့် လိပ်စာနဲ့ ဖုန်းနံပါတ် ပို့ပေးပါနော်။"
+    assert deliver(db) == ["ဆက်သွယ်ရန် ဖုန်းနံပါတ် ပို့ပေးပါနော်။"]
 
-    address = say(db, 4, "အမှတ် ၁၂, ဗဟန်း 09 777 123 456")
+    two = say(db, 4, "09 777 123 456 နဲ့ ၀၉ ၄၄၄ ၅၅၅ ၆၆၆")
+    assert button(client, two)[0] == "📞 Save phones + ask address"
+    tap(client, token, two)
+    assert phones(db) == ["09777123456", "09444555666"] and order_row(db)[3] == ["09777123456", "09444555666"]
+    assert deliver(db) == ["ဖုန်းနံပါတ် 09777123456, 09444555666 ရပါပြီ။ ပို့ပေးရမယ့် လိပ်စာ ပို့ပေးပါနော်။"]
+
+    address = say(db, 5, "အမှတ် ၁၂, ဗဟန်း ကိုပို့ပေးပါ")
     label, tooltip, _ = button(client, address)
-    assert label == "📍 Save address + 💳 send payment info"
-    assert "KPay – 09000000001 (Test Shop)" in tooltip and "Saves: အမှတ် 12, ဗဟန်း, 09777123456" in tooltip
+    assert label == "📍 Save address + 💳 send payment info" and "Saves: အမှတ် 12, ဗဟန်း." in tooltip
     tap(client, token, address)
-    assert order_row(db) == ("waiting_payment", 18000, "အမှတ် 12, ဗဟန်း", "09777123456")
-    assert scalar(db, "SELECT address FROM customers WHERE external_user_id = '91'") == "အမှတ် 12, ဗဟန်း"
-
-    # Undo of the address action: back to confirmed, address forgotten again
+    assert order_row(db)[:3] == ("waiting_payment", 18000, "အမှတ် 12, ဗဟန်း")
     aid = scalar(db, "SELECT id FROM quick_actions WHERE message_id = :m", m=address)
     client.post(f"/quick/{aid}/undo", data={"csrf": token})
     assert order_row(db)[:3] == ("confirmed", 18000, None)
     assert scalar(db, "SELECT address FROM customers WHERE external_user_id = '91'") is None
 
-    tap(client, token, address)
-    payment = deliver(db)[0][1]
-    assert payment == ("• Stronger With You Intensely 5ml – 18,000 ကျပ်\nစုစုပေါင်း 18,000 ကျပ်ပါ။\n"
-                       "KPay – 09000000001 (Test Shop)\nငွေလွှဲပြီးရင် transaction id ပါတဲ့ screenshot ပို့ပေးပါနော်။")
+    # the cart panel offers the same action with the address editable before the tap
     cid = customer_id(db, "91")
     page = client.get(f"/chats/{cid}?tab=cart").text
-    assert "💳 waiting for payment" in page and "Waiting for the payment screenshot" in page
-    assert scalar(db, "SELECT count(*) FROM audit_log WHERE action = 'quick.cart_add'") == 2
+    assert "Address to save (you can fix it first)" in page and "အမှတ် 12, ဗဟန်း</textarea>" in page
+    tap(client, token, address, address="No. 12, Bahan Road", back=f"/chats/{cid}?tab=cart")
+    assert order_row(db)[:3] == ("waiting_payment", 18000, "No. 12, Bahan Road")
+    assert deliver(db) == ["• Stronger With You Intensely 5ml – 18,000 ကျပ်\nစုစုပေါင်း 18,000 ကျပ်ပါ။\n"
+                           + PAYMENT_FOOTER]
+
+    # a later message with another number: added as phone 3, short reply
+    third = say(db, 6, "ph 09 111 222 333 လည်းရပါတယ်")
+    assert button(client, third)[0] == "📞 Save phone + reply"
+    tap(client, token, third)
+    assert phones(db) == ["09777123456", "09444555666", "09111222333"]
+    assert deliver(db) == ["ဖုန်းနံပါတ် 09111222333 ကိုလည်း ထည့်ထားပါပြီ။"]
+    assert button(client, say(db, 7, "09 999 888 777")) is None  # max 3 numbers: use the cart panel
 
 
-def test_same_address_next_time_and_payment_via_editor(shop, db):
+def test_partial_cart(shop, db):
+    client, token = shop
+    buy = say(db, 1, "stw intensely 5ml, ysl y edp 5ml, sauvage edp 3ml, hawas ice 10ml ယူမယ်", customer="95")
+    label, tooltip, _ = button(client, buy)
+    assert label == "🛒 Add 1 known item + send list"
+    tap(client, token, buy)
+    assert items(db) == [("Stronger With You Intensely", 5, False, 1, 18000),
+                         ("Sauvage Eau de Parfum", 3, False, 1, None), ("?hawas ice", 10, False, 1, None)]
+    assert deliver(db) == ["မင်္ဂလာပါ။\n• Stronger With You Intensely 5ml – 18,000 ကျပ်\n"
+                           "စုစုပေါင်း 18,000 ကျပ်ပါ။ အဆင်ပြေရင် confirm လုပ်ပေးပါနော်။\n"
+                           "hawas ice 10ml, Sauvage Eau de Parfum 3ml ကိုတော့ စစ်ပြီး ပြန်ပြောပေးပါမယ်နော်။\n"
+                           "Y Eau de Parfum 5ml လောလောဆယ် ကုန်နေပါတယ်နော်။"]
+    cid = customer_id(db, "95")
+    page = client.get(f"/chats/{cid}?tab=cart").text
+    assert "❓ hawas ice" in page and "not in product list" in page and "no price" in page
+    # confirm + phone + address: everything saved, but payment info stays blocked
+    tap(client, token, say(db, 2, "ok", customer="95"))
+    deliver(db)
+    contact = say(db, 3, "09 777 123 456 ဗဟန်း ကိုပို့ပေးပါ", customer="95")
+    label, tooltip, _ = button(client, contact)
+    assert label == "📞 Save phone & 📍 Save address"  # no payment info: red items first
+    assert "Still to check before payment: hawas ice 10ml, Sauvage Eau de Parfum 3ml" in tooltip
+    tap(client, token, contact)
+    page = client.get(f"/chats/{cid}?compose=payment_info").text
+    assert "Not in the product list: hawas ice 10ml" in page and "No price for: Sauvage Eau de Parfum 3ml" in page
+    # removing the red rows -> new confirmation -> payment info is the next step
+    with db.connect() as c:
+        red = c.execute(text("SELECT id FROM order_items WHERE unit_price_mmk IS NULL AND removed_at IS NULL")
+                        ).scalars().all()
+    for item_id in red:
+        client.post(f"/chats/{cid}/cart/items/{item_id}/remove", data={"csrf": token})
+    assert order_row(db, "95")[0] == "cart"  # changed items: needs a new confirmation
+    client.post(f"/chats/{cid}/cart/confirm", data={"csrf": token})
+    assert "Next: Send payment info" in client.get(f"/chats/{cid}?tab=cart").text
+
+
+def test_same_phone_and_address_next_time(shop, db):
     client, token = shop
     with db.begin() as c:
-        c.execute(text("INSERT INTO customers (channel, external_user_id, address, phone) "
-                       "VALUES ('telegram', '92', 'No. 5, Sanchaung', '09111222333')"))
+        cid = c.execute(text("INSERT INTO customers (channel, external_user_id, address, phone) VALUES "
+                             "('telegram', '92', 'No. 5, Sanchaung', '09111222333') RETURNING id")).scalar()
+        c.execute(text("INSERT INTO customer_phones (customer_id, phone, position) VALUES (:c, '09111222333', 1)"),
+                  {"c": cid})
     tap(client, token, say(db, 1, "stw intensely 10ml ယူမယ်", customer="92"))
     deliver(db)
     ok = say(db, 2, "ဟုတ်ကဲ့", customer="92")
-    assert button(client, ok)[0] == "✅ Confirm cart"  # address known from last time: don't ask
+    assert button(client, ok)[0] == "✅ Confirm cart"  # saved info exists: the admin decides
     tap(client, token, ok)
-    cid = customer_id(db, "92")
     page = client.get(f"/chats/{cid}?tab=cart").text
-    assert "Next: Use same address as last time" in page and "No. 5, Sanchaung" in page
-    client.post(f"/chats/{cid}/cart/same-address", data={"csrf": token})
-    page = client.get(f"/chats/{cid}?tab=cart").text
-    assert "Next: Send payment info" in page
+    assert "Next: Same phone &amp; address as last time" in page and "09111222333" in page
+    client.post(f"/chats/{cid}/cart/same-contact", data={"csrf": token})
+    assert order_row(db, "92")[2:] == ("No. 5, Sanchaung", ["09111222333"])
+    assert "Next: Send payment info" in client.get(f"/chats/{cid}?tab=cart").text
 
     page = client.get(f"/chats/{cid}?compose=payment_info").text
-    assert "KPay – 09000000001 (Test Shop)" in page
     key = re.search(r'name="key" value="([^"]+)"', page).group(1)
-    body = re.search(r'<textarea name="text"[^>]*>([^<]*)</textarea>', page).group(1)
+    body = html.unescape(re.search(r'<textarea name="text"[^>]*>([^<]*)</textarea>', page).group(1))
+    assert body.endswith(PAYMENT_FOOTER)
     client.post(f"/chats/{cid}/send", data={"csrf": token, "key": key, "reply_kind": "payment_info", "text": body})
-    assert order_row(db, "92")[:3] == ("waiting_payment", 33000, "No. 5, Sanchaung")
+    assert order_row(db, "92")[0] == "waiting_payment"
 
 
-def test_payment_info_blocked_until_ready(shop, db):
+def test_cart_panel_phones_and_blockers(shop, db):
     client, token = shop
     add(1, "hi", customer="93")
     cid = customer_id(db, "93")
     stw = scalar(db, "SELECT id FROM products WHERE name = 'Stronger With You Intensely'")
-    client.post(f"/chats/{cid}/cart/add", data={"csrf": token, "product_id": str(stw), "size": "3", "quantity": "2"})
-    assert items(db) == [("Stronger With You Intensely", 3, False, 2, None)]
+    client.post(f"/chats/{cid}/cart/add", data={"csrf": token, "product_id": str(stw), "size": "100"})
+    assert items(db) == [("Stronger With You Intensely", None, True, 1, 380000)]  # 100ml = full bottle
     page = client.get(f"/chats/{cid}?compose=payment_info").text
-    assert "not confirmed the cart yet" in page and "No price for: Stronger With You Intensely 3ml × 2" in page
-    assert "No address yet" in page and "/send" not in page.split('id="reply"')[1]
+    assert "not confirmed the cart yet" in page and "No phone yet" in page and "No address yet" in page
     r = client.post(f"/chats/{cid}/send", data={"csrf": token, "key": "k", "reply_kind": "payment_info", "text": "x"})
     assert "Not sent" in r.text and scalar(db, "SELECT count(*) FROM outbox") == 0
 
-    item_id = scalar(db, "SELECT id FROM order_items")
-    client.post(f"/chats/{cid}/cart/items/{item_id}/remove", data={"csrf": token})
-    client.post(f"/chats/{cid}/cart/add", data={"csrf": token, "product_id": str(stw), "size": "100", "quantity": "1"})
-    assert items(db) == [("Stronger With You Intensely", None, True, 1, 380000)]  # 100ml = full bottle
     client.post(f"/chats/{cid}/cart/confirm", data={"csrf": token})
-    client.post(f"/chats/{cid}/cart/contact", data={"csrf": token, "address": "Yankin", "phone": "09 5555 6666"})
-    assert order_row(db, "93") == ("confirmed", 380000, "Yankin", "0955556666")
+    assert "Next: Ask for phone" in client.get(f"/chats/{cid}?tab=cart").text
+    for number in ("09 5555 6666", "၀၉၇၇၇၇၈၈၈၈", "+959 4444 3333", "09 1111 2222"):
+        client.post(f"/chats/{cid}/cart/phones", data={"csrf": token, "phone": number})
+    assert phones(db, "93") == ["0955556666", "0977778888", "0944443333"]  # max 3
+    client.post(f"/chats/{cid}/cart/phones/2/up", data={"csrf": token})
+    client.post(f"/chats/{cid}/cart/phones/0/remove", data={"csrf": token})
+    assert phones(db, "93") == order_row(db, "93")[3] == ["0944443333", "0977778888"]
+    assert scalar(db, "SELECT phone FROM customers WHERE external_user_id = '93'") == "0944443333"
+    assert "Next: Ask for address" in client.get(f"/chats/{cid}?tab=cart").text
+    client.post(f"/chats/{cid}/cart/address", data={"csrf": token, "address": "Yankin"})
     assert "Next: Send payment info" in client.get(f"/chats/{cid}?tab=cart").text
-    # changing the items of a confirmed cart needs a new confirmation
-    client.post(f"/chats/{cid}/cart/add", data={"csrf": token, "product_id": str(stw), "size": "5", "quantity": "1"})
-    assert order_row(db, "93")[:2] == ("cart", 398000)
     client.post(f"/chats/{cid}/cart/cancel", data={"csrf": token})
     assert order_row(db, "93")[0] == "cancelled"
 

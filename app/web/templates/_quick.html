@@ -1,7 +1,8 @@
 {# One-tap action. Needs: m, quick (Suggestion), quick_action ((QuickAction, Outbox|None)), in_row, optional quick_error. #}
 {% set target = 'hx-target="#msg-' ~ m.id ~ '" hx-swap="outerHTML"' if in_row else '' %}
 {% set kind_done = {"price": "price reply", "cart_add": "added + cart list", "cart_remove": "removed + cart list",
-                    "cart_list": "cart list", "confirm": "confirmed", "address": "address saved"} %}
+                    "cart_list": "cart list", "confirm": "confirmed", "address": "address saved",
+                    "contact": "phone/address saved"} %}
 <div class="quick">
   {% if quick_error %}<p class="error small" role="alert">{{ quick_error }}</p>{% endif %}
   {% if quick_action %}
@@ -34,6 +35,8 @@
       <input type="hidden" name="csrf" value="{{ csrf }}">
       <input type="hidden" name="expect" value="{{ quick.fingerprint }}">
       <input type="hidden" name="back" value="{{ back | default('/') }}">
+      {% if quick.address and not in_row %}<label class="small">Address to save (you can fix it first)
+        <textarea name="address" rows="2" maxlength="500">{{ quick.address }}</textarea></label>{% endif %}
       <button class="primary" title="{{ quick.tooltip }}">{{ quick.label }}</button>
     </form>
     <p class="quick-preview small muted" title="{{ quick.tooltip }}">{{ quick.preview }}</p>

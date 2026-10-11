@@ -30,6 +30,7 @@
       <a href="/chats/{{ c.id }}?compose=price#reply" {% if mode == "price" %}aria-current="page"{% endif %}>Price</a>
       {% if cart and not cart.empty %}
       <a href="/chats/{{ c.id }}?compose=cart#reply" {% if mode == "cart" %}aria-current="page"{% endif %}>Cart list</a>
+      <a href="/chats/{{ c.id }}?compose=ask_phone#reply" {% if mode == "ask_phone" %}aria-current="page"{% endif %}>Ask phone</a>
       <a href="/chats/{{ c.id }}?compose=ask_address#reply" {% if mode == "ask_address" %}aria-current="page"{% endif %}>Ask address</a>
       <a href="/chats/{{ c.id }}?compose=payment_info#reply" {% if mode == "payment_info" %}aria-current="page"{% endif %}>Payment info</a>
       {% endif %}

@@ -17,7 +17,7 @@ class Customer(Base):
     display_name: Mapped[str | None] = mapped_column(String(255))
     ignored: Mapped[bool] = mapped_column(Boolean, server_default=false(), default=False)
     created_at: Mapped[datetime] = created_at_column()
-    # Contact details (v2). phone: newest number the parser found in their messages.
+    # Contact details (v2). phone = first of customer_phones (kept in sync by app/orders/cart.py).
     phone: Mapped[str | None] = mapped_column(String(20))
     phone_message_id: Mapped[int | None] = mapped_column(ForeignKey("messages.id", use_alter=True))
     address: Mapped[str | None] = mapped_column(Text)  # set by an admin (Step 4)

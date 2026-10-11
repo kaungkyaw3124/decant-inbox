@@ -1,4 +1,5 @@
-{# Cart panel. Needs: c, order, cart (CartView|None), next_step, payment_problems, contact_phone, products, sizes, item_size, tab #}
+{# Cart panel. Needs: c, order, cart (CartView|None), next_step, payment_problems, saved_phones, max_phones,
+   contact_hint, products, sizes, item_size, tab #}
 {% set status_label = {"cart": "🛒 cart", "confirmed": "✅ confirmed", "waiting_payment": "💳 waiting for payment",
                        "photo_received": "📷 payment photo received"} %}
 <section class="card cart-pane {% if tab != 'cart' %}phone-hidden{% endif %}" id="cart">
@@ -21,9 +22,9 @@
   <table class="cart-items">
     <tbody>
     {% for i, p in cart.lines %}
-      <tr {% if i.unit_price_mmk is none %}class="problem-row"{% endif %}>
-        <td>{{ p.name }} <span class="muted small">{{ item_size(i, p) }}</span></td>
-        <td class="num">{% if i.unit_price_mmk is none %}<span class="problem-text">no price</span>{% else %}{{ format_mmk(i.unit_price_mmk * i.quantity) }}{% endif %}</td>
+      <tr {% if p is none or i.unit_price_mmk is none %}class="problem-row"{% endif %}>
+        <td>{% if p %}{{ p.name }}{% else %}❓ {{ i.unknown_text }}{% endif %} <span class="muted small">{{ item_size(i, p) }}</span></td>
+        <td class="num">{% if p is none %}<span class="problem-text">not in product list</span>{% elif i.unit_price_mmk is none %}<span class="problem-text">no price</span>{% else %}{{ format_mmk(i.unit_price_mmk * i.quantity) }}{% endif %}</td>
         <td>
           <form method="post" action="/chats/{{ c.id }}/cart/items/{{ i.id }}/remove" class="inline">
             <input type="hidden" name="csrf" value="{{ csrf }}">
@@ -35,6 +36,10 @@
     </tbody>
     <tfoot><tr><th>Total</th><th class="num">{{ format_mmk(cart.total) }} ကျပ်</th><th></th></tr></tfoot>
   </table>
+  {% if cart.unknown %}
+    <p class="problem-text small">Not in the product list: {{ cart.unknown | join(", ") }}. Payment info is blocked until
+      you remove it (✕) or add the product with a price and add it again. (Map / "we don't have it": Step 6.)</p>
+  {% endif %}
   {% if cart.unpriced %}
     <p class="problem-text small">No price for {{ cart.unpriced | join(", ") }}: add it in the price list, then
       <form method="post" action="/chats/{{ c.id }}/cart/refresh-prices" class="inline"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="link">refresh prices</button></form>.</p>
@@ -65,16 +70,55 @@
   </details>
 
   {% if order %}
-  <form method="post" action="/chats/{{ c.id }}/cart/contact" class="stack contact">
-    <input type="hidden" name="csrf" value="{{ csrf }}">
-    <label>Address <textarea name="address" rows="2" maxlength="500">{{ order.address or "" }}</textarea></label>
-    {% if not order.address and c.address %}
-      <p class="small">Last time: <b>{{ c.address }}</b></p>
-      <button formaction="/chats/{{ c.id }}/cart/same-address">Same address as last time</button>
+  {% if contact_hint %}
+    {% set hm, hs = contact_hint %}
+    <form method="post" action="/messages/{{ hm.id }}/quick" class="stack contact-hint card notice">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <input type="hidden" name="expect" value="{{ hs.fingerprint }}">
+      <input type="hidden" name="back" value="/chats/{{ c.id }}?tab=cart">
+      <p class="small">From their message: <i>{{ hm.raw_text }}</i></p>
+      <label>Address to save (you can fix it first)
+        <textarea name="address" rows="2" maxlength="500">{{ hs.address }}</textarea></label>
+      <button class="primary" title="{{ hs.tooltip }}">{{ hs.label }}</button>
+      {% if hs.text %}<p class="quick-preview small muted" title="{{ hs.tooltip }}">{{ hs.preview }}</p>{% endif %}
+    </form>
+  {% endif %}
+
+  <div class="contact stack">
+    <h3>Phone{% if order.phones|length != 1 %}s{% endif %}</h3>
+    {% if order.phones %}
+    <ul class="phones">
+      {% for ph in saved_phones %}
+      <li><span {% if ph not in order.phones %}class="muted"{% endif %}>{{ ph }}</span>
+        <form method="post" class="inline">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          {% if not loop.first %}<button class="link" formaction="/chats/{{ c.id }}/cart/phones/{{ loop.index0 }}/up" aria-label="Move {{ ph }} up">↑</button>{% endif %}
+          <button class="link danger" formaction="/chats/{{ c.id }}/cart/phones/{{ loop.index0 }}/remove" aria-label="Remove {{ ph }}">✕</button>
+        </form>
+      </li>
+      {% endfor %}
+    </ul>
+    {% elif saved_phones %}
+      <p class="small">Last time: <b>{{ saved_phones | join(", ") }}</b></p>
+    {% else %}
+      <p class="small problem-text">No phone yet.</p>
     {% endif %}
-    <label>Phone <input name="phone" value="{{ contact_phone }}" inputmode="tel" maxlength="20"></label>
-    <button>Save address & phone</button>
-  </form>
+    {% if saved_phones|length < max_phones %}
+    <form method="post" action="/chats/{{ c.id }}/cart/phones" class="inline-form">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <input name="phone" placeholder="09…" inputmode="tel" maxlength="20" aria-label="Add phone">
+      <button>Add phone</button>
+    </form>
+    {% endif %}
+
+    <h3>Address</h3>
+    {% if not order.address and c.address %}<p class="small">Last time: <b>{{ c.address }}</b></p>{% endif %}
+    <form method="post" action="/chats/{{ c.id }}/cart/address" class="stack">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <textarea name="address" rows="2" maxlength="500" aria-label="Address">{{ order.address or "" }}</textarea>
+      <button>Save address</button>
+    </form>
+  </div>
 
   {% if order.status in ("confirmed", "waiting_payment") and payment_problems %}
     <p class="small problem-text">Payment info not possible yet: {{ payment_problems | join(" ") }}</p>

@@ -265,12 +265,13 @@ def message_row(request: Request, message_id: int, db: Session = Depends(get_db)
 @router.post("/messages/{message_id}/quick")
 def quick_action(
     request: Request, message_id: int, expect: str = Form(...), back: str = Form("/"),
-    db: Session = Depends(get_db), user: User = Depends(current_user),
+    address: str | None = Form(None), db: Session = Depends(get_db), user: User = Depends(current_user),
 ):
-    """One tap: do the suggested action (reply waits UNDO_SECONDS) and mark the message done."""
+    """One tap: do the suggested action (reply waits UNDO_SECONDS) and mark the message done.
+    address: the admin's edited version of the address to save (contact actions)."""
     message = get_message(db, message_id)
     try:
-        action = actions.perform(db, message, expect, user, replies.load(db))
+        action = actions.perform(db, message, expect, user, replies.load(db), address)
         db.commit()
         note = None
     except actions.Refused as exc:
@@ -280,6 +281,8 @@ def quick_action(
         return templates.TemplateResponse(request, "_row.html", {**row_by_id(db, message_id), "quick_error": note})
     flash(request, note or ("Done. The reply goes out in "
                             f"{UNDO_SECONDS} s unless you undo." if action.outbox_id else "Done."))
+    if back.startswith("/chats/"):  # tapped in the cart panel
+        return RedirectResponse(safe_back(back, "/") + "#cart", status_code=303)
     return RedirectResponse(detail_url(message_id, back), status_code=303)
 
 

@@ -471,3 +471,38 @@ Short entries from the VPS Claude Code session, newest last.
   blockers, full-bottle rule, re-confirm after change, cancel; abandoning idle carts).
   Live: services restarted (tunnel untouched), /healthz all ok. No live message currently
   shows a one-tap button (nothing would go to a real customer by accident).
+
+## 2026-10-12 — v2 Step 4b: partial carts, phone first then address, several phones
+- Spec: "Step 4b" (pulled f02e05e).
+- DB (migration d14d7d5b29d1, applied live after backup, round-trip tested):
+  `customer_phones` (customer, phone, position, source message; unique per customer; max 3
+  in code), `orders.phones` (text[] copy of the list; replaces orders.phone),
+  `order_items.unknown_text` (+ product_id now optional; check: one of the two),
+  quick_actions kind `contact`, outbox reply kinds `ask_phone`, `contact`.
+  Phones the parser had saved on customers (Step 3) became their phone 1.
+- A. Partial carts: a buy message with unknown items now gets "🛒 Add N known item(s) +
+  send list": known priced items are added; unknown items ("hawas ice 10ml") and items
+  without a price stay on the cart as red rows (blocking payment info) and are named in the
+  reply with the new template `unknown_items_note`; out-of-stock items are not added and get
+  the out-of-stock line. Needs at least one sellable item; products guessed from context
+  still go to the chat. Red unknown rows: ✕ to remove for now (map/add/"don't have it" = Step 6).
+- B. Step by step, phone first: after the customer confirms, the one-tap / next step asks only
+  for what is missing: `ask_phone` -> `phone_saved_ask_address` ("ဖုန်းနံပါတ် {phones} ရပါပြီ။ …")
+  -> payment info. A message with phone(s) and/or an address -> "📞 Save phone(s) / 📍 Save
+  address" + the next thing (ask address / ask phone / 💳 send payment info), both in one tap
+  when both are there. Address = message without numbers, "phone/ဖုန်း" words and a trailing
+  ကိုပို့ပေးပါ; editable before the tap on the message page and in the cart panel
+  ("From their message …"). Up to 3 phones, no duplicates; a new number after payment info ->
+  `phone_added` reply. Cart panel: phone list (↑ make first, ✕ remove, add), address box,
+  next step "Same phone & address as last time" when saved info exists (confirm then only
+  confirms; the admin decides to reuse).
+- Changed: the parser no longer saves phone numbers on the customer by itself (it only finds
+  them); saving is the admin's tap (the system suggests, the admin decides). customers.phone
+  is now kept = phone 1.
+- New templates (Settings): unknown_items_note, ask_phone, phone_saved_ask_address,
+  phone_added; ask_address default is now address only (as in the spec).
+- Verified: pytest 191 passed, 1 skipped (test_cart.py rewritten: whole flow phone-first with
+  undo + editable address + 3rd phone + 4th refused; partial cart with unknown, unpriced and
+  out-of-stock items and blocked payment info; same phone & address next time; cart-panel
+  phones (add incl. Burmese digits/+959, max 3, reorder, remove) and blockers; idle carts).
+  Live: /healthz all ok; no live orders yet (Step 4 not tested on the phone yet).

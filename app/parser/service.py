@@ -1,8 +1,9 @@
 """Database side of parsing, shared by the worker and scripts/reparse_all.py.
 
-Writes parse_results + parse_items (and refreshes messages.normalized_text), and the
-customer's phone when a message contains one (newest message wins). Never replaces a
-human result: once someone has edited a message in the dashboard, rules leave it alone.
+Writes parse_results + parse_items (and refreshes messages.normalized_text). Phone numbers
+are only found here (parse_results.phone); they are saved on the customer when an admin
+taps "Save phone" (Step 4b). Never replaces a human result: once someone has edited a
+message in the dashboard, rules leave it alone.
 """
 from dataclasses import astuple
 from datetime import timedelta
@@ -10,7 +11,7 @@ from datetime import timedelta
 from sqlalchemy import exists, select, update
 from sqlalchemy.orm import Session
 
-from app.models import Customer, Message, ParseItem, ParseResult, Product, ProductAlias
+from app.models import Message, ParseItem, ParseResult, Product, ProductAlias
 from app.parser.normalize import normalize
 from app.parser.rules import PARSER_VERSION, Alias, ParsedItem, ParseOutcome, parse
 
@@ -76,16 +77,6 @@ def _same(session: Session, result: ParseResult, outcome: ParseOutcome) -> bool:
     )
 
 
-def save_phone(session: Session, message: Message, phone: str) -> None:
-    """Newest message with a number wins (reparse in any order gives the same result)."""
-    customer = session.get(Customer, message.customer_id)
-    if customer.phone_message_id is not None and customer.phone_message_id != message.id:
-        source = session.get(Message, customer.phone_message_id)
-        if source is not None and (source.received_at, source.id) > (message.received_at, message.id):
-            return
-    customer.phone, customer.phone_message_id = phone, message.id
-
-
 def add_items(session: Session, result_id: int, items) -> None:
     for position, item in enumerate(items):
         session.add(ParseItem(
@@ -108,8 +99,6 @@ def parse_message(session: Session, message: Message, aliases: list[Alias],
     if full_sizes is None:
         full_sizes = load_full_sizes(session)
     outcome = parse(normalized, aliases, full_sizes, context_product(session, message))
-    if outcome.phone:
-        save_phone(session, message, outcome.phone)
     if current is not None and _same(session, current, outcome):
         return "unchanged"
     if current is not None:
