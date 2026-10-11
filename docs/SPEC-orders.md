@@ -147,6 +147,39 @@ order_items(product_id, size_ml, qty, unit_price) · payment_checks(order_id, me
 image_hash, transaction_id UNIQUE, amount, method, decision, reason, decided_by, decided_at)
 · unknown_requests(text, customer_id, resolution) · audit_log.
 
+## Step 4b — owner feedback 2026-10-12 (do BEFORE Step 5)
+### A. Buy message with some unknown items (live: "Good girl 5ml, swy 10ml, hawas ice 10ml ယူပါမယ်")
+- Today no button appears because one item is unknown. Instead offer one-tap
+  "🛒 Add 2 known items + send list" that adds the known, priced items and sends:
+  `• Good Girl 5ml – … ကျပ်\n• Stronger With You 10ml – … ကျပ်\nစုစုပေါင်း … ကျပ်ပါ။\nhawas ice ကိုတော့ စစ်ပြီး ပြန်ပြောပေးပါမယ်နော်။`
+  (new template `unknown_items_note` with {names}). The unknown item stays on the cart as a
+  red "❓ hawas ice 10ml — not in product list" row that blocks payment info until the admin
+  resolves it (Step 6 flow: map to product / add product + price / we don't have it ->
+  removed + `ဒီ product လောလောဆယ် မရှိသေးပါဘူးနော်။`). Same for items with no price / out of
+  stock: add the rest, list the problem item by name in the note.
+### B. Collect customer info step by step (system decides what to ask next; admin taps)
+- Required before payment info: at least ONE phone and an address.
+- After the customer confirms, the NEXT-STEP button asks only for what is missing, ONE
+  thing at a time, phone first:
+  ask_phone: `ဆက်သွယ်ရန် ဖုန်းနံပါတ် ပို့ပေးပါနော်။`
+  ask_address: `ပို့ပေးရမယ့် လိပ်စာ ပို့ပေးပါနော်။`
+- Customer message with phone(s) -> one-tap "📞 Save phone + ask address" (or "+ send
+  payment info" when the address is already known). Reply:
+  `ဖုန်းနံပါတ် {phones} ရပါပြီ။ ပို့ပေးရမယ့် လိပ်စာ ပို့ပေးပါနော်။`
+- MULTIPLE PHONES: a message may contain 2+ numbers -> all saved. A later message with
+  another number -> added as phone 2/3 (no duplicates; max 3), reply
+  `ဖုန်းနံပါတ် {phone} ကိုလည်း ထည့်ထားပါပြီ။` Admin can remove/reorder phones in the cart panel.
+  Store as customer_phones(customer_id, phone, position, source_message_id) and copy the
+  list onto the order (order_phones or a text[] column).
+- Customer message with an address -> one-tap "📍 Save address + send payment info"
+  (or "+ ask phone" if no phone yet). Address text = the message without phone numbers and
+  without trailing ကိုပို့ပေးပါ/ပို့ပေးပါ; editable in the cart panel before tapping.
+- A message with BOTH phone and address -> save both -> payment info in one tap.
+- Saved info is reused next time ("Same phone & address as last time?").
+- The final confirmation message (Step 5) lists ALL phones: `ဖုန်း: 09…, 09…`.
+- Every customer reply in this flow gets exactly one suggested next action, so the admin
+  just taps through: list -> confirm -> phone -> address -> payment info.
+
 ## Build steps (one at a time)
 - Step 1: Price list: product_prices, Excel import (preview/confirm) + export, price shown on
   product pages. Settings: payment methods, reply templates (defaults above).
@@ -155,5 +188,7 @@ image_hash, transaction_id UNIQUE, amount, method, decision, reason, decided_by,
 - Step 3: Parser rules-2 (multi-item, full size, remove/confirm/done/address, phone, context)
   + fixture tests (extend tests/fixtures/synthetic_messages.csv).
 - Step 4: Cart + quick replies (add/remove/list, address/phone, payment info).
+- Step 4b: partial carts with unknown items + step-by-step phone/address collection,
+  multiple phones (see section above).
 - Step 5: Payment check + Order ID + confirmation message.
 - Step 6: Unknown product flow + "wanted but not stocked" list.
