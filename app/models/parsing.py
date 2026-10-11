@@ -54,3 +54,4 @@ class ParseItem(Base):
     quantity: Mapped[int] = mapped_column(Integer, server_default="1", default=1)
     unknown_text: Mapped[str | None] = mapped_column(String(255))  # named, but not in our catalog
     from_context: Mapped[bool] = mapped_column(Boolean, server_default=false(), default=False)
+    match: Mapped[str | None] = mapped_column(String(16))  # exact | fuzzy | inherited | ... (auto: exact only)

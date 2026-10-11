@@ -17,6 +17,57 @@
   </div>
 </section>
 
+{% if unknowns %}
+<section class="card notice" id="unknown">
+  <h2>❓ Not in your product list</h2>
+  <p class="muted small">Resolve each item; then the reply continues by itself (auto-reply ON) or the one-tap button appears.</p>
+  {% for u, sugg in unknowns %}
+  <div class="unknown-item">
+    <h3>“{{ u.text }}”{% if u.is_full_bottle %} · full bottle{% elif u.size_ml %} · {{ u.size_ml }}ml{% endif %}</h3>
+    <form method="post" action="/messages/{{ m.id }}/unknown/{{ u.position }}/map" class="inline-form">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <input type="hidden" name="back" value="{{ back }}">
+      <select name="product_id" required aria-label="Product">
+        <option value="">It's in my list: choose…</option>
+        <optgroup label="Most similar">{% for p in sugg %}<option value="{{ p.id }}">{{ p.name }} · {{ p.brand }}</option>{% endfor %}</optgroup>
+        <optgroup label="All products">{% for p in all_products if p.active %}<option value="{{ p.id }}">{{ p.name }} · {{ p.brand }}</option>{% endfor %}</optgroup>
+      </select>
+      <button class="primary">Save as alias</button>
+    </form>
+    <details>
+      <summary class="small">New product</summary>
+      <form method="post" action="/messages/{{ m.id }}/unknown/{{ u.position }}/new" class="stack">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <input type="hidden" name="back" value="{{ back }}">
+        <div class="grid">
+          <label>Brand <input name="brand" required></label>
+          <label>Name <input name="name" value="{{ u.text | title }}" required></label>
+          {% if u.size_ml or u.is_full_bottle %}
+          <label>Price for {{ "the full bottle" if u.is_full_bottle else u.size_ml ~ "ml" }} (ကျပ်) <input name="asked_price" inputmode="numeric" required></label>
+          {% endif %}
+          <label>Bottle size (ml) <input name="full_size_ml" inputmode="numeric"></label>
+        </div>
+        <div class="grid">
+          {% for s in (2, 5, 10) if s != u.size_ml %}<label>{{ s }}ml price <input name="p{{ s }}" inputmode="numeric"></label>{% endfor %}
+          {% if not u.is_full_bottle %}<label>Full bottle price <input name="pfull" inputmode="numeric"></label>{% endif %}
+        </div>
+        <label class="check"><input type="checkbox" name="in_stock" value="1" checked> In stock</label>
+        <button class="primary">Add product + price</button>
+      </form>
+    </details>
+    <form method="post" action="/messages/{{ m.id }}/unknown/{{ u.position }}/not-stocked" class="inline">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <input type="hidden" name="back" value="{{ back }}">
+      <button class="quiet">We don't have it</button>
+    </form>
+  </div>
+  {% endfor %}
+</section>
+{% endif %}
+{% if resolved %}
+<p class="muted small">Resolved: {% for r in resolved %}“{{ r.text }}” → {{ {"mapped": "alias", "new_product": "new product", "not_stocked": "we don't have it"}[r.resolution] }}{% if not loop.last %}, {% endif %}{% endfor %}</p>
+{% endif %}
+
 {% if quick or quick_action %}
 <section class="card quick-card">
   <h2>Quick reply</h2>

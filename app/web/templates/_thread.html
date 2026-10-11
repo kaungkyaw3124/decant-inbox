@@ -22,6 +22,7 @@
     {% endif %}
     {% if m.raw_text %}<p class="text">{{ m.raw_text }}</p>{% endif %}
     <div class="bubble-meta">
+      {% if m.id in auto_msgs %}<span title="Sent by auto-reply">🤖</span> · {% endif %}
       {% if m.direction == "in" %}<a href="/messages/{{ m.id }}?back=/chats/{{ c.id }}">details</a> · {% endif %}
       <time>{{ m.received_at | local_time }}</time>
     </div>
@@ -33,7 +34,9 @@
   <div class="bubble out pending status-{{ o.status }}">
     <p class="text">{{ o.text }}</p>
     <div class="bubble-meta">
-      {% if o.status == "queued" %}⏳ queued{% if o.error %} · {{ o.error }}{% endif %}
+      {% if o.id in auto_box %}🤖 {% endif %}
+      {% if o.status == "queued" and o.send_after > now() %}<span data-send-at="{{ o.send_after.isoformat() }}">Sending in {{ ((o.send_after - now()).total_seconds()) | round | int }} s</span>
+      {% elif o.status == "queued" %}⏳ queued{% if o.error %} · {{ o.error }}{% endif %}
       {% elif o.status == "sending" and o.id in stuck %}<span class="error">⚠ unknown: check Telegram whether it arrived</span>
       {% elif o.status == "sending" %}sending…
       {% elif o.status == "failed" %}<span class="error">✖ not sent: {{ o.error }}</span>{% endif %}

@@ -34,7 +34,8 @@ from app.models import (
     AuditLog, Customer, Message, MessageReview, Order, Outbox, ParseItem, ParseResult, Product, QuickAction, User,
 )
 from app.models.outbox import UNDO_SECONDS
-from app.orders import cart
+from app.orders import cart, unknown
+from app.parser.normalize import normalize
 from app.parser.rules import ADDRESS_RE, NEEDS_REVIEW_BELOW, find_phones
 from app.pricing.prices import size_label
 from app.replies import compose
@@ -88,6 +89,7 @@ def fingerprint(kind: str, text: str | None) -> str:
 
 
 def upsert_review(db: Session, message_id: int, status: str, user: User | None, note: str | None = None) -> None:
+    """user None = done by auto mode."""
     values = {"message_id": message_id, "status": status, "reviewed_by": user.id if user else None,
               "reviewed_at": datetime.now(UTC)}
     if note is not None:
@@ -156,9 +158,36 @@ def _ask_next(session: Session, order: Order, texts: dict[str, str]) -> tuple[st
 
 def _apply(session: Session, message: Message, result: ParseResult, texts: dict[str, str],
            address_override: str | None = None) -> Outcome | None:
+    outcome = _apply_items(session, message, result, texts, address_override)
+    dropped = _not_stocked_lines(session, message, result, texts)
+    if not dropped:
+        return outcome
+    if outcome is None:
+        if any(i.product_id or i.unknown_text for i in _remaining(session, message, result)):
+            return None  # something else in the message is still uncertain
+        return Outcome("not_stocked", "💬 Reply: we don't have it", "\n".join(dropped), "custom")
+    if outcome.text:
+        outcome.text = "\n".join([outcome.text, *dropped])
+    return outcome
+
+
+def _remaining(session: Session, message: Message, result: ParseResult) -> list[ParseItem]:
+    """Items without the ones the admin marked "we don't have it"."""
+    dropped = unknown.not_stocked_texts(session, message.id)
+    return [i for i in _items(session, result) if not (i.unknown_text and normalize(i.unknown_text) in dropped)]
+
+
+def _not_stocked_lines(session: Session, message: Message, result: ParseResult, texts: dict[str, str]) -> list[str]:
+    dropped = unknown.not_stocked_texts(session, message.id)
+    return [render(texts["not_stocked_item"], name=i.unknown_text) for i in _items(session, result)
+            if i.unknown_text and normalize(i.unknown_text) in dropped]
+
+
+def _apply_items(session: Session, message: Message, result: ParseResult, texts: dict[str, str],
+                 address_override: str | None) -> Outcome | None:
     intent = result.intent
     customer = session.get(Customer, message.customer_id)
-    items = _items(session, result)
+    items = _remaining(session, message, result)
 
     if intent in ("ask_price", "ask_stock"):
         if not _certain(items):
@@ -295,8 +324,8 @@ def _contact(session: Session, message: Message, customer: Customer, order: Orde
 def _eligible(session: Session, message: Message, result: ParseResult | None, now: datetime) -> bool:
     if message.direction != "in" or result is None or not result.is_current:
         return False
-    if result.method != "human" and result.confidence < NEEDS_REVIEW_BELOW and result.intent != "buy":
-        return False  # a buy with an unknown item has low confidence on purpose (partial carts)
+    if result.method != "human" and result.confidence < NEEDS_REVIEW_BELOW and not _resolved(session, message, result):
+        return False
     if session.scalar(select(exists().where(QuickAction.message_id == message.id, QuickAction.undone_at.is_(None)))):
         return False  # already handled with a one-tap action
     if session.scalar(select(exists().where(Outbox.customer_id == message.customer_id,
@@ -311,6 +340,16 @@ def _eligible(session: Session, message: Message, result: ParseResult | None, no
                           .where(QuickAction.customer_id == message.customer_id, QuickAction.undone_at.is_(None))
                           .order_by(Message.received_at.desc()).limit(1))
     return last is None or message.received_at > last
+
+
+def _resolved(session: Session, message: Message, result: ParseResult) -> bool:
+    """Low confidence only because of unknown items that are clear by now: a buy (partial
+    cart: unknown items become red rows) or items the admin resolved ("we don't have it")."""
+    items = _items(session, result)
+    if not items or any(i.from_context or (not i.product_id and not i.unknown_text) for i in items):
+        return False
+    return result.intent == "buy" or (result.intent in ("ask_price", "ask_stock")
+                                      and not unknown.open_unknowns(session, message))
 
 
 def _with_greeting(session: Session, outcome: Outcome, customer_id: int, texts: dict[str, str], now: datetime):
@@ -343,10 +382,13 @@ def _edit_url(message: Message, outcome: Outcome) -> str | None:
     return f"/chats/{message.customer_id}?tab=cart#cart"
 
 
-def perform(session: Session, message: Message, expect: str, user: User, texts: dict[str, str],
-            address: str | None = None) -> QuickAction:
+def perform(session: Session, message: Message, expect: str, user: User | None, texts: dict[str, str],
+            address: str | None = None, delay: timedelta = timedelta(seconds=UNDO_SECONDS)) -> QuickAction:
     """Do the action the button showed (address: the admin's edited address, if any).
+    user None = auto mode (app/orders/auto.py), which passes its own random delay.
     Raises Refused if the reply changed meanwhile."""
+    auto = user is None
+    user_id = None if auto else user.id
     session.execute(select(Customer.id).where(Customer.id == message.customer_id).with_for_update())
     now = datetime.now(UTC)
     result = session.scalar(select(ParseResult).where(ParseResult.message_id == message.id, ParseResult.is_current))
@@ -362,20 +404,21 @@ def perform(session: Session, message: Message, expect: str, user: User, texts: 
     outbox_id = None
     if outcome.text:
         box = Outbox(customer_id=message.customer_id, text=outcome.text, reply_kind=outcome.reply_kind,
-                     status="queued", idempotency_key=f"quick-{message.id}-{now.timestamp()}", created_by=user.id,
-                     send_after=now + timedelta(seconds=UNDO_SECONDS), source_message_id=message.id,
+                     status="queued", idempotency_key=f"quick-{message.id}-{now.timestamp()}", created_by=user_id,
+                     send_after=now + delay, source_message_id=message.id,
                      previous_review_status=outcome.undo["review"])
         session.add(box)
         session.flush()
         outbox_id = box.id
     upsert_review(session, message.id, "done", user)
     action = QuickAction(message_id=message.id, customer_id=message.customer_id, kind=outcome.kind,
-                         order_id=outcome.order_id, outbox_id=outbox_id, undo=outcome.undo, created_by=user.id)
+                         order_id=outcome.order_id, outbox_id=outbox_id, undo=outcome.undo, created_by=user_id,
+                         auto=auto)
     session.add(action)
     session.flush()
-    session.add(AuditLog(user_id=user.id, action=f"quick.{outcome.kind}", details={
-        "quick_action_id": action.id, "message_id": message.id, "customer_id": message.customer_id,
-        "order_id": outcome.order_id, "outbox_id": outbox_id}))
+    session.add(AuditLog(user_id=user_id, action=f"{'auto' if auto else 'quick'}.{outcome.kind}", details={
+        "actor": "auto" if auto else "admin", "quick_action_id": action.id, "message_id": message.id,
+        "customer_id": message.customer_id, "order_id": outcome.order_id, "outbox_id": outbox_id}))
     return action
 
 

@@ -150,3 +150,11 @@ tr.problem-row td { background: var(--bad-bg); }
 .contact h3 { font-size: .95rem; margin: 8px 0 0; }
 .contact-hint { margin: 10px 0; }
 .contact-hint p { margin: 0; }
+.auto-switch button { font-size: .85rem; min-height: 32px; padding: 4px 10px; }
+.auto-switch.on button { background: var(--done); color: var(--accent-text); border-color: var(--done); }
+.feed { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; }
+.feed li { display: flex; flex-wrap: wrap; gap: 6px; align-items: baseline; }
+.unknown-item { border-top: 1px solid var(--line); padding-top: 10px; margin-top: 10px; display: grid; gap: 8px; }
+.unknown-item h3 { font-size: 1rem; margin: 0; }
+.paused { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+@media (max-width: 560px) { .top { flex-wrap: wrap; } }

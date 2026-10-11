@@ -13,6 +13,12 @@
 {% if request.session.get("user_id") %}
 <header class="top">
   <a class="brand" href="/">Decant Inbox</a>
+  <form method="post" action="/auto-reply" class="inline auto-switch {{ 'on' if auto_on else 'off' }}">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <input type="hidden" name="back" value="{{ request.url.path }}">
+    <input type="hidden" name="on" value="{{ '0' if auto_on else '1' }}">
+    <button title="{{ 'Click to turn auto-reply OFF' if auto_on else 'Click to turn auto-reply ON' }}">🤖 Auto-reply: <b>{{ "ON" if auto_on else "OFF" }}</b></button>
+  </form>
   <nav>
     <a href="/" {% if path == "/" %}aria-current="page"{% endif %}>Inbox</a>
     <a href="/chats" {% if path.startswith("/chats") %}aria-current="page"{% endif %}>Chats</a>

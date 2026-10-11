@@ -1,0 +1,167 @@
+"""Auto mode switches, unknown-item resolution, and the monitoring data for the inbox."""
+from datetime import UTC, datetime, timedelta
+
+from fastapi import APIRouter, Depends, Form, HTTPException, Request
+from fastapi.responses import RedirectResponse
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from app.models import AuditLog, Customer, Message, Outbox, Product, QuickAction, User
+from app.orders import auto, unknown
+from app.web.auth import current_user, verify_csrf
+from app.web.deps import get_db
+from app.web.inbox import detail_url, flash, safe_back
+
+router = APIRouter(dependencies=[Depends(current_user), Depends(verify_csrf)])
+FEED_WINDOW = timedelta(hours=24)
+FAILED_WINDOW = timedelta(days=3)
+
+
+@router.post("/auto-reply")
+def switch(request: Request, on: str = Form(...), back: str = Form("/"), db: Session = Depends(get_db),
+           user: User = Depends(current_user)):
+    auto.set_enabled(db, on == "1", user)
+    db.add(AuditLog(user_id=user.id, action="auto.switch", details={"enabled": on == "1"}))
+    db.commit()
+    flash(request, "Auto-reply is ON: certain messages from now on are answered by themselves (8-20 s, "
+                   "Cancel in the chat)." if on == "1" else "Auto-reply is OFF: one-tap buttons only.")
+    return RedirectResponse(safe_back(back, "/"), status_code=303)
+
+
+def _customer(db: Session, customer_id: int) -> Customer:
+    customer = db.get(Customer, customer_id)
+    if customer is None:
+        raise HTTPException(404, "Customer not found")
+    return customer
+
+
+@router.post("/customers/{customer_id}/auto")
+def customer_auto(request: Request, customer_id: int, off: str = Form(...), db: Session = Depends(get_db),
+                  user: User = Depends(current_user)):
+    customer = _customer(db, customer_id)
+    customer.auto_reply_off = off == "1"
+    db.add(AuditLog(user_id=user.id, action="auto.customer", details={"customer_id": customer_id,
+                                                                        "never_auto": customer.auto_reply_off}))
+    db.commit()
+    flash(request, "Never auto-reply to this customer." if customer.auto_reply_off
+          else "Auto-reply allowed for this customer again.")
+    return RedirectResponse(f"/chats/{customer_id}", status_code=303)
+
+
+@router.post("/customers/{customer_id}/resume-auto")
+def resume(request: Request, customer_id: int, db: Session = Depends(get_db), user: User = Depends(current_user)):
+    customer = _customer(db, customer_id)
+    customer.auto_resumed_at = datetime.now(UTC)
+    db.add(AuditLog(user_id=user.id, action="auto.resume", details={"customer_id": customer_id}))
+    db.commit()
+    flash(request, "Auto-reply resumed for this chat.")
+    return RedirectResponse(f"/chats/{customer_id}", status_code=303)
+
+
+# ---------- unknown items ----------
+
+def _unknown(db: Session, message_id: int, position: int) -> tuple[Message, unknown.Unknown]:
+    message = db.get(Message, message_id)
+    if message is None:
+        raise HTTPException(404, "Message not found")
+    item = next((u for u in unknown.open_unknowns(db, message) if u.position == position), None)
+    if item is None:
+        raise HTTPException(409, "Already resolved")
+    return message, item
+
+
+def _done(request: Request, message: Message, back: str, note: str) -> RedirectResponse:
+    flash(request, note)
+    return RedirectResponse(detail_url(message.id, back), status_code=303)
+
+
+@router.post("/messages/{message_id}/unknown/{position}/map")
+def map_item(request: Request, message_id: int, position: int, product_id: int = Form(...),
+             back: str = Form("/"), db: Session = Depends(get_db), user: User = Depends(current_user)):
+    message, item = _unknown(db, message_id, position)
+    product = db.get(Product, product_id)
+    if product is None:
+        raise HTTPException(400, "Choose a product")
+    unknown.map_to_product(db, message, item, product_id, user)
+    db.commit()
+    return _done(request, message, back, f"“{item.text}” is now an alias of {product.name}.")
+
+
+def _price(value: str) -> int | None:
+    digits = "".join(c for c in value if c.isdigit())
+    return int(digits) if digits and 0 < int(digits) <= 100_000_000 else None
+
+
+@router.post("/messages/{message_id}/unknown/{position}/new")
+async def new_item(request: Request, message_id: int, position: int, brand: str = Form(...),
+                   name: str = Form(...), asked_price: str = Form(""), full_size_ml: str = Form(""),
+                   in_stock: str = Form(""), back: str = Form("/"), db: Session = Depends(get_db),
+                   user: User = Depends(current_user)):
+    message, item = _unknown(db, message_id, position)
+    brand, name = brand.strip(), name.strip()
+    if not brand or not name:
+        raise HTTPException(400, "Brand and name are required")
+    if db.scalar(select(Product.id).where(Product.brand == brand, Product.name == name)):
+        raise HTTPException(400, "That product already exists: use “It's in my list”")
+    form = await request.form()
+    prices: dict[int | None, int] = {}
+    for size in (2, 3, 5, 10, 15, 20, 30):
+        if (p := _price(str(form.get(f"p{size}", "")))) is not None:
+            prices[size] = p
+    if (p := _price(str(form.get("pfull", "")))) is not None:
+        prices[None] = p
+    asked = None if item.is_full_bottle else item.size_ml
+    if (p := _price(asked_price)) is not None:
+        prices[asked] = p
+    if (asked not in prices) and (item.size_ml or item.is_full_bottle):
+        raise HTTPException(400, "The price for the asked size is required")
+    bottle = int(full_size_ml) if full_size_ml.strip().isdigit() and 0 < int(full_size_ml) <= 1000 else None
+    product = unknown.new_product(db, message, item, user, brand, name, prices, bottle, in_stock == "1")
+    db.commit()
+    return _done(request, message, back, f"{product.name} added with {len(prices)} price(s); "
+                                         f"“{item.text}” is an alias.")
+
+
+@router.post("/messages/{message_id}/unknown/{position}/not-stocked")
+def not_stocked(request: Request, message_id: int, position: int, back: str = Form("/"),
+                db: Session = Depends(get_db), user: User = Depends(current_user)):
+    message, item = _unknown(db, message_id, position)
+    unknown.not_stocked(db, message, item, user)
+    db.commit()
+    return _done(request, message, back, f"“{item.text}”: we don't have it (the reply will say so).")
+
+
+# ---------- monitoring ----------
+
+def needs_you(db: Session) -> dict:
+    """The "🟡 Needs you" queue: unknown items, failed sends, paused chats with new messages."""
+    now = datetime.now(UTC)
+    unknown_msgs = unknown.messages_needing_you(db, now)
+    failed = db.execute(select(Outbox, Customer).join(Customer, Customer.id == Outbox.customer_id)
+                        .where(Outbox.status == "failed", Outbox.created_at >= now - FAILED_WINDOW)
+                        .order_by(Outbox.id.desc())).all()
+    paused = []
+    for customer in db.scalars(select(Customer).where(Customer.ignored.is_(False))):
+        until = auto.paused_until(db, customer, now)
+        if until is None:
+            continue
+        hand = auto.last_hand_reply(db, customer.id, now)
+        newer = db.scalar(select(Message.id).where(Message.customer_id == customer.id, Message.direction == "in",
+                                                   Message.received_at > hand).limit(1))
+        if newer:
+            paused.append((customer, until))
+    customers = {c.id: c for c in db.scalars(select(Customer).where(
+        Customer.id.in_([m.customer_id for m in unknown_msgs])))}
+    return {"unknown": [(m, customers[m.customer_id], unknown.open_unknowns(db, m)) for m in unknown_msgs],
+            "failed": failed, "paused": paused,
+            "count": len(unknown_msgs) + len(failed) + len(paused)}
+
+
+def handled_feed(db: Session, limit: int = 30) -> list:
+    """"🤖 Handled automatically" (last 24 h): action, customer, its reply."""
+    since = datetime.now(UTC) - FEED_WINDOW
+    return db.execute(
+        select(QuickAction, Customer, Outbox).join(Customer, Customer.id == QuickAction.customer_id)
+        .outerjoin(Outbox, Outbox.id == QuickAction.outbox_id)
+        .where(QuickAction.auto, QuickAction.created_at >= since)
+        .order_by(QuickAction.id.desc()).limit(limit)).all()

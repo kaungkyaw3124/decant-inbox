@@ -1,5 +1,44 @@
 {% extends "base.html" %}
 {% block content %}
+{% set kind_label = {"price": "price reply", "cart_add": "added to cart + list", "cart_remove": "removed + list",
+                     "cart_list": "cart list", "confirm": "confirmed", "contact": "phone/address", "address": "address",
+                     "not_stocked": "we don't have it"} %}
+{% if needs_you is not none %}
+<section class="card needs-you {% if needs_you.count %}notice{% endif %}">
+  <h2>🟡 Needs you ({{ needs_you.count }})</h2>
+  {% if not needs_you.count %}<p class="muted small">Nothing waiting for you.</p>{% endif %}
+  <ul class="feed">
+  {% for m, c, items in needs_you.unknown %}
+    <li><a href="/messages/{{ m.id }}"><b>{{ c.display_name or c.username or "Customer" }}</b>: {{ m.raw_text | truncate(70) }}</a>
+      <span class="badge warn">❓ {{ items | map(attribute="text") | join(", ") }}</span>
+      <a class="small" href="/messages/{{ m.id }}#unknown">resolve</a></li>
+  {% endfor %}
+  {% for o, c in needs_you.failed %}
+    <li><a href="/chats/{{ c.id }}#bottom"><b>{{ c.display_name or c.username or "Customer" }}</b>: reply not sent</a>
+      <span class="small error">{{ o.error }}</span></li>
+  {% endfor %}
+  {% for c, until in needs_you.paused %}
+    <li><a href="/chats/{{ c.id }}"><b>{{ c.display_name or c.username or "Customer" }}</b>: new message while paused</a>
+      <span class="small muted">(you replied by hand; auto until {{ until | local_time("%H:%M") }} off)</span></li>
+  {% endfor %}
+  </ul>
+</section>
+{% if handled %}
+<details class="card" {% if auto_on %}open{% endif %}>
+  <summary>🤖 Handled automatically (last 24 h): {{ handled | length }}</summary>
+  <ul class="feed small">
+  {% for a, c, o in handled %}
+    <li><time>{{ a.created_at | local_time("%H:%M") }}</time>
+      <a href="/chats/{{ c.id }}">{{ c.display_name or c.username or "Customer" }}</a>: {{ kind_label.get(a.kind, a.kind) }}
+      {% if a.undone_at %}<span class="muted">· cancelled</span>
+      {% elif o and o.status == "sent" %}<span class="done-text">· sent</span>
+      {% elif o and o.status == "failed" %}<span class="error">· failed</span>
+      {% elif o %}<span class="muted">· sending…</span>{% endif %}</li>
+  {% endfor %}
+  </ul>
+</details>
+{% endif %}
+{% endif %}
 <form method="get" action="/" class="filters">
   <input type="search" name="q" value="{{ f.q }}" placeholder="Search text or customer" aria-label="Search">
   <select name="status" aria-label="Status">

@@ -8,14 +8,15 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session, aliased
 
 from app.models import (
-    Customer, Message, MessageReview, ParseItem, ParseResult, Product, ProductAlias, QuickAction, User,
+    Customer, Message, MessageReview, ParseItem, ParseResult, Product, ProductAlias, QuickAction, UnknownRequest,
+    User,
 )
 from app.models.messages import REVIEW_STATUSES
 from app.models.parsing import INTENTS
 from app.parser.normalize import normalize
 from app.models.outbox import UNDO_SECONDS
 from app.parser.rules import NEEDS_REVIEW_BELOW
-from app.orders import actions
+from app.orders import actions, unknown
 from app.replies import templates as replies
 from app.web.auth import current_user, verify_csrf
 from app.web.deps import get_db, templates
@@ -137,7 +138,12 @@ def inbox(
     def page_url(n: int) -> str:
         return "/?" + urlencode({**params, "page": n})
 
+    from app.web import auto as auto_pages  # late import: auto_pages imports this module
+
+    first_page = page == 1 and not f["q"] and not f["product"]
     return templates.TemplateResponse(request, "inbox.html", {
+        "needs_you": auto_pages.needs_you(db) if first_page else None,
+        "handled": auto_pages.handled_feed(db) if first_page else [],
         "rows": [row_context(*r, infos[r[0].id]) for r in rows[:PAGE_SIZE]], "f": f,
         "newer_url": page_url(page - 1) if page > 1 else None,
         "older_url": page_url(page + 1) if len(rows) > PAGE_SIZE else None,
@@ -165,7 +171,11 @@ def message_detail(request: Request, message_id: int, back: str = "/", db: Sessi
     reviewer = db.get(User, review.reviewed_by) if review and review.reviewed_by else None
     customer = db.get(Customer, message.customer_id)
     info = quick_infos(db, [(message, customer, current[0])])[message_id]
+    open_unknown = unknown.open_unknowns(db, message)
     return templates.TemplateResponse(request, "message.html", {
+        "unknowns": [(u, unknown.suggestions(db, u.text)) for u in open_unknown],
+        "all_products": products_for_select(db) if open_unknown else [],
+        "resolved": db.scalars(select(UnknownRequest).where(UnknownRequest.message_id == message_id)).all(),
         **info, "undo_seconds": UNDO_SECONDS,
         "m": message, "c": customer,
         "r": current[0], "p": current[1], "history": history,
@@ -202,7 +212,7 @@ def edit_parse(
     db.flush()
     if pid is not None or size is not None or full:  # a correction is one item
         db.add(ParseItem(parse_result_id=result.id, position=0, product_id=pid, size_ml=size,
-                         is_full_bottle=full, quantity=qty))
+                         is_full_bottle=full, quantity=qty, match="human"))
     note = "Saved."
     alias_norm = normalize(alias)
     if alias_norm and pid is not None:

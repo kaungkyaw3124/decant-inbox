@@ -506,3 +506,48 @@ Short entries from the VPS Claude Code session, newest last.
   out-of-stock items and blocked payment info; same phone & address next time; cart-panel
   phones (add incl. Burmese digits/+959, max 3, reorder, remove) and blockers; idle carts).
   Live: /healthz all ok; no live orders yet (Step 4 not tested on the phone yet).
+
+## 2026-10-12 — v2 Step 4c: AUTO MODE + unknown-item resolution
+- Spec: "Step 4c — AUTO MODE" (pulled 662b167). Deployed with auto-reply **OFF**.
+- DB (migration 548928f8b391, applied live after backup, round-trip tested): `app_settings`
+  (auto_reply = {"enabled", "since"}; inserted OFF), `auto_runs` (one final auto decision per
+  incoming message), `unknown_requests` (mapped / new_product / not_stocked; not_stocked = the
+  Step 6 "wanted but not stocked" list), customers.auto_reply_off / auto_resumed_at,
+  quick_actions.auto, parse_items.match (exact / fuzzy / inherited / context / human; all
+  messages re-parsed live so every item has it).
+- Auto engine (app/orders/auto.py, runs in the parser worker every ~5 s): calls exactly the
+  one-tap code (actions.suggest + actions.perform) without a tap; actor "auto" (audit_log
+  user NULL, details.actor = "auto"; quick_actions.auto; outbox.created_by NULL). Rules:
+  switch ON; only messages that arrived after it was switched on (never old ones) and < 24 h;
+  customer not ignored / not "never auto-reply"; not paused; every product named exactly
+  (exact alias, not fuzzy, not from context; human-corrected counts as exact); no unknown
+  item left; intent price/stock/buy/remove/done/confirm/address only; text only (no photos);
+  not already answered by a person after the message (hand reply or dashboard; auto's own
+  replies don't count); customer quiet for 15 s; no reply of theirs still in the outbox (so
+  quick messages are handled one after another, each with the newest state); random 8-20 s
+  delay in the outbox (chat shows "🤖 Sending in N s" + Cancel = exact undo); max 300 auto
+  replies / 24 h, then one-tap; at most one auto decision per message (auto_runs).
+- Owner pause: a message we sent that did not come from the outbox (= typed on the phone)
+  pauses auto for that chat for 2 h; chat shows "⏸ Paused — you're replying by hand" +
+  "Resume auto". Per-customer "Never auto-reply to this customer" in the chat header.
+- Unknown items: a price/buy message with an unknown item gets no auto reply; it is listed in
+  "🟡 Needs you". Message page "❓ Not in your product list", per item: "It's in my list"
+  (most similar products first, then all) -> saved as learned alias; "New product" (brand,
+  name, price for the asked size required, 2/5/10/full optional, bottle size, in stock) ->
+  product + prices + aliases; "We don't have it" -> recorded, and the reply gets
+  `not_stocked_item` ("{name} ကတော့ လောလောဆယ် မရှိသေးပါဘူးနော်။"). The message is re-parsed at
+  once; then auto mode (or the one-tap button) continues with the normal reply. Learned
+  aliases work for the next message immediately. The 4b partial-cart button stays as a
+  manual option.
+- Inbox top: "🟡 Needs you (N)" (unknown items, failed sends, paused chats with new
+  messages; payments come in Step 5) and "🤖 Handled automatically (last 24 h)" feed. Header on
+  every page: "🤖 Auto-reply: ON/OFF" switch. Chat: 🤖 on auto replies.
+- Verified: pytest 197 passed, 1 skipped (6 new: off by default; quiet window, one reply per
+  message, delay 8-20 s, actor auto, feed and 🤖; a whole order (buy -> ok -> phone -> address
+  -> payment info) fully automatic; safety: before switch-on, ignored, never-auto, fuzzy,
+  intent other, already answered, paused + resume, daily cap -> one-tap; unknown items wait,
+  then not-stocked / new product / alias resolutions continue automatically and the alias
+  works for the next customer; cancel from the chat undoes and auto does not retry).
+  Live: re-parse changed=5 unchanged=5, /healthz all ok, auto_reply = OFF.
+- Note: when ON, auto mode answers EVERY customer who writes (not only the test account)
+  if the message is certain. Friends/family: "Never auto-reply" in their chat first.

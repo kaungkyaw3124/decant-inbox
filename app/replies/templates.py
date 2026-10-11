@@ -65,6 +65,8 @@ TEMPLATES: tuple[TemplateDef, ...] = (
                 "ကျန်ငွေ {remaining} ကျပ် ထပ်လွှဲပေးပါနော်။", {"remaining": "5,000"}),
     TemplateDef("out_of_stock", "Out of stock",
                 "{product} {size} လောလောဆယ် ကုန်နေပါတယ်နော်။", {"product": "Aventus", "size": "10ml"}),
+    TemplateDef("not_stocked_item", "One asked item we don't have (added to the reply)",
+                "{name} ကတော့ လောလောဆယ် မရှိသေးပါဘူးနော်။", {"name": "hawas ice"}),
     TemplateDef("not_stocked", "Product we don't have",
                 "ဒီ product လောလောဆယ် မရှိသေးပါဘူးနော်။", {}),
 )

@@ -14,7 +14,9 @@ from app.core.base import Base, created_at_column
 ORDER_STATUSES = ("cart", "confirmed", "waiting_payment", "photo_received", "paid", "delivered",
                   "cancelled", "abandoned")
 OPEN_STATUSES = ("cart", "confirmed", "waiting_payment", "photo_received")
-QUICK_KINDS = ("price", "cart_add", "cart_remove", "cart_list", "confirm", "address", "contact")
+QUICK_KINDS = ("price", "cart_add", "cart_remove", "cart_list", "confirm", "address", "contact", "not_stocked")
+UNKNOWN_RESOLUTIONS = ("mapped", "new_product", "not_stocked")
+AUTO_STATUSES = ("replied", "skipped")
 MAX_PHONES = 3
 
 
@@ -92,6 +94,43 @@ class QuickAction(Base):
     order_id: Mapped[int | None] = mapped_column(ForeignKey("orders.id"))
     outbox_id: Mapped[int | None] = mapped_column(ForeignKey("outbox.id"))
     undo: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
-    created_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+    created_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"))  # None when auto
+    auto: Mapped[bool] = mapped_column(Boolean, server_default=false(), default=False)  # done by auto mode
     created_at: Mapped[datetime] = created_at_column()
     undone_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class UnknownRequest(Base):
+    """How an admin resolved a product a customer asked for that was not in the list.
+    not_stocked rows are the "wanted but not stocked" list (Step 6)."""
+
+    __tablename__ = "unknown_requests"
+    __table_args__ = (
+        UniqueConstraint("message_id", "normalized_text"),
+        CheckConstraint(f"resolution IN {UNKNOWN_RESOLUTIONS}", name="resolution"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    message_id: Mapped[int] = mapped_column(ForeignKey("messages.id"), index=True)
+    customer_id: Mapped[int] = mapped_column(ForeignKey("customers.id"))
+    text: Mapped[str] = mapped_column(String(255))
+    normalized_text: Mapped[str] = mapped_column(String(255))
+    size_ml: Mapped[int | None] = mapped_column(Integer)
+    is_full_bottle: Mapped[bool] = mapped_column(Boolean, server_default=false(), default=False)
+    resolution: Mapped[str] = mapped_column(String(16))
+    product_id: Mapped[int | None] = mapped_column(ForeignKey("products.id"))
+    resolved_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+    resolved_at: Mapped[datetime] = created_at_column()
+
+
+class AutoRun(Base):
+    """Auto mode's final decision for an incoming message (at most one auto reply each)."""
+
+    __tablename__ = "auto_runs"
+    __table_args__ = (CheckConstraint(f"status IN {AUTO_STATUSES}", name="status"),)
+
+    message_id: Mapped[int] = mapped_column(ForeignKey("messages.id"), primary_key=True)
+    status: Mapped[str] = mapped_column(String(16))
+    reason: Mapped[str | None] = mapped_column(String(120))
+    quick_action_id: Mapped[int | None] = mapped_column(ForeignKey("quick_actions.id"))
+    created_at: Mapped[datetime] = created_at_column()

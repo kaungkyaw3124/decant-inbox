@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Boolean, ForeignKey, String, Text, UniqueConstraint, false
+from sqlalchemy import Boolean, DateTime, ForeignKey, String, Text, UniqueConstraint, false
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.base import Base, created_at_column
@@ -21,3 +21,7 @@ class Customer(Base):
     phone: Mapped[str | None] = mapped_column(String(20))
     phone_message_id: Mapped[int | None] = mapped_column(ForeignKey("messages.id", use_alter=True))
     address: Mapped[str | None] = mapped_column(Text)  # set by an admin (Step 4)
+    # Auto mode (Step 4c): never auto-reply to this customer (friends, family) / resumed
+    # by the admin after an owner pause (replying by hand pauses auto for 2 h).
+    auto_reply_off: Mapped[bool] = mapped_column(Boolean, server_default=false(), default=False)
+    auto_resumed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

@@ -15,7 +15,7 @@ from sqlalchemy.exc import IntegrityError
 from app.core.db import SessionLocal
 from app.core.heartbeat import beat
 from app.models import Message
-from app.orders import cart
+from app.orders import auto, cart
 from app.parser.rules import PARSER_VERSION
 from app.parser.service import load_aliases, load_full_sizes, parse_message, unparsed_message_ids
 from scripts.reparse_all import reparse_all
@@ -93,6 +93,7 @@ def main() -> None:
         if parsed:
             log.info("parsed %d messages", parsed)
             continue  # there may be more
+        auto.run_once()  # auto mode (does nothing while it is switched off)
         if args.once:
             return
         time.sleep(args.interval)

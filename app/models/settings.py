@@ -1,6 +1,8 @@
 from datetime import datetime
+from typing import Any
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, func, true
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.base import Base, created_at_column
@@ -16,6 +18,18 @@ class PaymentMethod(Base):
     active: Mapped[bool] = mapped_column(Boolean, server_default=true(), default=True)
     sort_order: Mapped[int] = mapped_column(Integer, server_default="0", default=0)
     created_at: Mapped[datetime] = created_at_column()
+
+
+class AppSetting(Base):
+    """Small switches changed in the dashboard, e.g. auto_reply = {"enabled": true, "since": "..."}."""
+
+    __tablename__ = "app_settings"
+
+    key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    value: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
+    updated_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(),
+                                                 onupdate=func.now())
 
 
 class ReplyTemplate(Base):

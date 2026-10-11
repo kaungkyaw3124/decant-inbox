@@ -62,12 +62,12 @@ def stored_items(session: Session, result_id: int) -> tuple[ParsedItem, ...]:
     rows = session.scalars(select(ParseItem).where(ParseItem.parse_result_id == result_id)
                            .order_by(ParseItem.position))
     return tuple(ParsedItem(r.product_id, r.size_ml, r.is_full_bottle, r.quantity, r.unknown_text,
-                            r.from_context) for r in rows)
+                            r.from_context, r.match or "none") for r in rows)
 
 
 def _same(session: Session, result: ParseResult, outcome: ParseOutcome) -> bool:
     def key(items) -> list[tuple]:
-        return [astuple(i)[:6] for i in items]  # without the match kind (not stored)
+        return [astuple(i) for i in items]
 
     return (
         result.parser_version == PARSER_VERSION
@@ -82,7 +82,8 @@ def add_items(session: Session, result_id: int, items) -> None:
         session.add(ParseItem(
             parse_result_id=result_id, position=position, product_id=item.product_id, size_ml=item.size_ml,
             is_full_bottle=item.is_full_bottle, quantity=item.quantity,
-            unknown_text=item.unknown_text[:255] if item.unknown_text else None, from_context=item.from_context))
+            unknown_text=item.unknown_text[:255] if item.unknown_text else None, from_context=item.from_context,
+            match=item.match))
 
 
 def parse_message(session: Session, message: Message, aliases: list[Alias],

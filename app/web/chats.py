@@ -20,7 +20,7 @@ from app.models import (
 )
 from app.models.orders import MAX_PHONES, OPEN_STATUSES
 from app.models.outbox import MAX_TEXT, MEDIA_DIR
-from app.orders import actions, cart
+from app.orders import actions, auto, cart
 from app.parser.normalize import normalize
 from app.parser.rules import find_phones
 from app.pricing.prices import current_prices
@@ -87,7 +87,12 @@ def thread_context(db: Session, customer: Customer) -> dict:
         if m.grouped_id:
             albums[m.grouped_id] = albums.get(m.grouped_id, 0) + 1
     now = datetime.now(UTC)
+    auto_msgs = set(db.scalars(select(Outbox.sent_message_id).join(QuickAction, QuickAction.outbox_id == Outbox.id)
+                               .where(QuickAction.auto, Outbox.customer_id == customer.id)))
+    auto_box = set(db.scalars(select(QuickAction.outbox_id).where(
+        QuickAction.auto, QuickAction.outbox_id.in_([o.id for o in pending]))))
     return {
+        "auto_msgs": auto_msgs, "auto_box": auto_box,
         "c": customer, "messages": messages, "downloads": downloads, "pending": pending, "albums": albums,
         "stuck": {o.id for o in pending if o.status == "sending" and now - o.created_at > STUCK_AFTER},
         "polling": any(o.status in ("queued", "sending") for o in pending)
@@ -143,6 +148,7 @@ def chat(request: Request, customer_id: int, db: Session = Depends(get_db)):
         "items": items + [compose.PriceItem(0, "all")] * (compose.MAX_PRICE_ITEMS - len(items)),
         "products": products, "sizes": sizes, "can_send": has_written(db, customer_id),
         "key": secrets.token_urlsafe(16), "tg_link": telegram_link(customer), "max_text": MAX_TEXT,
+        "paused_until": auto.paused_until(db, customer),
     })
 
 

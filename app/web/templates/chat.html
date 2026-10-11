@@ -8,8 +8,23 @@
     <h1>{{ c.display_name or ("@" ~ c.username if c.username else "Customer") }}</h1>
     <p class="muted small">{% if c.username %}@{{ c.username }} · {% endif %}{{ c.channel }} id {{ c.external_user_id }}{% if c.ignored %} · ignored{% endif %}</p>
   </div>
-  <a class="button" href="{{ tg_link }}">Open in Telegram</a>
+  <div class="buttons">
+    <a class="button" href="{{ tg_link }}">Open in Telegram</a>
+    <form method="post" action="/customers/{{ c.id }}/auto" class="inline">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      {% if c.auto_reply_off %}<button name="off" value="0" class="quiet">Allow auto-reply</button>
+      {% else %}<button name="off" value="1" class="quiet">Never auto-reply to this customer</button>{% endif %}
+    </form>
+  </div>
 </header>
+{% if c.auto_reply_off %}<p class="flash warnbox">🤖 Auto-reply is off for this customer.</p>{% endif %}
+{% if paused_until %}
+<form method="post" action="/customers/{{ c.id }}/resume-auto" class="flash warnbox paused">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  ⏸ Paused — you're replying by hand (until {{ paused_until | local_time("%H:%M") }}).
+  <button>Resume auto</button>
+</form>
+{% endif %}
 
 <nav class="tabs phone-tabs" aria-label="View">
   <a href="/chats/{{ c.id }}" {% if tab != "cart" %}aria-current="page"{% endif %}>Chat</a>
