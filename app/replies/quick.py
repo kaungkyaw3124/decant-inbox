@@ -1,7 +1,7 @@
 """One-tap quick replies (docs/SPEC-orders.md "One-tap quick replies").
 
 A quick price reply is offered only when everything is certain: a customer's message
-parsed as ask_price/ask_stock with a known product, a known size (or none = all sizes),
+parsed as ask_price/ask_stock/buy with a known product, a known size (or none = all sizes),
 confident (or corrected by a human), every price present and in stock, and nothing sent
 or queued to that customer in the last 60 s. Otherwise the admin uses the chat editor.
 The text is fixed when the button is shown; the server re-builds it on tap and refuses
@@ -18,7 +18,8 @@ from app.models import Message, Outbox, ParseResult
 from app.parser.rules import NEEDS_REVIEW_BELOW
 from app.replies import compose
 
-QUICK_INTENTS = ("ask_price", "ask_stock")
+# buy too, until the cart (Step 4) exists: the customer at least gets the price (spec 2026-10-12)
+QUICK_INTENTS = ("ask_price", "ask_stock", "buy")
 RECENT_REPLY = timedelta(seconds=60)
 
 

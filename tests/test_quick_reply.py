@@ -28,7 +28,7 @@ def setup_messages(db):
     add(102, "stw intensely ဘယ်လောက်လဲ", customer="52", when=now)                # quick: all sizes
     add(103, "stw intensely 3ml ဘယ်လောက်လဲ", customer="53", when=now)            # 3ml has no price
     add(104, "sauvage edp 5ml ရှိလား", customer="54", when=now)                   # out of stock
-    add(105, "stw intensely 5ml ဝယ်ချင်လို့ပါ", customer="55", when=now)          # buy: not a price question
+    add(105, "stw intensely 5ml ဝယ်ချင်လို့ပါ", customer="55", when=now)          # buy: quick too (until cart)
     run_batch()
 
 
@@ -36,8 +36,9 @@ def test_when_the_button_is_offered(client, db):  # noqa: F811
     log_in(client)
     setup_messages(db)
     page = client.get("/?intent=all").text
-    assert button(page, msg_id(db, "101")) and button(page, msg_id(db, "102"))
-    for ext in ("103", "104", "105", "1", "3"):  # also the fixture's buy msg and unknown "aventus"
+    for ext in ("101", "102", "105", "1"):  # 105 and 1 are buy messages: offered too (until cart)
+        assert button(page, msg_id(db, ext)), ext
+    for ext in ("103", "104", "3"):  # 3ml has no price, out of stock, unknown "aventus"
         assert button(page, msg_id(db, ext)) is None, ext
     assert 'title="မင်္ဂလာပါ။\nStronger With You Intensely 5ml က 18,000 ကျပ်ပါ။' in page  # full text on hover
     assert "မင်္ဂလာပါ။ · Stronger With You Intensely 5ml က 18,000" in page  # one-line preview
