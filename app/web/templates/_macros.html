@@ -1,0 +1,2 @@
+{# "?" help next to a section (docs/SPEC-v4.md 4.5): one sentence, Burmese for Burmese users. #}
+{% macro help(text) %}<details class="help"><summary aria-label="{{ _('Help') }}">?</summary><p>{{ _(text) }}</p></details>{% endmacro %}

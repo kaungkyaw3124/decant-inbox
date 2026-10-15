@@ -2,7 +2,7 @@
 <li class="row status-{{ status }}" id="msg-{{ m.id }}"{% if waiting %} hx-get="/messages/{{ m.id }}/row" hx-trigger="every 3s" hx-swap="outerHTML"{% endif %}>
   <a class="row-main" href="/messages/{{ m.id }}?back={{ back | default('/') | urlencode }}">
     <div class="meta">
-      <span class="who">{{ c.display_name or ("@" ~ c.username if c.username else "Customer " ~ c.external_user_id) }}</span>
+      <span class="who">{{ c.display_name or ("@" ~ c.username if c.username else _("Customer") ~ " " ~ c.external_user_id) }}</span>
       <time>{{ m.received_at | local_time }}</time>
     </div>
     <p class="text">{{ m.raw_text }}</p>
@@ -11,11 +11,11 @@
   <div class="row-actions">
     {% if quick or quick_action or quick_error %}{% with in_row = true %}{% include "_quick.html" %}{% endwith %}{% endif %}
     {% if status == "new" %}
-      <button hx-post="/messages/{{ m.id }}/review" hx-vals='{"status": "done"}' hx-target="#msg-{{ m.id }}" hx-swap="outerHTML">Done</button>
-      <button hx-post="/messages/{{ m.id }}/review" hx-vals='{"status": "ignored"}' hx-target="#msg-{{ m.id }}" hx-swap="outerHTML" class="quiet">Ignore</button>
+      <button hx-post="/messages/{{ m.id }}/review" hx-vals='{"status": "done"}' hx-target="#msg-{{ m.id }}" hx-swap="outerHTML">{{ _("Done") }}</button>
+      <button hx-post="/messages/{{ m.id }}/review" hx-vals='{"status": "ignored"}' hx-target="#msg-{{ m.id }}" hx-swap="outerHTML" class="quiet">{{ _("Ignore") }}</button>
     {% else %}
-      <span class="state">{{ status }}</span>
-      <button hx-post="/messages/{{ m.id }}/review" hx-vals='{"status": "new"}' hx-target="#msg-{{ m.id }}" hx-swap="outerHTML" class="quiet">Undo</button>
+      <span class="state">{{ _(status) }}</span>
+      <button hx-post="/messages/{{ m.id }}/review" hx-vals='{"status": "new"}' hx-target="#msg-{{ m.id }}" hx-swap="outerHTML" class="quiet">{{ _("Undo") }}</button>
     {% endif %}
   </div>
 </li>

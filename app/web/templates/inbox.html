@@ -1,147 +1,149 @@
 {% extends "base.html" %}
 {% block content %}
+{% from "_macros.html" import help with context %}
 {% set kind_label = {"price": "price reply", "cart_add": "added to cart + list", "cart_remove": "removed + list",
                      "cart_list": "cart list", "confirm": "confirmed", "contact": "phone/address", "address": "address",
-                     "not_stocked": "we don't have it", "delivery": "delivery status", "cancel_order": "order cancelled", "faq": "FAQ answer"} %}
+                     "not_stocked": "we don't have it", "delivery": "delivery status", "cancel_order": "order cancelled",
+                     "faq": "FAQ answer", "greeting": "greeting", "choose_previous": "which earlier item?"} %}
 {% if needs_you is not none %}
 <section class="card needs-you {% if needs_you.count %}notice{% endif %}">
-  <h2>🟡 Needs you ({{ needs_you.count }})</h2>
-  {% if not needs_you.count %}<p class="muted small">Nothing waiting for you.</p>{% endif %}
+  <h2>🟡 {{ _("Needs you") }} ({{ needs_you.count }}) {{ help("Things only a person can do: check payments, answer questions the app could not, teach it new words. Work from top to bottom.") }}</h2>
+  {% if not needs_you.count %}<p class="muted small">{{ _("Nothing waiting for you.") }}</p>{% endif %}
   <ul class="feed">
   {% for check, order, c in needs_you.payments %}
-    <li><a href="/payments/{{ check.id }}"><b>💳 {{ c.display_name or c.username or "Customer" }}</b>:
-      {{ "several photos — ask for one" if check.decision == "several" else "payment screenshot to check" }}</a>
+    <li><a href="/payments/{{ check.id }}"><b>💳 {{ c.display_name or c.username or _("Customer") }}</b>:
+      {{ _("several photos — ask for one") if check.decision == "several" else _("payment screenshot to check") }}</a>
       <span class="small muted">{{ format_mmk(order.total_mmk) }} ကျပ်</span></li>
   {% endfor %}
   {% for m, c, o in needs_you.cancels %}
-    <li><a href="/chats/{{ c.id }}"><b>🚫 {{ c.display_name or c.username or "Customer" }}</b>: wants to cancel a paid order
-      {% if o.order_no %}#{{ o.order_no }}{% else %}(payment photo sent){% endif %}</a>
+    <li><a href="/chats/{{ c.id }}"><b>🚫 {{ c.display_name or c.username or _("Customer") }}</b>: {{ _("wants to cancel a paid order") }}
+      {% if o.order_no %}#{{ o.order_no }}{% else %}{{ _("(payment photo sent)") }}{% endif %}</a>
       <span class="small muted">“{{ m.raw_text | truncate(50) }}” · {{ format_mmk(o.total_mmk) }} ကျပ်</span>
-      <details class="cancel-order"><summary class="button link danger">Cancel order</summary>
+      <details class="cancel-order"><summary class="button link danger">{{ _("Cancel order") }}</summary>
         <form method="post" action="/orders/{{ o.id }}/cancel" class="stack">
           <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="back" value="/">
-          <p class="small problem-text">Money may be involved: refund outside the system.</p>
-          <label>Note <input name="note" maxlength="500"></label>
-          <label class="check"><input type="radio" name="message" value="order_cancelled" checked> Send “order cancelled”</label>
-          <label class="check"><input type="radio" name="message" value="none"> Send nothing</label>
-          <button class="danger">Cancel order</button>
+          <p class="small problem-text">{{ _("Money may be involved: refund outside the system.") }}</p>
+          <label>{{ _("Note") }} <input name="note" maxlength="500"></label>
+          <label class="check"><input type="radio" name="message" value="order_cancelled" checked> {{ _("Send “order cancelled”") }}</label>
+          <label class="check"><input type="radio" name="message" value="none"> {{ _("Send nothing") }}</label>
+          <button class="danger">{{ _("Cancel order") }}</button>
         </form></details>
       <form method="post" action="/needs-you/clear" class="inline"><input type="hidden" name="csrf" value="{{ csrf }}">
-        <input type="hidden" name="message_id" value="{{ m.id }}"><button class="link">keep order (done)</button></form></li>
+        <input type="hidden" name="message_id" value="{{ m.id }}"><button class="link">{{ _("keep order (done)") }}</button></form></li>
   {% endfor %}
   {% for d, why in needs_you.unpaid %}
-    <li><a href="/chats/{{ d.customer.id }}"><b>💳 {{ d.customer.display_name or d.customer.username or "Customer" }}</b>:
-      no payment for {{ d.hours }} h</a> <span class="small muted">({{ why }})</span>
+    <li><a href="/chats/{{ d.customer.id }}"><b>💳 {{ d.customer.display_name or d.customer.username or _("Customer") }}</b>:
+      {{ _("no payment for {hours} h", hours=d.hours) }}</a> <span class="small muted">({{ _(why) }})</span>
       {% if d.what == "reminder" %}
       <form method="post" action="/orders/{{ d.order.id }}/remind" class="inline"><input type="hidden" name="csrf" value="{{ csrf }}">
-        <button class="quiet">Send payment reminder</button></form>
+        <button class="quiet">{{ _("Send payment reminder") }}</button></form>
       {% else %}
       <form method="post" action="/orders/{{ d.order.id }}/cancel" class="inline"><input type="hidden" name="csrf" value="{{ csrf }}">
         <input type="hidden" name="back" value="/"><input type="hidden" name="message" value="order_auto_cancelled">
-        <input type="hidden" name="note" value="not paid in {{ d.hours }} h"><button class="quiet">Cancel order + tell them</button></form>
+        <input type="hidden" name="note" value="not paid in {{ d.hours }} h"><button class="quiet">{{ _("Cancel order + tell them") }}</button></form>
       {% endif %}</li>
   {% endfor %}
   {% for m, c, card in needs_you.teach %}
-    <li class="teach-row"><a href="/messages/{{ m.id }}"><b>📘 {{ c.display_name or c.username or "Customer" }}</b>: {{ m.raw_text | truncate(70) }}</a>
+    <li class="teach-row"><a href="/messages/{{ m.id }}"><b>📘 {{ c.display_name or c.username or _("Customer") }}</b>: {{ m.raw_text | truncate(70) }}</a>
       {% if card.products %}<span class="badge warn">❓ {{ card.products | map(attribute="words") | join(", ") }}</span>{% endif %}
-      <span class="small muted">{{ m.received_at | age }}</span>
+      <span class="small muted">{{ _(m.received_at | age) }}</span>
       <details class="teach-box"><summary class="button primary">📘 သင်ပေးမယ်</summary>
         {% with back = "/" %}{% include "_card.html" %}{% endwith %}
       </details></li>
   {% endfor %}
   {% for row, product, m in needs_you.price_needed %}
-    <li><b>💲 {{ product.name }}</b>: ဈေး လိုတယ် (price needed) · {{ "full bottle" if row.is_full_bottle else (row.size_ml ~ "ml" if row.size_ml else "") }}
+    <li><b>💲 {{ product.name }}</b>: {{ _("price needed") }} · {{ _("full bottle") if row.is_full_bottle else (row.size_ml ~ "ml" if row.size_ml else "") }}
       <span class="small muted">“{{ m.raw_text | truncate(50) }}”</span>
       {% if user_role == "owner" %}
       <form method="post" action="/learning/price/{{ row.id }}" class="inline-form">
         <input type="hidden" name="csrf" value="{{ csrf }}">
-        <input name="price" inputmode="numeric" placeholder="ဈေး (ကျပ်)" aria-label="Price" required>
-        <input name="full_size_ml" inputmode="numeric" placeholder="ပုလင်း ml" aria-label="Bottle size">
-        <button class="primary">Save + send list</button>
+        <input name="price" inputmode="numeric" placeholder="{{ _('Price (ကျပ်)') }}" aria-label="{{ _('Price') }}" required>
+        <input name="full_size_ml" inputmode="numeric" placeholder="{{ _('Bottle ml') }}" aria-label="{{ _('Bottle size') }}">
+        <button class="primary">{{ _("Save + send list") }}</button>
       </form>
-      {% else %}<span class="small muted">— ပိုင်ရှင် ဈေးထည့်ရင် စာရင်း အလိုအလျောက် ပို့မယ်။</span>{% endif %}</li>
+      {% else %}<span class="small muted">— {{ _("When the owner adds the price, the list goes out by itself.") }}</span>{% endif %}</li>
   {% endfor %}
   {% if needs_you.to_approve and user_role == "owner" %}
-    <li><a href="/learning"><b>📘 {{ needs_you.to_approve }} pattern{{ "s" if needs_you.to_approve > 1 }} to approve</b></a></li>
+    <li><a href="/learning"><b>📘 {{ _("{n} pattern to approve", n=needs_you.to_approve) if needs_you.to_approve == 1 else _("{n} patterns to approve", n=needs_you.to_approve) }}</b></a></li>
   {% endif %}
   {% for conflict in needs_you.conflicts if user_role == "owner" %}
-    <li><a href="/learning#conflicts"><b>⚠️ “{{ conflict.details.text }}”</b>: taught differently — decide on the Learning page</a></li>
+    <li><a href="/learning#conflicts"><b>⚠️ “{{ conflict.details.text }}”</b>: {{ _("taught differently — decide on the Learning page") }}</a></li>
   {% endfor %}
   {% for m, c, items in needs_you.unknown %}
-    <li><a href="/messages/{{ m.id }}"><b>{{ c.display_name or c.username or "Customer" }}</b>: {{ m.raw_text | truncate(70) }}</a>
+    <li><a href="/messages/{{ m.id }}"><b>{{ c.display_name or c.username or _("Customer") }}</b>: {{ m.raw_text | truncate(70) }}</a>
       <span class="badge warn">❓ {{ items | map(attribute="text") | join(", ") }}</span>
-      <a class="small" href="/messages/{{ m.id }}#unknown">resolve</a></li>
+      <a class="small" href="/messages/{{ m.id }}#unknown">{{ _("resolve") }}</a></li>
   {% endfor %}
   {% for u in needs_you.unanswered %}
-    <li><a href="/chats/{{ u.customer.id }}#bottom"><b>💬 {{ u.customer.display_name or u.customer.username or "Customer" }}</b>: {{ u.last_text | truncate(60) }}</a>
-      <span class="small muted">unanswered{% if u.message_ids | length > 1 %} ({{ u.message_ids | length }}){% endif %} · {{ u.last_at | age }}</span>
+    <li><a href="/chats/{{ u.customer.id }}#bottom"><b>💬 {{ u.customer.display_name or u.customer.username or _("Customer") }}</b>: {{ u.last_text | truncate(60) }}</a>
+      <span class="small muted">{{ _("unanswered") }}{% if u.message_ids | length > 1 %} ({{ u.message_ids | length }}){% endif %} · {{ _(u.last_at | age) }}</span>
       <form method="post" action="/needs-you/clear" class="inline"><input type="hidden" name="csrf" value="{{ csrf }}">
         {% for mid in u.message_ids %}<input type="hidden" name="message_id" value="{{ mid }}">{% endfor %}
-        <button class="link" name="status" value="done">done</button> <button class="link" name="status" value="ignored">ignore</button></form>
+        <button class="link" name="status" value="done">{{ _("done") }}</button> <button class="link" name="status" value="ignored">{{ _("ignore") }}</button></form>
       {% if u.card %}{% set m, card = u.card %}
       <details class="teach-box"><summary class="button primary">📘 သင်ပေးမယ်</summary>
         {% with back = "/" %}{% include "_card.html" %}{% endwith %}
       </details>{% endif %}
       {% if u.faq %}{% set mid, match = u.faq %}
       <form method="post" action="/messages/{{ mid }}/faq/{{ match.entry.id }}" class="inline"><input type="hidden" name="csrf" value="{{ csrf }}">
-        <button class="quiet" title="{{ match.entry.answer }}">💬 Send FAQ: {{ match.entry.title }}</button></form>{% endif %}</li>
+        <button class="quiet" title="{{ match.entry.answer }}">💬 {{ _("Send FAQ") }}: {{ match.entry.title }}</button></form>{% endif %}</li>
   {% endfor %}
   {% for m, c, match in needs_you.faq_hints %}
-    <li><a href="/chats/{{ c.id }}#bottom"><b>💬 {{ c.display_name or c.username or "Customer" }}</b>: {{ m.raw_text | truncate(60) }}</a>
-      <span class="small muted">also asks: FAQ “{{ match.entry.title }}”</span>
+    <li><a href="/chats/{{ c.id }}#bottom"><b>💬 {{ c.display_name or c.username or _("Customer") }}</b>: {{ m.raw_text | truncate(60) }}</a>
+      <span class="small muted">{{ _("also asks: FAQ") }} “{{ match.entry.title }}”</span>
       <form method="post" action="/messages/{{ m.id }}/faq/{{ match.entry.id }}" class="inline"><input type="hidden" name="csrf" value="{{ csrf }}">
-        <button class="quiet" title="{{ match.entry.answer }}">💬 Send FAQ: {{ match.entry.title }}</button></form>
+        <button class="quiet" title="{{ match.entry.answer }}">💬 {{ _("Send FAQ") }}: {{ match.entry.title }}</button></form>
       <form method="post" action="/messages/{{ m.id }}/faq-hint-done" class="inline"><input type="hidden" name="csrf" value="{{ csrf }}">
-        <button class="link">done</button></form></li>
+        <button class="link">{{ _("done") }}</button></form></li>
   {% endfor %}
   {% for o, c in needs_you.failed %}
-    <li><a href="/chats/{{ c.id }}#bottom"><b>{{ c.display_name or c.username or "Customer" }}</b>: reply not sent</a>
+    <li><a href="/chats/{{ c.id }}#bottom"><b>{{ c.display_name or c.username or _("Customer") }}</b>: {{ _("reply not sent") }}</a>
       <span class="small error">{{ o.error }}</span></li>
   {% endfor %}
   {% for c, until in needs_you.paused %}
-    <li><a href="/chats/{{ c.id }}"><b>{{ c.display_name or c.username or "Customer" }}</b>: new message while paused</a>
-      <span class="small muted">(you replied by hand; auto until {{ until | local_time("%H:%M") }} off)</span></li>
+    <li><a href="/chats/{{ c.id }}"><b>{{ c.display_name or c.username or _("Customer") }}</b>: {{ _("new message while paused") }}</a>
+      <span class="small muted">{{ _("(you replied by hand; auto until {time} off)", time=until | local_time("%H:%M")) }}</span></li>
   {% endfor %}
   {% for o, c in needs_you.auto_cancelled %}
-    <li class="muted"><a href="/chats/{{ c.id }}">ℹ️ {{ c.display_name or c.username or "Customer" }}</a>: order cancelled automatically (not paid){% if o.cancel_note %} · {{ o.cancel_note }}{% endif %}</li>
+    <li class="muted"><a href="/chats/{{ c.id }}">ℹ️ {{ c.display_name or c.username or _("Customer") }}</a>: {{ _("order cancelled automatically (not paid)") }}{% if o.cancel_note %} · {{ o.cancel_note }}{% endif %}</li>
   {% endfor %}
   </ul>
 </section>
 {% if handled %}
 <details class="card" {% if auto_on %}open{% endif %}>
-  <summary>🤖 Handled automatically (last 24 h): {{ handled | length }}</summary>
+  <summary>🤖 {{ _("Handled automatically (last 24 h)") }}: {{ handled | length }}</summary>
   <ul class="feed small">
   {% for a, c, o in handled %}
     <li><time>{{ a.created_at | local_time("%H:%M") }}</time>
-      <a href="/chats/{{ c.id }}">{{ c.display_name or c.username or "Customer" }}</a>: {{ kind_label.get(a.kind, a.kind) }}
-      {% if a.undone_at %}<span class="muted">· cancelled</span>
-      {% elif o and o.status == "sent" %}<span class="done-text">· sent</span>
-      {% elif o and o.status == "failed" %}<span class="error">· failed</span>
-      {% elif o %}<span class="muted">· sending…</span>{% endif %}</li>
+      <a href="/chats/{{ c.id }}">{{ c.display_name or c.username or _("Customer") }}</a>: {{ _(kind_label.get(a.kind, a.kind)) }}
+      {% if a.undone_at %}<span class="muted">· {{ _("cancelled") }}</span>
+      {% elif o and o.status == "sent" %}<span class="done-text">· {{ _("sent") }}</span>
+      {% elif o and o.status == "failed" %}<span class="error">· {{ _("failed") }}</span>
+      {% elif o %}<span class="muted">· {{ _("sending…") }}</span>{% endif %}</li>
   {% endfor %}
   </ul>
 </details>
 {% endif %}
 {% endif %}
 <form method="get" action="/" class="filters">
-  <input type="search" name="q" value="{{ f.q }}" placeholder="Search text or customer" aria-label="Search">
-  <select name="status" aria-label="Status">
-    {% for s in statuses %}<option value="{{ s }}" {% if f.status == s %}selected{% endif %}>{{ s | capitalize }}</option>{% endfor %}
-    <option value="all" {% if f.status == "all" %}selected{% endif %}>Any status</option>
+  <input type="search" name="q" value="{{ f.q }}" placeholder="{{ _('Search text or customer') }}" aria-label="{{ _('Search') }}">
+  <select name="status" aria-label="{{ _('Status') }}">
+    {% for s in statuses %}<option value="{{ s }}" {% if f.status == s %}selected{% endif %}>{{ _(s | capitalize) }}</option>{% endfor %}
+    <option value="all" {% if f.status == "all" %}selected{% endif %}>{{ _("Any status") }}</option>
   </select>
-  <select name="intent" aria-label="Intent">
-    <option value="requests" {% if f.intent == "requests" %}selected{% endif %}>Requests (not “other”)</option>
-    <option value="all" {% if f.intent == "all" %}selected{% endif %}>All intents</option>
-    {% for i in intents %}<option value="{{ i }}" {% if f.intent == i %}selected{% endif %}>{{ i | replace("_", " ") }}</option>{% endfor %}
+  <select name="intent" aria-label="{{ _('Intent') }}">
+    <option value="requests" {% if f.intent == "requests" %}selected{% endif %}>{{ _("Requests (not “other”)") }}</option>
+    <option value="all" {% if f.intent == "all" %}selected{% endif %}>{{ _("All intents") }}</option>
+    {% for i in intents %}<option value="{{ i }}" {% if f.intent == i %}selected{% endif %}>{{ _(i | replace("_", " ")) }}</option>{% endfor %}
   </select>
-  <select name="product" aria-label="Product">
-    <option value="">Any product</option>
-    {% for p in products %}<option value="{{ p.id }}" {% if f.product == p.id %}selected{% endif %}>{{ p.name }}{% if not p.active %} (inactive){% endif %}</option>{% endfor %}
+  <select name="product" aria-label="{{ _('Product') }}">
+    <option value="">{{ _("Any product") }}</option>
+    {% for p in products %}<option value="{{ p.id }}" {% if f.product == p.id %}selected{% endif %}>{{ p.name }}{% if not p.active %} ({{ _("inactive") }}){% endif %}</option>{% endfor %}
   </select>
-  <label class="check"><input type="checkbox" name="needs_review" value="1" {% if f.needs_review %}checked{% endif %}> Needs review</label>
-  <label class="check"><input type="checkbox" name="show_ignored" value="1" {% if f.show_ignored %}checked{% endif %}> Ignored customers</label>
-  <button class="primary">Filter</button>
-  <a href="/" class="reset">Reset</a>
+  <label class="check"><input type="checkbox" name="needs_review" value="1" {% if f.needs_review %}checked{% endif %}> {{ _("Needs review") }}</label>
+  <label class="check"><input type="checkbox" name="show_ignored" value="1" {% if f.show_ignored %}checked{% endif %}> {{ _("Ignored customers") }}</label>
+  <button class="primary">{{ _("Filter") }}</button>
+  <a href="/" class="reset">{{ _("Reset") }}</a>
 </form>
 
 {% if rows %}
@@ -149,11 +151,11 @@
   {% for row in rows %}{% with m=row.m, c=row.c, r=row.r, p=row.p, status=row.status, needs_review=row.needs_review, quick=row.quick, quick_action=row.quick_action, items=row["items"] %}{% include "_row.html" %}{% endwith %}{% endfor %}
 </ul>
 {% else %}
-<p class="empty">No messages match these filters.</p>
+<p class="empty">{{ _("No messages match these filters.") }}</p>
 {% endif %}
 
 <nav class="pager">
-  {% if newer_url %}<a href="{{ newer_url }}">← Newer</a>{% endif %}
-  {% if older_url %}<a href="{{ older_url }}">Older →</a>{% endif %}
+  {% if newer_url %}<a href="{{ newer_url }}">← {{ _("Newer") }}</a>{% endif %}
+  {% if older_url %}<a href="{{ older_url }}">{{ _("Older") }} →</a>{% endif %}
 </nav>
 {% endblock %}

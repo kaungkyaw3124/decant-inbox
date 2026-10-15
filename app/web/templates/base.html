@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="{{ lang or 'en' }}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -18,33 +18,41 @@
     <input type="hidden" name="csrf" value="{{ csrf }}">
     <input type="hidden" name="back" value="{{ request.url.path }}">
     <input type="hidden" name="on" value="{{ '0' if auto_on else '1' }}">
-    <button title="{{ 'Click to turn auto-reply OFF' if auto_on else 'Click to turn auto-reply ON' }}">🤖 Auto-reply: <b>{{ "ON" if auto_on else "OFF" }}</b></button>
+    <button title="{{ _('Click to turn auto-reply OFF') if auto_on else _('Click to turn auto-reply ON') }}">🤖 {{ _("Auto-reply") }}: <b>{{ _("ON") if auto_on else _("OFF") }}</b></button>
   </form>
-  {% else %}<span class="auto-switch {{ 'on' if auto_on else 'off' }} small">🤖 Auto-reply: <b>{{ "ON" if auto_on else "OFF" }}</b></span>{% endif %}
+  {% else %}<span class="auto-switch {{ 'on' if auto_on else 'off' }} small">🤖 {{ _("Auto-reply") }}: <b>{{ _("ON") if auto_on else _("OFF") }}</b></span>{% endif %}
   <nav>
-    <a href="/" {% if path == "/" %}aria-current="page"{% endif %}>Inbox</a>
-    <a href="/payments" {% if path.startswith("/payments") %}aria-current="page"{% endif %}>Payments{% if payments_open %} <span class="badge warn">{{ payments_open }}</span>{% endif %}</a>
-    <a href="/orders" {% if path.startswith("/orders") %}aria-current="page"{% endif %}>Orders{% if to_pack %} <span class="badge">{{ to_pack }}</span>{% endif %}</a>
-    <a href="/chats" {% if path.startswith("/chats") %}aria-current="page"{% endif %}>Chats</a>
-    <a href="/products" {% if path.startswith("/products") %}aria-current="page"{% endif %}>Products</a>
-    {% if user_role == "owner" %}<a href="/prices" {% if path.startswith("/prices") %}aria-current="page"{% endif %}>Prices</a>{% endif %}
-    <a href="/sales" {% if path.startswith("/sales") %}aria-current="page"{% endif %}>Sales</a>
-    <a href="/reports/wanted" {% if path.startswith("/reports") %}aria-current="page"{% endif %}>Reports</a>
+    <a href="/" {% if path == "/" %}aria-current="page"{% endif %}>{{ _("Inbox") }}</a>
+    <a href="/payments" {% if path.startswith("/payments") %}aria-current="page"{% endif %}>{{ _("Payments") }}{% if payments_open %} <span class="badge warn">{{ payments_open }}</span>{% endif %}</a>
+    <a href="/orders" {% if path.startswith("/orders") %}aria-current="page"{% endif %}>{{ _("Orders") }}{% if to_pack %} <span class="badge">{{ to_pack }}</span>{% endif %}</a>
+    <a href="/chats" {% if path.startswith("/chats") %}aria-current="page"{% endif %}>{{ _("Chats") }}</a>
+    <a href="/products" {% if path.startswith("/products") %}aria-current="page"{% endif %}>{{ _("Products") }}</a>
+    {% if user_role == "owner" %}<a href="/prices" {% if path.startswith("/prices") %}aria-current="page"{% endif %}>{{ _("Prices") }}</a>{% endif %}
+    <a href="/sales" {% if path.startswith("/sales") %}aria-current="page"{% endif %}>{{ _("Sales") }}</a>
+    <a href="/reports/wanted" {% if path.startswith("/reports") %}aria-current="page"{% endif %}>{{ _("Reports") }}</a>
     {% if user_role == "owner" %}
-    <a href="/learning" {% if path.startswith("/learning") %}aria-current="page"{% endif %}>Learning{% if to_learn %} <span class="badge">{{ to_learn }}</span>{% endif %}</a>
-    <a href="/settings" {% if path.startswith("/settings") %}aria-current="page"{% endif %}>Settings</a>
-    <a href="/users" {% if path.startswith("/users") or path.startswith("/activity") %}aria-current="page"{% endif %}>Users</a>
+    <a href="/learning" {% if path.startswith("/learning") %}aria-current="page"{% endif %}>{{ _("Learning") }}{% if to_learn %} <span class="badge">{{ to_learn }}</span>{% endif %}</a>
+    <a href="/settings" {% if path.startswith("/settings") %}aria-current="page"{% endif %}>{{ _("Settings") }}</a>
+    <a href="/users" {% if path.startswith("/users") or path.startswith("/activity") %}aria-current="page"{% endif %}>{{ _("Users") }}</a>
     {% endif %}
-    <a href="/health" {% if path == "/health" %}aria-current="page"{% endif %}>Health</a>
+    <a href="/practice" {% if path.startswith("/practice") %}aria-current="page"{% endif %}>{{ _("Practice") }}</a>
+    <a href="/help" {% if path == "/help" %}aria-current="page"{% endif %}>{{ _("Help") }}</a>
+    <a href="/health" {% if path == "/health" %}aria-current="page"{% endif %}>{{ _("Health") }}</a>
+    <form method="post" action="/language" class="inline lang-switch">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <input type="hidden" name="back" value="{{ request.url.path }}">
+      {% if lang == "my" %}<button name="language" value="en" class="link" title="Switch to English">English</button>
+      {% else %}<button name="language" value="my" class="link" title="မြန်မာလို ပြောင်းမယ်">မြန်မာ</button>{% endif %}
+    </form>
     <form method="post" action="/logout" class="inline">
       <input type="hidden" name="csrf" value="{{ csrf }}">
-      <button class="link">Log out</button>
+      <button class="link">{{ _("Log out") }}</button>
     </form>
   </nav>
 </header>
 {% endif %}
 <main class="{% block main_class %}{% endblock %}">
-{% if flash %}<p class="flash" role="status">{{ flash }}</p>{% endif %}
+{% if flash %}<p class="flash" role="status">{{ _(flash) }}</p>{% endif %}
 {% block content %}{% endblock %}
 </main>
 </body>

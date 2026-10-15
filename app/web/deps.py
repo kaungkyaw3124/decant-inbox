@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from app.core.config import get_settings
 from app.core.db import SessionLocal
 from app.pricing.prices import format_mmk, size_label
+from app.web.i18n import translator
 
 
 def csrf_token(request: Request) -> str:
@@ -20,7 +21,7 @@ def csrf_token(request: Request) -> str:
 
 
 def _template_context(request: Request) -> dict:
-    auto_on, payments_open, to_pack, role, to_learn = False, 0, 0, None, 0
+    auto_on, payments_open, to_pack, role, to_learn, lang = False, 0, 0, None, 0, "en"
     if request.session.get("user_id"):  # the switch and the badges are on every page
         from sqlalchemy import func, select
 
@@ -31,11 +32,12 @@ def _template_context(request: Request) -> dict:
         with SessionLocal() as session:
             auto_on, payments_open = auto.enabled(session), payments.count_open(session)
             to_pack = session.scalar(select(func.count()).select_from(Order).where(Order.status == "paid"))
-            role = session.scalar(select(User.role).where(User.id == request.session["user_id"]))
+            row = session.execute(select(User.role, User.language).where(User.id == request.session["user_id"])).first()
+            role, lang = row if row else (None, "en")
             to_learn = patterns.pending_count(session)
     return {"csrf": csrf_token(request), "flash": request.session.pop("flash", None),
             "path": request.url.path, "auto_on": auto_on, "payments_open": payments_open, "to_pack": to_pack,
-            "user_role": role, "to_learn": to_learn}
+            "user_role": role, "to_learn": to_learn, "lang": lang, "_": translator(lang)}
 
 
 templates = Jinja2Templates(

@@ -197,3 +197,11 @@ table.sales td.num, table.sales th.num { font-variant-numeric: tabular-nums; whi
 button.big, a.button.big { min-height: 52px; font-size: 1.05rem; padding: 10px 20px; }
 .big-line { font-size: 1.15rem; font-weight: 600; margin: 0 0 8px; }
 details.teach-box > summary { cursor: pointer; display: inline-flex; }
+/* "?" help (v4 4.5) */
+details.help { display: inline-block; vertical-align: middle; margin-left: 6px; font-size: .85rem; font-weight: 400; }
+details.help > summary { list-style: none; cursor: pointer; width: 22px; height: 22px; border-radius: 50%; border: 1px solid var(--line);
+  display: inline-flex; align-items: center; justify-content: center; color: var(--muted); background: var(--card); }
+details.help > summary::-webkit-details-marker { display: none; }
+details.help[open] > p { position: absolute; z-index: 2; max-width: 320px; margin: 6px 0 0; padding: 8px 10px; border-radius: 8px;
+  background: var(--card); border: 1px solid var(--line); color: var(--text); box-shadow: 0 2px 8px rgba(0,0,0,.12); }
+.lang-switch button { font-weight: 600; }
