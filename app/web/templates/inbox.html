@@ -61,10 +61,10 @@
       </form>
       {% else %}<span class="small muted">— ပိုင်ရှင် ဈေးထည့်ရင် စာရင်း အလိုအလျောက် ပို့မယ်။</span>{% endif %}</li>
   {% endfor %}
-  {% if needs_you.to_approve %}
+  {% if needs_you.to_approve and user_role == "owner" %}
     <li><a href="/learning"><b>📘 {{ needs_you.to_approve }} pattern{{ "s" if needs_you.to_approve > 1 }} to approve</b></a></li>
   {% endif %}
-  {% for conflict in needs_you.conflicts %}
+  {% for conflict in needs_you.conflicts if user_role == "owner" %}
     <li><a href="/learning#conflicts"><b>⚠️ “{{ conflict.details.text }}”</b>: taught differently — decide on the Learning page</a></li>
   {% endfor %}
   {% for m, c, items in needs_you.unknown %}

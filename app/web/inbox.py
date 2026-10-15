@@ -7,6 +7,7 @@ from sqlalchemy import and_, or_, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session, aliased
 
+from app.core import audit
 from app.models import (
     Customer, Message, MessageReview, ParseItem, ParseResult, Product, ProductAlias, QuickAction, UnknownRequest,
     User,
@@ -124,7 +125,7 @@ def inbox(
     request: Request,
     status: str = "new", intent: str = "requests", product: str = "", needs_review: str = "",
     show_ignored: str = "", q: str = "", page: int = 1,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db), user: User = Depends(current_user),
 ):
     f = {
         "status": status, "intent": intent, "product": int(product) if product.isdigit() else None,
@@ -143,7 +144,7 @@ def inbox(
     first_page = page == 1 and not f["q"] and not f["product"]
     from app.web.learning import card_context
 
-    needs_you = auto_pages.needs_you(db) if first_page else None
+    needs_you = auto_pages.needs_you(db, owner=user.is_owner) if first_page else None
     return templates.TemplateResponse(request, "inbox.html", {
         **(card_context(db) if needs_you and (needs_you["teach"] or any(r.card for r in needs_you["unanswered"]))
            else {}),
@@ -233,7 +234,13 @@ def edit_parse(
                          is_full_bottle=full, quantity=qty, match="human"))
     note = "Saved."
     alias_norm = normalize(alias)
-    if alias_norm and pid is not None:
+    if alias_norm and pid is not None and not user.is_owner:  # staff teach; the owner approves (4.4)
+        from app.learning import patterns
+
+        taught = patterns.teach(db, "nickname", alias, user, product_id=pid, message_id=message_id)
+        note = {"saved": f"Saved. “{alias.strip()}” waits for the owner's approval (📘).",
+                "known": "Saved. That nickname was already known."}.get(taught.status, f"Saved. {taught.note}")
+    elif alias_norm and pid is not None:
         if len(alias_norm) < 2:
             note = "Saved. Alias too short, not added."
         else:
@@ -243,6 +250,7 @@ def edit_parse(
             note = f"Saved. Alias “{alias.strip()}” added." if added else "Saved. Alias already existed."
     elif alias_norm:
         note = "Saved. Alias not added: choose a product first."
+    audit.record(db, user, "message.correct", message_id=message_id, intent=intent, product_id=pid, size_ml=size)
     db.commit()
     flash(request, note)
     return RedirectResponse(detail_url(message_id, back), status_code=303)
@@ -252,6 +260,7 @@ def set_review(db: Session, message_id: int, status: str, note: str | None, user
     if status not in REVIEW_STATUSES:
         raise HTTPException(400, "Unknown status")
     actions.upsert_review(db, message_id, status, user, note)
+    audit.record(db, user, "message.review", message_id=message_id, status=status)
     db.commit()
 
 
@@ -271,12 +280,13 @@ def review_message(
 @router.post("/customers/{customer_id}/ignored")
 def ignore_customer(
     request: Request, customer_id: int, ignored: str = Form(...), back: str = Form("/"),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db), user: User = Depends(current_user),
 ):
     customer = db.get(Customer, customer_id)
     if customer is None:
         raise HTTPException(404, "Customer not found")
     customer.ignored = ignored == "1"
+    audit.record(db, user, "customer.ignore" if customer.ignored else "customer.unignore", customer_id=customer_id)
     db.commit()
     flash(request, "Customer ignored: their messages are hidden from the inbox."
           if customer.ignored else "Customer no longer ignored.")

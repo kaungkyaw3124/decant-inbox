@@ -25,6 +25,7 @@
   </tbody>
 </table>
 
+{% if user_role == "owner" %}
 <form method="post" action="/products" class="card stack">
   <h2>Add product</h2>
   <input type="hidden" name="csrf" value="{{ csrf }}">
@@ -35,4 +36,5 @@
   <button class="primary">Add</button>
   <p class="muted small">The main list is the <a href="/prices">price list (Excel)</a>; a new row there also adds a product. Products added here are included in the Excel download.</p>
 </form>
+{% endif %}
 {% endblock %}

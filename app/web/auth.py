@@ -75,8 +75,8 @@ def authenticate(db: Session, username: str, password: str, ip: str) -> User | N
         _failures[f"ip:{ip}"].append(now)
         _failures[f"user:{username}"].append(now)
         return None
-    if user is None:
-        return None
+    if user is None or user.disabled:
+        return None  # a disabled user can't log in (same message as a wrong password)
     _failures.pop(f"ip:{ip}", None)
     return user
 
@@ -90,6 +90,9 @@ def login(request: Request, user: User) -> None:
 def current_user(request: Request, db: Session = Depends(get_db)) -> User:
     user_id = request.session.get("user_id")
     user = db.get(User, user_id) if user_id else None
+    if user is not None and user.disabled:  # disabled while logged in: out at the next click
+        request.session.clear()
+        user = None
     if user is None:
         target = request.url.path + (f"?{request.url.query}" if request.url.query else "")
         raise LoginRequired(quote(target, safe=""))
@@ -103,3 +106,10 @@ async def verify_csrf(request: Request) -> None:
     sent = request.headers.get("x-csrf-token") or (await request.form()).get("csrf")
     if not expected or not sent or not secrets.compare_digest(str(sent), expected):
         raise HTTPException(403, "Form expired. Go back, reload the page and try again.")
+
+
+def owner_only(user: User = Depends(current_user)) -> User:
+    """Money settings, prices, users, learning approvals (docs/SPEC-v4.md 4.4): 403 for staff."""
+    if not user.is_owner:
+        raise HTTPException(403, "Only the owner can do this.")
+    return user

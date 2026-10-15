@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from app.models import AuditLog, User
 from app.orders import sales
 from app.pricing import costs
-from app.web.auth import current_user, verify_csrf
+from app.web.auth import current_user, owner_only, verify_csrf
 from app.web.deps import get_db, templates
 from app.web.inbox import flash
 
@@ -34,16 +34,16 @@ def sales_page(request: Request, db: Session = Depends(get_db)):
 
 
 @router.get("/export.xlsx")
-def export(request: Request, db: Session = Depends(get_db)):
+def export(request: Request, db: Session = Depends(get_db), user: User = Depends(current_user)):
     q = request.query_params
     key, first, last = sales.resolve(q.get("range", "today"), q.get("from", ""), q.get("to", ""))
-    data = sales.export(sales.report(db, key, first, last))
+    data = sales.export(sales.report(db, key, first, last), with_costs=user.is_owner)  # staff: revenue only
     name = f"sales-{first.isoformat()}" + (f"-to-{last.isoformat()}" if last != first else "") + ".xlsx"
     return Response(data, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                     headers={"Content-Disposition": f'attachment; filename="{name}"'})
 
 
-@router.post("/fill-costs")
+@router.post("/fill-costs", dependencies=[Depends(owner_only)])
 def fill_costs(request: Request, range: str = Form("today"), start: str = Form("", alias="from"),
                end: str = Form("", alias="to"), db: Session = Depends(get_db), user: User = Depends(current_user)):
     """Orders paid before a bottle cost existed: use today's costs for their missing items."""

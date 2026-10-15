@@ -11,11 +11,11 @@ from app.pricing import costs
 from app.pricing.prices import DEFAULT_SIZES, current_prices
 from app.replies import faq
 from app.replies import templates as replies
-from app.web.auth import current_user, verify_csrf
+from app.web.auth import current_user, owner_only, verify_csrf
 from app.web.deps import get_db, templates
 from app.web.inbox import flash
 
-router = APIRouter(prefix="/settings", dependencies=[Depends(current_user), Depends(verify_csrf)])
+router = APIRouter(prefix="/settings", dependencies=[Depends(owner_only), Depends(verify_csrf)])  # owner only (4.4)
 
 
 def _page(request: Request, db: Session, errors: dict[str, str] | None = None,

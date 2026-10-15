@@ -16,11 +16,11 @@ from sqlalchemy.orm import Session
 from app.core.config import get_settings
 from app.models import AuditLog, User
 from app.pricing import excel
-from app.web.auth import current_user, verify_csrf
+from app.web.auth import current_user, owner_only, verify_csrf
 from app.web.deps import _TZ, get_db, templates
 from app.web.inbox import flash
 
-router = APIRouter(prefix="/prices", dependencies=[Depends(current_user), Depends(verify_csrf)])
+router = APIRouter(prefix="/prices", dependencies=[Depends(owner_only), Depends(verify_csrf)])  # owner only (4.4)
 MAX_UPLOAD = 2 * 1024 * 1024
 PREVIEW_MAX_AGE = 3600
 

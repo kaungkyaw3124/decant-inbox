@@ -12,7 +12,12 @@
   <p class="small">📞 {{ order.phones | join(", ") or "—" }} · 📍 {{ order.address or "—" }}</p>
 </section>
 
-{% if check.decision == "several" %}
+{% if check.decision in ("several", "pending") and not may_decide %}
+<section class="card">
+  {% if check.decision == "pending" %}{% include "_payment_shot.html" %}{% endif %}
+  <p class="notice small">ငွေစစ်တာကို ပိုင်ရှင်က လုပ်ပါမယ် (only the owner checks payments now).</p>
+</section>
+{% elif check.decision == "several" %}
 <section class="card notice">
   <h2>📷 Several photos ({{ check.photo_count }})</h2>
   <p class="small">Not downloaded. Ask the customer for one screenshot with the transaction ID.</p>

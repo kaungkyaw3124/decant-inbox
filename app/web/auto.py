@@ -12,7 +12,7 @@ from app.learning import cards, patterns
 from app.orders import auto, followups, payments, unknown
 from app.replies import compose, faq
 from app.replies import templates as replies
-from app.web.auth import current_user, verify_csrf
+from app.web.auth import current_user, owner_only, verify_csrf
 from app.web.deps import get_db
 from app.web.inbox import detail_url, flash, safe_back
 
@@ -21,7 +21,7 @@ FEED_WINDOW = timedelta(hours=24)
 FAILED_WINDOW = timedelta(days=3)
 
 
-@router.post("/auto-reply")
+@router.post("/auto-reply", dependencies=[Depends(owner_only)])
 def switch(request: Request, on: str = Form(...), back: str = Form("/"), db: Session = Depends(get_db),
            user: User = Depends(current_user)):
     auto.set_enabled(db, on == "1", user)
@@ -79,7 +79,7 @@ def _done(request: Request, message: Message, back: str, note: str) -> RedirectR
     return RedirectResponse(detail_url(message.id, back), status_code=303)
 
 
-@router.post("/messages/{message_id}/unknown/{position}/map")
+@router.post("/messages/{message_id}/unknown/{position}/map", dependencies=[Depends(owner_only)])
 def map_item(request: Request, message_id: int, position: int, product_id: int = Form(...),
              back: str = Form("/"), db: Session = Depends(get_db), user: User = Depends(current_user)):
     message, item = _unknown(db, message_id, position)
@@ -96,7 +96,7 @@ def _price(value: str) -> int | None:
     return int(digits) if digits and 0 < int(digits) <= 100_000_000 else None
 
 
-@router.post("/messages/{message_id}/unknown/{position}/new")
+@router.post("/messages/{message_id}/unknown/{position}/new", dependencies=[Depends(owner_only)])
 async def new_item(request: Request, message_id: int, position: int, brand: str = Form(...),
                    name: str = Form(...), asked_price: str = Form(""), full_size_ml: str = Form(""),
                    in_stock: str = Form(""), back: str = Form("/"), db: Session = Depends(get_db),
@@ -137,7 +137,7 @@ def not_stocked(request: Request, message_id: int, position: int, back: str = Fo
 
 # ---------- monitoring ----------
 
-def needs_you(db: Session, now: datetime | None = None) -> dict:
+def needs_you(db: Session, now: datetime | None = None, owner: bool = True) -> dict:
     """The "🟡 Needs you" queue: payments, cancel requests for paid orders, unknown items,
     unpaid orders the system may not remind / cancel by itself, unanswered messages, failed
     sends, paused chats with new messages. Auto-cancelled orders are shown as info."""
@@ -186,8 +186,8 @@ def needs_you(db: Session, now: datetime | None = None) -> dict:
         else:
             hints.append((message, customer, match))
     price_needed = cards.price_needed(db)
-    to_approve = patterns.pending_count(db)
-    conflicts = patterns.conflicts(db)
+    to_approve = patterns.pending_count(db) if owner else 0  # approving is the owner's job (4.4)
+    conflicts = patterns.conflicts(db) if owner else []
     return {"faq_hints": hints, "payments": to_check, "cancels": cancels, "unpaid": unpaid, "unanswered": unanswered,
             "unknown": [(m, customers[m.customer_id], unknown.open_unknowns(db, m)) for m in unknown_msgs],
             "teach": [(m, customers[m.customer_id], card) for m, card in teach],

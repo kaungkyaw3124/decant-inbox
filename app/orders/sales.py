@@ -192,8 +192,8 @@ def _pct(value: float | None):
     return MISSING if value is None else round(value, 1)
 
 
-def export(r: Report) -> bytes:
-    """The same numbers as the page, one sheet per table."""
+def export(r: Report, with_costs: bool = True) -> bytes:
+    """The same numbers as the page, one sheet per table (staff: without cost and profit)."""
     wb = Workbook()
     ws = wb.active
     ws.title = "Summary"
@@ -202,13 +202,15 @@ def export(r: Report) -> bytes:
                 ("Revenue (ကျပ်)", t.revenue), ("Orders", len(t.orders)), ("Items sold", t.items),
                 ("ml sold", t.ml), ("Cost (ကျပ်)", _money(t.cost)), ("Profit (ကျပ်)", _money(t.profit)),
                 ("Profit %", _pct(t.margin)), ("Average order (ကျပ်)", t.average)):
-        ws.append(row)
-    if t.missing_cost:
+        if with_costs or not row[0].startswith(("Cost", "Profit")):
+            ws.append(row)
+    if t.missing_cost and with_costs:
         ws.append(("Note", "Some items have no cost: add bottle_cost in the price list."))
-    header = ["Orders", "Items", "ml", "Revenue", "Cost", "Profit", "Profit %"]
+    header = ["Orders", "Items", "ml", "Revenue"] + (["Cost", "Profit", "Profit %"] if with_costs else [])
 
     def values(g: Group) -> list:
-        return [len(g.orders), g.items, g.ml, g.revenue, _money(g.cost), _money(g.profit), _pct(g.margin)]
+        costs = [_money(g.cost), _money(g.profit), _pct(g.margin)] if with_costs else []
+        return [len(g.orders), g.items, g.ml, g.revenue, *costs]
 
     for title, first_col, groups in (
             ("Per day", "Day", [(d.isoformat(), g) for d, g in r.days]),

@@ -31,6 +31,7 @@
   <div class="unknown-item">
     <h3>“{{ u.text }}”{% if u.is_full_bottle %} · full bottle{% elif u.size_ml %} · {{ u.size_ml }}ml{% endif %}</h3>
     {% if u.partial %}<p class="small">Contains the nickname of <b>{{ sugg[0].name }}</b>, plus other words: is it the same perfume?</p>{% endif %}
+    {% if user_role == "owner" %}
     <form method="post" action="/messages/{{ m.id }}/unknown/{{ u.position }}/map" class="inline-form">
       <input type="hidden" name="csrf" value="{{ csrf }}">
       <input type="hidden" name="back" value="{{ back }}">
@@ -62,6 +63,7 @@
         <button class="primary">Add product + price</button>
       </form>
     </details>
+    {% endif %}
     <form method="post" action="/messages/{{ m.id }}/unknown/{{ u.position }}/not-stocked" class="inline">
       <input type="hidden" name="csrf" value="{{ csrf }}">
       <input type="hidden" name="back" value="{{ back }}">

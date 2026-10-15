@@ -17,7 +17,7 @@ from app.models.outbox import UNDO_SECONDS
 from app.orders import actions
 from app.parser.service import current_result
 from app.replies import templates as replies
-from app.web.auth import current_user, verify_csrf
+from app.web.auth import current_user, owner_only, verify_csrf
 from app.web.deps import get_db, templates
 from app.web.inbox import detail_url, flash, get_message, products_for_select, safe_back
 
@@ -115,7 +115,7 @@ async def teach_confirm(request: Request, message_id: int, db: Session = Depends
 
 # ---------- price needed ----------
 
-@router.post("/learning/price/{request_id}")
+@router.post("/learning/price/{request_id}", dependencies=[Depends(owner_only)])
 def add_price(request: Request, request_id: int, price: str = Form(...), full_size_ml: str = Form(""),
               db: Session = Depends(get_db), user: User = Depends(current_user)):
     """The owner prices a product a staff member added: the waiting list goes out by itself."""
@@ -159,7 +159,7 @@ def handled_this_week(db: Session) -> int:
         QuickAction.undo.has_key("learned")))
 
 
-@router.get("/learning", response_class=HTMLResponse)
+@router.get("/learning", response_class=HTMLResponse, dependencies=[Depends(owner_only)])
 def learning_page(request: Request, db: Session = Depends(get_db)):
     rows = db.execute(select(LearnedPattern, Product, User, Message)
                       .outerjoin(Product, Product.id == LearnedPattern.product_id)
@@ -184,7 +184,7 @@ def _pattern(db: Session, pattern_id: int) -> LearnedPattern:
     return pattern
 
 
-@router.post("/learning/{pattern_id}/decide")
+@router.post("/learning/{pattern_id}/decide", dependencies=[Depends(owner_only)])
 def decide(request: Request, pattern_id: int, status: str = Form(...), db: Session = Depends(get_db),
            user: User = Depends(current_user)):
     pattern = _pattern(db, pattern_id)
@@ -196,7 +196,7 @@ def decide(request: Request, pattern_id: int, status: str = Form(...), db: Sessi
     return RedirectResponse("/learning", status_code=303)
 
 
-@router.post("/learning/{pattern_id}/edit")
+@router.post("/learning/{pattern_id}/edit", dependencies=[Depends(owner_only)])
 def edit(request: Request, pattern_id: int, text: str = Form(...), product_id: str = Form(""),
          intent: str = Form(""), db: Session = Depends(get_db), user: User = Depends(current_user)):
     pattern = _pattern(db, pattern_id)
@@ -210,7 +210,7 @@ def edit(request: Request, pattern_id: int, text: str = Form(...), product_id: s
     return RedirectResponse("/learning", status_code=303)
 
 
-@router.post("/learning/conflicts/{conflict_id}")
+@router.post("/learning/conflicts/{conflict_id}", dependencies=[Depends(owner_only)])
 def conflict(request: Request, conflict_id: int, use_new: str = Form(...), db: Session = Depends(get_db),
              user: User = Depends(current_user)):
     row = db.get(AuditLog, conflict_id)
@@ -222,7 +222,7 @@ def conflict(request: Request, conflict_id: int, use_new: str = Form(...), db: S
     return RedirectResponse(safe_back(str(request.query_params.get("back", "/learning")), "/learning"), status_code=303)
 
 
-@router.post("/settings/learning")
+@router.post("/settings/learning", dependencies=[Depends(owner_only)])
 def learning_settings(request: Request, auto_approve_after: str = Form("3"), greeting: str = Form(""),
                       auto_not_stocked: str = Form(""), db: Session = Depends(get_db),
                       user: User = Depends(current_user)):

@@ -853,3 +853,39 @@ system decided (🤖 = automatic).
   "၁"; C3 "1 နဲ့ 2" auto; C4 expired prompt → "1" is not a choice; C5 no history → card → order;
   C6 quantity 2; undo removes the prompt; parse_choice cases). Fixture +4 rows (s63-s66).
   Full suite: 281 passed, 1 skipped.
+
+## 2026-10-15 — v4 4.4: roles, permissions, owner approval
+- Spec: docs/SPEC-v4.md 4.4.
+- **Owner only** (the link is hidden and the server answers 403 "Only the owner can do this."):
+  - prices and the Excel import/export;
+  - product add / activate / alias edits (staff see products read-only);
+  - all of Settings: payment methods, templates, FAQ, order rules, vial costs, auto speed, learning settings;
+  - the auto-reply switch (staff only see ON/OFF);
+  - Users, Activity, the Learning page (approve / reject / edit / conflicts), and "price needed" pricing;
+  - "Use today's costs" on Sales;
+  - the old v2 "it's in my list" / "new product" routes.
+- **Staff**:
+  - Can use the inbox, Needs you, chats, replies, teaching cards, carts, order statuses, reports and Sales.
+  - Sales and its export show revenue and orders only, with no cost or profit.
+  - Payment decisions (approve / reject / not a payment / ask for one) follow the new switch "Staff may
+    approve / reject payment screenshots" on the Users page (default ON). When it's OFF they get 403,
+    and the payment card says the owner checks payments.
+  - A nickname a staff member teaches (card, or "Save as alias" in Correct the parse) waits as a
+    pending pattern for the owner, instead of becoming an alias at once.
+  - "📘 N patterns to approve" and conflicts show only for the owner.
+- **Users page** (/users): add a user (staff default, Burmese), reset password, disable / enable (you
+  can't disable yourself), language. `scripts/create_user.py NAME --role staff` also works and starts
+  staff in Burmese. A disabled user can't log in, and an open session ends at their next click.
+- **Activity page** (/activity): the audit log with the user's name (or 🤖 auto), filter by person.
+  Actions that had no audit entry now write one: product edits, review done/ignored, ignore customer,
+  parse correction, Needs-you clear.
+- DB: migration 222274ae7a9b (users.disabled, users.language; existing staff set to Burmese).
+  Applied live after backup product_requests_2026-10-15T2033Z.dump; round-trip done. Live has one
+  user (owner "admin"); no staff yet.
+- Decision: a generic "log every POST" middleware was tried and dropped. It added noise (login,
+  previews, double taps) and broke 4 audit tests. Explicit entries per action match the codebase.
+- Tests: tests/test_v4_roles.py (D1 every owner-only GET/POST → 403 for staff and no menu links,
+  staff pages that work; staff sales without cost/profit incl. export; D2 payments switch ON/OFF;
+  D3 staff-taught pattern → owner approve → parser uses it → reject → ignored; staff alias waits;
+  D4 auto_approve_after=0 keeps it pending after 5 uses; D5 disabled login + open session; users
+  page + activity names; create_user script). Full suite: 290 passed, 1 skipped.

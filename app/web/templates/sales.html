@@ -3,7 +3,7 @@
 {% macro money(v) %}{% if v is none %}{{ missing }}{% else %}{{ format_mmk(v) }}{% endif %}{% endmacro %}
 {% macro pct(v) %}{% if v is none %}{{ missing }}{% else %}{{ "%.1f" | format(v) }}%{% endif %}{% endmacro %}
 {% block content %}
-<h1>Sales & profit</h1>
+<h1>{{ "Sales & profit" if user_role == "owner" else "Sales" }}</h1>
 <nav class="tabs" aria-label="Date range">
   {% for key, label in ranges.items() if key != "custom" %}
   <a href="/sales?range={{ key }}" {% if r.key == key %}aria-current="page"{% endif %}>{{ label }}</a>
@@ -23,12 +23,14 @@
   <div class="tile"><span>Orders</span><b>{{ r.total.orders | length }}</b></div>
   <div class="tile"><span>Items sold</span><b>{{ r.total.items }}</b></div>
   <div class="tile"><span>ml sold</span><b>{{ format_mmk(r.total.ml) }}</b></div>
+  {% if user_role == "owner" %}{# staff see revenue and orders only (docs/SPEC-v4.md 4.4) #}
   <div class="tile"><span>Cost</span><b>{{ money(r.total.cost) }}</b><small>ကျပ်</small></div>
   <div class="tile"><span>Profit</span><b>{{ money(r.total.profit) }}</b><small>ကျပ်</small></div>
   <div class="tile"><span>Profit %</span><b>{{ pct(r.total.margin) }}</b></div>
+  {% endif %}
   <div class="tile"><span>Average order</span><b>{{ format_mmk(r.total.average) }}</b><small>ကျပ်</small></div>
 </section>
-{% if r.total.missing_cost %}
+{% if r.total.missing_cost and user_role == "owner" %}
 <p class="card notice small">Profit {{ missing }}: some items have no cost — add bottle_cost in the <a href="/prices">price list</a> (and the vial cost per size in Settings).
   {% if r.missing_orders %}
   <form method="post" action="/sales/fill-costs" class="inline">
@@ -60,15 +62,15 @@
   <h2>{{ title }}</h2>
   <div class="scroll">
   <table class="sales">
-    <thead><tr><th>{{ first }}</th><th class="num">Orders</th><th class="num">Qty</th>{% if show_ml %}<th class="num">ml</th>{% endif %}<th class="num">Revenue</th><th class="num">Cost</th><th class="num">Profit</th></tr></thead>
+    <thead><tr><th>{{ first }}</th><th class="num">Orders</th><th class="num">Qty</th>{% if show_ml %}<th class="num">ml</th>{% endif %}<th class="num">Revenue</th>{% if user_role == "owner" %}<th class="num">Cost</th><th class="num">Profit</th>{% endif %}</tr></thead>
     <tbody>
     {% for label, g in rows %}
-      <tr><td>{{ label }}</td><td class="num">{{ g.orders | length }}</td><td class="num">{{ g.items }}</td>{% if show_ml %}<td class="num">{{ format_mmk(g.ml) }}</td>{% endif %}<td class="num">{{ format_mmk(g.revenue) }}</td><td class="num">{{ money(g.cost) }}</td><td class="num">{{ money(g.profit) }}</td></tr>
+      <tr><td>{{ label }}</td><td class="num">{{ g.orders | length }}</td><td class="num">{{ g.items }}</td>{% if show_ml %}<td class="num">{{ format_mmk(g.ml) }}</td>{% endif %}<td class="num">{{ format_mmk(g.revenue) }}</td>{% if user_role == "owner" %}<td class="num">{{ money(g.cost) }}</td><td class="num">{{ money(g.profit) }}</td>{% endif %}</tr>
     {% else %}
       <tr><td colspan="7" class="empty">No paid orders.</td></tr>
     {% endfor %}
     </tbody>
-    <tfoot><tr><th>Total</th><th class="num">{{ r.total.orders | length }}</th><th class="num">{{ r.total.items }}</th>{% if show_ml %}<th class="num">{{ format_mmk(r.total.ml) }}</th>{% endif %}<th class="num">{{ format_mmk(r.total.revenue) }}</th><th class="num">{{ money(r.total.cost) }}</th><th class="num">{{ money(r.total.profit) }}</th></tr></tfoot>
+    <tfoot><tr><th>Total</th><th class="num">{{ r.total.orders | length }}</th><th class="num">{{ r.total.items }}</th>{% if show_ml %}<th class="num">{{ format_mmk(r.total.ml) }}</th>{% endif %}<th class="num">{{ format_mmk(r.total.revenue) }}</th>{% if user_role == "owner" %}<th class="num">{{ money(r.total.cost) }}</th><th class="num">{{ money(r.total.profit) }}</th>{% endif %}</tr></tfoot>
   </table>
   </div>
 </section>

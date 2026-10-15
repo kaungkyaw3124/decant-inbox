@@ -8,6 +8,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core import audit
 from app.models import Customer, Order, OrderEvent, User
 from app.models.orders import PAID_STATUSES
 from app.orders import cart, delivery, followups, reports
@@ -136,6 +137,7 @@ async def clear(request: Request, status: str = Form("done"), back: str = Form("
     if status not in ("done", "ignored") or not ids:
         raise HTTPException(400, "Nothing to clear")
     followups.clear(db, ids, status, user)
+    audit.record(db, user, f"needs_you.{status}", message_ids=ids)
     db.commit()
     flash(request, f"Marked {status}.")
     return RedirectResponse(safe_back(back, "/"), status_code=303)

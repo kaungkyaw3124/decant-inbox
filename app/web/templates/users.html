@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Users · Decant Inbox{% endblock %}
+{% block content %}
+<h1>👥 Users</h1>
+<p class="muted small">Staff can do the daily work: inbox, Needs you, chats, replies, teaching cards, carts, order statuses{% if staff_settings.can_approve_payments %}, payments{% endif %}, reports (read only). Only you change prices, products, payment methods, templates, FAQ, settings, auto-reply, users, and approve what the app learned. Staff see sales revenue, not cost or profit.</p>
+<section class="card">
+  <table>
+    <thead><tr><th>User</th><th>Role</th><th>Language</th><th>Status</th><th></th></tr></thead>
+    <tbody>
+    {% for u in users %}
+      <tr {% if u.disabled %}class="inactive"{% endif %}>
+        <td><b>{{ u.username }}</b></td><td>{{ u.role }}</td>
+        <td><form method="post" action="/users/{{ u.id }}/language" class="inline"><input type="hidden" name="csrf" value="{{ csrf }}">
+          <select name="language" aria-label="Language">{% for l in languages %}<option value="{{ l }}" {% if l == u.language %}selected{% endif %}>{{ {"my": "မြန်မာ", "en": "English"}[l] }}</option>{% endfor %}</select>
+          <button class="link">save</button></form></td>
+        <td>{{ "disabled" if u.disabled else "active" }}</td>
+        <td>
+          <details><summary class="button link">Reset password</summary>
+            <form method="post" action="/users/{{ u.id }}/password" class="inline-form"><input type="hidden" name="csrf" value="{{ csrf }}">
+              <input type="password" name="password" minlength="{{ min_password }}" autocomplete="new-password" aria-label="New password" required>
+              <button>Set</button></form></details>
+          {% if u.id != request.session.get("user_id") %}
+          <form method="post" action="/users/{{ u.id }}/disabled" class="inline"><input type="hidden" name="csrf" value="{{ csrf }}">
+            {% if u.disabled %}<button name="disabled" value="0">Enable</button>{% else %}<button name="disabled" value="1" class="danger">Disable</button>{% endif %}</form>
+          {% endif %}
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</section>
+<section class="card">
+  <h2>Add a user</h2>
+  <form method="post" action="/users" class="stack">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <div class="grid">
+      <label>Username <input name="username" required maxlength="64" autocomplete="off"></label>
+      <label>Password (min {{ min_password }}) <input type="password" name="password" minlength="{{ min_password }}" required autocomplete="new-password"></label>
+      <label>Role <select name="role"><option value="staff" selected>staff</option><option value="owner">owner</option></select></label>
+      <label>Language <select name="language"><option value="my" selected>မြန်မာ</option><option value="en">English</option></select></label>
+    </div>
+    <button class="primary">Add user</button>
+  </form>
+  <p class="muted small">Or on the server: <code>.venv/bin/python -m scripts.create_user NAME --role staff</code></p>
+</section>
+<section class="card">
+  <h2>What staff may do</h2>
+  <form method="post" action="/users/staff-settings" class="stack">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <label class="check"><input type="checkbox" name="can_approve_payments" value="1" {% if staff_settings.can_approve_payments %}checked{% endif %}> Staff may approve / reject payment screenshots</label>
+    <button class="primary">Save</button>
+  </form>
+</section>
+<p><a href="/activity">📜 Activity: who did what →</a></p>
+{% endblock %}

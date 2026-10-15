@@ -13,23 +13,28 @@
 {% if request.session.get("user_id") %}
 <header class="top">
   <a class="brand" href="/">Decant Inbox</a>
+  {% if user_role == "owner" %}
   <form method="post" action="/auto-reply" class="inline auto-switch {{ 'on' if auto_on else 'off' }}">
     <input type="hidden" name="csrf" value="{{ csrf }}">
     <input type="hidden" name="back" value="{{ request.url.path }}">
     <input type="hidden" name="on" value="{{ '0' if auto_on else '1' }}">
     <button title="{{ 'Click to turn auto-reply OFF' if auto_on else 'Click to turn auto-reply ON' }}">🤖 Auto-reply: <b>{{ "ON" if auto_on else "OFF" }}</b></button>
   </form>
+  {% else %}<span class="auto-switch {{ 'on' if auto_on else 'off' }} small">🤖 Auto-reply: <b>{{ "ON" if auto_on else "OFF" }}</b></span>{% endif %}
   <nav>
     <a href="/" {% if path == "/" %}aria-current="page"{% endif %}>Inbox</a>
     <a href="/payments" {% if path.startswith("/payments") %}aria-current="page"{% endif %}>Payments{% if payments_open %} <span class="badge warn">{{ payments_open }}</span>{% endif %}</a>
     <a href="/orders" {% if path.startswith("/orders") %}aria-current="page"{% endif %}>Orders{% if to_pack %} <span class="badge">{{ to_pack }}</span>{% endif %}</a>
     <a href="/chats" {% if path.startswith("/chats") %}aria-current="page"{% endif %}>Chats</a>
     <a href="/products" {% if path.startswith("/products") %}aria-current="page"{% endif %}>Products</a>
-    <a href="/prices" {% if path.startswith("/prices") %}aria-current="page"{% endif %}>Prices</a>
+    {% if user_role == "owner" %}<a href="/prices" {% if path.startswith("/prices") %}aria-current="page"{% endif %}>Prices</a>{% endif %}
     <a href="/sales" {% if path.startswith("/sales") %}aria-current="page"{% endif %}>Sales</a>
     <a href="/reports/wanted" {% if path.startswith("/reports") %}aria-current="page"{% endif %}>Reports</a>
+    {% if user_role == "owner" %}
     <a href="/learning" {% if path.startswith("/learning") %}aria-current="page"{% endif %}>Learning{% if to_learn %} <span class="badge">{{ to_learn }}</span>{% endif %}</a>
     <a href="/settings" {% if path.startswith("/settings") %}aria-current="page"{% endif %}>Settings</a>
+    <a href="/users" {% if path.startswith("/users") or path.startswith("/activity") %}aria-current="page"{% endif %}>Users</a>
+    {% endif %}
     <a href="/health" {% if path == "/health" %}aria-current="page"{% endif %}>Health</a>
     <form method="post" action="/logout" class="inline">
       <input type="hidden" name="csrf" value="{{ csrf }}">

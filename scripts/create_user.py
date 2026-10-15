@@ -33,7 +33,8 @@ def main() -> None:
     with SessionLocal.begin() as session:
         user = session.scalar(select(User).where(User.username == username))
         if user is None:
-            session.add(User(username=username, password_hash=hash_password(password), role=args.role))
+            session.add(User(username=username, password_hash=hash_password(password), role=args.role,
+                             language="my" if args.role == "staff" else "en"))  # staff start in Burmese
             print(f"Created {args.role} user {username}.")
         else:
             user.password_hash = hash_password(password)

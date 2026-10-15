@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from app.models import Customer, Order, PaymentCheck, PaymentMethod, User
 from app.orders import cart, payments
 from app.replies import templates as replies
+from app.web import staff
 from app.web.auth import current_user, verify_csrf
 from app.web.deps import get_db, templates
 from app.web.inbox import flash
@@ -40,6 +41,7 @@ def _card(request: Request, db: Session, check: PaymentCheck, form: payments.For
         "methods": db.scalars(select(PaymentMethod).where(PaymentMethod.active).order_by(PaymentMethod.sort_order)).all(),
         "form": form or payments.Form(check.transaction_id or "", check.amount_mmk or view.total, check.method),
         "warnings": found or [], "error": error, "reasons": payments.REASON_LABELS,
+        "may_decide": staff.may_decide_payments(db, db.get(User, request.session["user_id"])),
     }, status_code=status_code)
 
 
@@ -63,7 +65,7 @@ def shot(request: Request, check_id: int, db: Session = Depends(get_db)):
                                                                       "shot": payments.screenshot(db, check)})
 
 
-@router.post("/{check_id}/approve")
+@router.post("/{check_id}/approve", dependencies=[Depends(staff.payment_decider)])
 def approve(request: Request, check_id: int, transaction_id: str = Form(""), amount: str = Form(""),
             method: str = Form(""), confirmed: str = Form(""), db: Session = Depends(get_db),
             user: User = Depends(current_user)):
@@ -83,7 +85,7 @@ def approve(request: Request, check_id: int, transaction_id: str = Form(""), amo
     return RedirectResponse(f"/chats/{order.customer_id}#bottom", status_code=303)
 
 
-@router.post("/{check_id}/reject")
+@router.post("/{check_id}/reject", dependencies=[Depends(staff.payment_decider)])
 def reject(request: Request, check_id: int, reason: str = Form(""), transaction_id: str = Form(""),
            amount: str = Form(""), method: str = Form(""), db: Session = Depends(get_db),
            user: User = Depends(current_user)):
@@ -99,7 +101,7 @@ def reject(request: Request, check_id: int, reason: str = Form(""), transaction_
     return RedirectResponse(f"/chats/{db.get(Order, check.order_id).customer_id}#bottom", status_code=303)
 
 
-@router.post("/{check_id}/not-payment")
+@router.post("/{check_id}/not-payment", dependencies=[Depends(staff.payment_decider)])
 def not_payment(request: Request, check_id: int, db: Session = Depends(get_db), user: User = Depends(current_user)):
     check = _check(db, check_id)
     try:
@@ -112,7 +114,7 @@ def not_payment(request: Request, check_id: int, db: Session = Depends(get_db), 
     return RedirectResponse("/payments", status_code=303)
 
 
-@router.post("/{check_id}/ask-one")
+@router.post("/{check_id}/ask-one", dependencies=[Depends(staff.payment_decider)])
 def ask_one(request: Request, check_id: int, db: Session = Depends(get_db), user: User = Depends(current_user)):
     check = _check(db, check_id)
     try:

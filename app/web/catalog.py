@@ -6,10 +6,11 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
-from app.models import ParseResult, Product, ProductAlias, ProductPrice
+from app.core import audit
+from app.models import ParseResult, Product, ProductAlias, ProductPrice, User
 from app.parser.normalize import normalize
 from app.pricing.prices import current_prices
-from app.web.auth import current_user, verify_csrf
+from app.web.auth import current_user, owner_only, verify_csrf
 from app.web.deps import get_db, templates
 from app.web.inbox import flash
 
@@ -47,8 +48,9 @@ def products(request: Request, q: str = "", db: Session = Depends(get_db)):
         "rows": db.execute(query).all(), "q": q, "prices": current_prices(db)})
 
 
-@router.post("")
-def add_product(request: Request, brand: str = Form(...), name: str = Form(...), db: Session = Depends(get_db)):
+@router.post("", dependencies=[Depends(owner_only)])
+def add_product(request: Request, brand: str = Form(...), name: str = Form(...), db: Session = Depends(get_db),
+                user: User = Depends(current_user)):
     brand, name = brand.strip(), name.strip()
     if not brand or not name:
         raise HTTPException(400, "Brand and name are required")
@@ -63,6 +65,7 @@ def add_product(request: Request, brand: str = Form(...), name: str = Form(...),
             product_id=product_id, alias_text=name, normalized_alias=normalize(name), source="learned",
         ).on_conflict_do_nothing())
         flash(request, "Product added. Add the nicknames customers use below.")
+        audit.record(db, user, "product.add", product_id=product_id, source="products page")
     db.commit()
     return RedirectResponse(f"/products/{product_id}", status_code=303)
 
@@ -85,18 +88,21 @@ def product_detail(request: Request, product_id: int, db: Session = Depends(get_
     })
 
 
-@router.post("/{product_id}/active")
-def set_active(request: Request, product_id: int, active: str = Form(...), db: Session = Depends(get_db)):
+@router.post("/{product_id}/active", dependencies=[Depends(owner_only)])
+def set_active(request: Request, product_id: int, active: str = Form(...), db: Session = Depends(get_db),
+               user: User = Depends(current_user)):
     product = get_product(db, product_id)
     product.active = active == "1"
+    audit.record(db, user, "product.activate" if product.active else "product.deactivate", product_id=product_id)
     db.commit()
     flash(request, "Product activated." if product.active else
           "Product deactivated: the parser no longer matches it.")
     return RedirectResponse(f"/products/{product_id}", status_code=303)
 
 
-@router.post("/{product_id}/aliases")
-def add_alias(request: Request, product_id: int, alias: str = Form(...), db: Session = Depends(get_db)):
+@router.post("/{product_id}/aliases", dependencies=[Depends(owner_only)])
+def add_alias(request: Request, product_id: int, alias: str = Form(...), db: Session = Depends(get_db),
+              user: User = Depends(current_user)):
     get_product(db, product_id)
     norm = normalize(alias)
     if len(norm) < 2:
@@ -105,16 +111,21 @@ def add_alias(request: Request, product_id: int, alias: str = Form(...), db: Ses
         added = db.execute(insert(ProductAlias).values(
             product_id=product_id, alias_text=alias.strip(), normalized_alias=norm, source="learned",
         ).on_conflict_do_nothing()).rowcount
+        if added:
+            audit.record(db, user, "alias.add", product_id=product_id, alias=norm)
         db.commit()
         flash(request, "Alias added." if added else "Alias already existed.")
     return RedirectResponse(f"/products/{product_id}", status_code=303)
 
 
-@router.post("/{product_id}/aliases/{alias_id}/delete")
-def delete_alias(request: Request, product_id: int, alias_id: int, db: Session = Depends(get_db)):
+@router.post("/{product_id}/aliases/{alias_id}/delete", dependencies=[Depends(owner_only)])
+def delete_alias(request: Request, product_id: int, alias_id: int, db: Session = Depends(get_db),
+                 user: User = Depends(current_user)):
     deleted = db.execute(delete(ProductAlias).where(
         ProductAlias.id == alias_id, ProductAlias.product_id == product_id, ProductAlias.source == "learned",
     )).rowcount
+    if deleted:
+        audit.record(db, user, "alias.delete", product_id=product_id, alias_id=alias_id)
     db.commit()
     flash(request, "Alias deleted." if deleted else "Only aliases added here can be deleted; "
           "seed aliases come from data/aliases.csv.")
