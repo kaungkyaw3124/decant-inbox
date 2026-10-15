@@ -20,6 +20,8 @@ For each message at most ONE action is offered, chosen from its parse and the ca
                                         price/stock/delivery question only when nothing else fits
   greeting              -> greeting     "မင်္ဂလာပါ။ ဘာကူညီပေးရမလဲ။" when the message is only a greeting
                                         and we haven't messaged them for 6 h (docs/SPEC-v4.md 4.2)
+  previous_item         -> cart_add     one earlier item: add it + list with "(အရင်ယူထားတဲ့ဟာ)" (4.3)
+                        -> choose_previous  2-5 earlier items: numbered list; the answer "1" is a buy
 Learned patterns (4.2) that are not approved yet still give the action, marked "📘", but only
 as a one-tap button (auto mode skips them); accepting it unchanged counts a use.
 So every customer reply gets exactly one next action: list -> confirm -> phone -> address
@@ -43,11 +45,11 @@ from sqlalchemy.orm import Session
 
 from app.learning import patterns
 from app.models import (
-    AuditLog, Customer, LearnedPattern, Message, MessageReview, Order, Outbox, ParseItem, ParseResult, Product,
+    AuditLog, ChoicePrompt, Customer, LearnedPattern, Message, MessageReview, Order, Outbox, ParseItem, ParseResult, Product,
     QuickAction, UnknownRequest, User,
 )
 from app.models.outbox import UNDO_SECONDS
-from app.orders import cart, delivery, unknown
+from app.orders import cart, delivery, previous, unknown
 from app.parser.normalize import normalize
 from app.parser.rules import ADDRESS_RE, NEEDS_REVIEW_BELOW, find_phones
 from app.pricing.prices import size_label
@@ -242,6 +244,8 @@ def _apply_items(session: Session, message: Message, result: ParseResult, texts:
         return Outcome("delivery", "💬 Reply delivery status", delivery.status_answer(shipping, texts), "delivery",
                        f"Order #{shipping.order_no} is {shipping.status.replace('_', ' ')}.")
     order = cart.open_cart(session, customer.id)
+    if intent == "previous_item":
+        return _previous(session, message, customer, order, result, texts)
     if intent == "cancel_order":
         if order is None or order.status not in ("cart", "confirmed", "waiting_payment") \
                 or delivery.has_payment_photo(session, order):
@@ -330,6 +334,35 @@ def _buy(session: Session, message: Message, customer: Customer, order: Order | 
     return Outcome("cart_add", label, "\n".join(lines), "cart", note, order.id,
                    {"added": [i for i in changed if i > 0], "removed": [-i for i in changed if i < 0],
                     "order": before, "created_order": created})
+
+
+def _previous(session: Session, message: Message, customer: Customer, order: Order | None, result: ParseResult,
+              texts: dict[str, str]) -> Outcome | None:
+    """"ဟိုနေ့ကဟာ ထပ်ယူမယ်": one earlier item -> add it; several -> ask which (numbered)."""
+    found = previous.candidates(session, message)
+    qty = result.quantity or 1
+    if len(found) == 1:
+        c = found[0]
+        item = ParseItem(product_id=c.product_id, size_ml=c.size_ml, is_full_bottle=c.is_full_bottle, quantity=qty,
+                         unknown_text=None, from_context=False)
+        product = session.get(Product, c.product_id)
+        line = render(texts["previous_item_line"], product=product.name,
+                      size=size_label(None if c.is_full_bottle else c.size_ml, product.full_size_ml))
+        outcome = _buy(session, message, customer, order, [item], texts, [line])
+        if outcome is not None:
+            outcome.label = "🛒 Add the earlier item + send list"
+        return outcome
+    if not found:
+        return None  # nothing earlier: Needs you (teaching card)
+    options = [c.as_option() for c in found[:previous.MAX_OPTIONS]]
+    prompt = ChoicePrompt(customer_id=customer.id, message_id=message.id, options=options, quantity=qty,
+                          expires_at=datetime.now(UTC) + previous.PROMPT_TTL)
+    session.add(prompt)
+    session.flush()
+    lines = "\n".join(f"{n}. {previous.label(session, o)}" for n, o in enumerate(options, 1))
+    return Outcome("choose_previous", "🔢 Ask which earlier item", render(texts["choose_previous"], options=lines),
+                   "choice", f"{len(options)} earlier items; their answer “1”, “1 နဲ့ 2”, “အကုန်” adds them.",
+                   undo={"prompt": prompt.id})
 
 
 def _contact(session: Session, message: Message, customer: Customer, order: Order, phones: list[str],
@@ -571,6 +604,10 @@ def undo(session: Session, action: QuickAction, user: User) -> None:
         if u.get("created_order") and cart.view(session, order).empty:
             cart.cancel(session, order)
         cart.touch(session, order)
+    if u.get("prompt"):
+        prompt = session.get(ChoicePrompt, u["prompt"])
+        if prompt is not None:
+            session.delete(prompt)
     if u.get("learned_confirmed"):
         patterns.unconfirm_uses(session, u["learned_confirmed"], u.get("learned_approved") or [])
     for row_id in u.get("unknown_requests") or []:

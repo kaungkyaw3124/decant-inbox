@@ -25,7 +25,7 @@ from app.models import (
     AuditLog, Customer, Message, MessageReview, ParseItem, ParseResult, Product, ProductAlias, ProductPrice,
     QuickAction, UnknownRequest, User,
 )
-from app.orders import unknown
+from app.orders import previous, unknown
 from app.parser.normalize import normalize
 from app.parser.rules import PRODUCT_INTENTS, find_phones
 from app.pricing.prices import current_prices, size_label
@@ -42,6 +42,7 @@ INTENT_CHOICES = (
     ("remove", "ဖြုတ်မယ်"),
     ("cancel_order", "အော်ဒါ cancel"),
     ("ask_delivery", "ပစ္စည်းရောက်ပြီလားမေး"),
+    ("previous_item", "အရင်ကဟာ ပြန်ယူမယ်"),
     ("greeting", "နှုတ်ဆက်တာ"),
     ("question", "မေးခွန်း — ကိုယ်တိုင်ဖြေမယ်"),
     ("ignore", "ဘာမှမလုပ်နဲ့"),
@@ -148,6 +149,12 @@ def build(session: Session, message: Message) -> Card | None:
         shown = words or (message.raw_text or "")[:60]
         card.products.append(ProductQuestion(item.position, shown, item.size_ml, item.is_full_bottle, kind,
                                              _options(session, shown, first), words))
+    if result.intent == "previous_item" and not items and not previous.candidates(session, message):
+        words = (message.raw_text or "")[:60]  # "ဟိုနေ့ကဟာ" but no history: which product?
+        options = _options(session, words, None)
+        card.products.append(ProductQuestion(0, words, None, False, "previous", options, ""))
+        card.sizes.append(SizeQuestion(0, options[0].name if options else "",
+                                       sizes_for(session, options[0].id if options else None)))
     has_product = any(i.product_id for i in items) or bool(card.products)
     no_faq = faq.for_message(session, message, result) is None
     if result.intent in ("other", "unknown") and no_faq and (has_product or not items):
@@ -188,7 +195,7 @@ def to_teach(session: Session, now: datetime | None = None) -> list[tuple[Messag
         .join(Customer, Customer.id == Message.customer_id)
         .where(Message.direction == "in", Message.kind == "text", Message.received_at >= now - TEACH_WINDOW,
                Customer.ignored.is_(False), ParseResult.method != "human", ~acted, ~reviewed,
-               or_(ParseResult.intent.in_(("other", "unknown")), unsure))
+               or_(ParseResult.intent.in_(("other", "unknown", "previous_item")), unsure))
         .order_by(Message.received_at.desc()).limit(MAX_TEACH * 3)).all()
     found = []
     unanswered: set[int] | None = None
@@ -322,9 +329,15 @@ def apply(session: Session, message: Message, answers: Answers, user: User) -> A
         if answers.sizes.get(q.position) is None:
             raise CardError("Size ရွေးပါ။")
 
+    if card.result.intent == "previous_item" and card.products:
+        intent = "buy"  # the admin named the earlier item
     applied = Applied(None, intent, undo)
     learned_before = list(card.result.learned_ids or [])
     items = _items(session, card.result)
+    known = {i.position for i in items}
+    items += [ParseItem(position=q.position, product_id=None, size_ml=None, is_full_bottle=False,
+                        quantity=card.result.quantity or 1, unknown_text=None, from_context=False, match="none")
+              for q in card.products if q.position not in known]  # "previous" questions have no item yet
     new_items = []
     for item in items:
         pid, unknown_text, match = item.product_id, item.unknown_text, item.match

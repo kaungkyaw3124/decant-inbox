@@ -8,7 +8,7 @@ from app.core.config import BASE_DIR
 
 OUTBOX_STATUSES = ("queued", "sending", "sent", "failed", "cancelled")
 REPLY_KINDS = ("custom", "price", "cart", "ask_address", "ask_phone", "contact", "payment_info", "payment",
-               "delivery", "reminder", "cancel", "faq", "greeting")
+               "delivery", "reminder", "cancel", "faq", "greeting", "choice")
 DOWNLOAD_STATUSES = ("queued", "done", "failed")
 UNDO_SECONDS = 10
 MAX_TEXT = 4096  # Telegram's limit for one message

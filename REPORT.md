@@ -828,3 +828,28 @@ system decided (🤖 = automatic).
   - test_after_payment A4 used "ဟိုင်း" as an unanswered question; now a real question.
   - test_auto checked the old "Save as alias" text on the message page; now it checks the card.
   Fixture +4 rows (s59-s62). Full suite: 271 passed, 1 skipped.
+
+## 2026-10-15 — v4 4.3: "the previous one" (reorder from history)
+- Spec: docs/SPEC-v4.md 4.3. Parser is now `rules-6`.
+- New intent `previous_item`. Seed phrases: ဟိုနေ့ကဟာ, အရင်ကဟာ, အရင်ယူတဲ့ဟာ, ပြီးခဲ့တဲ့တစ်ခါကဟာ,
+  အဲ့ဒါ, အဲ့ဟာ, same one, last time, same as before, plus phrases taught on a card
+  (Q-intent "အရင်ကဟာ ပြန်ယူမယ်"). It only counts when no product is named and the message is not a
+  price / stock / remove question. So "အဲ့ဒါ ဘယ်လောက်လဲ" stays a price question.
+- Candidates (product+size, no duplicates, newest first): the last PAID order's items, the current
+  or last cart, and products asked about with a size in the last 30 days, before this message.
+  - 1 → added (quantity from the message: "၂ ခု" = 2), and the list says
+    "{product} {size} (အရင်ယူထားတဲ့ဟာ) ဟုတ်တယ်နော်။ မဟုတ်ရင် ပြောပေးပါ။". Auto allowed.
+  - 2-5 → template `choose_previous` (numbered) + a `choice_prompts` row (expires in 24 h). The
+    next message "1", "၁", "1 နဲ့ 2", "1,2", "2 ခုလုံး", "အကုန်" (optionally "...ယူမယ်") becomes a buy
+    of those items. Auto allowed, since they picked from our own list. Anything else is parsed
+    normally. With more than 5, the newest 5 are offered.
+  - 0 → no reply; a teaching card asks which product + size. The answer finishes the order.
+- Undo of the numbered list deletes the prompt, so a later "1" is just "1".
+- New templates (editable): `previous_item_line`, `choose_previous`.
+- DB: migration 814861587f85 (choice_prompts, intent previous_item, quick kind choose_previous,
+  reply kind choice). Applied live after backup product_requests_2026-10-15T2008Z.dump; round-trip
+  done. 23 live messages were re-parsed with rules-6; nothing was sent.
+- Tests: tests/test_v4_previous.py (C1 auto add from a paid order; C2 numbered list, "2" and
+  "၁"; C3 "1 နဲ့ 2" auto; C4 expired prompt → "1" is not a choice; C5 no history → card → order;
+  C6 quantity 2; undo removes the prompt; parse_choice cases). Fixture +4 rows (s63-s66).
+  Full suite: 281 passed, 1 skipped.

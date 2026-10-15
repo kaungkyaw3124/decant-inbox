@@ -8,7 +8,8 @@ Read CLAUDE.md first. This file tracks where we are.
   acceptance tests, loop test -> fix until green, self-review vs GOAL, deploy, report, next.
   - 4.1 partial name matches: ✅ done (rules-4, migration 92fe0f25b1bf, tests/test_v4_partial.py).
   - 4.2 teaching cards: ✅ done (rules-5, migration d16b1c96eac6, tests/test_v4_teaching.py).
-  - NEXT: 4.3 "the previous one".
+  - 4.3 "the previous one": ✅ done (rules-6, migration 814861587f85, tests/test_v4_previous.py).
+  - NEXT: 4.4 roles, permissions, owner approval.
 - No external AI (not available in Myanmar). Epic 4.6 (AI) only when the owner asks.
 - At the end: OWNER TEST SCRIPT v4 + STAFF TEST in REPORT.md.
 - Owner checks: `bash scripts/status.sh`.

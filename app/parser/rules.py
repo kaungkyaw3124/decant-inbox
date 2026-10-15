@@ -17,13 +17,15 @@ rules-5 (docs/SPEC-v4.md 4.2): learned patterns from teaching cards: nicknames (
 learned_id; pending ones give match "learned_pending" = one-tap only, approved ones "learned"),
 intent phrases (they win over the seed keywords; their words are not product names), and the
 greeting intent (a message that is ONLY a greeting). Items keep the customer's words (name_text).
+rules-6 (docs/SPEC-v4.md 4.3): previous_item ("ဟိုနေ့ကဟာ ထပ်ယူမယ်", "same as before") when no product is
+named and it is not a price / stock / remove question; parse_choice() reads "1", "1 နဲ့ 2", "အကုန်".
 """
 import re
 from dataclasses import dataclass, field
 
 from rapidfuzz import fuzz
 
-PARSER_VERSION = "rules-5"
+PARSER_VERSION = "rules-6"
 NEEDS_REVIEW_BELOW = 0.6  # dashboard shows results under this as "needs review"
 FUZZY_THRESHOLD = 88      # rapidfuzz partial_ratio, 0-100
 FUZZY_MIN_ALIAS_LEN = 5   # shorter aliases match too much by accident
@@ -71,6 +73,12 @@ DELI_WORD_RE = _rx(_w("deli"))
 DONE_RE = _rx("ဒါပဲ", "ဒါပါပဲ", "ဒီလောက်ပါပဲ", "ဒီလောက်ပဲ", "ဒါတွေပဲ", "ဒါတွေပါပဲ")
 CONFIRM_RE = _rx("အဆင်ပြေတယ်", "အဆင်ပြေပါတယ်", "ဟုတ်ကဲ့", "ရပါတယ်", _w("ok"), _w("okay"), _w("confirm"))
 PRODUCT_INTENTS = ("buy", "ask_price", "ask_stock", "remove")
+# "The previous one" (4.3): the items come from the customer's history, not from the text.
+PREVIOUS_RE = _rx("ဟိုနေ့က(?:ဟာ|ဟို|ပစ္စည်း)", "အရင်က(?:ဟာ|ဟို|ပစ္စည်း)", "အရင်ယူတဲ့(?:ဟာ|ဟို)", "ပြီးခဲ့တဲ့တစ်ခါက(?:ဟာ)?",
+                  "အဲ့ဒါ", "အဲ့ဟာ", "အဲဒါ", _w("same one"), _w("last time"), _w("same as before"), _w("same again"))
+_ALL_RE = re.compile(r"^(?:အကုန်(?:လုံး)?|အားလုံး|all|both|နှစ်ခုလုံး)$")
+_N_ALL_RE = re.compile(r"^(\d{1,2})ခုလုံး$")
+_CHOICE_TAIL_RE = re.compile(r"(?:ကို)?(?:ပဲ)?(?:ယူ(?:ပါ)?မယ်|ပေးပါ|ပါ|နော်|ရှင့်|ခင်ဗျာ)*$")
 
 # Size: a number directly followed by "ml" (normalize() already unified the unit).
 _SIZE_RE = re.compile(r"(?<![\d.])(\d{1,3})\s*mls?(?![a-z])")
@@ -402,6 +410,24 @@ def greeting_only(text: str, phrases: list[Phrase] = ()) -> tuple[bool, tuple[in
     return (found and not rest), tuple(used)
 
 
+def parse_choice(text: str, options: int) -> list[int] | None:
+    """The customer's answer to a numbered list (4.3): 1-based numbers picked, or None if the
+    message is not (only) a choice. "1", "၁" (normalized to 1), "1 နဲ့ 2", "1,2", "2 ခုလုံး", "အကုန်"."""
+    compact = re.sub(r"[\s.။!]+", "", text or "")
+    compact = _CHOICE_TAIL_RE.sub("", compact) if not compact.isdigit() else compact
+    if not compact:
+        return None
+    if _ALL_RE.match(compact):
+        return list(range(1, options + 1))
+    if m := _N_ALL_RE.match(compact):
+        return list(range(1, options + 1)) if int(m.group(1)) == options else None
+    parts = [p for p in re.split(r",|၊|နဲ့|နှင့်|and|&|\+", compact) if p]
+    if not parts or not all(p.isdigit() for p in parts):
+        return None
+    picked = list(dict.fromkeys(int(p) for p in parts))
+    return picked if all(1 <= n <= options for n in picked) else None
+
+
 def split_parts(text: str) -> list[str]:
     return [p.strip() for p in _SPLIT_RE.split(text) if p and p.strip()]
 
@@ -449,7 +475,8 @@ def _items(text: str, aliases: list[Alias], full_sizes: dict[int, int],
 
 
 _MATCH_SCORE = {"exact": 0.5, "inherited": 0.5, "fuzzy": 0.35, "multiple": 0.25, "context": 0.25,
-                "ambiguous": 0.0, "partial": 0.0, "none": 0.0, "learned": 0.5, "learned_pending": 0.5}
+                "ambiguous": 0.0, "partial": 0.0, "none": 0.0, "learned": 0.5, "learned_pending": 0.5,
+                "choice": 0.5}
 
 
 def parse(normalized_text: str, aliases: list[Alias], full_sizes: dict[int, int] | None = None,
@@ -473,6 +500,9 @@ def parse(normalized_text: str, aliases: list[Alias], full_sizes: dict[int, int]
     if phrase is not None:  # a taught phrase wins over the seed keywords; its words are no product
         learned.append(phrase.learned_id)
         item_text = _phrase_re(phrase.normalized_text).sub(" ", text)
+    previous = bool(PREVIOUS_RE.search(text)) or (phrase is not None and phrase.intent == "previous_item")
+    if previous:
+        item_text = PREVIOUS_RE.sub(" ", item_text)  # "same one" / "last time" are not product names
     keyword_intent = phrase.intent if phrase else find_intent(text)
     items = _items(item_text, aliases, full_sizes, context_product_id,
                    allow_unknown=keyword_intent in PRODUCT_INTENTS, known_words=known_words or {}, learned=learned)
@@ -480,6 +510,9 @@ def parse(normalized_text: str, aliases: list[Alias], full_sizes: dict[int, int]
     intent = phrase.intent if phrase else find_intent(
         text, has_product_or_size=any(i.product_id or i.size_ml or i.is_full_bottle for i in named))
     learned_ids = tuple(dict.fromkeys(learned))
+    if previous and not any(i.product_id or i.unknown_text for i in named) \
+            and intent in (None, "buy", "unknown", "previous_item"):
+        return ParseOutcome("previous_item", None, None, find_quantity(text), 0.8, (), phone, learned_ids)
     if intent is None and phone:
         intent = "address"  # contact details
     if intent not in PRODUCT_INTENTS and intent is not None:

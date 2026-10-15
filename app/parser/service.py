@@ -123,7 +123,10 @@ def parse_message(session: Session, message: Message, aliases: list[Alias],
         known_words = load_known_words(session)
     if phrases is None:
         phrases = load_phrases(session)
-    outcome = parse(normalized, aliases, full_sizes, context_product(session, message), known_words, phrases)
+    from app.orders import previous  # late import: orders -> parser
+
+    outcome = previous.as_choice(session, message, normalized) or parse(  # "1" answering a numbered list (4.3)
+        normalized, aliases, full_sizes, context_product(session, message), known_words, phrases)
     if current is not None and _same(session, current, outcome):
         return "unchanged"
     if current is not None:

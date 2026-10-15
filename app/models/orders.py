@@ -18,7 +18,7 @@ OPEN_STATUSES = ("cart", "confirmed", "waiting_payment", "photo_received")
 PAID_STATUSES = ("paid", "packed", "sent_out", "delivered")  # counted as sales
 SHIPPING_STATUSES = ("paid", "packed", "sent_out")  # paid, not delivered yet
 QUICK_KINDS = ("price", "cart_add", "cart_remove", "cart_list", "confirm", "address", "contact", "not_stocked",
-               "delivery", "cancel_order", "faq", "greeting", "teach")
+               "delivery", "cancel_order", "faq", "greeting", "teach", "choose_previous")
 UNKNOWN_RESOLUTIONS = ("mapped", "new_product", "not_stocked")
 AUTO_STATUSES = ("replied", "skipped")
 # pending: one screenshot to check · several: more than one photo (ask for one) ·
@@ -198,3 +198,19 @@ class OrderEvent(Base):
     created_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
     created_at: Mapped[datetime] = created_at_column()
     undone_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class ChoicePrompt(Base):
+    """"Which one?" (docs/SPEC-v4.md 4.3): we sent a numbered list of the customer's earlier
+    items; their next message "1", "၁", "1 နဲ့ 2", "အကုန်" (within 24 h) picks from options."""
+
+    __tablename__ = "choice_prompts"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    customer_id: Mapped[int] = mapped_column(ForeignKey("customers.id"), index=True)
+    message_id: Mapped[int] = mapped_column(ForeignKey("messages.id"))  # the "ဟိုနေ့ကဟာ" message
+    options: Mapped[list[dict[str, Any]]] = mapped_column(JSONB)  # [{product_id, size_ml, is_full_bottle}]
+    quantity: Mapped[int] = mapped_column(Integer, server_default="1", default=1)
+    created_at: Mapped[datetime] = created_at_column()
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    answered_message_id: Mapped[int | None] = mapped_column(ForeignKey("messages.id"))

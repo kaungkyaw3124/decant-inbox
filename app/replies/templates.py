@@ -93,6 +93,13 @@ TEMPLATES: tuple[TemplateDef, ...] = (
                 {"total": "83,000"}),
     TemplateDef("order_auto_cancelled", "Order cancelled because no payment came",
                 "ငွေလွှဲမှု မရရှိသေးတဲ့အတွက် အော်ဒါကို cancel လုပ်ထားပါတယ်။ ပြန်မှာချင်ရင် ပြောပေးပါနော်။", {}),
+    # docs/SPEC-v4.md 4.3
+    TemplateDef("previous_item_line", "“The previous one”: line added to the cart list when we found one item",
+                "{product} {size} (အရင်ယူထားတဲ့ဟာ) ဟုတ်တယ်နော်။ မဟုတ်ရင် ပြောပေးပါ။",
+                {"product": "Good Girl", "size": "5ml"}),
+    TemplateDef("choose_previous", "“The previous one”: several earlier items – ask which ({options} = numbered lines)",
+                "အရင်က ယူထားတာတွေပါ –\n{options}\nဘယ်ဟာလဲ နံပါတ်လေး ပြောပေးပါနော်။",
+                {"options": "1. Good Girl 5ml\n2. Aventus 10ml"}),
     TemplateDef("order_cancelled", "Customer cancelled the order",
                 "အော်ဒါ cancel လုပ်ပြီးပါပြီ။ နောက်မှ ပြန်မှာချင်ရင် ပြောပေးပါနော်။", {}),
 )
