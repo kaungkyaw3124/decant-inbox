@@ -2,7 +2,7 @@
 {% block content %}
 {% set kind_label = {"price": "price reply", "cart_add": "added to cart + list", "cart_remove": "removed + list",
                      "cart_list": "cart list", "confirm": "confirmed", "contact": "phone/address", "address": "address",
-                     "not_stocked": "we don't have it", "delivery": "delivery status", "cancel_order": "order cancelled"} %}
+                     "not_stocked": "we don't have it", "delivery": "delivery status", "cancel_order": "order cancelled", "faq": "FAQ answer"} %}
 {% if needs_you is not none %}
 <section class="card needs-you {% if needs_you.count %}notice{% endif %}">
   <h2>🟡 Needs you ({{ needs_you.count }})</h2>
@@ -51,7 +51,18 @@
       <span class="small muted">unanswered{% if u.message_ids | length > 1 %} ({{ u.message_ids | length }}){% endif %} · {{ u.last_at | age }}</span>
       <form method="post" action="/needs-you/clear" class="inline"><input type="hidden" name="csrf" value="{{ csrf }}">
         {% for mid in u.message_ids %}<input type="hidden" name="message_id" value="{{ mid }}">{% endfor %}
-        <button class="link" name="status" value="done">done</button> <button class="link" name="status" value="ignored">ignore</button></form></li>
+        <button class="link" name="status" value="done">done</button> <button class="link" name="status" value="ignored">ignore</button></form>
+      {% if u.faq %}{% set mid, match = u.faq %}
+      <form method="post" action="/messages/{{ mid }}/faq/{{ match.entry.id }}" class="inline"><input type="hidden" name="csrf" value="{{ csrf }}">
+        <button class="quiet" title="{{ match.entry.answer }}">💬 Send FAQ: {{ match.entry.title }}</button></form>{% endif %}</li>
+  {% endfor %}
+  {% for m, c, match in needs_you.faq_hints %}
+    <li><a href="/chats/{{ c.id }}#bottom"><b>💬 {{ c.display_name or c.username or "Customer" }}</b>: {{ m.raw_text | truncate(60) }}</a>
+      <span class="small muted">also asks: FAQ “{{ match.entry.title }}”</span>
+      <form method="post" action="/messages/{{ m.id }}/faq/{{ match.entry.id }}" class="inline"><input type="hidden" name="csrf" value="{{ csrf }}">
+        <button class="quiet" title="{{ match.entry.answer }}">💬 Send FAQ: {{ match.entry.title }}</button></form>
+      <form method="post" action="/messages/{{ m.id }}/faq-hint-done" class="inline"><input type="hidden" name="csrf" value="{{ csrf }}">
+        <button class="link">done</button></form></li>
   {% endfor %}
   {% for o, c in needs_you.failed %}
     <li><a href="/chats/{{ c.id }}#bottom"><b>{{ c.display_name or c.username or "Customer" }}</b>: reply not sent</a>

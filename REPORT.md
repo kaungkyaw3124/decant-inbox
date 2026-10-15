@@ -645,3 +645,27 @@ Short entries from the VPS Claude Code session, newest last.
 - Verified: pytest 223 passed, 1 skipped (new tests/test_after_payment.py: A1-A6 + parser cases).
   Live: services restarted (tunnel untouched), parser rules-3 re-parsed 19 messages, /healthz all ok.
 
+## 2026-10-15 — v3 Step 7: FAQ auto-answers
+- Migration db0641e10ac5 (after backup product_requests_2026-10-15T1722Z.dump, round-trip done):
+  `faq_entries` (title, keywords, answer, active, edited, sort_order) seeded with the 4 spec entries
+  (shown "edit me" until saved once); outbox kind + quick kind `faq`.
+- Settings > 💬 FAQ answers: edit title / keywords (comma separated) / answer / active, delete, add.
+  Matching reads the table every time, so edits work at once.
+- Matching (app/replies/faq.py): normalized text; Latin keywords must stand alone ("cod" not in
+  "code"), Burmese keywords are substrings; most keywords found wins (tie: first in the list).
+  Only when the message names no product and no size: intent other/unknown -> the FAQ answer first;
+  price / stock / delivery questions only when the normal flow has nothing (e.g. "kpay ရလား",
+  where "kpay" is part of the keyword, not an unknown product: it no longer lands in "unknown items").
+- Auto ON: sent like other auto replies (same speed, safety rules, 🤖, handled feed). Auto OFF:
+  one-tap "💬 Send FAQ: {title}" on the message / inbox row, and on its "unanswered" row in Needs you
+  (the inbox hides intent "other" by default). Every FAQ answer is marked 🤖 in the chat.
+- Product named + FAQ question ("sauvage edp 10ml ဘယ်လောက်လဲ original လား"): the price reply goes out,
+  and Needs you shows "also asks: FAQ “Authentic”" with Send FAQ / done (24 h).
+- Unmatched questions: no reply, Needs you "unanswered" (Step 6.3).
+- Test A4 (Step 6) uses "authentic လား" as an unanswerable question; it now switches the FAQ off
+  inside that test, since B1 requires the FAQ to answer exactly that text.
+- Verified: pytest 232 passed, 1 skipped (new tests/test_faq.py: B1 auto ON / auto OFF one-tap,
+  B2 + "kpay ရလား", most keywords wins, B3, B4 + hint + send, B5 edit / add in Settings, B6).
+  Live: restarted, /healthz all ok. NOTE: live auto-reply is ON, so from now on FAQ questions get
+  the seed answers automatically — edit them in Settings if the wording should change.
+

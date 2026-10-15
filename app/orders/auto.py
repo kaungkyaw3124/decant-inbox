@@ -15,7 +15,8 @@ Runs in the parser worker (database only). Extra rules on top of the one-tap one
 - a random delay in the outbox (default 2-3 s; Cancel in the chat);
 - at most 300 auto replies a day, then one-tap again;
 - at most one auto decision per incoming message (auto_runs).
-Never automatic: photos, intents other/unknown, unknown items (those go to "Needs you").
+Never automatic: photos, intents other/unknown (except an FAQ answer, Step 7), unknown items
+(those go to "Needs you").
 """
 import logging
 import random
@@ -28,6 +29,7 @@ from sqlalchemy.orm import Session
 from app.core.db import SessionLocal
 from app.models import AppSetting, AutoRun, Customer, Message, Outbox, ParseItem, ParseResult, QuickAction, User
 from app.orders import actions
+from app.replies import faq
 from app.replies import templates as replies
 
 log = logging.getLogger("auto")
@@ -140,7 +142,7 @@ def decide(session: Session, message: Message, now: datetime) -> str | None:
         return _skip(session, message.id, "auto-reply off for this customer")
     if message.kind != "text":
         return _skip(session, message.id, "photo / file")
-    if result.intent not in AUTO_INTENTS:
+    if result.intent not in AUTO_INTENTS and faq.for_message(session, message, result) is None:
         return _skip(session, message.id, f"intent {result.intent}")
     if answered_by_human(session, message):
         return _skip(session, message.id, "already answered")

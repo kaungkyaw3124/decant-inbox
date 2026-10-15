@@ -6,8 +6,8 @@ Read CLAUDE.md first. This file tracks where we are.
 - v1 COMPLETE. v2 (docs/SPEC-orders.md) Steps 1-5 DONE and deployed.
 - v3 (docs/SPEC-v3.md): Step 6 DONE + deployed 2026-10-15 (delivery statuses, reminder +
   auto-cancel, unanswered -> Needs you, cancel whole order, wanted report).
-- NOW: Step 7 (FAQ), then Step 8 (daily sales & profit). Each with its acceptance tests, loop
-  test -> fix until green, then the next.
+- Step 7 (FAQ) DONE + deployed 2026-10-15.
+- NOW: Step 8 (daily sales & profit), then the OWNER TEST SCRIPT in REPORT.md.
 - At the end: OWNER TEST SCRIPT in REPORT.md.
 - Owner checks: `bash scripts/status.sh`.
 
@@ -22,7 +22,7 @@ Read CLAUDE.md first. This file tracks where we are.
 | 4 | Dashboard + Tailscale (private access) | ✅ Dashboard verified by owner via SSH tunnel (2026-10-11). Tailscale (phone access) still optional |
 | 5 | Run 24/7, backups, health page | ✅ Done: reboot test passed 2026-10-11 (all services back, health ok, new tunnel URL) |
 | 6 | v2: replies, cart, payment check, orders (docs/SPEC-orders.md) | ✅ Steps 1-5 done |
-| 7 | v3 (docs/SPEC-v3.md): after payment, FAQ, sales | 🟡 Step 6 done; Step 7 next |
+| 7 | v3 (docs/SPEC-v3.md): after payment, FAQ, sales | 🟡 Steps 6-7 done; Step 8 next |
 
 ## Phase 0 checklist
 - [x] Step 0: rollback safety net scripts in ~/hardening/

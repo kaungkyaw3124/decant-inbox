@@ -91,6 +91,10 @@ def thread_context(db: Session, customer: Customer) -> dict:
                                .where(QuickAction.auto, Outbox.customer_id == customer.id)))
     auto_box = set(db.scalars(select(QuickAction.outbox_id).where(
         QuickAction.auto, QuickAction.outbox_id.in_([o.id for o in pending]))))
+    # every FAQ answer is marked 🤖 too (Step 7), also when an admin tapped it
+    auto_msgs |= set(db.scalars(select(Outbox.sent_message_id).where(
+        Outbox.customer_id == customer.id, Outbox.reply_kind == "faq", Outbox.sent_message_id.is_not(None))))
+    auto_box |= {o.id for o in pending if o.reply_kind == "faq"}
     return {
         "auto_msgs": auto_msgs, "auto_box": auto_box,
         "c": customer, "messages": messages, "downloads": downloads, "pending": pending, "albums": albums,

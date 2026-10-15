@@ -41,3 +41,10 @@ def db(migrated_db):
         c.execute(text("TRUNCATE products, product_aliases, customers, messages, users, service_heartbeats, "
                        "payment_methods, reply_templates, audit_log, app_settings RESTART IDENTITY CASCADE"))
         c.execute(text("ALTER SEQUENCE order_no_seq RESTART WITH 1001"))
+        # faq_entries is emptied by the CASCADE (updated_by -> users): back to the migration's seed
+        from app.replies.faq import SEED
+
+        c.execute(text("TRUNCATE faq_entries RESTART IDENTITY"))
+        for n, (title, keywords, answer) in enumerate(SEED, start=1):
+            c.execute(text("INSERT INTO faq_entries (title, keywords, answer, sort_order) VALUES (:t, :k, :a, :n)"),
+                      {"t": title, "k": keywords, "a": answer, "n": n})

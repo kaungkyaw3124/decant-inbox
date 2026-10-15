@@ -16,6 +16,8 @@ For each message at most ONE action is offered, chosen from its parse and the ca
                                         (docs/SPEC-v3.md 6.1); no paid order: nothing
   cancel_order          -> cancel_order cancel an unpaid order + reply (6.4); once a payment
                                         screenshot came: nothing (Needs you, admin decides)
+  FAQ question          -> faq          the FAQ answer (Step 7): first for other/unknown; for a
+                                        price/stock/delivery question only when nothing else fits
 So every customer reply gets exactly one next action: list -> confirm -> phone -> address
 -> payment info.
 
@@ -43,7 +45,7 @@ from app.orders import cart, delivery, unknown
 from app.parser.normalize import normalize
 from app.parser.rules import ADDRESS_RE, NEEDS_REVIEW_BELOW, find_phones
 from app.pricing.prices import size_label
-from app.replies import compose
+from app.replies import compose, faq
 from app.replies.templates import render
 
 CONTEXT_WINDOW = timedelta(hours=24)
@@ -163,10 +165,20 @@ def _ask_next(session: Session, order: Order, texts: dict[str, str]) -> tuple[st
     return None, None, ""
 
 
+def _faq(match: faq.Match) -> Outcome:
+    return Outcome("faq", f"💬 Send FAQ: {match.entry.title}", match.entry.answer, "faq",
+                   f"FAQ “{match.entry.title}” (keywords: {', '.join(match.keywords)}).")
+
+
 def _apply(session: Session, message: Message, result: ParseResult, texts: dict[str, str],
            address_override: str | None = None) -> Outcome | None:
+    match = faq.for_message(session, message, result)
+    if match is not None and result.intent in faq.FIRST_INTENTS:
+        return _faq(match)
     dropped = _not_stocked_lines(session, message, result, texts)
     outcome = _apply_items(session, message, result, texts, address_override, dropped)
+    if outcome is None and match is not None and not dropped:
+        return _faq(match)  # e.g. "kpay ရလား", "deli ဘယ်နှစ်ရက်ကြာလဲ" without an order
     if not dropped or (outcome is not None and outcome.kind == "cart_add"):  # cart_add placed them itself
         return outcome
     if outcome is None:
@@ -353,7 +365,8 @@ def _contact(session: Session, message: Message, customer: Customer, order: Orde
 def _eligible(session: Session, message: Message, result: ParseResult | None, now: datetime) -> bool:
     if message.direction != "in" or result is None or not result.is_current:
         return False
-    if result.method != "human" and result.confidence < NEEDS_REVIEW_BELOW and not _resolved(session, message, result):
+    if result.method != "human" and result.confidence < NEEDS_REVIEW_BELOW and not _resolved(session, message, result) \
+            and faq.for_message(session, message, result) is None:
         return False
     if session.scalar(select(exists().where(QuickAction.message_id == message.id, QuickAction.undone_at.is_(None)))):
         return False  # already handled with a one-tap action

@@ -251,6 +251,8 @@ def test_a4_unanswered_with_open_cart(shop, db):
     say(1, "stw intensely 5ml ယူမယ်", "91", ago=timedelta(minutes=5))
     run_auto()
     assert len(deliver(db)) == 1  # cart list
+    with db.begin() as c:  # since Step 7 the FAQ answers this (B1); here: a question nobody can answer
+        c.execute(text("UPDATE faq_entries SET active = false"))
     mid = say(2, "authentic လား", "91", ago=timedelta(seconds=10))
     run_auto()
     assert deliver(db) == []  # not certain: no auto reply

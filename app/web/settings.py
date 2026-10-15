@@ -1,12 +1,13 @@
 """Settings: payment methods and reply templates. Every change goes to audit_log."""
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
-from app.models import AuditLog, PaymentMethod, ReplyTemplate, User
+from app.models import AuditLog, FaqEntry, PaymentMethod, ReplyTemplate, User
 from app.orders import auto, delivery
+from app.replies import faq
 from app.replies import templates as replies
 from app.web.auth import current_user, verify_csrf
 from app.web.deps import get_db, templates
@@ -31,7 +32,9 @@ def _page(request: Request, db: Session, errors: dict[str, str] | None = None,
     return templates.TemplateResponse(request, "settings.html", {
         "methods": methods, "templates": rows, "speed": auto.speed(db), "speed_limits": auto.SPEED_LIMITS,
         "speed_error": (errors or {}).get("speed"), "order_rules": delivery.rules(db),
-        "rule_limits": delivery.RULE_LIMITS, "rules_error": (errors or {}).get("rules")}, status_code=status_code)
+        "rule_limits": delivery.RULE_LIMITS, "rules_error": (errors or {}).get("rules"),
+        "faqs": db.scalars(select(FaqEntry).order_by(FaqEntry.sort_order, FaqEntry.id)).all(),
+        "faq_error": (errors or {}).get("faq"), "faq_error_id": (errors or {}).get("faq_id")}, status_code=status_code)
 
 
 def _method_fields(name: str, account_number: str, account_name: str) -> dict[str, str]:
@@ -162,3 +165,57 @@ def save_order_rules(request: Request, reminder_hours: str = Form(""), cancel_ho
     db.commit()
     flash(request, "Orders & payments settings saved.")
     return RedirectResponse("/settings#order-rules", status_code=303)
+
+
+# ---------- FAQ (Step 7) ----------
+
+def _faq_entry(db: Session, entry_id: int) -> FaqEntry:
+    entry = db.get(FaqEntry, entry_id)
+    if entry is None:
+        raise HTTPException(404, "FAQ entry not found")
+    return entry
+
+
+@router.post("/faq")
+def add_faq(request: Request, title: str = Form(""), keywords: str = Form(""), answer: str = Form(""),
+            db: Session = Depends(get_db), user: User = Depends(current_user)):
+    try:
+        fields = faq.validate(title, keywords, answer)
+    except ValueError as exc:
+        return _page(request, db, errors={"faq": str(exc), "faq_id": "new"}, status_code=400)
+    last = db.scalar(select(FaqEntry.sort_order).order_by(FaqEntry.sort_order.desc()).limit(1))
+    entry = FaqEntry(**fields, active=True, edited=True, sort_order=(last or 0) + 1, updated_by=user.id)
+    db.add(entry)
+    db.flush()
+    _log(db, user, "faq.add", id=entry.id, **fields)
+    db.commit()
+    flash(request, f"FAQ “{entry.title}” added.")
+    return RedirectResponse(f"/settings#faq-{entry.id}", status_code=303)
+
+
+@router.post("/faq/{entry_id}")
+def update_faq(request: Request, entry_id: int, title: str = Form(""), keywords: str = Form(""),
+               answer: str = Form(""), active: str = Form(""), db: Session = Depends(get_db),
+               user: User = Depends(current_user)):
+    entry = _faq_entry(db, entry_id)
+    try:
+        fields = faq.validate(title, keywords, answer)
+    except ValueError as exc:
+        return _page(request, db, errors={"faq": str(exc), "faq_id": entry_id}, status_code=400)
+    for key, value in {**fields, "active": active == "1", "edited": True, "updated_by": user.id}.items():
+        setattr(entry, key, value)
+    entry.updated_at = func.now()
+    _log(db, user, "faq.update", id=entry_id, active=active == "1", **fields)
+    db.commit()
+    flash(request, f"FAQ “{entry.title}” saved.")
+    return RedirectResponse(f"/settings#faq-{entry_id}", status_code=303)
+
+
+@router.post("/faq/{entry_id}/delete")
+def delete_faq(request: Request, entry_id: int, db: Session = Depends(get_db), user: User = Depends(current_user)):
+    entry = _faq_entry(db, entry_id)
+    _log(db, user, "faq.delete", id=entry_id, title=entry.title, keywords=entry.keywords, answer=entry.answer)
+    db.delete(entry)
+    db.commit()
+    flash(request, "FAQ entry deleted.")
+    return RedirectResponse("/settings#faq", status_code=303)

@@ -39,6 +39,10 @@ def open_unknowns(session: Session, message: Message) -> list[Unknown]:
     result = session.scalar(select(ParseResult).where(ParseResult.message_id == message.id, ParseResult.is_current))
     if result is None or result.intent not in QUESTION_INTENTS:
         return []
+    from app.replies import faq  # late import: faq -> models only, but keep this module light
+
+    if faq.for_message(session, message, result) is not None:
+        return []  # "kpay ရလား": an FAQ question, not an unknown product
     done = set(session.scalars(select(UnknownRequest.normalized_text).where(UnknownRequest.message_id == message.id)))
     return [Unknown(i.position, i.unknown_text, i.size_ml, i.is_full_bottle) for i in session.scalars(
         select(ParseItem).where(ParseItem.parse_result_id == result.id, ParseItem.unknown_text.is_not(None))
@@ -61,7 +65,7 @@ def messages_needing_you(session: Session, now: datetime | None = None) -> list[
         .where(Message.direction == "in", Message.received_at >= now - NEEDS_YOU_WINDOW,
                ParseResult.intent.in_(QUESTION_INTENTS), ParseItem.unknown_text.is_not(None), ~resolved)
         .order_by(Message.received_at.desc()).distinct()).all()
-    return sorted(set(rows), key=lambda m: m.received_at, reverse=True)
+    return sorted({m for m in rows if open_unknowns(session, m)}, key=lambda m: m.received_at, reverse=True)
 
 
 def suggestions(session: Session, text: str, limit: int = 5) -> list[Product]:

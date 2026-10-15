@@ -148,6 +148,7 @@ class Unanswered:
     last_text: str
     last_at: datetime
     reason: str
+    faq: tuple | None = None  # (message id, faq.Match): an FAQ question inside (Step 7 hint)
 
 
 def unanswered(session: Session, now: datetime | None = None) -> list[Unanswered]:

@@ -6,8 +6,11 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import AuditLog, Customer, Message, Outbox, Product, QuickAction, User
+from app.models import AuditLog, Customer, FaqEntry, Message, Outbox, Product, QuickAction, User
+from app.models.outbox import UNDO_SECONDS
 from app.orders import auto, followups, payments, unknown
+from app.replies import compose, faq
+from app.replies import templates as replies
 from app.web.auth import current_user, verify_csrf
 from app.web.deps import get_db
 from app.web.inbox import detail_url, flash, safe_back
@@ -158,11 +161,24 @@ def needs_you(db: Session, now: datetime | None = None) -> dict:
     cancels = followups.cancel_requests(db, now)
     unpaid = [(d, why) for d in followups.due(db, now) if (why := followups.blocked(db, d.customer, now))]
     unanswered = followups.unanswered(db, now)
-    return {"payments": to_check, "cancels": cancels, "unpaid": unpaid, "unanswered": unanswered,
+    for row in unanswered:  # an FAQ question nobody answered yet (auto OFF): offer the one-tap answer
+        for mid in reversed(row.message_ids):
+            if match := faq.for_message(db, db.get(Message, mid)):
+                row.faq = (mid, match)
+                break
+    listed = {mid for row in unanswered for mid in row.message_ids}
+    hints = []
+    for message, customer, match in faq.hints(db, now):  # product named, so not automatic
+        if message.id in listed:  # shown on its unanswered row instead
+            row = next(r for r in unanswered if message.id in r.message_ids)
+            row.faq = row.faq or (message.id, match)
+        else:
+            hints.append((message, customer, match))
+    return {"faq_hints": hints,"payments": to_check, "cancels": cancels, "unpaid": unpaid, "unanswered": unanswered,
             "unknown": [(m, customers[m.customer_id], unknown.open_unknowns(db, m)) for m in unknown_msgs],
             "failed": failed, "paused": paused, "auto_cancelled": followups.auto_cancelled(db, now),
             "count": len(to_check) + len(cancels) + len(unpaid) + len(unknown_msgs) + len(unanswered)
-                     + len(failed) + len(paused)}
+                     + len(hints) + len(failed) + len(paused)}
 
 
 def handled_feed(db: Session, limit: int = 30) -> list:
@@ -173,3 +189,36 @@ def handled_feed(db: Session, limit: int = 30) -> list:
         .outerjoin(Outbox, Outbox.id == QuickAction.outbox_id)
         .where(QuickAction.auto, QuickAction.created_at >= since)
         .order_by(QuickAction.id.desc()).limit(limit)).all()
+
+
+# ---------- FAQ answers from "Needs you" ----------
+
+@router.post("/messages/{message_id}/faq/{entry_id}")
+def send_faq(request: Request, message_id: int, entry_id: int, back: str = Form("/"),
+             db: Session = Depends(get_db), user: User = Depends(current_user)):
+    """Send an FAQ answer to this message's customer (10 s, Cancel in the chat)."""
+    message = db.get(Message, message_id)
+    entry = db.get(FaqEntry, entry_id)
+    if message is None or entry is None or message.direction != "in":
+        raise HTTPException(404, "Not found")
+    now = datetime.now(UTC)
+    texts = replies.load(db)
+    body = compose.with_greeting(entry.answer, texts, compose.needs_greeting(db, message.customer_id, now))
+    box = Outbox(customer_id=message.customer_id, text=body, reply_kind="faq", status="queued",
+                 idempotency_key=f"faq-{message_id}-{entry_id}-{now.timestamp()}", created_by=user.id,
+                 send_after=now + timedelta(seconds=UNDO_SECONDS), source_message_id=message_id)
+    db.add(box)
+    db.flush()
+    db.add(AuditLog(user_id=user.id, action="faq.send", details={"message_id": message_id, "faq_id": entry_id,
+                                                                 "outbox_id": box.id}))
+    db.commit()
+    flash(request, f"FAQ “{entry.title}” goes out in {UNDO_SECONDS} s (Cancel in the chat).")
+    return RedirectResponse(safe_back(back, "/"), status_code=303)
+
+
+@router.post("/messages/{message_id}/faq-hint-done")
+def faq_hint_done(request: Request, message_id: int, db: Session = Depends(get_db),
+                  user: User = Depends(current_user)):
+    db.add(AuditLog(user_id=user.id, action="faq.hint_done", details={"message_id": message_id}))
+    db.commit()
+    return RedirectResponse("/", status_code=303)
