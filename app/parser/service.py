@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 
 from app.models import Message, ParseItem, ParseResult, Product, ProductAlias
 from app.parser.normalize import normalize
-from app.parser.rules import PARSER_VERSION, Alias, ParsedItem, ParseOutcome, parse
+from app.parser.rules import PARSER_VERSION, Alias, ParsedItem, ParseOutcome, known_words_of, parse
 
 CONTEXT_WINDOW = timedelta(hours=24)
 
@@ -31,6 +31,11 @@ def load_full_sizes(session: Session) -> dict[int, int]:
     """Bottle size per product (from the price list): "100ml" of a 100ml bottle = full bottle."""
     return dict(session.execute(select(Product.id, Product.full_size_ml)
                                 .where(Product.active, Product.full_size_ml.is_not(None))).all())
+
+
+def load_known_words(session: Session) -> dict[int, frozenset[str]]:
+    products = session.execute(select(Product.id, Product.brand, Product.name).where(Product.active)).all()
+    return known_words_of([(pid, normalize(b), normalize(n)) for pid, b, n in products], load_aliases(session))
 
 
 def unparsed_message_ids(session: Session, limit: int, skip: set[int] = frozenset()) -> list[int]:
@@ -62,7 +67,7 @@ def stored_items(session: Session, result_id: int) -> tuple[ParsedItem, ...]:
     rows = session.scalars(select(ParseItem).where(ParseItem.parse_result_id == result_id)
                            .order_by(ParseItem.position))
     return tuple(ParsedItem(r.product_id, r.size_ml, r.is_full_bottle, r.quantity, r.unknown_text,
-                            r.from_context, r.match or "none") for r in rows)
+                            r.from_context, r.match or "none", r.candidate_product_id) for r in rows)
 
 
 def _same(session: Session, result: ParseResult, outcome: ParseOutcome) -> bool:
@@ -83,11 +88,12 @@ def add_items(session: Session, result_id: int, items) -> None:
             parse_result_id=result_id, position=position, product_id=item.product_id, size_ml=item.size_ml,
             is_full_bottle=item.is_full_bottle, quantity=item.quantity,
             unknown_text=item.unknown_text[:255] if item.unknown_text else None, from_context=item.from_context,
-            match=item.match))
+            match=item.match, candidate_product_id=item.candidate_id))
 
 
 def parse_message(session: Session, message: Message, aliases: list[Alias],
-                  full_sizes: dict[int, int] | None = None) -> str:
+                  full_sizes: dict[int, int] | None = None,
+                  known_words: dict[int, frozenset[str]] | None = None) -> str:
     """Parse one message and store the result. Returns what happened:
     new | changed | unchanged | human (kept the human edit)."""
     normalized = normalize(message.raw_text, keep_newlines=True)
@@ -99,7 +105,9 @@ def parse_message(session: Session, message: Message, aliases: list[Alias],
         return "human"
     if full_sizes is None:
         full_sizes = load_full_sizes(session)
-    outcome = parse(normalized, aliases, full_sizes, context_product(session, message))
+    if known_words is None:
+        known_words = load_known_words(session)
+    outcome = parse(normalized, aliases, full_sizes, context_product(session, message), known_words)
     if current is not None and _same(session, current, outcome):
         return "unchanged"
     if current is not None:

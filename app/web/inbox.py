@@ -173,7 +173,7 @@ def message_detail(request: Request, message_id: int, back: str = "/", db: Sessi
     info = quick_infos(db, [(message, customer, current[0])])[message_id]
     open_unknown = unknown.open_unknowns(db, message)
     return templates.TemplateResponse(request, "message.html", {
-        "unknowns": [(u, unknown.suggestions(db, u.text)) for u in open_unknown],
+        "unknowns": [(u, unknown.suggestions(db, u.text, first=u.candidate_id)) for u in open_unknown],
         "all_products": products_for_select(db) if open_unknown else [],
         "resolved": db.scalars(select(UnknownRequest).where(UnknownRequest.message_id == message_id)).all(),
         **info, "undo_seconds": UNDO_SECONDS,

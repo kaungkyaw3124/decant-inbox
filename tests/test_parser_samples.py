@@ -17,7 +17,7 @@ from pathlib import Path
 import pytest
 
 from app.parser.normalize import normalize
-from app.parser.rules import Alias, parse
+from app.parser.rules import Alias, known_words_of, parse
 from scripts.make_sample_prices import SAMPLE
 
 DATA = Path(__file__).parent.parent / "data"
@@ -33,8 +33,7 @@ def load_samples(path: Path) -> list[dict]:
 
 
 def load_aliases() -> tuple[list[Alias], dict[int, str]]:
-    with (DATA / "products.csv").open(newline="", encoding="utf-8-sig") as f:
-        names = [r["name"].strip() for r in csv.DictReader(f)]
+    names = [name for _, name in _products()]
     ids = {name: i for i, name in enumerate(names, 1)}
     with (DATA / "aliases.csv").open(newline="", encoding="utf-8-sig") as f:
         aliases = [Alias(ids[r["product_name"].strip()], normalize(r["alias"]))
@@ -44,6 +43,11 @@ def load_aliases() -> tuple[list[Alias], dict[int, str]]:
 
 SYNTHETIC_ROWS = load_samples(SYNTHETIC)
 SAMPLE_ROWS = load_samples(SAMPLES)
+
+
+def _products() -> list[tuple[str, str]]:
+    with (DATA / "products.csv").open(newline="", encoding="utf-8-sig") as f:
+        return [(r["brand"].strip(), r["name"].strip()) for r in csv.DictReader(f)]
 
 
 def full_sizes(names: dict[int, str]) -> dict[int, int]:
@@ -60,7 +64,9 @@ def describe(item, names: dict[int, str]) -> str:
 
 def check(row: dict) -> None:
     aliases, names = load_aliases()
-    r = parse(normalize(row["text"], keep_newlines=True), aliases, full_sizes(names))
+    brands = {i: normalize(b) for i, (b, _) in enumerate(_products(), 1)}
+    known = known_words_of([(i, brands[i], normalize(n)) for i, n in names.items()], aliases)
+    r = parse(normalize(row["text"], keep_newlines=True), aliases, full_sizes(names), known_words=known)
     got = (r.intent, names.get(r.product_id, ""), str(r.size_ml or ""))
     assert got == (row["intent"], row["product"], row["size_ml"])
     if row.get("items"):

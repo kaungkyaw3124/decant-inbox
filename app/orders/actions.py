@@ -390,6 +390,8 @@ def _resolved(session: Session, message: Message, result: ParseResult) -> bool:
     items = _items(session, result)
     if not items or any(i.from_context or (not i.product_id and not i.unknown_text) for i in items):
         return False
+    if any(u.partial for u in unknown.open_unknowns(session, message)):
+        return False  # 4.1 "hawas for him": not certain, the whole message waits for an admin
     return result.intent == "buy" or (result.intent in ("ask_price", "ask_stock")
                                       and not unknown.open_unknowns(session, message))
 

@@ -754,3 +754,24 @@ E. Payment reminder + auto-cancel (Step 6.2; optional, takes 2 h)
 If something differs: note the step number and what arrived; the chat page and Inbox show what the
 system decided (🤖 = automatic).
 
+
+## 2026-10-15 — v4 4.1: partial name matches (the "hawas for him" bug)
+- Spec: docs/SPEC-v4.md 4.1. Parser is now `rules-4`.
+- What: if a known nickname sits inside a longer name ("hawas for him" with the alias "hawas"),
+  the item is NOT that product. It becomes ONE item with match `partial`, unknown text = the
+  whole name, and the nickname's product kept only as a suggestion
+  (`parse_items.candidate_product_id`). There is no one-tap button and no auto reply. The whole
+  message waits in Needs you, and the product question lists the candidate first and preselected
+  ("Contains the nickname of Hawas Ice, plus other words").
+- Decisions: "extra words" = Latin words directly next to the alias (same comma part, stops at
+  sizes, digits, Burmese text). These don't count as extra: filler/greeting words (hi, pls, for,
+  edp...) and words of the product's own brand, name or same-brand aliases. So "dior sauvage
+  elixir 5ml" is still Sauvage Elixir and "hi swy 5ml" is still Stronger With You.
+- DB: migration 92fe0f25b1bf (parse_items.candidate_product_id), applied live after backup
+  product_requests_2026-10-15T1925Z.dump; round-trip (down/up) done. The worker re-parsed 23 live
+  messages with rules-4; nothing was sent because of it.
+- Tests: tests/test_v4_partial.py (A1 partial → no reply, in Needs you, candidate first; A2 "hawas ice
+  10ml" / "hawas 10ml" exact; A3 "good girl 5ml, hawas for him 10ml" → nothing sent, after the admin
+  answers one reply with both and never "hawas him"; not-stocked variant). Fixture
+  synthetic_messages.csv +3 rows (s56-s58: two partials, one brand-word check), all rows pass.
+  Full suite: 246 passed, 1 skipped.

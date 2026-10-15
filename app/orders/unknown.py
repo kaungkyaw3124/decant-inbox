@@ -32,6 +32,11 @@ class Unknown:
     text: str
     size_ml: int | None
     is_full_bottle: bool
+    candidate_id: int | None = None  # 4.1 partial match: the product whose alias is inside the text
+
+    @property
+    def partial(self) -> bool:
+        return self.candidate_id is not None
 
 
 def open_unknowns(session: Session, message: Message) -> list[Unknown]:
@@ -44,7 +49,7 @@ def open_unknowns(session: Session, message: Message) -> list[Unknown]:
     if faq.for_message(session, message, result) is not None:
         return []  # "kpay ရလား": an FAQ question, not an unknown product
     done = set(session.scalars(select(UnknownRequest.normalized_text).where(UnknownRequest.message_id == message.id)))
-    return [Unknown(i.position, i.unknown_text, i.size_ml, i.is_full_bottle) for i in session.scalars(
+    return [Unknown(i.position, i.unknown_text, i.size_ml, i.is_full_bottle, i.candidate_product_id) for i in session.scalars(
         select(ParseItem).where(ParseItem.parse_result_id == result.id, ParseItem.unknown_text.is_not(None))
         .order_by(ParseItem.position)) if normalize(i.unknown_text) not in done]
 
@@ -68,14 +73,18 @@ def messages_needing_you(session: Session, now: datetime | None = None) -> list[
     return sorted({m for m in rows if open_unknowns(session, m)}, key=lambda m: m.received_at, reverse=True)
 
 
-def suggestions(session: Session, text: str, limit: int = 5) -> list[Product]:
-    """Active products most like the customer's words (fuzzy), best first."""
+def suggestions(session: Session, text: str, limit: int = 5, first: int | None = None) -> list[Product]:
+    """Active products most like the customer's words (fuzzy), best first; `first` (the
+    candidate of a partial match, 4.1) always leads."""
     target = normalize(text)
+    aliases: dict[int, list[str]] = {}
+    for pid, alias in session.execute(select(ProductAlias.product_id, ProductAlias.normalized_alias)):
+        aliases.setdefault(pid, []).append(alias)
     scored = []
     for product in session.scalars(select(Product).where(Product.active)):
-        names = [normalize(product.name), normalize(f"{product.brand} {product.name}")]
+        names = [normalize(product.name), normalize(f"{product.brand} {product.name}"), *aliases.get(product.id, [])]
         score = max(fuzz.WRatio(target, n) for n in names)
-        scored.append((score, product))
+        scored.append((1000 if product.id == first else score, product))
     return [p for _, p in sorted(scored, key=lambda sp: -sp[0])[:limit]]
 
 

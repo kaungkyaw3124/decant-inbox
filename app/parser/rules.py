@@ -10,13 +10,16 @@ rules-2 (docs/SPEC-orders.md "Parser v2"): multi-item, polite buy words, full bo
 intents remove/confirm/done/address, phone numbers, 24 h context, unknown product text.
 rules-3 (docs/SPEC-v3.md 6.1, 6.4): ask_delivery ("ဘယ်တော့ရောက်မလဲ", "deli"), cancel_order (a
 cancel word WITHOUT a product: the whole order; with a product it stays remove).
+rules-4 (docs/SPEC-v4.md 4.1): an alias with extra unknown Latin words attached ("hawas for him"
+with alias "hawas") is NOT a match: match="partial", unknown_text = the whole name, the
+alias' product kept as candidate_id (a suggestion only, never auto).
 """
 import re
 from dataclasses import dataclass, field
 
 from rapidfuzz import fuzz
 
-PARSER_VERSION = "rules-3"
+PARSER_VERSION = "rules-4"
 NEEDS_REVIEW_BELOW = 0.6  # dashboard shows results under this as "needs review"
 FUZZY_THRESHOLD = 88      # rapidfuzz partial_ratio, 0-100
 FUZZY_MIN_ALIAS_LEN = 5   # shorter aliases match too much by accident
@@ -99,7 +102,8 @@ class ParsedItem:
     quantity: int = 1
     unknown_text: str | None = None  # product named but not in the catalog
     from_context: bool = False  # product taken from the customer's previous message (24 h)
-    match: str = "none"  # exact | fuzzy | multiple | ambiguous | inherited | context | none
+    match: str = "none"  # exact | fuzzy | multiple | ambiguous | inherited | context | partial | none
+    candidate_id: int | None = None  # partial: the product whose alias is inside the name
 
 
 @dataclass(frozen=True)
@@ -219,6 +223,72 @@ def _shared_alias_spans(text: str, aliases: list[Alias]) -> set[tuple[int, int]]
     return spans
 
 
+# Latin words next to a product name that are not part of a name (4.1 partial matches).
+_NOT_NAME_LATIN = _FILLER_LATIN | {
+    "price", "how", "much", "buy", "available", "avai", "instock", "in", "stock", "cancel", "deli",
+    "confirm", "address", "hey", "mingalarpar", "mingalaba", "mingalabar", "ko",
+    "eau", "de", "toilette", "cologne", "spray", "decants", "vial", "same", "last", "time",
+}
+_RUN_TOKEN = re.compile(r"\S+")
+_NAME_WORD = re.compile(r"[a-z][a-z'-]*[.?!]*")
+
+
+def words_of(text: str) -> set[str]:
+    return {w.strip(".'-?!") for w in _LATIN_WORD.findall(text)}
+
+
+def known_words_of(products: list[tuple[int, str, str]], aliases: list[Alias]) -> dict[int, frozenset[str]]:
+    """Per product: Latin words of its brand, its name and the aliases of every product of the
+    same brand ("dior sauvage elixir" is still Sauvage Elixir; "hawas for him" is not Hawas).
+    products: (id, normalized brand, normalized name)."""
+    by_brand: dict[str, set[str]] = {}
+    brand_of = {}
+    for pid, brand, name in products:
+        by_brand.setdefault(brand, set()).update(words_of(brand) | words_of(name))
+        brand_of[pid] = brand
+    for a in aliases:
+        if a.product_id in brand_of:
+            by_brand[brand_of[a.product_id]].update(words_of(a.normalized_alias))
+    return {pid: frozenset(by_brand[brand]) for pid, brand in brand_of.items()}
+
+
+def partial_name(part: str, aliases: list[Alias], product_id: int,
+                 known: frozenset[str] | set[str] = frozenset()) -> str | None:
+    """4.1: the product's alias sits inside a longer name ("hawas for him" with alias "hawas").
+    Returns that whole name if Latin words that are not filler and not words of the product
+    (its brand, name, aliases) are attached directly before or after the alias, else None.
+    Expansion stops at anything that is not a Latin word (sizes, digits, Burmese, commas)."""
+    spans = [span for a in sorted(aliases, key=lambda a: -len(a.normalized_alias)) if a.product_id == product_id
+             for span in _exact_spans(part, a.normalized_alias)]
+    if not spans:
+        return None
+    start, end = spans[0]
+    tokens = [(m.start(), m.end(), m.group()) for m in _RUN_TOKEN.finditer(part)]
+    inside = [n for n, (s, e, _) in enumerate(tokens) if s < end and start < e]
+    if not inside:
+        return None
+    first, last = inside[0], inside[-1]
+    while first > 0 and _NAME_WORD.fullmatch(tokens[first - 1][2]):
+        first -= 1
+    while last + 1 < len(tokens) and _NAME_WORD.fullmatch(tokens[last + 1][2]):
+        last += 1
+    own = known | {w for a in aliases if a.product_id == product_id for w in words_of(a.normalized_alias)}
+
+    def name_word(token: str) -> bool:
+        word = token.strip(".'-?!")
+        return bool(word) and word not in _NOT_NAME_LATIN
+
+    outside = [t for n, (_, _, t) in enumerate(tokens[first:last + 1], first) if n not in inside]
+    if not any(name_word(t) and t.strip(".'-?!") not in own for t in outside):
+        return None
+    run = [t.strip("?!") for _, _, t in tokens[first:last + 1]]
+    while run and not name_word(run[0]) and run[0] not in part[start:end]:
+        run.pop(0)
+    while run and not name_word(run[-1]):
+        run.pop()
+    return " ".join(run) or None
+
+
 def unknown_product_text(part: str) -> str | None:
     """What is left of a part once sizes, quantities, intent and filler words are removed,
     if it looks like a (Latin-script) product name, e.g. "hawas ice"."""
@@ -236,7 +306,8 @@ def split_parts(text: str) -> list[str]:
 
 
 def _items(text: str, aliases: list[Alias], full_sizes: dict[int, int],
-           context_product_id: int | None, allow_unknown: bool) -> list[ParsedItem]:
+           context_product_id: int | None, allow_unknown: bool,
+           known_words: dict[int, frozenset[str]]) -> list[ParsedItem]:
     items: list[ParsedItem] = []
     for part in split_parts(text):
         product_id, how = find_product(part, aliases)
@@ -244,7 +315,12 @@ def _items(text: str, aliases: list[Alias], full_sizes: dict[int, int],
         full = bool(_FULL_RE.search(part))
         qty = find_quantity(part)
         unknown = None
-        if product_id is None and how != "ambiguous":
+        candidate = None
+        if how == "exact":
+            name = partial_name(part, aliases, product_id, known_words.get(product_id, frozenset()))
+            if name is not None:  # "hawas for him": not Hawas Ice, only a suggestion
+                product_id, how, unknown, candidate = None, "partial", name, product_id
+        if product_id is None and how not in ("ambiguous", "partial"):
             unknown = unknown_product_text(part) if (allow_unknown or sizes or full) else None
             if unknown is None and (sizes or full):
                 previous = next((i for i in reversed(items) if i.product_id), None)
@@ -262,22 +338,25 @@ def _items(text: str, aliases: list[Alias], full_sizes: dict[int, int],
         for size in sizes_for_part:
             is_full = full or (size is not None and bottle is not None and size == bottle)
             items.append(ParsedItem(product_id, None if is_full else size, is_full, qty, unknown,
-                                    how == "context", how))
+                                    how == "context", how, candidate))
     return items
 
 
 _MATCH_SCORE = {"exact": 0.5, "inherited": 0.5, "fuzzy": 0.35, "multiple": 0.25, "context": 0.25,
-                "ambiguous": 0.0, "none": 0.0}
+                "ambiguous": 0.0, "partial": 0.0, "none": 0.0}
 
 
 def parse(normalized_text: str, aliases: list[Alias], full_sizes: dict[int, int] | None = None,
-          context_product_id: int | None = None) -> ParseOutcome:
+          context_product_id: int | None = None,
+          known_words: dict[int, frozenset[str]] | None = None) -> ParseOutcome:
+    """known_words: per product, Latin words that may stand next to its alias without making
+    the name a different one (brand, name, same-brand aliases); see partial_name()."""
     text = normalized_text
     phone = find_phone(text)
     full_sizes = full_sizes or {}
     keyword_intent = find_intent(text)
     items = _items(text, aliases, full_sizes, context_product_id,
-                   allow_unknown=keyword_intent in PRODUCT_INTENTS)
+                   allow_unknown=keyword_intent in PRODUCT_INTENTS, known_words=known_words or {})
     named = [i for i in items if i.match != "context"]
     intent = find_intent(text, has_product_or_size=any(i.product_id or i.size_ml or i.is_full_bottle for i in named))
     if intent is None and phone:
