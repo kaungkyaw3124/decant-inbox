@@ -29,3 +29,22 @@ class ProductPrice(Base):
     effective_from: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     created_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
     created_at: Mapped[datetime] = created_at_column()
+
+
+class ProductCost(Base):
+    """What the owner paid for a full bottle (docs/SPEC-v3.md Step 8), append-only like prices:
+    the current cost is the newest row. Cost per ml = bottle_cost / products.full_size_ml.
+    The cost at the time of a sale is copied onto order_items.unit_cost_mmk when it is paid."""
+
+    __tablename__ = "product_costs"
+    __table_args__ = (
+        CheckConstraint("bottle_cost_mmk > 0", name="cost_positive"),
+        Index("ix_product_costs_lookup", "product_id", "effective_from"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    product_id: Mapped[int] = mapped_column(ForeignKey("products.id"))
+    bottle_cost_mmk: Mapped[int] = mapped_column(Integer)
+    effective_from: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    created_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+    created_at: Mapped[datetime] = created_at_column()

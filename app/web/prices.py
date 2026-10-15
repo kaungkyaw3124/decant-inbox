@@ -101,5 +101,6 @@ async def confirm(request: Request, payload: str = Form(...), db: Session = Depe
                     details={"filename": data["filename"], "rows": len(sheet.rows), **stats}))
     db.commit()
     flash(request, f"Price list saved: {stats['products_added']} new products, "
-                   f"{stats['products_updated']} updated, {stats['prices_written']} price changes.")
+                   f"{stats['products_updated']} updated, {stats['prices_written']} price changes"
+                   + (f", {stats['costs_written']} bottle costs." if stats.get('costs_written') else "."))
     return RedirectResponse("/prices", status_code=303)

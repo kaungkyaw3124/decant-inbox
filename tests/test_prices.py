@@ -112,7 +112,7 @@ def test_preview_writes_nothing_and_apply_writes_prices(catalog, db):
         assert c.execute(text("SELECT count(*) FROM product_prices")).scalar() == 0
 
     stats = run_import(xlsx(STW, SAUVAGE))
-    assert stats == {"products_added": 0, "products_updated": 2, "prices_written": 7}
+    assert stats == {"products_added": 0, "products_updated": 2, "prices_written": 7, "costs_written": 0}
     assert prices_of("Stronger With You Intensely") == {
         2: (8000, True), 5: (18000, True), 10: (33000, True), None: (380000, True)}
     assert None in prices_of("Sauvage Eau de Parfum") and 2 not in prices_of("Sauvage Eau de Parfum")

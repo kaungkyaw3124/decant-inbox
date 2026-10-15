@@ -669,3 +669,88 @@ Short entries from the VPS Claude Code session, newest last.
   Live: restarted, /healthz all ok. NOTE: live auto-reply is ON, so from now on FAQ questions get
   the seed answers automatically — edit them in Settings if the wording should change.
 
+## 2026-10-15 — v3 Step 8: daily sales & profit
+- Migration 53fdc749b259 (after backup product_requests_2026-10-15T1731Z.dump, round-trip done):
+  `product_costs` (bottle cost history, append-only like prices), `order_items.unit_cost_mmk`.
+- Price list Excel: optional `bottle_cost` column (last column in the export; empty = unchanged; preview
+  shows "bottle cost: 300,000 → 320,000"). Settings > 🧪 Vial cost per decant size (default 0).
+- Cost of an item = bottle_cost / bottle ml × size + vial cost of that size (full bottle = bottle_cost),
+  stamped on the order items when the payment is approved (cost at the time of sale; later price or cost
+  changes don't touch old sales). Unknown cost (no bottle_cost / no bottle size) -> "—".
+- Sales page (/sales, nav "Sales"): Today / Yesterday / This week (from Monday) / This month / custom
+  dates, Yangon days, paid orders only (paid, packed, sent out, delivered; by paid_at; cancelled after
+  payment = not counted). Tiles: revenue, orders, items, ml, cost, profit, profit %, average order.
+  Bar chart per day (inline SVG, hover a bar for the day's total). Tables per day, per perfume (by
+  revenue), per size. Any item without cost -> cost / profit "—" + note "add bottle_cost in the price
+  list", and a button "Use today's costs for N order(s) already paid" (for sales made before the
+  costs were entered). "⬇ Export .xlsx" = the same numbers (Summary, Per day, Per perfume, Per size).
+- Verified: pytest 239 passed, 1 skipped (new tests/test_sales.py: C1 paid only + Yangon midnight
+  boundary, C2 15,500, C3 price and cost changed after the sale, C4 "—" + fill costs, C5 export =
+  page tiles, Excel bottle_cost round trip, cost math). Live: restarted, /healthz all ok.
+- Owner to do (optional): add `bottle_cost` to the price list Excel and the vial costs in Settings,
+  so profit shows. No paid orders exist yet, so nothing needs filling.
+
+## OWNER TEST SCRIPT (v3: Steps 6-8)
+Setup: open the dashboard (address: `bash scripts/status.sh`). Header must say "🤖 Auto-reply: ON".
+Use a SECOND Telegram account (not ignored, not "Never auto-reply"). Each automatic reply arrives
+~3 s after your message. The first reply of the day starts with "မင်္ဂလာပါ။" (6 h rule) — below it is
+left out. If your test account already has a saved phone + address, the cart list ends with
+"ဖုန်း …၊ လိပ်စာ … ကိုပဲ ပို့ပေးရမလား။" instead of asking for the phone: answer "ဟုတ်ကဲ့" and skip to 5.
+Optional first: Prices > download Excel, fill `bottle_cost` for Good Girl (e.g. 240000; its bottle is 80 ml), upload,
+Confirm; Settings > Vial cost: 5ml = 500. Then step 9 shows a profit.
+
+A. FAQ (Step 7)
+1. Send `authentic လား` -> "အားလုံး authentic (original) ပစ္စည်းတွေ ကနေ ခွဲထည့်ပေးတာပါနော်။" (🤖 in the chat).
+2. Send `ဘယ်နှစ်ရက်ကြာလဲ` -> "ရန်ကုန်မြို့တွင်း ၁-၂ ရက်၊ နယ်ကို ၃-၅ ရက်လောက် ကြာပါတယ်နော်။"
+3. Send `kpay ရလား` -> "KPay / AYA Pay နဲ့ ကြိုလွှဲပေးရပါတယ်။ ပို့ခကိုတော့ ပစ္စည်းရောက်မှ ပေးရပါတယ်နော်။"
+4. Send `ဒီအနံ့က ဘယ်လိုမျိုးလဲ` -> NO reply. After 2 min the Inbox "🟡 Needs you" shows
+   "💬 <you>: ဒီအနံ့က ဘယ်လိုမျိုးလဲ · unanswered". Tap "done" -> it disappears.
+5. Settings > 💬 FAQ answers: change one answer, Save ("edit me" disappears); send its keyword again
+   -> the new answer.
+
+B. Order to delivery (Step 6)
+1. Send `good girl 5ml ယူမယ်` -> "• Good Girl 5ml – 21,000 ကျပ်\nစုစုပေါင်း 21,000 ကျပ်ပါ။\n
+   ဝယ်ယူမယ်ဆိုရင် ဖုန်းနံပါတ် ပို့ပေးပါနော်။"
+2. Send a phone, e.g. `09777123456` -> "ဖုန်းနံပါတ် 09777123456 ရပါပြီ။ ပို့ပေးရမယ့် လိပ်စာ ပို့ပေးပါနော်။"
+3. Send `No. 12, Bahan` -> payment info: item line, "စုစုပေါင်း 21,000 ကျပ်ပါ။", the KPay and AYA Pay
+   lines, "ငွေလွှဲပြီးရင် transaction id ပါတဲ့ screenshot ပို့ပေးပါနော်။"
+4. Send ONE photo (any screenshot). Dashboard: "Payments 1". Open it, wait for the picture, type any
+   transaction ID (e.g. TEST1), ✅ Approve (amount = 21,000). -> after 10 s: "✅ Order #100x
+   အတည်ပြုပြီးပါပြီ။ …". Orders (nav) shows a badge 1, tab "📦 To pack".
+5. Send `ဘယ်တော့ရောက်မလဲ` -> "Order #100x ကို ပြင်ဆင်နေပါတယ်။ ပို့လိုက်တာနဲ့ အကြောင်းကြားပေးပါမယ်နော်။"
+6. Orders > 📦 Packed. Then tap "↩ Undo packed" -> back in To pack. Tap 📦 Packed again.
+7. Send `အော်ဒါ cancel` -> NO reply (the order is paid). Needs you: "🚫 <you>: wants to cancel a paid
+   order #100x". Tap "keep order (done)" (do NOT cancel, so the test can go on).
+8. Orders > tab 🚚 To send > "🚚 Sent out", fill Deli name `Ko Min`, Deli phone `09555111222`, tap
+   "Sent out + tell the customer". After 60 s: "Order #100x ကို ပို့လိုက်ပါပြီ။\nDeli: Ko Min
+   09555111222\nပို့ခကို ပစ္စည်းရောက်မှ ပေးချေပေးပါနော်။" (Undo within those 60 s = no message.)
+9. Send `ရောက်ပြီလား` -> "Order #100x ကို <today dd/mm/yyyy> မှာ ပို့ပြီးပါပြီ။\nDeli: Ko Min 09555111222"
+10. Orders > tab Sent > ✅ Delivered -> NO message (thank-you is off in Settings > 📦 Orders & payments).
+11. Sales (nav) > Today: revenue 21,000, 1 order, 1 item, 5 ml. With the optional costs:
+    cost 15,500 (240,000 / 80 ml × 5 ml = 15,000 + 500 vial), profit 5,500, 26.2 %. Without costs:
+    cost / profit "—" + the note. ⬇ Export .xlsx: same totals.
+
+C. Cancel / remove (Step 6.4)
+1. Send `sauvage edp 5ml, ysl y 5ml ယူမယ်` -> list with both, total 38,000.
+2. Send `ysl y မယူတော့ဘူး` -> list with only Sauvage Eau de Parfum 5ml, total 20,000.
+3. Send `မယူတော့ဘူး` -> "အော်ဒါ cancel လုပ်ပြီးပါပြီ။ နောက်မှ ပြန်မှာချင်ရင် ပြောပေးပါနော်။"
+4. Send `ဘယ်တော့ရောက်မလဲ` -> NO reply (no paid order on its way; the delivered one doesn't count) ->
+   after 2 min in Needs you as unanswered. Tap "done".
+
+D. Not stocked + report (Step 6.5)
+1. Send `hawas ice 10ml ဘယ်လောက်လဲ` -> NO reply; Needs you "❓ hawas ice". Open it, "We don't have it"
+   -> "hawas ice ကတော့ လောလောဆယ် မရှိသေးပါဘူးနော်။"
+2. Reports (nav) -> "hawas ice · not in list · 1 · 1".
+
+E. Payment reminder + auto-cancel (Step 6.2; optional, takes 2 h)
+1. Settings > 📦 Orders & payments: reminder 1 h, cancel 2 h, Save.
+2. Send `bdc 5ml ယူမယ်`, then `ဟုတ်ကဲ့` (or phone/address as asked) until you get the payment info. Send
+   no photo.
+3. After 1 h: "Order အတွက် ငွေလွှဲပြီးရင် transaction id ပါတဲ့ screenshot ပို့ပေးပါနော်။ စုစုပေါင်း 23,000 ကျပ်ပါ။"
+   (only once). After 2 h: "ငွေလွှဲမှု မရရှိသေးတဲ့အတွက် အော်ဒါကို cancel လုပ်ထားပါတယ်။ ပြန်မှာချင်ရင်
+   ပြောပေးပါနော်။" and Needs you shows "ℹ️ order cancelled automatically (not paid)".
+4. Set the settings back to 12 h / 48 h.
+
+If something differs: note the step number and what arrived; the chat page and Inbox show what the
+system decided (🤖 = automatic).
+

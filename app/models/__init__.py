@@ -10,9 +10,9 @@ from app.models.orders import (
 )
 from app.models.outbox import MediaDownload, Outbox
 from app.models.parsing import ParseItem, ParseResult
-from app.models.pricing import ProductPrice
+from app.models.pricing import ProductCost, ProductPrice
 from app.models.settings import AppSetting, PaymentMethod, ReplyTemplate
 from app.models.users import User
 
 __all__ = ["AppSetting", "AuditLog", "AutoRun", "Customer", "CustomerPhone", "FaqEntry", "MediaDownload", "Message", "MessageReview", "Order", "OrderEvent", "OrderItem", "Outbox", "ParseItem", "PaymentCheck", "ParseResult", "PaymentMethod", "Product",
-           "ProductAlias", "ProductPrice", "QuickAction", "ReplyTemplate", "ServiceHeartbeat", "UnknownRequest", "User"]
+           "ProductAlias", "ProductCost", "ProductPrice", "QuickAction", "ReplyTemplate", "ServiceHeartbeat", "UnknownRequest", "User"]

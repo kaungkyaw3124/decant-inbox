@@ -7,6 +7,8 @@ from sqlalchemy.orm import Session
 
 from app.models import AuditLog, FaqEntry, PaymentMethod, ReplyTemplate, User
 from app.orders import auto, delivery
+from app.pricing import costs
+from app.pricing.prices import DEFAULT_SIZES, current_prices
 from app.replies import faq
 from app.replies import templates as replies
 from app.web.auth import current_user, verify_csrf
@@ -34,7 +36,8 @@ def _page(request: Request, db: Session, errors: dict[str, str] | None = None,
         "speed_error": (errors or {}).get("speed"), "order_rules": delivery.rules(db),
         "rule_limits": delivery.RULE_LIMITS, "rules_error": (errors or {}).get("rules"),
         "faqs": db.scalars(select(FaqEntry).order_by(FaqEntry.sort_order, FaqEntry.id)).all(),
-        "faq_error": (errors or {}).get("faq"), "faq_error_id": (errors or {}).get("faq_id")}, status_code=status_code)
+        "faq_error": (errors or {}).get("faq"), "faq_error_id": (errors or {}).get("faq_id"),
+        "vials": costs.vial_costs(db), "vial_sizes": _decant_sizes(db), "vial_error": (errors or {}).get("vial")}, status_code=status_code)
 
 
 def _method_fields(name: str, account_number: str, account_name: str) -> dict[str, str]:
@@ -219,3 +222,30 @@ def delete_faq(request: Request, entry_id: int, db: Session = Depends(get_db), u
     db.commit()
     flash(request, "FAQ entry deleted.")
     return RedirectResponse("/settings#faq", status_code=303)
+
+
+# ---------- vial cost per decant size (Step 8) ----------
+
+def _decant_sizes(db: Session) -> list[int]:
+    sizes = set(DEFAULT_SIZES) | set(costs.vial_costs(db))
+    for prices in current_prices(db).values():
+        sizes.update(p.size_ml for p in prices if p.size_ml)
+    return sorted(sizes)
+
+
+@router.post("/vial-costs")
+async def save_vial_costs(request: Request, db: Session = Depends(get_db), user: User = Depends(current_user)):
+    form = await request.form()
+    values = {}
+    for size in _decant_sizes(db):
+        raw = "".join(c for c in str(form.get(f"vial_{size}", "")) if c.isdigit())
+        values[size] = int(raw) if raw else 0
+    try:
+        costs.set_vial_costs(db, values, user)
+    except ValueError as exc:
+        db.rollback()
+        return _page(request, db, errors={"vial": str(exc)}, status_code=400)
+    _log(db, user, "vial_costs.update", **{str(k): v for k, v in values.items()})
+    db.commit()
+    flash(request, "Vial costs saved (used for orders paid from now on).")
+    return RedirectResponse("/settings#vial-costs", status_code=303)

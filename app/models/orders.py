@@ -80,6 +80,7 @@ class OrderItem(Base):
     is_full_bottle: Mapped[bool] = mapped_column(Boolean, server_default=false(), default=False)
     quantity: Mapped[int] = mapped_column(Integer, server_default="1", default=1)
     unit_price_mmk: Mapped[int | None] = mapped_column(Integer)  # price when added; None = no price yet
+    unit_cost_mmk: Mapped[int | None] = mapped_column(Integer)  # cost when paid (bottle share + vial); None = unknown
     source_message_id: Mapped[int | None] = mapped_column(ForeignKey("messages.id"))
     created_at: Mapped[datetime] = created_at_column()
     removed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

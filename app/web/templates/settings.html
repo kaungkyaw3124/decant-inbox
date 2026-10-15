@@ -30,6 +30,17 @@
   <button class="primary">Save</button>
 </form>
 
+<form method="post" action="/settings/vial-costs" class="card stack" id="vial-costs">
+  <h2>🧪 Vial cost per decant size</h2>
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <p class="muted small">Cost of the empty vial / packaging, added to the perfume cost of each decant (Sales page). Bottle costs come from the price list (bottle_cost column). Saved on each order when it is paid.</p>
+  {% if vial_error %}<p class="error" role="alert">{{ vial_error }}</p>{% endif %}
+  <div class="grid">
+    {% for size in vial_sizes %}<label>{{ size }}ml vial (ကျပ်) <input name="vial_{{ size }}" inputmode="numeric" value="{{ vials.get(size, 0) }}"></label>{% endfor %}
+  </div>
+  <button class="primary">Save vial costs</button>
+</form>
+
 <section class="card stack" id="faq">
   <h2>💬 FAQ answers</h2>
   <p class="muted small">Common questions. A message that names no product and matches keywords gets the answer (automatically when auto-reply is ON, otherwise a one-tap “💬 Send FAQ” button). Keywords: comma separated, Burmese or English. Most keywords found wins.</p>

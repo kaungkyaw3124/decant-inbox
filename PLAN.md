@@ -6,8 +6,10 @@ Read CLAUDE.md first. This file tracks where we are.
 - v1 COMPLETE. v2 (docs/SPEC-orders.md) Steps 1-5 DONE and deployed.
 - v3 (docs/SPEC-v3.md): Step 6 DONE + deployed 2026-10-15 (delivery statuses, reminder +
   auto-cancel, unanswered -> Needs you, cancel whole order, wanted report).
-- Step 7 (FAQ) DONE + deployed 2026-10-15.
-- NOW: Step 8 (daily sales & profit), then the OWNER TEST SCRIPT in REPORT.md.
+- Step 7 (FAQ) and Step 8 (sales & profit) DONE + deployed 2026-10-15. v3 Steps 6-8 complete.
+- NOW: owner runs the OWNER TEST SCRIPT at the end of REPORT.md (second Telegram account) and
+  reports differences. Optional: bottle_cost in the price list + vial costs in Settings.
+- Step 9 (inventory) only when the owner asks.
 - At the end: OWNER TEST SCRIPT in REPORT.md.
 - Owner checks: `bash scripts/status.sh`.
 
@@ -22,7 +24,7 @@ Read CLAUDE.md first. This file tracks where we are.
 | 4 | Dashboard + Tailscale (private access) | ✅ Dashboard verified by owner via SSH tunnel (2026-10-11). Tailscale (phone access) still optional |
 | 5 | Run 24/7, backups, health page | ✅ Done: reboot test passed 2026-10-11 (all services back, health ok, new tunnel URL) |
 | 6 | v2: replies, cart, payment check, orders (docs/SPEC-orders.md) | ✅ Steps 1-5 done |
-| 7 | v3 (docs/SPEC-v3.md): after payment, FAQ, sales | 🟡 Steps 6-7 done; Step 8 next |
+| 7 | v3 (docs/SPEC-v3.md): after payment, FAQ, sales | ✅ Steps 6-8 done (owner test pending) |
 
 ## Phase 0 checklist
 - [x] Step 0: rollback safety net scripts in ~/hardening/
@@ -82,8 +84,7 @@ Do NOT send the URL via the owner's Telegram account (account is read-only).
       correct the intent/product/size_ml columns, then `.venv/bin/pytest tests/test_parser_samples.py`
 
 ## Backlog (owner asked to be reminded)
-- After the reply + payment feature: DAILY SALES dashboard (sales per day, revenue,
-  cost, profit per perfume, best sellers). Needs cost prices (bottle cost / ml).
+- ~~DAILY SALES dashboard~~ done in v3 Step 8 (/sales).
 - Fixed domain for the dashboard (instead of the changing trycloudflare.com URL).
 
 ## Later (not v1)

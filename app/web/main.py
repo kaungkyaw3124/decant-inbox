@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 from starlette.middleware.sessions import SessionMiddleware
 
 from app.core.config import get_settings
-from app.web import auto as auto_pages, catalog, chats, health, inbox, orders, payments, prices, settings as settings_pages
+from app.web import auto as auto_pages, catalog, chats, health, inbox, orders, payments, prices, sales, settings as settings_pages
 from app.web.auth import LoginRequired, authenticate, client_ip, locked_out, login, verify_csrf
 from app.web.deps import get_db, templates
 
@@ -39,6 +39,7 @@ app.include_router(chats.router)
 app.include_router(auto_pages.router)
 app.include_router(payments.router)
 app.include_router(orders.router)
+app.include_router(sales.router)
 app.include_router(prices.router)
 app.include_router(settings_pages.router)
 app.include_router(health.router)

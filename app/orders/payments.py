@@ -20,6 +20,7 @@ from sqlalchemy.orm import Session
 from app.models import AuditLog, Customer, MediaDownload, Message, Order, Outbox, PaymentCheck, User
 from app.models.outbox import UNDO_SECONDS
 from app.orders import cart
+from app.pricing import costs
 from app.pricing.prices import format_mmk
 from app.replies import compose
 from app.replies import templates as replies
@@ -167,6 +168,7 @@ def approve(session: Session, check: PaymentCheck, form: Form, user: User, texts
     _decide(check, "approved", user, form)
     order.order_no = session.scalar(text("SELECT nextval('order_no_seq')"))
     order.status, order.paid_at = "paid", datetime.now(UTC)
+    costs.stamp(session, order)  # cost at the time of the sale (Step 8)
     _queue(session, check, order, confirmation_text(session, order, texts), user)
     session.add(AuditLog(user_id=user.id, action="payment.approve", details={
         "check_id": check.id, "order_id": order.id, "order_no": order.order_no, "warnings": found}))

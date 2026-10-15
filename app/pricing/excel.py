@@ -1,10 +1,12 @@
 """Price list as Excel: one row per perfume.
 
-    brand | name | full_size_ml | full_price | 2ml | 5ml | 10ml | ... | in_stock
+    brand | name | full_size_ml | full_price | 2ml | 5ml | 10ml | ... | in_stock | bottle_cost
 
 - Any header like "3ml" / "15 ml" is a decant size. Empty cell = size not sold.
 - A size column that is missing from the file leaves that size unchanged.
 - in_stock: yes/no; empty = unchanged (yes for new products). Applies to every size.
+- bottle_cost (optional): what the owner paid for the full bottle; empty = unchanged. Kept
+  as history (product_costs) for the sales & profit page (docs/SPEC-v3.md Step 8).
 - Import is two steps: read_sheet() + plan_import() build a preview without writing
   anything; apply_import() writes it after the admin confirms.
 """
@@ -22,8 +24,9 @@ from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
-from app.models import Product, ProductAlias, ProductPrice
+from app.models import Product, ProductAlias, ProductCost, ProductPrice
 from app.parser.normalize import normalize
+from app.pricing.costs import current_costs
 from app.pricing.prices import DEFAULT_SIZES, format_mmk, latest_prices, size_label
 
 SHEET_NAME = "Prices"
@@ -32,7 +35,7 @@ MAX_COLUMNS = 40
 MAX_PRICE = 100_000_000
 MAX_SIZE_ML = 1000
 FUZZY_THRESHOLD = 80
-NAMED_COLUMNS = ("brand", "name", "full_size_ml", "full", "in_stock")  # "full" = full_price
+NAMED_COLUMNS = ("brand", "name", "full_size_ml", "full", "in_stock", "bottle_cost")  # "full" = full_price
 YES = {"yes", "y", "true", "1", "ရှိ", "ရှိတယ်"}
 NO = {"no", "n", "false", "0", "မရှိ", "ကုန်", "ကုန်ပြီ"}
 _SIZE_HEADER = re.compile(r"^(\d+)\s*ml$")
@@ -46,6 +49,7 @@ HELP_LINES = [
     "Empty price cell = that size is not sold. Deleting a whole size column leaves that size unchanged.",
     "full_size_ml = bottle size (e.g. 100), full_price = price of the full bottle.",
     "in_stock: yes or no (for the whole perfume). Empty = unchanged.",
+    "bottle_cost (optional): what you paid for the full bottle, for the Sales page profit. Empty = unchanged.",
     "A new brand + name adds a new product. Names that look like an existing product are shown for you to decide.",
     "Upload in the dashboard: Prices > Upload. You see a preview first; nothing is saved until you press Confirm.",
 ]
@@ -64,6 +68,7 @@ class SheetRow:
     prices: dict[str, int | None]  # "5" -> 18000, "full" -> 280000; only columns in the file
     in_stock: bool | None  # None = unchanged
     full_size_given: bool = False
+    bottle_cost: int | None = None  # None = unchanged
 
 
 @dataclass
@@ -179,7 +184,7 @@ def read_sheet(data: bytes) -> Sheet:
             columns[key] = idx
         else:
             sheet.warnings.append(f"Column {letter} '{_text(values[0][idx])}' is ignored "
-                                  "(not brand/name/full_size_ml/full_price/in_stock or a size like 5ml).")
+                                  "(not brand/name/full_size_ml/full_price/in_stock/bottle_cost or a size like 5ml).")
     for required in ("brand", "name"):
         if required not in columns:
             raise SheetError(f"Header row (row 1) must have a '{required}' column.")
@@ -234,9 +239,16 @@ def read_sheet(data: bytes) -> Sheet:
                 in_stock = _stock(cell("in_stock"))
             except ValueError:
                 sheet.errors.append(f"{ref('in_stock')}: '{_text(cell('in_stock'))}' must be yes or no.")
+        bottle_cost = None
+        if "bottle_cost" in columns:
+            try:
+                bottle_cost = _number(cell("bottle_cost"), MAX_PRICE)
+            except ValueError:
+                sheet.errors.append(f"{ref('bottle_cost')}: '{_text(cell('bottle_cost'))}' is not a cost "
+                                    "(whole kyat, e.g. 300000).")
         if prices.get("full") and sheet.has_full_size and not full_size:
             sheet.warnings.append(f"Row {offset}: {name} has a full bottle price but no full_size_ml.")
-        sheet.rows.append(SheetRow(offset, brand, name, full_size, prices, in_stock, sheet.has_full_size))
+        sheet.rows.append(SheetRow(offset, brand, name, full_size, prices, in_stock, sheet.has_full_size, bottle_cost))
     if not sheet.rows and not sheet.errors:
         sheet.errors.append("No perfumes found below the header row.")
     return sheet
@@ -293,7 +305,12 @@ def _bottle_size_changes(row: SheetRow, product: Product) -> bool:
     return row.full_size_given and row.full_size_ml != product.full_size_ml
 
 
-def _describe(row: SheetRow, product: Product | None, current: dict[int | None, Any]) -> list[str]:
+def _cost_changes(row: SheetRow, cost: int | None) -> bool:
+    return row.bottle_cost is not None and row.bottle_cost != cost
+
+
+def _describe(row: SheetRow, product: Product | None, current: dict[int | None, Any],
+              cost: int | None = None) -> list[str]:
     lines = []
     full_size = row.full_size_ml if row.full_size_given or product is None else product.full_size_ml
     if product is not None and _bottle_size_changes(row, product):
@@ -312,6 +329,9 @@ def _describe(row: SheetRow, product: Product | None, current: dict[int | None, 
         lines.append(f"in stock: {'yes' if True in old_stock else 'no'} → {'yes' if row.in_stock else 'no'}")
     elif row.in_stock is False and not old_stock:
         lines.append("in stock: no")
+    if _cost_changes(row, cost):
+        lines.append(f"bottle cost: {format_mmk(row.bottle_cost)}" if cost is None
+                     else f"bottle cost: {format_mmk(cost)} → {format_mmk(row.bottle_cost)}")
     return lines
 
 
@@ -331,6 +351,7 @@ def plan_import(session: Session, sheet: Sheet) -> Plan:
     products = list(session.scalars(select(Product)))
     by_key = {(normalize(p.brand), normalize(p.name)): p for p in products}
     latest = latest_prices(session)
+    bottle_costs = current_costs(session)
     active = [p for p in products if p.active]
     rows, matched = [], set()
     for row in sheet.rows:
@@ -341,7 +362,7 @@ def plan_import(session: Session, sheet: Sheet) -> Plan:
                                 changes=_describe(row, None, {})))
             continue
         matched.add(product.id)
-        changes = _describe(row, product, latest.get(product.id, {}))
+        changes = _describe(row, product, latest.get(product.id, {}), bottle_costs.get(product.id))
         rows.append(RowPlan(row, "changed" if changes or not product.active else "same", product.id,
                             changes=changes, reactivate=not product.active))
     untouched = sorted(f"{p.brand} {p.name}" for p in active if p.id not in matched)
@@ -380,7 +401,8 @@ def apply_import(session: Session, plan: Plan, choices: dict[int, str], user_id:
 
     now = datetime.now(UTC)
     latest = latest_prices(session)
-    stats = {"products_added": 0, "products_updated": 0, "prices_written": 0}
+    bottle_costs = current_costs(session)
+    stats = {"products_added": 0, "products_updated": 0, "prices_written": 0, "costs_written": 0}
     for rp, product in targets:
         row = rp.row
         if product is None:
@@ -405,6 +427,11 @@ def apply_import(session: Session, plan: Plan, choices: dict[int, str], user_id:
                                      price_mmk=price, in_stock=in_stock, effective_from=now, created_by=user_id))
             stats["prices_written"] += 1
             changed = True
+        if _cost_changes(row, bottle_costs.get(product.id)):
+            session.add(ProductCost(product_id=product.id, bottle_cost_mmk=row.bottle_cost, effective_from=now,
+                                    created_by=user_id))
+            stats["costs_written"] += 1
+            changed = True
         if changed and not added:
             stats["products_updated"] += 1
     return stats
@@ -413,21 +440,22 @@ def apply_import(session: Session, plan: Plan, choices: dict[int, str], user_id:
 # ---------- writing ----------
 
 def write_workbook(rows: list[dict[str, Any]], sizes: list[int]) -> bytes:
-    """rows: brand, name, full_size_ml, full_price, prices {size_ml: price}, in_stock (bool)."""
+    """rows: brand, name, full_size_ml, full_price, prices {size_ml: price}, in_stock (bool), bottle_cost."""
     wb = Workbook()
     ws = wb.active
     ws.title = SHEET_NAME
-    header = ["brand", "name", "full_size_ml", "full_price", *[f"{s}ml" for s in sizes], "in_stock"]
+    header = ["brand", "name", "full_size_ml", "full_price", *[f"{s}ml" for s in sizes], "in_stock", "bottle_cost"]
     ws.append(header)
     for r in rows:
         ws.append([r["brand"], r["name"], r.get("full_size_ml"), r.get("full_price"),
-                   *[r["prices"].get(s) for s in sizes], "yes" if r.get("in_stock", True) else "no"])
+                   *[r["prices"].get(s) for s in sizes], "yes" if r.get("in_stock", True) else "no",
+                   r.get("bottle_cost")])
     for cell in ws[1]:
         cell.font = Font(bold=True)
-    for col in range(4, 5 + len(sizes)):
+    for col in [*range(4, 5 + len(sizes)), 6 + len(sizes)]:
         for (cell,) in ws.iter_rows(min_row=2, min_col=col, max_col=col):
             cell.number_format = "#,##0"
-    widths = [22, 34, 13, 13, *[10] * len(sizes), 10]
+    widths = [22, 34, 13, 13, *[10] * len(sizes), 10, 13]
     for idx, width in enumerate(widths, start=1):
         ws.column_dimensions[get_column_letter(idx)].width = width
     ws.freeze_panes = "C2"
@@ -444,6 +472,7 @@ def write_workbook(rows: list[dict[str, Any]], sizes: list[int]) -> bytes:
 def export_rows(session: Session) -> tuple[list[dict[str, Any]], list[int]]:
     products = list(session.scalars(select(Product).where(Product.active).order_by(Product.brand, Product.name)))
     latest = latest_prices(session, [p.id for p in products])
+    bottle_costs = current_costs(session, [p.id for p in products])
     sizes = set(DEFAULT_SIZES)
     rows = []
     for p in products:
@@ -456,5 +485,6 @@ def export_rows(session: Session) -> tuple[list[dict[str, Any]], list[int]]:
             "prices": {s: pr.price_mmk for s, pr in current.items() if s is not None},
             # one stock flag per perfume in the file: "no" only if every size is out of stock
             "in_stock": not current or any(pr.in_stock for pr in current.values()),
+            "bottle_cost": bottle_costs.get(p.id),
         })
     return rows, sorted(sizes)
