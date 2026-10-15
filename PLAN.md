@@ -2,25 +2,13 @@
 
 Read CLAUDE.md first. This file tracks where we are.
 
-## RESUME HERE (updated 2026-10-12 01:55 Yangon)
-- v1 COMPLETE (Phases 1-5, reboot test passed).
-- NOW: feature v2 "Replies, Cart, Payment check, Orders". Full spec: docs/SPEC-orders.md.
-  Build its steps 1-6 one at a time; report after each in REPORT.md and update this note.
-- v2 Step 1 (price list + Excel + Settings) DONE and live; sample prices imported, test
-  payment methods KPay/AYA Pay (Test Shop) added.
-- v2 Step 2 (messaging core) DONE and deployed; waiting for the owner's first live send test
-  (see REPORT.md).
-- One-tap quick replies ("💬 Reply price", 10 s Undo) DONE; live send verified
-  2026-10-11 18:48 UTC (queued -> sent after 11 s). Also offered for intent=buy (until cart).
-- v2 Step 3 (parser rules-2) DONE and verified by owner.
-- v2 Step 4 (cart, one-tap cart actions, address/phone, payment info) DONE and deployed.
-- v2 Step 4b (partial carts, phone first then address, up to 3 phones, same phone & address
-  next time) DONE and deployed; waiting for the owner's end-to-end test (REPORT.md).
-- v2 Step 4c (AUTO MODE + unknown-item resolution) DONE; owner switched auto ON 2026-10-11 20:01 UTC.
-- v2 Step 4d (~3 s auto replies, list asks for phone, phone/address = agreement, returning
-  customer ending, later buys add to the cart) DONE and deployed.
-- v2 Step 5 (payment check + Order ID + confirmation) DONE and deployed; waiting for the
-  owner's test (REPORT.md). NEXT: Step 6 ("wanted but not stocked" list) after owner OK.
+## RESUME HERE (updated 2026-10-15 by planning chat)
+- v1 COMPLETE. v2 (docs/SPEC-orders.md) Steps 1-5 DONE and deployed.
+- NOW: v3 plan docs/SPEC-v3.md — Step 6 (after-payment delivery statuses, payment reminder +
+  auto-cancel, unanswered -> Needs you, cancel whole order, wanted report), Step 7 (FAQ),
+  Step 8 (daily sales & profit). Do them in order, each with its acceptance tests, loop
+  test -> fix until green, then the next. Old SPEC-orders "Step 6" is replaced by v3 6.5.
+- At the end: OWNER TEST SCRIPT in REPORT.md.
 - Owner checks: `bash scripts/status.sh`.
 
 ## Status
