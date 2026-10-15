@@ -8,13 +8,15 @@ Bump PARSER_VERSION whenever the rules or scoring change.
 
 rules-2 (docs/SPEC-orders.md "Parser v2"): multi-item, polite buy words, full bottle,
 intents remove/confirm/done/address, phone numbers, 24 h context, unknown product text.
+rules-3 (docs/SPEC-v3.md 6.1, 6.4): ask_delivery ("ဘယ်တော့ရောက်မလဲ", "deli"), cancel_order (a
+cancel word WITHOUT a product: the whole order; with a product it stays remove).
 """
 import re
 from dataclasses import dataclass, field
 
 from rapidfuzz import fuzz
 
-PARSER_VERSION = "rules-2"
+PARSER_VERSION = "rules-3"
 NEEDS_REVIEW_BELOW = 0.6  # dashboard shows results under this as "needs review"
 FUZZY_THRESHOLD = 88      # rapidfuzz partial_ratio, 0-100
 FUZZY_MIN_ALIAS_LEN = 5   # shorter aliases match too much by accident
@@ -29,7 +31,9 @@ def _w(word: str) -> str:
     return r"(?<![a-z])" + word + r"(?![a-z])"
 
 
-REMOVE_RE = _rx("မယူတော့", "ဖြုတ်ပေး", "ဖြုတ်လိုက်", "ဖြုတ်ပါ", "မလိုတော့", "မဝယ်တော့", _w("cancel"))
+REMOVE_RE = _rx("မယူတော့", "ဖြုတ်ပေး", "ဖြုတ်လိုက်", "ဖြုတ်ပါ", "မလိုတော့", "မဝယ်တော့", "မမှာတော့", _w("cancel"))
+# The same words without a product name = cancel the whole order.
+CANCEL_ORDER_RE = _rx("မယူတော့", "မမှာတော့", "မဝယ်တော့", _w("cancel"))
 # The polite particle ပါ may sit inside: ယူပါမယ်, ဝယ်ပါမယ်, မှာပါမယ်, ယူပါရစေ.
 BUY_RE = _rx("ဝယ်ချင်", "ဝယ်(?:ပါ)?မယ်", "ယူ(?:ပါ)?မယ်", "ယူချင်", "ယူ(?:ပါ)?ရစေ", "မှာ(?:ပါ)?မယ်",
              "မှာချင်", _w("order"), _w("buy"))
@@ -53,6 +57,10 @@ TOWNSHIPS_LATIN = (
 )
 ADDRESS_RE = _rx("ပို့ပေး", "လိပ်စာ", "မြို့နယ်", "ရပ်ကွက်", "လမ်း", _w("address"), _w("township"),
                  _w("street"), _w("road"), *TOWNSHIPS, *(_w(t) for t in TOWNSHIPS_LATIN))
+# "When will it arrive?" Strong words win over address words; a bare "deli" only counts when
+# nothing else matched and there is no phone number (an address message may say "deli").
+ASK_DELIVERY_RE = _rx("ဘယ်တော့ရောက်", "ရောက်ပြီလား", "ရောက်ပြီလဲ", "ပို့ပြီးပြီလား", "ပို့ပြီးပြီလဲ", "ဘယ်တော့ပို့")
+DELI_WORD_RE = _rx(_w("deli"))
 DONE_RE = _rx("ဒါပဲ", "ဒါပါပဲ", "ဒီလောက်ပါပဲ", "ဒီလောက်ပဲ", "ဒါတွေပဲ", "ဒါတွေပါပဲ")
 CONFIRM_RE = _rx("အဆင်ပြေတယ်", "အဆင်ပြေပါတယ်", "ဟုတ်ကဲ့", "ရပါတယ်", _w("ok"), _w("okay"), _w("confirm"))
 PRODUCT_INTENTS = ("buy", "ask_price", "ask_stock", "remove")
@@ -72,6 +80,7 @@ _FILLER_LATIN = {
     "size", "full", "bottle", "decant", "the", "a", "for", "and", "also", "want", "need", "one", "two",
     "pcs", "pc", "x", "ml", "mls", "edp", "edt", "parfum", "perfume", "can", "i", "get", "have", "do", "is",
     "it", "this", "that", "too", "more", "again", "sir", "ma", "admin", "brand", "new", "original",
+    "my", "don't", "dont", "anymore", "sorry", "order", "all", "just",
 }
 _LATIN_WORD = re.compile(r"[a-z][a-z0-9'.-]*")
 
@@ -115,9 +124,12 @@ def find_intent(text: str, has_product_or_size: bool = False) -> str | None:
             return intent
     if has_product_or_size and POLITE_BUY_RE.search(text):
         return "buy"
-    for intent, pattern in (("address", ADDRESS_RE), ("done", DONE_RE), ("confirm", CONFIRM_RE)):
+    for intent, pattern in (("ask_delivery", ASK_DELIVERY_RE), ("address", ADDRESS_RE), ("done", DONE_RE),
+                            ("confirm", CONFIRM_RE)):
         if pattern.search(text):
             return intent
+    if DELI_WORD_RE.search(text) and not _PHONE_RE.search(text):
+        return "ask_delivery"
     return None
 
 
@@ -283,7 +295,9 @@ def parse(normalized_text: str, aliases: list[Alias], full_sizes: dict[int, int]
             # Nothing product-related: chit-chat, thanks...
             return ParseOutcome("other", None, None, 1, 0.7, (), phone)
         intent = "unknown"
-    if intent in ("address", "confirm", "done") or (intent == "remove" and not items):
+    if intent == "remove" and not items and CANCEL_ORDER_RE.search(text):
+        intent = "cancel_order"  # no product named: the whole order
+    if intent in ("address", "confirm", "done", "ask_delivery", "cancel_order") or (intent == "remove" and not items):
         return ParseOutcome(intent, product_id, size_ml, quantity, 0.8, items_t, phone)
 
     intent_score = 0.0 if intent == "unknown" else 0.3

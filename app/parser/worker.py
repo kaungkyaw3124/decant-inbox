@@ -15,7 +15,7 @@ from sqlalchemy.exc import IntegrityError
 from app.core.db import SessionLocal
 from app.core.heartbeat import beat
 from app.models import Message
-from app.orders import auto, cart, payments
+from app.orders import auto, cart, delivery, followups, payments
 from app.parser.rules import PARSER_VERSION
 from app.parser.service import load_aliases, load_full_sizes, parse_message, unparsed_message_ids
 from scripts.reparse_all import reparse_all
@@ -24,6 +24,7 @@ log = logging.getLogger("parser")
 BATCH = 200
 HEARTBEAT_SECONDS = 30
 HOUSEKEEPING_SECONDS = 600
+FOLLOWUP_SECONDS = 60
 _failed: set[int] = set()  # retried after a restart, so one bad row cannot block the queue
 
 
@@ -76,11 +77,24 @@ def scan_payments() -> None:
 
 
 def housekeeping() -> None:
-    """Carts idle for 3 days -> abandoned (DB-only chore; this worker runs 24/7 anyway)."""
+    """Carts idle for 3 days -> abandoned; sent out N days ago -> delivered (DB-only chores;
+    this worker runs 24/7 anyway)."""
     with SessionLocal.begin() as session:
         abandoned = cart.abandon_idle(session)
-    if abandoned:
-        log.info("abandoned %d idle carts", abandoned)
+        delivered = delivery.auto_deliver(session)
+    if abandoned or delivered:
+        log.info("abandoned %d idle carts, %d orders auto-delivered", abandoned, delivered)
+
+
+def follow_up() -> None:
+    """Payment reminders and auto-cancel of unpaid orders (docs/SPEC-v3.md 6.2)."""
+    try:
+        with SessionLocal.begin() as session:
+            stats = followups.run(session)
+        if stats:
+            log.info("payment follow-ups: %s", stats)
+    except Exception:
+        log.exception("payment follow-ups failed")
 
 
 def main() -> None:
@@ -92,11 +106,14 @@ def main() -> None:
 
     log.info("parser worker started (%s)", PARSER_VERSION)
     fingerprint = None
-    last_beat = last_chores = 0.0
+    last_beat = last_chores = last_follow_up = 0.0
     while True:
         if time.monotonic() - last_chores >= HOUSEKEEPING_SECONDS:
             housekeeping()
             last_chores = time.monotonic()
+        if time.monotonic() - last_follow_up >= FOLLOWUP_SECONDS:
+            follow_up()
+            last_follow_up = time.monotonic()
         if time.monotonic() - last_beat >= HEARTBEAT_SECONDS:
             beat("parser", PARSER_VERSION)
             last_beat = time.monotonic()

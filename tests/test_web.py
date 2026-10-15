@@ -1,6 +1,6 @@
 """Dashboard: login, inbox filters, edits, review, catalog. Runs on the test DB."""
 import re
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from fastapi.testclient import TestClient
@@ -14,7 +14,8 @@ from app.web.auth import hash_password
 from scripts.seed_catalog import seed
 from tests.test_seed_catalog import write_csvs
 
-NOW = datetime(2026, 10, 10, 12, 0, tzinfo=UTC)
+# old enough to be outside every "recent" window (Needs you, auto mode), whatever today is
+NOW = datetime.now(UTC).replace(microsecond=0) - timedelta(days=30)
 PASSWORD = "correct horse battery"
 
 

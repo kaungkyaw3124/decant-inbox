@@ -12,6 +12,10 @@ For each message at most ONE action is offered, chosen from its parse and the ca
                                         address) or send payment info when all is known
   phone(s) / address    -> contact      save them + ask what is still missing, or send
                                         payment info when everything is ready
+  ask_delivery          -> delivery     "preparing" / "sent on {date}" for a paid order
+                                        (docs/SPEC-v3.md 6.1); no paid order: nothing
+  cancel_order          -> cancel_order cancel an unpaid order + reply (6.4); once a payment
+                                        screenshot came: nothing (Needs you, admin decides)
 So every customer reply gets exactly one next action: list -> confirm -> phone -> address
 -> payment info.
 
@@ -35,7 +39,7 @@ from app.models import (
     AuditLog, Customer, Message, MessageReview, Order, Outbox, ParseItem, ParseResult, Product, QuickAction, User,
 )
 from app.models.outbox import UNDO_SECONDS
-from app.orders import cart, unknown
+from app.orders import cart, delivery, unknown
 from app.parser.normalize import normalize
 from app.parser.rules import ADDRESS_RE, NEEDS_REVIEW_BELOW, find_phones
 from app.pricing.prices import size_label
@@ -136,7 +140,7 @@ def contact_in(message: Message) -> tuple[list[str], str | None]:
 # ---------- the actions (run for preview in a savepoint, and for real) ----------
 
 def _order_state(order: Order) -> dict[str, Any]:
-    return {"status": order.status, "confirmed_at": _iso(order.confirmed_at),
+    return {"status": order.status, "closed_at": _iso(order.closed_at), "confirmed_at": _iso(order.confirmed_at),
             "payment_info_sent_at": _iso(order.payment_info_sent_at), "list_sent_at": _iso(order.list_sent_at),
             "address": order.address, "phones": list(order.phones or [])}
 
@@ -208,7 +212,23 @@ def _apply_items(session: Session, message: Message, result: ParseResult, texts:
         query = "".join(f"&p{n}={i.product_id}&s{n}={i.size}" for n, i in enumerate(price_items, 1))
         return Outcome("price", "💬 Reply price", made.text, "price", edit_query=f"compose=price&make=1{query}")
 
+    if intent == "ask_delivery":
+        shipping = delivery.shipping_order(session, customer.id)
+        if shipping is None:
+            return None  # no paid order: the admin answers (Needs you)
+        return Outcome("delivery", "💬 Reply delivery status", delivery.status_answer(shipping, texts), "delivery",
+                       f"Order #{shipping.order_no} is {shipping.status.replace('_', ' ')}.")
     order = cart.open_cart(session, customer.id)
+    if intent == "cancel_order":
+        if order is None or order.status not in ("cart", "confirmed", "waiting_payment") \
+                or delivery.has_payment_photo(session, order):
+            return None  # nothing to cancel, or money may be involved: the admin decides
+        before = _order_state(order)
+        cart.cancel(session, order)
+        order.cancel_note = "customer cancelled"
+        return Outcome("cancel_order", "🚫 Cancel order + reply", texts["order_cancelled"], "cancel",
+                       f"Cancels the {before['status'].replace('_', ' ')} order "
+                       f"({order.total_mmk:,} ကျပ်).", order.id, {"order": before})
     if intent == "buy":
         return _buy(session, message, customer, order, items, texts, dropped)
     if order is None or order.status not in ("cart", "confirmed", "waiting_payment"):
@@ -459,6 +479,10 @@ def undo(session: Session, action: QuickAction, user: User) -> None:
         if "order" in u:
             o = u["order"]
             order.status, order.address, order.phones = o["status"], o["address"], o.get("phones", [])
+            if "closed_at" in o:
+                order.closed_at = _dt(o["closed_at"])
+                if order.status != "cancelled":
+                    order.cancel_note = None
             order.confirmed_at, order.payment_info_sent_at, order.list_sent_at = (
                 _dt(o["confirmed_at"]), _dt(o["payment_info_sent_at"]), _dt(o["list_sent_at"]))
         if u.get("created_order") and cart.view(session, order).empty:

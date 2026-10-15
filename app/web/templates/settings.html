@@ -16,6 +16,20 @@
   <button class="primary">Save speed</button>
 </form>
 
+<form method="post" action="/settings/order-rules" class="card stack" id="order-rules">
+  <h2>📦 Orders & payments</h2>
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <p class="muted small">Reminder and cancel are sent only while auto-reply is ON; otherwise the order waits in “Needs you” with a button.</p>
+  {% if rules_error %}<p class="error" role="alert">{{ rules_error }}</p>{% endif %}
+  <div class="grid">
+    <label>Payment reminder after (hours) <input name="reminder_hours" type="number" min="{{ rule_limits.reminder_hours[0] }}" max="{{ rule_limits.reminder_hours[1] }}" value="{{ order_rules.reminder_hours }}" required></label>
+    <label>Cancel unpaid order after (hours) <input name="cancel_hours" type="number" min="{{ rule_limits.cancel_hours[0] }}" max="{{ rule_limits.cancel_hours[1] }}" value="{{ order_rules.cancel_hours }}" required></label>
+    <label>Sent out → delivered after (days) <input name="auto_delivered_days" type="number" min="{{ rule_limits.auto_delivered_days[0] }}" max="{{ rule_limits.auto_delivered_days[1] }}" value="{{ order_rules.auto_delivered_days }}" required></label>
+  </div>
+  <label class="check"><input type="checkbox" name="thank_you" value="1" {% if order_rules.thank_you %}checked{% endif %}> Send thank-you on delivered</label>
+  <button class="primary">Save</button>
+</form>
+
 <section class="card stack" id="payment-methods">
   <h2>Payment methods</h2>
   <p class="muted small">Active methods are listed in the payment info message to customers.</p>

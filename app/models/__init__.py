@@ -5,7 +5,7 @@ from app.models.customers import Customer
 from app.models.health import ServiceHeartbeat
 from app.models.messages import Message, MessageReview
 from app.models.orders import (
-    AutoRun, CustomerPhone, Order, OrderItem, PaymentCheck, QuickAction, UnknownRequest,
+    AutoRun, CustomerPhone, Order, OrderEvent, OrderItem, PaymentCheck, QuickAction, UnknownRequest,
 )
 from app.models.outbox import MediaDownload, Outbox
 from app.models.parsing import ParseItem, ParseResult
@@ -13,5 +13,5 @@ from app.models.pricing import ProductPrice
 from app.models.settings import AppSetting, PaymentMethod, ReplyTemplate
 from app.models.users import User
 
-__all__ = ["AppSetting", "AuditLog", "AutoRun", "Customer", "CustomerPhone", "MediaDownload", "Message", "MessageReview", "Order", "OrderItem", "Outbox", "ParseItem", "PaymentCheck", "ParseResult", "PaymentMethod", "Product",
+__all__ = ["AppSetting", "AuditLog", "AutoRun", "Customer", "CustomerPhone", "MediaDownload", "Message", "MessageReview", "Order", "OrderEvent", "OrderItem", "Outbox", "ParseItem", "PaymentCheck", "ParseResult", "PaymentMethod", "Product",
            "ProductAlias", "ProductPrice", "QuickAction", "ReplyTemplate", "ServiceHeartbeat", "UnknownRequest", "User"]

@@ -4,10 +4,10 @@ Read CLAUDE.md first. This file tracks where we are.
 
 ## RESUME HERE (updated 2026-10-15 by planning chat)
 - v1 COMPLETE. v2 (docs/SPEC-orders.md) Steps 1-5 DONE and deployed.
-- NOW: v3 plan docs/SPEC-v3.md — Step 6 (after-payment delivery statuses, payment reminder +
-  auto-cancel, unanswered -> Needs you, cancel whole order, wanted report), Step 7 (FAQ),
-  Step 8 (daily sales & profit). Do them in order, each with its acceptance tests, loop
-  test -> fix until green, then the next. Old SPEC-orders "Step 6" is replaced by v3 6.5.
+- v3 (docs/SPEC-v3.md): Step 6 DONE + deployed 2026-10-15 (delivery statuses, reminder +
+  auto-cancel, unanswered -> Needs you, cancel whole order, wanted report).
+- NOW: Step 7 (FAQ), then Step 8 (daily sales & profit). Each with its acceptance tests, loop
+  test -> fix until green, then the next.
 - At the end: OWNER TEST SCRIPT in REPORT.md.
 - Owner checks: `bash scripts/status.sh`.
 
@@ -21,7 +21,8 @@ Read CLAUDE.md first. This file tracks where we are.
 | 3b | AI fallback (optional) | ⬜ Not started |
 | 4 | Dashboard + Tailscale (private access) | ✅ Dashboard verified by owner via SSH tunnel (2026-10-11). Tailscale (phone access) still optional |
 | 5 | Run 24/7, backups, health page | ✅ Done: reboot test passed 2026-10-11 (all services back, health ok, new tunnel URL) |
-| 6 | v2: replies, cart, payment check, orders (docs/SPEC-orders.md) | 🟡 Steps 1-4 done (price list, Excel, Settings; outbox sender, chats, replies, one-tap; parser rules-2; cart + payment info; 4b partial carts + phones; 4c auto mode; 4d speed + flow; 5 payment check); Step 6 next |
+| 6 | v2: replies, cart, payment check, orders (docs/SPEC-orders.md) | ✅ Steps 1-5 done |
+| 7 | v3 (docs/SPEC-v3.md): after payment, FAQ, sales | 🟡 Step 6 done; Step 7 next |
 
 ## Phase 0 checklist
 - [x] Step 0: rollback safety net scripts in ~/hardening/

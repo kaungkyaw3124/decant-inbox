@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Wanted · Decant Inbox{% endblock %}
+{% block content %}
+<h1>Wanted but not stocked</h1>
+<p class="muted small">Products customers asked for that you marked “We don't have it”, and sizes that are out of stock now (from the price list). Most asked first.</p>
+<table class="wanted">
+  <thead><tr><th>Name</th><th class="num">Times asked</th><th class="num">Customers</th><th>Last asked</th></tr></thead>
+  <tbody>
+  {% for w in rows %}
+    <tr><td>{{ w.name }} {% if w.kind == "out_of_stock" %}<span class="badge warn">out of stock</span>{% else %}<span class="badge">not in list</span>{% endif %}</td>
+      <td class="num">{{ w.times }}</td><td class="num">{{ w.customers }}</td><td>{{ w.last_asked | local_time }}</td></tr>
+  {% else %}
+    <tr><td colspan="4" class="empty">Nothing yet.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

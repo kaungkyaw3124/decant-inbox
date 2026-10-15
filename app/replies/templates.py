@@ -73,6 +73,26 @@ TEMPLATES: tuple[TemplateDef, ...] = (
                 "{name} ကတော့ လောလောဆယ် မရှိသေးပါဘူးနော်။", {"name": "hawas ice"}),
     TemplateDef("not_stocked", "Product we don't have",
                 "ဒီ product လောလောဆယ် မရှိသေးပါဘူးနော်။", {}),
+    # docs/SPEC-v3.md Step 6
+    TemplateDef("order_sent_out", "Order sent out ({deli_line} = the Deli line below, only when given)",
+                "Order #{order_no} ကို ပို့လိုက်ပါပြီ။{deli_line}\nပို့ခကို ပစ္စည်းရောက်မှ ပေးချေပေးပါနော်။",
+                {"order_no": "1001", "deli_line": "\nDeli: Ko Min 09 555 111 222"}),
+    TemplateDef("deli_line", "Deli line (own line; only when a deli name or phone is given)",
+                "Deli: {deli_name} {deli_phone}", {"deli_name": "Ko Min", "deli_phone": "09 555 111 222"}),
+    TemplateDef("order_delivered", "Order delivered: thank-you (only if switched on in Orders & payments)",
+                "ပစ္စည်းရရှိပြီဖြစ်လို့ ကျေးဇူးတင်ပါတယ်။ နောက်လည်း အားပေးပါဦးနော်။", {}),
+    TemplateDef("delivery_preparing", "“When will it arrive?” – order paid / packed",
+                "Order #{order_no} ကို ပြင်ဆင်နေပါတယ်။ ပို့လိုက်တာနဲ့ အကြောင်းကြားပေးပါမယ်နော်။", {"order_no": "1001"}),
+    TemplateDef("delivery_sent", "“When will it arrive?” – order sent out",
+                "Order #{order_no} ကို {sent_date} မှာ ပို့ပြီးပါပြီ။{deli_line}",
+                {"order_no": "1001", "sent_date": "15/10/2026", "deli_line": "\nDeli: Ko Min 09 555 111 222"}),
+    TemplateDef("payment_reminder", "Payment reminder (once, when no screenshot came)",
+                "Order အတွက် ငွေလွှဲပြီးရင် transaction id ပါတဲ့ screenshot ပို့ပေးပါနော်။ စုစုပေါင်း {total} ကျပ်ပါ။",
+                {"total": "83,000"}),
+    TemplateDef("order_auto_cancelled", "Order cancelled because no payment came",
+                "ငွေလွှဲမှု မရရှိသေးတဲ့အတွက် အော်ဒါကို cancel လုပ်ထားပါတယ်။ ပြန်မှာချင်ရင် ပြောပေးပါနော်။", {}),
+    TemplateDef("order_cancelled", "Customer cancelled the order",
+                "အော်ဒါ cancel လုပ်ပြီးပါပြီ။ နောက်မှ ပြန်မှာချင်ရင် ပြောပေးပါနော်။", {}),
 )
 BY_KEY = {t.key: t for t in TEMPLATES}
 MAX_LENGTH = 2000

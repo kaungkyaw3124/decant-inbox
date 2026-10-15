@@ -20,14 +20,18 @@ def csrf_token(request: Request) -> str:
 
 
 def _template_context(request: Request) -> dict:
-    auto_on, payments_open = False, 0
-    if request.session.get("user_id"):  # the switch and the payments badge are on every page
+    auto_on, payments_open, to_pack = False, 0, 0
+    if request.session.get("user_id"):  # the switch and the badges are on every page
+        from sqlalchemy import func, select
+
+        from app.models import Order
         from app.orders import auto, payments  # late import: avoids an import cycle at startup
 
         with SessionLocal() as session:
             auto_on, payments_open = auto.enabled(session), payments.count_open(session)
+            to_pack = session.scalar(select(func.count()).select_from(Order).where(Order.status == "paid"))
     return {"csrf": csrf_token(request), "flash": request.session.pop("flash", None),
-            "path": request.url.path, "auto_on": auto_on, "payments_open": payments_open}
+            "path": request.url.path, "auto_on": auto_on, "payments_open": payments_open, "to_pack": to_pack}
 
 
 templates = Jinja2Templates(
@@ -45,5 +49,16 @@ def local_time(value: datetime | None, fmt: str = "%d %b %H:%M") -> str:
     return value.astimezone(_TZ).strftime(fmt) if value else ""
 
 
+def age(value: datetime | None) -> str:
+    """How long ago, short: "5 min", "3 h", "2 d"."""
+    if value is None:
+        return ""
+    minutes = int((datetime.now(UTC) - value).total_seconds() // 60)
+    if minutes < 60:
+        return f"{max(minutes, 0)} min"
+    return f"{minutes // 60} h" if minutes < 48 * 60 else f"{minutes // 1440} d"
+
+
 templates.env.filters["local_time"] = local_time
+templates.env.filters["age"] = age
 templates.env.globals.update(format_mmk=format_mmk, size_label=size_label, now=lambda: datetime.now(UTC))

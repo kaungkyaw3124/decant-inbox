@@ -604,3 +604,44 @@ Short entries from the VPS Claude Code session, newest last.
   screenshot + not a payment; several photos -> no download, ask for one, then a single
   one is checked; auto mode never touches payments; photos before payment info ignored).
   Live: /healthz ok; no order waiting for payment right now (orders: 1 cancelled, 1 cart).
+
+## 2026-10-15 — v3 Step 6: delivery statuses, reminders + auto-cancel, unanswered, cancel order, wanted
+- Spec: docs/SPEC-v3.md Step 6 (pulled). Migration f9a675362501 applied live after a fresh backup
+  (product_requests_2026-10-15T1709Z.dump), round-trip (down/up) done.
+- DB: orders.status + `packed`, `sent_out`; orders packed_at / sent_out_at / delivered_at, deli_name /
+  deli_phone / deli_note, reminder_sent_at, cancel_note; new `order_events` (every status change / cancel
+  with what Undo restores); intents `ask_delivery`, `cancel_order`; outbox kinds delivery / reminder /
+  cancel; quick kinds delivery / cancel_order.
+- 6.1 Orders page (/orders, nav badge = to pack): tabs To pack / To send / Sent / Delivered / All; row =
+  #, customer, items, total, phones, address, age. 📦 Packed, 🚚 Sent out (optional deli name / phone /
+  note), ✅ Delivered: one tap, ↩ Undo for 60 s, audit_log. Messages they send wait those 60 s in the
+  outbox, so Undo also takes the message back. Sent out -> `order_sent_out` (+ `deli_line` only when a
+  deli name/phone is given). Delivered: nothing unless "Send thank-you on delivered" is on. Sent out
+  N days (default 5) -> delivered by the worker, no message. Packing may be skipped (paid -> sent out).
+- 6.1 "ဘယ်တော့ရောက်မလဲ / ရောက်ပြီလား / ပို့ပြီးပြီလား / deli" = `ask_delivery` (parser rules-3; a bare
+  "deli" only when nothing else matched and no phone, so "Bahan, deli နဲ့ ပို့ပေးပါ" stays address).
+  With a paid/packed/sent-out order: one-tap / auto reply `delivery_preparing` or `delivery_sent`
+  (date dd/mm/yyyy, Yangon). No such order: no reply -> Needs you (6.3).
+- 6.2 Worker every 60 s: waiting_payment with no screenshot -> ONE `payment_reminder` after 12 h,
+  cancel + `order_auto_cancelled` after 48 h (Settings > 📦 Orders & payments). Only with auto-reply ON
+  and when the chat may be auto-answered (not ignored / never-auto / owner paused); otherwise nothing
+  is sent and Needs you shows "no payment for N h" with "Send payment reminder" / "Cancel order + tell
+  them". Auto-cancelled orders show as info in Needs you for 24 h. Any payment screenshot stops it.
+- 6.3 Needs you "💬 unanswered": per customer, incoming messages with no reply from us (any way, incl.
+  queued) after 2 min, while they have an open cart or a paid order not delivered yet; plus
+  other/unknown/ask_delivery/cancel_order messages of the last 7 days. Buttons done / ignore. Decision:
+  a quick/auto reply to an EARLIER message does not count as answering a later one (so "stw 5ml
+  ယူမယ်" + "authentic လား" right after still shows the question).
+- 6.4 "မယူတော့ဘူး / မမှာတော့ဘူး / cancel / အော်ဒါ cancel" without a product = `cancel_order`: open cart /
+  confirmed / waiting payment with no screenshot -> one-tap / auto cancel + `order_cancelled` (undoable
+  like other taps). Screenshot sent / paid / packed / sent out -> no auto; Needs you "🚫 wants to cancel
+  a paid order" with Cancel order (note, send "order cancelled" or nothing; refund outside the system)
+  or "keep order". With a product name it is still `remove`.
+- 6.5 Reports (/reports/wanted): "We don't have it" items grouped by name + asks for sizes that are out
+  of stock now; times asked, customers, last asked; most asked first.
+- Chat cart panel links to the customer's paid order on its way. Settings has the new templates.
+- Test fix: tests/test_web.py fixture messages were dated 2026-10-10 and had aged out of the 3-day
+  Needs-you window (test_auto failed before any change). They are now "30 days ago" (date-proof).
+- Verified: pytest 223 passed, 1 skipped (new tests/test_after_payment.py: A1-A6 + parser cases).
+  Live: services restarted (tunnel untouched), parser rules-3 re-parsed 19 messages, /healthz all ok.
+

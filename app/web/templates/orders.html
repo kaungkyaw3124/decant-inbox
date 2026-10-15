@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %}Orders · Decant Inbox{% endblock %}
+{% block content %}
+<h1>Orders</h1>
+<nav class="tabs" aria-label="Orders">
+  {% for key, (label, _, _) in tabs.items() %}
+  <a href="/orders?tab={{ key }}" {% if tab == key %}aria-current="page"{% endif %}>{{ label }}{% if counts.get(key) %} <span class="badge">{{ counts[key] }}</span>{% endif %}</a>
+  {% endfor %}
+</nav>
+<ul class="rows orders">
+{% for o, c, v in rows %}
+  {% set ev = undo.get(o.id) %}
+  <li class="row order-row" id="order-{{ o.id }}">
+    <div class="row-main">
+      <div class="meta">
+        <span class="who"><b>#{{ o.order_no }}</b> · <a href="/chats/{{ c.id }}">{{ c.display_name or c.username or "Customer" }}</a></span>
+        <span class="badge">{{ status_labels.get(o.status, o.status) }}</span>
+        <time title="paid {{ o.paid_at | local_time }}">{{ o.paid_at | age }}</time>
+      </div>
+      <p class="text">{% for i, p in v.lines %}{{ item_name(i, p) }}{% if not loop.last %}, {% endif %}{% endfor %}
+        · <b>{{ format_mmk(o.total_mmk) }} ကျပ်</b></p>
+      <p class="small">📞 {{ (o.phones or []) | join(", ") or "—" }}<br>📍 {{ o.address or "—" }}</p>
+      {% if o.status == "sent_out" %}<p class="small muted">Sent {{ o.sent_out_at | local_time }}{% if o.deli_name or o.deli_phone %} · Deli: {{ o.deli_name or "" }} {{ o.deli_phone or "" }}{% endif %}{% if o.deli_note %} · {{ o.deli_note }}{% endif %}</p>{% endif %}
+      {% if o.status == "cancelled" and o.cancel_note %}<p class="small muted">Cancelled: {{ o.cancel_note }}</p>{% endif %}
+    </div>
+    <div class="buttons order-actions">
+      {% if ev %}
+      <form method="post" action="/orders/events/{{ ev.id }}/undo" class="inline">
+        <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="back" value="/orders?tab={{ tab }}">
+        <button class="quiet">↩ Undo {{ ev.to_status | replace("_", " ") }}</button>
+      </form>
+      {% endif %}
+      {% if o.status == "paid" %}
+      <form method="post" action="/orders/{{ o.id }}/status" class="inline">
+        <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="back" value="/orders?tab={{ tab }}">
+        <input type="hidden" name="to" value="packed"><button class="primary">📦 Packed</button>
+      </form>
+      {% endif %}
+      {% if o.status in ("paid", "packed") %}
+      <details class="sent-out">
+        <summary class="button {% if o.status == 'packed' %}primary{% endif %}">🚚 Sent out</summary>
+        <form method="post" action="/orders/{{ o.id }}/status" class="stack">
+          <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="back" value="/orders?tab={{ tab }}">
+          <input type="hidden" name="to" value="sent_out">
+          <label>Deli name (optional) <input name="deli_name" maxlength="64"></label>
+          <label>Deli phone (optional) <input name="deli_phone" maxlength="32" inputmode="tel"></label>
+          <label>Note for us (optional) <input name="deli_note" maxlength="500"></label>
+          <button class="primary">🚚 Sent out + tell the customer</button>
+        </form>
+      </details>
+      {% endif %}
+      {% if o.status in ("paid", "packed", "sent_out") %}
+      <form method="post" action="/orders/{{ o.id }}/status" class="inline">
+        <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="back" value="/orders?tab={{ tab }}">
+        <input type="hidden" name="to" value="delivered"><button {% if o.status == "sent_out" %}class="primary"{% endif %}>✅ Delivered</button>
+      </form>
+      <details class="cancel-order">
+        <summary class="button link danger">Cancel order</summary>
+        <form method="post" action="/orders/{{ o.id }}/cancel" class="stack">
+          <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="back" value="/orders?tab={{ tab }}">
+          <p class="small problem-text">The order is paid: refund the customer outside the system.</p>
+          <label>Note (refund, reason) <input name="note" maxlength="500"></label>
+          <label class="check"><input type="radio" name="message" value="order_cancelled" checked> Send “order cancelled” to the customer</label>
+          <label class="check"><input type="radio" name="message" value="none"> Send nothing</label>
+          <button class="danger">Cancel order</button>
+        </form>
+      </details>
+      {% endif %}
+    </div>
+  </li>
+{% else %}
+  <li class="empty">No orders here.</li>
+{% endfor %}
+</ul>
+<p class="small muted">Sent-out orders become delivered by themselves after the days set in Settings. <a href="/reports/wanted">Wanted but not stocked →</a></p>
+{% endblock %}

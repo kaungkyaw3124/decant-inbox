@@ -7,7 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models import AuditLog, Customer, Message, Outbox, Product, QuickAction, User
-from app.orders import auto, payments, unknown
+from app.orders import auto, followups, payments, unknown
 from app.web.auth import current_user, verify_csrf
 from app.web.deps import get_db
 from app.web.inbox import detail_url, flash, safe_back
@@ -133,9 +133,11 @@ def not_stocked(request: Request, message_id: int, position: int, back: str = Fo
 
 # ---------- monitoring ----------
 
-def needs_you(db: Session) -> dict:
-    """The "🟡 Needs you" queue: unknown items, failed sends, paused chats with new messages."""
-    now = datetime.now(UTC)
+def needs_you(db: Session, now: datetime | None = None) -> dict:
+    """The "🟡 Needs you" queue: payments, cancel requests for paid orders, unknown items,
+    unpaid orders the system may not remind / cancel by itself, unanswered messages, failed
+    sends, paused chats with new messages. Auto-cancelled orders are shown as info."""
+    now = now or datetime.now(UTC)
     unknown_msgs = unknown.messages_needing_you(db, now)
     failed = db.execute(select(Outbox, Customer).join(Customer, Customer.id == Outbox.customer_id)
                         .where(Outbox.status == "failed", Outbox.created_at >= now - FAILED_WINDOW)
@@ -153,10 +155,14 @@ def needs_you(db: Session) -> dict:
     customers = {c.id: c for c in db.scalars(select(Customer).where(
         Customer.id.in_([m.customer_id for m in unknown_msgs])))}
     to_check = payments.to_check(db)
-    return {"payments": to_check,
+    cancels = followups.cancel_requests(db, now)
+    unpaid = [(d, why) for d in followups.due(db, now) if (why := followups.blocked(db, d.customer, now))]
+    unanswered = followups.unanswered(db, now)
+    return {"payments": to_check, "cancels": cancels, "unpaid": unpaid, "unanswered": unanswered,
             "unknown": [(m, customers[m.customer_id], unknown.open_unknowns(db, m)) for m in unknown_msgs],
-            "failed": failed, "paused": paused,
-            "count": len(to_check) + len(unknown_msgs) + len(failed) + len(paused)}
+            "failed": failed, "paused": paused, "auto_cancelled": followups.auto_cancelled(db, now),
+            "count": len(to_check) + len(cancels) + len(unpaid) + len(unknown_msgs) + len(unanswered)
+                     + len(failed) + len(paused)}
 
 
 def handled_feed(db: Session, limit: int = 30) -> list:

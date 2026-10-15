@@ -2,7 +2,7 @@
 {% block content %}
 {% set kind_label = {"price": "price reply", "cart_add": "added to cart + list", "cart_remove": "removed + list",
                      "cart_list": "cart list", "confirm": "confirmed", "contact": "phone/address", "address": "address",
-                     "not_stocked": "we don't have it"} %}
+                     "not_stocked": "we don't have it", "delivery": "delivery status", "cancel_order": "order cancelled"} %}
 {% if needs_you is not none %}
 <section class="card needs-you {% if needs_you.count %}notice{% endif %}">
   <h2>🟡 Needs you ({{ needs_you.count }})</h2>
@@ -13,10 +13,45 @@
       {{ "several photos — ask for one" if check.decision == "several" else "payment screenshot to check" }}</a>
       <span class="small muted">{{ format_mmk(order.total_mmk) }} ကျပ်</span></li>
   {% endfor %}
+  {% for m, c, o in needs_you.cancels %}
+    <li><a href="/chats/{{ c.id }}"><b>🚫 {{ c.display_name or c.username or "Customer" }}</b>: wants to cancel a paid order
+      {% if o.order_no %}#{{ o.order_no }}{% else %}(payment photo sent){% endif %}</a>
+      <span class="small muted">“{{ m.raw_text | truncate(50) }}” · {{ format_mmk(o.total_mmk) }} ကျပ်</span>
+      <details class="cancel-order"><summary class="button link danger">Cancel order</summary>
+        <form method="post" action="/orders/{{ o.id }}/cancel" class="stack">
+          <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="back" value="/">
+          <p class="small problem-text">Money may be involved: refund outside the system.</p>
+          <label>Note <input name="note" maxlength="500"></label>
+          <label class="check"><input type="radio" name="message" value="order_cancelled" checked> Send “order cancelled”</label>
+          <label class="check"><input type="radio" name="message" value="none"> Send nothing</label>
+          <button class="danger">Cancel order</button>
+        </form></details>
+      <form method="post" action="/needs-you/clear" class="inline"><input type="hidden" name="csrf" value="{{ csrf }}">
+        <input type="hidden" name="message_id" value="{{ m.id }}"><button class="link">keep order (done)</button></form></li>
+  {% endfor %}
+  {% for d, why in needs_you.unpaid %}
+    <li><a href="/chats/{{ d.customer.id }}"><b>💳 {{ d.customer.display_name or d.customer.username or "Customer" }}</b>:
+      no payment for {{ d.hours }} h</a> <span class="small muted">({{ why }})</span>
+      {% if d.what == "reminder" %}
+      <form method="post" action="/orders/{{ d.order.id }}/remind" class="inline"><input type="hidden" name="csrf" value="{{ csrf }}">
+        <button class="quiet">Send payment reminder</button></form>
+      {% else %}
+      <form method="post" action="/orders/{{ d.order.id }}/cancel" class="inline"><input type="hidden" name="csrf" value="{{ csrf }}">
+        <input type="hidden" name="back" value="/"><input type="hidden" name="message" value="order_auto_cancelled">
+        <input type="hidden" name="note" value="not paid in {{ d.hours }} h"><button class="quiet">Cancel order + tell them</button></form>
+      {% endif %}</li>
+  {% endfor %}
   {% for m, c, items in needs_you.unknown %}
     <li><a href="/messages/{{ m.id }}"><b>{{ c.display_name or c.username or "Customer" }}</b>: {{ m.raw_text | truncate(70) }}</a>
       <span class="badge warn">❓ {{ items | map(attribute="text") | join(", ") }}</span>
       <a class="small" href="/messages/{{ m.id }}#unknown">resolve</a></li>
+  {% endfor %}
+  {% for u in needs_you.unanswered %}
+    <li><a href="/chats/{{ u.customer.id }}#bottom"><b>💬 {{ u.customer.display_name or u.customer.username or "Customer" }}</b>: {{ u.last_text | truncate(60) }}</a>
+      <span class="small muted">unanswered{% if u.message_ids | length > 1 %} ({{ u.message_ids | length }}){% endif %} · {{ u.last_at | age }}</span>
+      <form method="post" action="/needs-you/clear" class="inline"><input type="hidden" name="csrf" value="{{ csrf }}">
+        {% for mid in u.message_ids %}<input type="hidden" name="message_id" value="{{ mid }}">{% endfor %}
+        <button class="link" name="status" value="done">done</button> <button class="link" name="status" value="ignored">ignore</button></form></li>
   {% endfor %}
   {% for o, c in needs_you.failed %}
     <li><a href="/chats/{{ c.id }}#bottom"><b>{{ c.display_name or c.username or "Customer" }}</b>: reply not sent</a>
@@ -25,6 +60,9 @@
   {% for c, until in needs_you.paused %}
     <li><a href="/chats/{{ c.id }}"><b>{{ c.display_name or c.username or "Customer" }}</b>: new message while paused</a>
       <span class="small muted">(you replied by hand; auto until {{ until | local_time("%H:%M") }} off)</span></li>
+  {% endfor %}
+  {% for o, c in needs_you.auto_cancelled %}
+    <li class="muted"><a href="/chats/{{ c.id }}">ℹ️ {{ c.display_name or c.username or "Customer" }}</a>: order cancelled automatically (not paid){% if o.cancel_note %} · {{ o.cancel_note }}{% endif %}</li>
   {% endfor %}
   </ul>
 </section>

@@ -10,11 +10,15 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.base import Base, created_at_column
 
-# cart -> confirmed -> waiting_payment -> photo_received -> paid -> delivered (docs/SPEC-orders.md)
-ORDER_STATUSES = ("cart", "confirmed", "waiting_payment", "photo_received", "paid", "delivered",
-                  "cancelled", "abandoned")
+# cart -> confirmed -> waiting_payment -> photo_received -> paid -> packed -> sent_out -> delivered
+# (docs/SPEC-orders.md, docs/SPEC-v3.md 6.1)
+ORDER_STATUSES = ("cart", "confirmed", "waiting_payment", "photo_received", "paid", "packed", "sent_out",
+                  "delivered", "cancelled", "abandoned")
 OPEN_STATUSES = ("cart", "confirmed", "waiting_payment", "photo_received")
-QUICK_KINDS = ("price", "cart_add", "cart_remove", "cart_list", "confirm", "address", "contact", "not_stocked")
+PAID_STATUSES = ("paid", "packed", "sent_out", "delivered")  # counted as sales
+SHIPPING_STATUSES = ("paid", "packed", "sent_out")  # paid, not delivered yet
+QUICK_KINDS = ("price", "cart_add", "cart_remove", "cart_list", "confirm", "address", "contact", "not_stocked",
+               "delivery", "cancel_order")
 UNKNOWN_RESOLUTIONS = ("mapped", "new_product", "not_stocked")
 AUTO_STATUSES = ("replied", "skipped")
 # pending: one screenshot to check · several: more than one photo (ask for one) ·
@@ -48,6 +52,14 @@ class Order(Base):
     payment_info_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))  # cancelled/abandoned
     paid_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    packed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    sent_out_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    delivered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    deli_name: Mapped[str | None] = mapped_column(String(64))  # optional, given with "Sent out"
+    deli_phone: Mapped[str | None] = mapped_column(String(32))
+    deli_note: Mapped[str | None] = mapped_column(Text)  # for us only
+    reminder_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))  # one payment reminder
+    cancel_note: Mapped[str | None] = mapped_column(Text)  # why it was cancelled (admin / auto)
     created_at: Mapped[datetime] = created_at_column()
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(),
                                                  default=func.now())  # last change: idle carts expire
@@ -168,3 +180,20 @@ class AutoRun(Base):
     reason: Mapped[str | None] = mapped_column(String(120))
     quick_action_id: Mapped[int | None] = mapped_column(ForeignKey("quick_actions.id"))
     created_at: Mapped[datetime] = created_at_column()
+
+
+class OrderEvent(Base):
+    """A delivery-status change of a paid order (or a cancel), with what is needed to undo it
+    within 60 s. created_by None = done by the system (auto-delivered, auto-cancel)."""
+
+    __tablename__ = "order_events"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    order_id: Mapped[int] = mapped_column(ForeignKey("orders.id"), index=True)
+    from_status: Mapped[str] = mapped_column(String(20))
+    to_status: Mapped[str] = mapped_column(String(20))
+    previous: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)  # fields to restore on undo
+    outbox_id: Mapped[int | None] = mapped_column(ForeignKey("outbox.id"))  # message it queued, if any
+    created_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+    created_at: Mapped[datetime] = created_at_column()
+    undone_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

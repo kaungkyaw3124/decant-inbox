@@ -20,7 +20,7 @@ from app.models import (
 )
 from app.models.orders import MAX_PHONES, OPEN_STATUSES
 from app.models.outbox import MAX_TEXT, MEDIA_DIR
-from app.orders import actions, auto, cart
+from app.orders import actions, auto, cart, delivery
 from app.parser.normalize import normalize
 from app.parser.rules import find_phones
 from app.pricing.prices import current_prices
@@ -191,7 +191,7 @@ def cart_context(db: Session, customer: Customer, texts: dict[str, str]) -> dict
         "pending_check": db.scalar(select(PaymentCheck).where(
             PaymentCheck.order_id == order.id, PaymentCheck.decision.in_(("pending", "several")),
             PaymentCheck.outbox_id.is_(None))) if order else None,
-        "item_size": cart.item_size,
+        "item_size": cart.item_size, "shipping": delivery.shipping_order(db, customer.id),
     }
 
 

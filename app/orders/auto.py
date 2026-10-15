@@ -35,7 +35,8 @@ SETTING = "auto_reply"
 SPEED_SETTING = "auto_speed"
 DEFAULT_SPEED = {"quiet_s": 1, "delay_min_s": 2, "delay_max_s": 3}  # ~3 s from message to reply
 SPEED_LIMITS = {"quiet_s": (0, 30), "delay_min_s": (1, 60), "delay_max_s": (1, 60)}
-AUTO_INTENTS = ("ask_price", "ask_stock", "buy", "remove", "done", "confirm", "address")
+AUTO_INTENTS = ("ask_price", "ask_stock", "buy", "remove", "done", "confirm", "address", "ask_delivery",
+                "cancel_order")
 CERTAIN_MATCHES = ("exact", "inherited", "human")
 PAUSE_AFTER_HAND_REPLY = timedelta(hours=2)
 LINK_GRACE = timedelta(seconds=30)  # a dashboard send is linked to its outbox row within ms

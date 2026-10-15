@@ -22,9 +22,11 @@
   <nav>
     <a href="/" {% if path == "/" %}aria-current="page"{% endif %}>Inbox</a>
     <a href="/payments" {% if path.startswith("/payments") %}aria-current="page"{% endif %}>Payments{% if payments_open %} <span class="badge warn">{{ payments_open }}</span>{% endif %}</a>
+    <a href="/orders" {% if path.startswith("/orders") %}aria-current="page"{% endif %}>Orders{% if to_pack %} <span class="badge">{{ to_pack }}</span>{% endif %}</a>
     <a href="/chats" {% if path.startswith("/chats") %}aria-current="page"{% endif %}>Chats</a>
     <a href="/products" {% if path.startswith("/products") %}aria-current="page"{% endif %}>Products</a>
     <a href="/prices" {% if path.startswith("/prices") %}aria-current="page"{% endif %}>Prices</a>
+    <a href="/reports/wanted" {% if path.startswith("/reports") %}aria-current="page"{% endif %}>Reports</a>
     <a href="/settings" {% if path.startswith("/settings") %}aria-current="page"{% endif %}>Settings</a>
     <a href="/health" {% if path == "/health" %}aria-current="page"{% endif %}>Health</a>
     <form method="post" action="/logout" class="inline">

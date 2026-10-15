@@ -155,8 +155,8 @@ def test_unknown_items_need_you_then_continue(shop, db):
     auto.run_once()
     assert outbox(db) == [] and runs(db) == {}  # waiting for the admin, not skipped
     page = client.get("/").text
-    # 4 = these 3 + the client fixture's "aventus 10ml ရှိလား" (also not in the small catalog)
-    assert "🟡 Needs you (4)" in page and "❓ hawas ice" in page and "❓ aqua ice" in page
+    # the client fixture's "aventus 10ml ရှိလား" is 30 days old: outside the window
+    assert "🟡 Needs you (3)" in page and "❓ hawas ice" in page and "❓ aqua ice" in page
 
     # 1. we don't have it -> price reply for the rest + "we don't have" line
     detail = client.get(f"/messages/{msg(db, 1)}").text
@@ -170,7 +170,7 @@ def test_unknown_items_need_you_then_continue(shop, db):
     sauvage = scalar(db, "SELECT id FROM products WHERE name = 'Sauvage Eau de Parfum'")
     client.post(f"/messages/{msg(db, 3)}/unknown/0/map", data={"csrf": token, "product_id": str(sauvage)})
     assert scalar(db, "SELECT source FROM product_aliases WHERE normalized_alias = 'aqua ice'") == "learned"
-    assert "🟡 Needs you (1)" in client.get("/").text  # only the fixture's aventus left
+    assert "🟡 Needs you (0)" in client.get("/").text
 
     auto.run_once()
     sent = sorted(deliver(db))

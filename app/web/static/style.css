@@ -159,3 +159,13 @@ tr.problem-row td { background: var(--bad-bg); }
 .paused { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 @media (max-width: 560px) { .top { flex-wrap: wrap; } }
 .shot { max-width: 100%; max-height: 70vh; border-radius: 8px; display: block; }
+.order-actions { align-items: flex-start; }
+details.sent-out, details.cancel-order { display: inline-block; }
+details.sent-out summary, details.cancel-order summary { list-style: none; cursor: pointer; }
+details.sent-out[open] form, details.cancel-order[open] form { margin-top: .5rem; min-width: 16rem; }
+.feed form.inline { margin-left: .25rem; }
+summary.button { display: inline-flex; align-items: center; padding: 9px 14px; border-radius: 8px; border: 1px solid var(--line);
+  background: var(--card); color: var(--text); min-height: 40px; }
+summary.button.primary { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+summary.button.link { border: none; background: none; padding: 9px 4px; }
+summary.button.danger { color: var(--danger); }

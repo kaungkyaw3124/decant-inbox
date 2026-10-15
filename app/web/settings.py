@@ -6,7 +6,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
 from app.models import AuditLog, PaymentMethod, ReplyTemplate, User
-from app.orders import auto
+from app.orders import auto, delivery
 from app.replies import templates as replies
 from app.web.auth import current_user, verify_csrf
 from app.web.deps import get_db, templates
@@ -30,7 +30,8 @@ def _page(request: Request, db: Session, errors: dict[str, str] | None = None,
     methods = db.scalars(select(PaymentMethod).order_by(PaymentMethod.sort_order, PaymentMethod.id)).all()
     return templates.TemplateResponse(request, "settings.html", {
         "methods": methods, "templates": rows, "speed": auto.speed(db), "speed_limits": auto.SPEED_LIMITS,
-        "speed_error": (errors or {}).get("speed")}, status_code=status_code)
+        "speed_error": (errors or {}).get("speed"), "order_rules": delivery.rules(db),
+        "rule_limits": delivery.RULE_LIMITS, "rules_error": (errors or {}).get("rules")}, status_code=status_code)
 
 
 def _method_fields(name: str, account_number: str, account_name: str) -> dict[str, str]:
@@ -141,3 +142,23 @@ def save_speed(request: Request, quiet_s: str = Form(""), delay_min_s: str = For
     db.commit()
     flash(request, "Auto-reply speed saved.")
     return RedirectResponse("/settings#auto-speed", status_code=303)
+
+
+@router.post("/order-rules")
+def save_order_rules(request: Request, reminder_hours: str = Form(""), cancel_hours: str = Form(""),
+                     auto_delivered_days: str = Form(""), thank_you: str = Form(""),
+                     db: Session = Depends(get_db), user: User = Depends(current_user)):
+    try:
+        values = {"reminder_hours": int(reminder_hours), "cancel_hours": int(cancel_hours),
+                  "auto_delivered_days": int(auto_delivered_days), "thank_you": thank_you == "1"}
+    except ValueError:
+        return _page(request, db, errors={"rules": "Whole numbers only."}, status_code=400)
+    try:
+        delivery.set_rules(db, values, user)
+    except ValueError as exc:
+        db.rollback()
+        return _page(request, db, errors={"rules": str(exc)}, status_code=400)
+    _log(db, user, "order_rules.update", **values)
+    db.commit()
+    flash(request, "Orders & payments settings saved.")
+    return RedirectResponse("/settings#order-rules", status_code=303)
