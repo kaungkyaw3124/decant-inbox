@@ -2,15 +2,12 @@
 
 Read CLAUDE.md first. This file tracks where we are.
 
-## RESUME HERE (updated 2026-10-15 by planning chat)
-- v1 COMPLETE. v2 (docs/SPEC-orders.md) Steps 1-5 DONE and deployed.
-- v3 (docs/SPEC-v3.md): Step 6 DONE + deployed 2026-10-15 (delivery statuses, reminder +
-  auto-cancel, unanswered -> Needs you, cancel whole order, wanted report).
-- Step 7 (FAQ) and Step 8 (sales & profit) DONE + deployed 2026-10-15. v3 Steps 6-8 complete.
-- NOW: owner runs the OWNER TEST SCRIPT at the end of REPORT.md (second Telegram account) and
-  reports differences. Optional: bottle_cost in the price list + vial costs in Settings.
-- Step 9 (inventory) only when the owner asks.
-- At the end: OWNER TEST SCRIPT in REPORT.md.
+## RESUME HERE (updated 2026-10-16 by planning chat)
+- v1, v2, v3 DONE (v3 owner testing in parallel).
+- NOW: Release v4 "Learning Inbox" — docs/SPEC-v4.md. Epics 4.1 -> 4.5 in order, each with
+  acceptance tests, loop test -> fix until green, self-review vs GOAL, deploy, report, next.
+- No external AI (not available in Myanmar). Epic 4.6 (AI) only when the owner asks.
+- At the end: OWNER TEST SCRIPT v4 + STAFF TEST in REPORT.md.
 - Owner checks: `bash scripts/status.sh`.
 
 ## Status
