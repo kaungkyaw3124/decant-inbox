@@ -18,7 +18,7 @@ OPEN_STATUSES = ("cart", "confirmed", "waiting_payment", "photo_received")
 PAID_STATUSES = ("paid", "packed", "sent_out", "delivered")  # counted as sales
 SHIPPING_STATUSES = ("paid", "packed", "sent_out")  # paid, not delivered yet
 QUICK_KINDS = ("price", "cart_add", "cart_remove", "cart_list", "confirm", "address", "contact", "not_stocked",
-               "delivery", "cancel_order", "faq")
+               "delivery", "cancel_order", "faq", "greeting", "teach")
 UNKNOWN_RESOLUTIONS = ("mapped", "new_product", "not_stocked")
 AUTO_STATUSES = ("replied", "skipped")
 # pending: one screenshot to check · several: more than one photo (ask for one) ·

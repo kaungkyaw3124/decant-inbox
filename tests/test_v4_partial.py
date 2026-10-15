@@ -43,8 +43,10 @@ def outbox_count(db) -> int:
 
 
 def unknown_ids() -> list[int]:
+    """Messages waiting in Needs you for their unknown items (with a teaching card since 4.2)."""
     with SessionLocal() as s:
-        return [m.id for m, _, _ in auto_pages.needs_you(s)["unknown"]]
+        needs = auto_pages.needs_you(s)
+        return [m.id for m, _, _ in needs["unknown"]] + [m.id for m, _, _ in needs["teach"]]
 
 
 def test_a1_partial_name_is_not_a_match(shop, db):
@@ -56,10 +58,12 @@ def test_a1_partial_name_is_not_a_match(shop, db):
     assert auto.run_once() == {} and outbox_count(db) == 0  # not certain: no auto reply
     assert button(client, mid) is None  # and no one-tap reply either
     assert mid in unknown_ids()  # it waits in Needs you
-    page = client.get(f"/messages/{mid}").text
-    assert "“hawas for him”" in page and "Contains the nickname of <b>Hawas Ice</b>" in page
-    first = page.index('<optgroup label="Most similar">')
-    assert page.index("Hawas Ice", first) < page.index("Good Girl", first)  # candidate first
+    page = client.get(f"/messages/{mid}").text  # 4.2 teaching card: the candidate is the first answer
+    assert "“hawas for him” ဆိုတာ ဘယ်ပစ္စည်းလဲ?" in page and "“Hawas Ice” ရဲ့ nickname ပါပေမယ့်" in page
+    first = page.index('name="p0"')
+    assert page.index("Hawas Ice", first) < page.index("Good Girl", first) and 'value="' in page[first:first + 80]
+    hawas = scalar(db, "SELECT id FROM products WHERE name = 'Hawas Ice'")
+    assert f'name="p0" value="{hawas}" checked' in page
 
 
 def test_a2_exact_names_unchanged(shop, db):

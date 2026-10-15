@@ -17,7 +17,8 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
 from app.models import (
-    AuditLog, Message, ParseItem, ParseResult, Product, ProductAlias, ProductPrice, UnknownRequest, User,
+    AuditLog, LearnedPattern, Message, ParseItem, ParseResult, Product, ProductAlias, ProductPrice, UnknownRequest,
+    User,
 )
 from app.parser.normalize import normalize
 from app.parser.service import load_aliases, load_full_sizes, parse_message
@@ -39,6 +40,25 @@ class Unknown:
         return self.candidate_id is not None
 
 
+def _unknown_items(session: Session, result: ParseResult) -> list[ParseItem]:
+    return list(session.scalars(select(ParseItem).where(
+        ParseItem.parse_result_id == result.id, ParseItem.unknown_text.is_not(None)).order_by(ParseItem.position)))
+
+
+def learned_not_stocked(session: Session, message_id: int) -> dict[str, LearnedPattern]:
+    """Unknown items of this message that a learned not_stocked pattern answers (4.2), by
+    normalized text, unless an admin already resolved them."""
+    result = session.scalar(select(ParseResult).where(ParseResult.message_id == message_id, ParseResult.is_current))
+    if result is None or result.intent not in QUESTION_INTENTS:
+        return {}
+    from app.learning import patterns  # late import: patterns -> parser -> this module's callers
+
+    resolved = set(session.scalars(select(UnknownRequest.normalized_text).where(
+        UnknownRequest.message_id == message_id)))
+    texts = [t for t in {normalize(i.unknown_text) for i in _unknown_items(session, result)} if t not in resolved]
+    return patterns.not_stocked_hits(session, texts)
+
+
 def open_unknowns(session: Session, message: Message) -> list[Unknown]:
     """Unknown items of the message's current parse that nobody has resolved yet."""
     result = session.scalar(select(ParseResult).where(ParseResult.message_id == message.id, ParseResult.is_current))
@@ -49,14 +69,16 @@ def open_unknowns(session: Session, message: Message) -> list[Unknown]:
     if faq.for_message(session, message, result) is not None:
         return []  # "kpay ရလား": an FAQ question, not an unknown product
     done = set(session.scalars(select(UnknownRequest.normalized_text).where(UnknownRequest.message_id == message.id)))
-    return [Unknown(i.position, i.unknown_text, i.size_ml, i.is_full_bottle, i.candidate_product_id) for i in session.scalars(
-        select(ParseItem).where(ParseItem.parse_result_id == result.id, ParseItem.unknown_text.is_not(None))
-        .order_by(ParseItem.position)) if normalize(i.unknown_text) not in done]
+    done |= set(learned_not_stocked(session, message.id))
+    return [Unknown(i.position, i.unknown_text, i.size_ml, i.is_full_bottle, i.candidate_product_id)
+            for i in _unknown_items(session, result) if normalize(i.unknown_text) not in done]
 
 
 def not_stocked_texts(session: Session, message_id: int) -> set[str]:
+    """Items we don't have: marked by an admin, or answered by a learned not_stocked pattern."""
     return set(session.scalars(select(UnknownRequest.normalized_text).where(
-        UnknownRequest.message_id == message_id, UnknownRequest.resolution == "not_stocked")))
+        UnknownRequest.message_id == message_id, UnknownRequest.resolution == "not_stocked"))) \
+        | set(learned_not_stocked(session, message_id))
 
 
 def messages_needing_you(session: Session, now: datetime | None = None) -> list[Message]:

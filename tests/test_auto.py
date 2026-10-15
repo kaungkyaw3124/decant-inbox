@@ -160,7 +160,7 @@ def test_unknown_items_need_you_then_continue(shop, db):
 
     # 1. we don't have it -> price reply for the rest + "we don't have" line
     detail = client.get(f"/messages/{msg(db, 1)}").text
-    assert "Not in your product list" in detail and "Save as alias" in detail
+    assert "“hawas ice” ဆိုတာ ဘယ်ပစ္စည်းလဲ?" in detail  # v4: the teaching card asks (old routes still work)
     client.post(f"/messages/{msg(db, 1)}/unknown/1/not-stocked", data={"csrf": token})
     # 2. new product with the asked price -> product + price + alias
     client.post(f"/messages/{msg(db, 2)}/unknown/0/new", data={

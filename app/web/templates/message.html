@@ -17,7 +17,13 @@
   </div>
 </section>
 
-{% if unknowns %}
+{% if card %}
+<section class="card notice" id="card">
+  <h2>📘 သင်ပေးမယ် <span class="small muted">(teach the app)</span></h2>
+  <p class="muted small">ဖြေလိုက်ရင် ဒီဖောက်သည်ကို ဆက်ဖြေပေးမယ်၊ နောက်တစ်ခါ အလိုလို သိမယ်။</p>
+  {% include "_card.html" %}
+</section>
+{% elif unknowns %}
 <section class="card notice" id="unknown">
   <h2>❓ Not in your product list</h2>
   <p class="muted small">Resolve each item; then the reply continues by itself (auto-reply ON) or the one-tap button appears.</p>

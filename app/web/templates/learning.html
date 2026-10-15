@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block title %}Learning · Decant Inbox{% endblock %}
+{% block content %}
+<h1>📘 Learning</h1>
+<p class="muted small">What the team taught with teaching cards. Waiting ones are only suggested (one tap, never automatic) until you approve them{% if settings.auto_approve_after %} or they were accepted {{ settings.auto_approve_after }} times without a correction{% endif %}.</p>
+<div class="tiles">
+  <div class="tile"><span>Waiting for approval</span><b>{{ pending.values() | map("length") | sum }}</b></div>
+  <div class="tile"><span>Approved</span><b>{{ approved | length }}</b></div>
+  <div class="tile"><span>Handled by learned patterns this week</span><b>{{ handled_week }}</b></div>
+</div>
+
+{% if conflicts %}
+<section class="card problem" id="conflicts">
+  <h2>⚠️ Needs your decision</h2>
+  <ul class="feed">
+  {% for c in conflicts %}{% set d = c.details %}
+    <li>“{{ d.text }}” was taught as <b>{% if d.product_id %}{{ (products | selectattr("id", "equalto", d.product_id) | first).name if (products | selectattr("id", "equalto", d.product_id) | list) else "a product" }}{% elif d.intent %}{{ d.intent | replace("_", " ") }}{% else %}we don't sell it{% endif %}</b>, but it is already {{ d.existing }}.
+      <form method="post" action="/learning/conflicts/{{ c.id }}" class="inline"><input type="hidden" name="csrf" value="{{ csrf }}">
+        <button name="use_new" value="1" class="primary">Use the new answer</button>
+        <button name="use_new" value="0">Keep it as it is</button></form></li>
+  {% endfor %}
+  </ul>
+</section>
+{% endif %}
+
+{% for kind, title in kind_titles.items() %}
+<section class="card">
+  <h2>{{ title }} — waiting ({{ pending[kind] | length }})</h2>
+  {% if not pending[kind] %}<p class="muted small">Nothing waiting.</p>{% endif %}
+  <ul class="aliases">
+  {% for p, product, teacher, msg in pending[kind] %}
+    <li id="pattern-{{ p.id }}"><span>“<b>{{ p.text }}</b>” → {% if kind == "nickname" %}{{ product.name if product else "?" }}{% elif kind == "intent_phrase" %}{{ dict(intents).get(p.intent, p.intent) }}{% else %}we don't sell it{% endif %}
+      <br><span class="small muted">taught by {{ teacher.username if teacher else "?" }} · {{ p.taught_at | local_time }} · used {{ p.confirmed_uses }}×{% if p.corrections %} · <span class="error">corrected {{ p.corrections }}×</span>{% endif %}{% if msg %} · e.g. “{{ msg.raw_text | truncate(60) }}”{% endif %}</span></span>
+      <form method="post" action="/learning/{{ p.id }}/decide" class="inline"><input type="hidden" name="csrf" value="{{ csrf }}">
+        <button name="status" value="approved" class="primary">✅ Approve</button>
+        <button name="status" value="rejected" class="danger">❌ Reject</button></form>
+      <details><summary class="button link">✏️ Edit</summary>
+        <form method="post" action="/learning/{{ p.id }}/edit" class="stack">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <label>Words <input name="text" value="{{ p.text }}" maxlength="255"></label>
+          {% if kind == "nickname" %}<label>Product <select name="product_id">{% for pr in products %}<option value="{{ pr.id }}" {% if pr.id == p.product_id %}selected{% endif %}>{{ pr.name }} · {{ pr.brand }}</option>{% endfor %}</select></label>{% endif %}
+          {% if kind == "intent_phrase" %}<label>Means <select name="intent">{% for v, label in intents %}<option value="{{ v }}" {% if v == p.intent %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>{% endif %}
+          <button class="primary">Save</button>
+        </form></details></li>
+  {% endfor %}
+  </ul>
+</section>
+{% endfor %}
+
+<details class="card">
+  <summary>✅ Approved ({{ approved | length }})</summary>
+  <ul class="aliases">
+  {% for p, product, teacher, msg in approved %}
+    <li><span>“{{ p.text }}” → {% if p.kind == "nickname" %}{{ product.name if product else "?" }}{% elif p.kind == "intent_phrase" %}{{ dict(intents).get(p.intent, p.intent) }}{% else %}we don't sell it{% endif %}
+      <span class="small muted">· {{ "auto-approved after " ~ p.confirmed_uses ~ " uses" if not p.approved_by else "approved" }} {{ p.approved_at | local_time }}</span></span>
+      <form method="post" action="/learning/{{ p.id }}/decide" class="inline"><input type="hidden" name="csrf" value="{{ csrf }}">
+        <button name="status" value="rejected" class="link">remove</button></form></li>
+  {% endfor %}
+  </ul>
+</details>
+
+<section class="card" id="settings">
+  <h2>⚙️ Learning settings</h2>
+  <form method="post" action="/settings/learning" class="stack">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <label>Approve by itself after this many one-tap accepts without a correction (0 = only you approve)
+      <input name="auto_approve_after" inputmode="numeric" value="{{ settings.auto_approve_after }}"></label>
+    <label class="check"><input type="checkbox" name="greeting" value="1" {% if settings.greeting %}checked{% endif %}> Answer a message that is only a greeting (“hi”) with the greeting reply</label>
+    <label class="check"><input type="checkbox" name="auto_not_stocked" value="1" {% if settings.auto_not_stocked %}checked{% endif %}> Auto-reply “we don't have it” for approved “we don't sell” names</label>
+    <button class="primary">Save</button>
+  </form>
+</section>
+{% endblock %}

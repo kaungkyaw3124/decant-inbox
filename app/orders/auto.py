@@ -16,7 +16,7 @@ Runs in the parser worker (database only). Extra rules on top of the one-tap one
 - at most 300 auto replies a day, then one-tap again;
 - at most one auto decision per incoming message (auto_runs).
 Never automatic: photos, intents other/unknown (except an FAQ answer, Step 7), unknown items
-(those go to "Needs you").
+(those go to "Needs you"), learned patterns not approved yet (docs/SPEC-v4.md 4.2: one-tap "📘").
 """
 import logging
 import random
@@ -28,6 +28,7 @@ from sqlalchemy.orm import Session
 
 from app.core.db import SessionLocal
 from app.models import AppSetting, AutoRun, Customer, Message, Outbox, ParseItem, ParseResult, QuickAction, User
+from app.learning import patterns
 from app.orders import actions
 from app.replies import faq
 from app.replies import templates as replies
@@ -38,8 +39,8 @@ SPEED_SETTING = "auto_speed"
 DEFAULT_SPEED = {"quiet_s": 1, "delay_min_s": 2, "delay_max_s": 3}  # ~3 s from message to reply
 SPEED_LIMITS = {"quiet_s": (0, 30), "delay_min_s": (1, 60), "delay_max_s": (1, 60)}
 AUTO_INTENTS = ("ask_price", "ask_stock", "buy", "remove", "done", "confirm", "address", "ask_delivery",
-                "cancel_order")
-CERTAIN_MATCHES = ("exact", "inherited", "human")
+                "cancel_order", "greeting")
+CERTAIN_MATCHES = ("exact", "inherited", "human", "learned")  # learned = an approved learned nickname (4.2)
 PAUSE_AFTER_HAND_REPLY = timedelta(hours=2)
 LINK_GRACE = timedelta(seconds=30)  # a dashboard send is linked to its outbox row within ms
 DAILY_CAP = 300
@@ -152,6 +153,8 @@ def decide(session: Session, message: Message, now: datetime) -> str | None:
     open_unknown = actions.unknown.open_unknowns(session, message)
     if open_unknown:
         return None  # "Needs you": decided again once the admin resolved the items
+    if patterns.not_certain(session, actions.learned_used(session, message, result)):
+        return _skip(session, message.id, "learned pattern waiting for approval")
     if any(i.product_id and (i.from_context or (i.match not in CERTAIN_MATCHES and result.method != "human"))
            for i in items):
         return _skip(session, message.id, "product not named exactly")

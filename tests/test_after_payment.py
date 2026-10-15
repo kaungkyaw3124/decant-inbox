@@ -271,7 +271,7 @@ def test_a4_unanswered_with_open_cart(shop, db):
     assert needs(db, minutes=3)["unanswered"] == []
 
     # a question from someone without an order counts too; "done" clears it
-    other = say(3, "ဟိုင်း", "96", ago=timedelta(minutes=10))
+    other = say(3, "ဒီအနံ့က ဘယ်လိုမျိုးလဲ", "96", ago=timedelta(minutes=10))  # (v4: "ဟိုင်း" is a greeting)
     assert [r.message_ids for r in needs(db)["unanswered"]] == [[other]]
     client.post("/needs-you/clear", data={"csrf": token, "message_id": str(other), "status": "done"})
     assert needs(db)["unanswered"] == []

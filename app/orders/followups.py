@@ -149,6 +149,7 @@ class Unanswered:
     last_at: datetime
     reason: str
     faq: tuple | None = None  # (message id, faq.Match): an FAQ question inside (Step 7 hint)
+    card: tuple | None = None  # (message, cards.Card): its teaching card (docs/SPEC-v4.md 4.2)
 
 
 def unanswered(session: Session, now: datetime | None = None) -> list[Unanswered]:

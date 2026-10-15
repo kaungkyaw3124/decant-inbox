@@ -13,18 +13,27 @@ from sqlalchemy.orm import Session
 
 from app.models import Message, ParseItem, ParseResult, Product, ProductAlias
 from app.parser.normalize import normalize
-from app.parser.rules import PARSER_VERSION, Alias, ParsedItem, ParseOutcome, known_words_of, parse
+from app.parser.rules import PARSER_VERSION, Alias, ParsedItem, ParseOutcome, Phrase, known_words_of, parse
 
 CONTEXT_WINDOW = timedelta(hours=24)
 
 
 def load_aliases(session: Session) -> list[Alias]:
+    """Seed / dashboard aliases, then nicknames taught with teaching cards (4.2)."""
+    from app.learning import patterns  # late import: patterns imports the parser
+
     rows = session.execute(
         select(ProductAlias.product_id, ProductAlias.normalized_alias)
         .join(Product, Product.id == ProductAlias.product_id)
         .where(Product.active)
     )
-    return [Alias(product_id, alias) for product_id, alias in rows]
+    return [Alias(product_id, alias) for product_id, alias in rows] + patterns.nickname_aliases(session)
+
+
+def load_phrases(session: Session) -> list[Phrase]:
+    from app.learning import patterns
+
+    return patterns.intent_phrases(session)
 
 
 def load_full_sizes(session: Session) -> dict[int, int]:
@@ -35,7 +44,8 @@ def load_full_sizes(session: Session) -> dict[int, int]:
 
 def load_known_words(session: Session) -> dict[int, frozenset[str]]:
     products = session.execute(select(Product.id, Product.brand, Product.name).where(Product.active)).all()
-    return known_words_of([(pid, normalize(b), normalize(n)) for pid, b, n in products], load_aliases(session))
+    return known_words_of([(pid, normalize(b), normalize(n)) for pid, b, n in products],
+                          [a for a in load_aliases(session) if a.learned_id is None])
 
 
 def unparsed_message_ids(session: Session, limit: int, skip: set[int] = frozenset()) -> list[int]:
@@ -67,7 +77,7 @@ def stored_items(session: Session, result_id: int) -> tuple[ParsedItem, ...]:
     rows = session.scalars(select(ParseItem).where(ParseItem.parse_result_id == result_id)
                            .order_by(ParseItem.position))
     return tuple(ParsedItem(r.product_id, r.size_ml, r.is_full_bottle, r.quantity, r.unknown_text,
-                            r.from_context, r.match or "none", r.candidate_product_id) for r in rows)
+                            r.from_context, r.match or "none", r.candidate_product_id, r.name_text) for r in rows)
 
 
 def _same(session: Session, result: ParseResult, outcome: ParseOutcome) -> bool:
@@ -76,8 +86,10 @@ def _same(session: Session, result: ParseResult, outcome: ParseOutcome) -> bool:
 
     return (
         result.parser_version == PARSER_VERSION
-        and (result.intent, result.product_id, result.size_ml, result.quantity, result.confidence, result.phone)
-        == (outcome.intent, outcome.product_id, outcome.size_ml, outcome.quantity, outcome.confidence, outcome.phone)
+        and (result.intent, result.product_id, result.size_ml, result.quantity, result.confidence, result.phone,
+             list(result.learned_ids or []))
+        == (outcome.intent, outcome.product_id, outcome.size_ml, outcome.quantity, outcome.confidence, outcome.phone,
+            list(outcome.learned_ids))
         and key(stored_items(session, result.id)) == key(outcome.items)
     )
 
@@ -88,12 +100,14 @@ def add_items(session: Session, result_id: int, items) -> None:
             parse_result_id=result_id, position=position, product_id=item.product_id, size_ml=item.size_ml,
             is_full_bottle=item.is_full_bottle, quantity=item.quantity,
             unknown_text=item.unknown_text[:255] if item.unknown_text else None, from_context=item.from_context,
-            match=item.match, candidate_product_id=item.candidate_id))
+            match=item.match, candidate_product_id=item.candidate_id,
+            name_text=item.name_text[:255] if item.name_text else None))
 
 
 def parse_message(session: Session, message: Message, aliases: list[Alias],
                   full_sizes: dict[int, int] | None = None,
-                  known_words: dict[int, frozenset[str]] | None = None) -> str:
+                  known_words: dict[int, frozenset[str]] | None = None,
+                  phrases: list[Phrase] | None = None) -> str:
     """Parse one message and store the result. Returns what happened:
     new | changed | unchanged | human (kept the human edit)."""
     normalized = normalize(message.raw_text, keep_newlines=True)
@@ -107,7 +121,9 @@ def parse_message(session: Session, message: Message, aliases: list[Alias],
         full_sizes = load_full_sizes(session)
     if known_words is None:
         known_words = load_known_words(session)
-    outcome = parse(normalized, aliases, full_sizes, context_product(session, message), known_words)
+    if phrases is None:
+        phrases = load_phrases(session)
+    outcome = parse(normalized, aliases, full_sizes, context_product(session, message), known_words, phrases)
     if current is not None and _same(session, current, outcome):
         return "unchanged"
     if current is not None:
@@ -124,6 +140,7 @@ def parse_message(session: Session, message: Message, aliases: list[Alias],
         parser_version=PARSER_VERSION,
         is_current=True,
         phone=outcome.phone,
+        learned_ids=list(outcome.learned_ids),
     )
     session.add(result)
     session.flush()

@@ -41,6 +41,32 @@
         <input type="hidden" name="note" value="not paid in {{ d.hours }} h"><button class="quiet">Cancel order + tell them</button></form>
       {% endif %}</li>
   {% endfor %}
+  {% for m, c, card in needs_you.teach %}
+    <li class="teach-row"><a href="/messages/{{ m.id }}"><b>📘 {{ c.display_name or c.username or "Customer" }}</b>: {{ m.raw_text | truncate(70) }}</a>
+      {% if card.products %}<span class="badge warn">❓ {{ card.products | map(attribute="words") | join(", ") }}</span>{% endif %}
+      <span class="small muted">{{ m.received_at | age }}</span>
+      <details class="teach-box"><summary class="button primary">📘 သင်ပေးမယ်</summary>
+        {% with back = "/" %}{% include "_card.html" %}{% endwith %}
+      </details></li>
+  {% endfor %}
+  {% for row, product, m in needs_you.price_needed %}
+    <li><b>💲 {{ product.name }}</b>: ဈေး လိုတယ် (price needed) · {{ "full bottle" if row.is_full_bottle else (row.size_ml ~ "ml" if row.size_ml else "") }}
+      <span class="small muted">“{{ m.raw_text | truncate(50) }}”</span>
+      {% if user_role == "owner" %}
+      <form method="post" action="/learning/price/{{ row.id }}" class="inline-form">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <input name="price" inputmode="numeric" placeholder="ဈေး (ကျပ်)" aria-label="Price" required>
+        <input name="full_size_ml" inputmode="numeric" placeholder="ပုလင်း ml" aria-label="Bottle size">
+        <button class="primary">Save + send list</button>
+      </form>
+      {% else %}<span class="small muted">— ပိုင်ရှင် ဈေးထည့်ရင် စာရင်း အလိုအလျောက် ပို့မယ်။</span>{% endif %}</li>
+  {% endfor %}
+  {% if needs_you.to_approve %}
+    <li><a href="/learning"><b>📘 {{ needs_you.to_approve }} pattern{{ "s" if needs_you.to_approve > 1 }} to approve</b></a></li>
+  {% endif %}
+  {% for conflict in needs_you.conflicts %}
+    <li><a href="/learning#conflicts"><b>⚠️ “{{ conflict.details.text }}”</b>: taught differently — decide on the Learning page</a></li>
+  {% endfor %}
   {% for m, c, items in needs_you.unknown %}
     <li><a href="/messages/{{ m.id }}"><b>{{ c.display_name or c.username or "Customer" }}</b>: {{ m.raw_text | truncate(70) }}</a>
       <span class="badge warn">❓ {{ items | map(attribute="text") | join(", ") }}</span>
@@ -52,6 +78,10 @@
       <form method="post" action="/needs-you/clear" class="inline"><input type="hidden" name="csrf" value="{{ csrf }}">
         {% for mid in u.message_ids %}<input type="hidden" name="message_id" value="{{ mid }}">{% endfor %}
         <button class="link" name="status" value="done">done</button> <button class="link" name="status" value="ignored">ignore</button></form>
+      {% if u.card %}{% set m, card = u.card %}
+      <details class="teach-box"><summary class="button primary">📘 သင်ပေးမယ်</summary>
+        {% with back = "/" %}{% include "_card.html" %}{% endwith %}
+      </details>{% endif %}
       {% if u.faq %}{% set mid, match = u.faq %}
       <form method="post" action="/messages/{{ mid }}/faq/{{ match.entry.id }}" class="inline"><input type="hidden" name="csrf" value="{{ csrf }}">
         <button class="quiet" title="{{ match.entry.answer }}">💬 Send FAQ: {{ match.entry.title }}</button></form>{% endif %}</li>

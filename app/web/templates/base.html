@@ -28,6 +28,7 @@
     <a href="/prices" {% if path.startswith("/prices") %}aria-current="page"{% endif %}>Prices</a>
     <a href="/sales" {% if path.startswith("/sales") %}aria-current="page"{% endif %}>Sales</a>
     <a href="/reports/wanted" {% if path.startswith("/reports") %}aria-current="page"{% endif %}>Reports</a>
+    <a href="/learning" {% if path.startswith("/learning") %}aria-current="page"{% endif %}>Learning{% if to_learn %} <span class="badge">{{ to_learn }}</span>{% endif %}</a>
     <a href="/settings" {% if path.startswith("/settings") %}aria-current="page"{% endif %}>Settings</a>
     <a href="/health" {% if path == "/health" %}aria-current="page"{% endif %}>Health</a>
     <form method="post" action="/logout" class="inline">

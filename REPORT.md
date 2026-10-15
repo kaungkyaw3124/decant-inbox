@@ -775,3 +775,56 @@ system decided (🤖 = automatic).
   answers one reply with both and never "hawas him"; not-stocked variant). Fixture
   synthetic_messages.csv +3 rows (s56-s58: two partials, one brand-word check), all rows pass.
   Full suite: 246 passed, 1 skipped.
+
+## 2026-10-15 — v4 4.2: teaching cards (the app learns from the admin)
+- Spec: docs/SPEC-v4.md 4.2. Parser is now `rules-5`.
+- **Teaching card** (message page, and inline in Needs you as "📘 သင်ပေးမယ်"). It appears for any
+  message the app can't handle: unknown, partial, fuzzy or guessed names, no product named, an
+  unclear intent, or a buy without a size. Burmese questions with big buttons, most likely answer
+  first, at most 3 questions:
+  - Q-product: top 3, 🔍 all products, ➕ new product, 🚫 we don't sell it.
+  - Q-intent: buy / price / in stock / remove / cancel order / delivery / greeting / question (opens
+    the chat to reply) / ignore.
+  - Q-size: the sizes sold + full bottle.
+  The learn box is ticked by default, and the words to learn are shown and editable. Next shows a
+  preview line ("Y Eau de Parfum 10ml ကို ခြင်းထဲထည့်ပြီး စာရင်းပို့မယ်။" + the exact reply + what
+  will be learned), made by the same code and rolled back. ✅ saves a human parse result, then the
+  normal one-tap code sends the reply (10 s Undo). Undo also removes the patterns, the resolutions
+  and the human parse the card created.
+- **learned_patterns** (nickname / intent_phrase / not_stocked; pending → approved / rejected):
+  - Pending: understood, but only a one-tap button marked "📘", never automatic.
+  - Accepting a pending suggestion unchanged = +1 use. Changing it (card or "Correct the parse") = +1 correction.
+  - A pattern is approved by the owner, or automatically after `auto_approve_after` uses (default 3;
+    0 = owner only) with 0 corrections. Approved = like a seed alias / keyword.
+  - Conflicts are never saved: e.g. a nickname that already belongs to another product. The owner
+    decides on the Learning page ("Use the new answer" / "Keep it").
+- **Greeting**: a message that is only a greeting (hi, hello, ဟယ်လို, ဟိုင်း, မင်္ဂလာပါ, mingalarpar …)
+  is answered with the new template `greeting_reply` "မင်္ဂလာပါ။ ဘာကူညီပေးရမလဲ။". It isn't sent if
+  we messaged them in the last 6 h. Can be switched off.
+- **Not-stocked memory**: an approved not_stocked name gets the "we don't have it" reply
+  automatically (setting `auto_not_stocked`, default ON) and counts in Reports > Wanted.
+- **Staff adds a new product** without a price. The message waits, and Needs you shows the owner
+  "💲 <product>: price needed" with a price box. Save → the list goes out by itself.
+- **Learning page** (/learning, nav badge = waiting count): waiting patterns grouped by kind, each
+  with an example message, who taught it and uses/corrections, plus ✅ approve / ❌ reject / ✏️ edit.
+  Also the approved list with remove, conflicts, "handled by learned patterns this week", and the
+  learning settings. Needs you shows "📘 N patterns to approve" and conflicts.
+- Decisions:
+  - Learned phrases win over seed keywords (they are what the admin taught).
+  - A greeting phrase only counts when the whole message is a greeting.
+  - Q-intent learns its phrase only when the card asked it. That's why B1's "ရောယူပါမယ်" (already
+    = buy) is not saved.
+  - The old v2 "unknown item" routes still work, but the message page now shows the card instead.
+  - An unanswered message keeps its v3 row in Needs you, with its card attached.
+- DB: migration d16b1c96eac6 (learned_patterns, parse_results.learned_ids, parse_items.name_text,
+  intent greeting, quick kinds greeting/teach, reply kind greeting). Applied live after backup
+  product_requests_2026-10-15T1956Z.dump; round-trip done. The worker re-parsed 23 live messages
+  (5 are now greetings); nothing was sent.
+- Tests: tests/test_v4_teaching.py (B1-B8 plus: new intent phrase, a correction blocks
+  auto-approval, reject, auto-not-stocked off, greeting off, ignore/question, owner new product,
+  conflict "use new", size question + learn off, settings validation). Three older tests changed
+  because v4 changed what they check:
+  - fixture s29 "မင်္ဂလာပါ" is now `greeting`, not `other`.
+  - test_after_payment A4 used "ဟိုင်း" as an unanswered question; now a real question.
+  - test_auto checked the old "Save as alias" text on the message page; now it checks the card.
+  Fixture +4 rows (s59-s62). Full suite: 271 passed, 1 skipped.

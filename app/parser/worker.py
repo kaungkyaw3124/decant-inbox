@@ -15,10 +15,11 @@ from sqlalchemy.exc import IntegrityError
 from app.core.db import SessionLocal
 from app.core.heartbeat import beat
 from app.models import Message
+from app.learning import patterns
 from app.orders import auto, cart, delivery, followups, payments
 from app.parser.rules import PARSER_VERSION
 from app.parser.service import (
-    load_aliases, load_full_sizes, load_known_words, parse_message, unparsed_message_ids,
+    load_aliases, load_full_sizes, load_known_words, load_phrases, parse_message, unparsed_message_ids,
 )
 from scripts.reparse_all import reparse_all
 
@@ -39,11 +40,12 @@ def run_batch() -> int:
         aliases = load_aliases(session)  # reloaded per batch: dashboard may add aliases
         full_sizes = load_full_sizes(session)
         known_words = load_known_words(session)
+        phrases = load_phrases(session)
     done = 0
     for message_id in ids:
         try:
             with SessionLocal.begin() as session:
-                parse_message(session, session.get(Message, message_id), aliases, full_sizes, known_words)
+                parse_message(session, session.get(Message, message_id), aliases, full_sizes, known_words, phrases)
             done += 1
         except IntegrityError:
             log.info("message=%s already parsed by another process", message_id)
@@ -56,7 +58,7 @@ def run_batch() -> int:
 def catalog_fingerprint() -> int:
     with SessionLocal() as session:
         return hash((frozenset(load_aliases(session)), frozenset(load_full_sizes(session).items()),
-                     frozenset(load_known_words(session).items())))
+                     frozenset(load_known_words(session).items()), patterns.fingerprint(session)))
 
 
 def reparse_if_catalog_changed(last: int | None) -> int:

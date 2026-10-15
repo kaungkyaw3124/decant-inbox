@@ -13,13 +13,17 @@ cancel word WITHOUT a product: the whole order; with a product it stays remove).
 rules-4 (docs/SPEC-v4.md 4.1): an alias with extra unknown Latin words attached ("hawas for him"
 with alias "hawas") is NOT a match: match="partial", unknown_text = the whole name, the
 alias' product kept as candidate_id (a suggestion only, never auto).
+rules-5 (docs/SPEC-v4.md 4.2): learned patterns from teaching cards: nicknames (aliases with
+learned_id; pending ones give match "learned_pending" = one-tap only, approved ones "learned"),
+intent phrases (they win over the seed keywords; their words are not product names), and the
+greeting intent (a message that is ONLY a greeting). Items keep the customer's words (name_text).
 """
 import re
 from dataclasses import dataclass, field
 
 from rapidfuzz import fuzz
 
-PARSER_VERSION = "rules-4"
+PARSER_VERSION = "rules-5"
 NEEDS_REVIEW_BELOW = 0.6  # dashboard shows results under this as "needs review"
 FUZZY_THRESHOLD = 88      # rapidfuzz partial_ratio, 0-100
 FUZZY_MIN_ALIAS_LEN = 5   # shorter aliases match too much by accident
@@ -92,6 +96,17 @@ _LATIN_WORD = re.compile(r"[a-z][a-z0-9'.-]*")
 class Alias:
     product_id: int
     normalized_alias: str
+    learned_id: int | None = None  # a learned_patterns nickname (4.2)
+    pending: bool = False  # learned, not approved yet: understood, but never automatic
+
+
+@dataclass(frozen=True)
+class Phrase:
+    """A learned intent phrase (4.2): normalized text -> intent."""
+    learned_id: int
+    normalized_text: str
+    intent: str
+    pending: bool = False
 
 
 @dataclass(frozen=True)
@@ -104,6 +119,7 @@ class ParsedItem:
     from_context: bool = False  # product taken from the customer's previous message (24 h)
     match: str = "none"  # exact | fuzzy | multiple | ambiguous | inherited | context | partial | none
     candidate_id: int | None = None  # partial: the product whose alias is inside the name
+    name_text: str | None = None  # the customer's words for the product ("ysl edp"), for teaching
 
 
 @dataclass(frozen=True)
@@ -115,6 +131,7 @@ class ParseOutcome:
     confidence: float
     items: tuple[ParsedItem, ...] = field(default=())
     phone: str | None = None
+    learned_ids: tuple[int, ...] = ()  # learned patterns used (4.2)
 
     @property
     def needs_review(self) -> bool:
@@ -174,28 +191,38 @@ def _exact_spans(text: str, alias: str) -> list[tuple[int, int]]:
 
 
 def find_product(text: str, aliases: list[Alias]) -> tuple[int | None, str]:
-    """Return (product_id, how) where how is exact | fuzzy | ambiguous | multiple | none.
+    """Return (product_id, how) where how is exact | fuzzy | ambiguous | multiple | none."""
+    product_id, how, _ = match_product(text, aliases)
+    return product_id, how
+
+
+def match_product(text: str, aliases: list[Alias]) -> tuple[int | None, str, Alias | None]:
+    """(product_id, how, the alias that matched when exact).
 
     Exact: longest aliases claim text first, so "stw intensely" beats a shorter
-    "stw" alias. An alias shared by two products, or two different products in one
-    part of the message, cannot be resolved by rules.
+    "stw" alias (seed aliases before learned ones of the same length). An alias shared by
+    two products, or two different products in one part of the message, cannot be
+    resolved by rules.
     """
     taken: list[tuple[int, int]] = []
     found: dict[int, int] = {}  # product_id -> first position
-    for alias in sorted(aliases, key=lambda a: len(a.normalized_alias), reverse=True):
+    claimed: dict[int, Alias] = {}
+    for alias in sorted(aliases, key=lambda a: (-len(a.normalized_alias), a.learned_id is not None)):
         for start, end in _exact_spans(text, alias.normalized_alias):
             if any(start < e and s < end for s, e in taken if (s, e) != (start, end)):
                 continue  # inside a longer alias already matched
             taken.append((start, end))
             found.setdefault(alias.product_id, start)
+            claimed.setdefault(alias.product_id, alias)
     if found:
         ambiguous = _shared_alias_spans(text, aliases)
         if len(found) == 1:
-            return next(iter(found)), "exact"
+            pid = next(iter(found))
+            return pid, "exact", claimed[pid]
         if ambiguous and all(span in ambiguous for span in taken):
-            return None, "ambiguous"
+            return None, "ambiguous", None
         first = min(found, key=found.get)
-        return first, "multiple"
+        return first, "multiple", None
 
     best: dict[int, float] = {}
     for alias in aliases:
@@ -205,11 +232,11 @@ def find_product(text: str, aliases: list[Alias]) -> tuple[int | None, str]:
         if score >= FUZZY_THRESHOLD:
             best[alias.product_id] = max(best.get(alias.product_id, 0), score)
     if not best:
-        return None, "none"
+        return None, "none", None
     ranked = sorted(best.items(), key=lambda kv: kv[1], reverse=True)
     if len(ranked) > 1 and ranked[0][1] == ranked[1][1]:
-        return None, "ambiguous"
-    return ranked[0][0], "fuzzy"
+        return None, "ambiguous", None
+    return ranked[0][0], "fuzzy", None
 
 
 def _shared_alias_spans(text: str, aliases: list[Alias]) -> set[tuple[int, int]]:
@@ -301,25 +328,104 @@ def unknown_product_text(part: str) -> str | None:
     return name if sum(c.isalpha() for c in name) >= 3 else None
 
 
+# Words trimmed from the ends of the customer's words for a product; edp/edt/parfum stay
+# ("ysl edp" is how they name it).
+_NAME_TRIM = _NOT_NAME_LATIN - {"edp", "edt", "parfum", "perfume", "eau", "de", "toilette", "cologne", "for"}
+
+
+def name_text(part: str) -> str | None:
+    """The Latin words a customer used for a product in this part ("ysl edp"), or None."""
+    text = part
+    for pattern in (_SIZE_RE, _QTY_RE, _PHONE_RE, REMOVE_RE, BUY_RE, ASK_PRICE_RE, ASK_STOCK_RE):
+        text = pattern.sub(" ", text)
+    words = [w.strip(".'-?!") for w in _LATIN_WORD.findall(text)]
+    words = [w for w in words if w and not w.isdigit()]
+    while words and words[0] in _NAME_TRIM:
+        words.pop(0)
+    while words and words[-1] in _NAME_TRIM:
+        words.pop()
+    name = " ".join(words)
+    return name[:255] if sum(c.isalpha() for c in name) >= 2 else None
+
+
+# ---------- greetings + learned intent phrases (4.2) ----------
+
+GREETINGS_LATIN = ("hi", "hii", "hiii", "hello", "helo", "hey", "mingalarpar", "mingalaba", "mingalarbar",
+                   "mingalabar", "good morning", "good evening", "good afternoon")
+GREETINGS_MY = ("မင်္ဂလာပါ", "မင်္ဂလာ", "ဟယ်လို", "ဟယ်လိုး", "ဟိုင်း", "ဟိုင်")
+# Words that may come with a greeting without making it more than a greeting.
+_GREETING_EXTRA_LATIN = ("sis", "bro", "admin", "ko", "ma", "sir", "there", "everyone", "all", "dear", "ah", "a")
+_GREETING_EXTRA_MY = ("ခင်ဗျာ", "ခင်ဗျ", "ရှင့်", "ရှင်", "ဗျာ", "ဗျ", "နော်", "ပါ", "ရေ", "အစ်မ", "အမ", "ကို", "ညီမ")
+
+
+def _phrase_re(normalized: str) -> re.Pattern:
+    """A learned phrase, matched whatever the spaces ("လေး ထည့်ထား" = "လေးထည့်ထား"); Latin ends
+    must stand alone."""
+    chars = [c for c in normalized if not c.isspace()]
+    body = r"\s*".join(re.escape(c) for c in chars)
+    if chars and re.match(r"[a-z0-9]", chars[0]):
+        body = r"(?<![a-z0-9])" + body
+    if chars and re.match(r"[a-z0-9]", chars[-1]):
+        body += r"(?![a-z0-9])"
+    return re.compile(body)
+
+
+def find_phrase(text: str, phrases: list[Phrase]) -> Phrase | None:
+    """The longest learned phrase in the text (seed and learned alike: the longest wins)."""
+    for phrase in sorted(phrases, key=lambda p: -len(p.normalized_text.replace(" ", ""))):
+        if phrase.normalized_text.strip() and _phrase_re(phrase.normalized_text).search(text):
+            return phrase
+    return None
+
+
+def greeting_only(text: str, phrases: list[Phrase] = ()) -> tuple[bool, tuple[int, ...]]:
+    """(True, learned ids) if the message is ONLY a greeting ("hi", "မင်္ဂလာပါ ရှင့်", a learned
+    greeting phrase), with nothing else to answer."""
+    rest, found, used = text, False, []
+    for phrase in sorted(phrases, key=lambda p: -len(p.normalized_text)):
+        if phrase.intent == "greeting":
+            rest, n = _phrase_re(phrase.normalized_text).subn(" ", rest)
+            if n:
+                found = True
+                used.append(phrase.learned_id)
+    for word in sorted(GREETINGS_LATIN, key=len, reverse=True):
+        rest, n = re.subn(r"(?<![a-z])" + re.escape(word) + r"(?![a-z])", " ", rest)
+        found = found or bool(n)
+    for word in GREETINGS_MY:
+        if word in rest:
+            rest, found = rest.replace(word, " "), True
+    for word in _GREETING_EXTRA_LATIN:
+        rest = re.sub(r"(?<![a-z])" + word + r"(?![a-z])", " ", rest)
+    for word in _GREETING_EXTRA_MY:
+        rest = rest.replace(word, " ")
+    rest = re.sub(r"[^\w]|_", "", rest)
+    return (found and not rest), tuple(used)
+
+
 def split_parts(text: str) -> list[str]:
     return [p.strip() for p in _SPLIT_RE.split(text) if p and p.strip()]
 
 
 def _items(text: str, aliases: list[Alias], full_sizes: dict[int, int],
            context_product_id: int | None, allow_unknown: bool,
-           known_words: dict[int, frozenset[str]]) -> list[ParsedItem]:
+           known_words: dict[int, frozenset[str]], learned: list[int]) -> list[ParsedItem]:
+    """learned: filled with the learned_patterns ids of the nicknames used."""
     items: list[ParsedItem] = []
     for part in split_parts(text):
-        product_id, how = find_product(part, aliases)
+        product_id, how, alias = match_product(part, aliases)
         sizes = find_sizes(part)
         full = bool(_FULL_RE.search(part))
         qty = find_quantity(part)
         unknown = None
         candidate = None
+        words = name_text(part)
         if how == "exact":
             name = partial_name(part, aliases, product_id, known_words.get(product_id, frozenset()))
             if name is not None:  # "hawas for him": not Hawas Ice, only a suggestion
-                product_id, how, unknown, candidate = None, "partial", name, product_id
+                product_id, how, unknown, candidate, words = None, "partial", name, product_id, name
+            elif alias is not None and alias.learned_id is not None:  # taught with a teaching card
+                how = "learned_pending" if alias.pending else "learned"
+                learned.append(alias.learned_id)
         if product_id is None and how not in ("ambiguous", "partial"):
             unknown = unknown_product_text(part) if (allow_unknown or sizes or full) else None
             if unknown is None and (sizes or full):
@@ -338,27 +444,42 @@ def _items(text: str, aliases: list[Alias], full_sizes: dict[int, int],
         for size in sizes_for_part:
             is_full = full or (size is not None and bottle is not None and size == bottle)
             items.append(ParsedItem(product_id, None if is_full else size, is_full, qty, unknown,
-                                    how == "context", how, candidate))
+                                    how == "context", how, candidate, words))
     return items
 
 
 _MATCH_SCORE = {"exact": 0.5, "inherited": 0.5, "fuzzy": 0.35, "multiple": 0.25, "context": 0.25,
-                "ambiguous": 0.0, "partial": 0.0, "none": 0.0}
+                "ambiguous": 0.0, "partial": 0.0, "none": 0.0, "learned": 0.5, "learned_pending": 0.5}
 
 
 def parse(normalized_text: str, aliases: list[Alias], full_sizes: dict[int, int] | None = None,
           context_product_id: int | None = None,
-          known_words: dict[int, frozenset[str]] | None = None) -> ParseOutcome:
+          known_words: dict[int, frozenset[str]] | None = None,
+          phrases: list[Phrase] | None = None) -> ParseOutcome:
     """known_words: per product, Latin words that may stand next to its alias without making
-    the name a different one (brand, name, same-brand aliases); see partial_name()."""
+    the name a different one (brand, name, same-brand aliases); see partial_name().
+    phrases: learned intent phrases (4.2)."""
     text = normalized_text
     phone = find_phone(text)
     full_sizes = full_sizes or {}
-    keyword_intent = find_intent(text)
-    items = _items(text, aliases, full_sizes, context_product_id,
-                   allow_unknown=keyword_intent in PRODUCT_INTENTS, known_words=known_words or {})
+    phrases = phrases or []
+    if not phone:
+        greeting, used = greeting_only(text, phrases)
+        if greeting:
+            return ParseOutcome("greeting", None, None, 1, 0.8, (), None, used)
+    learned: list[int] = []
+    phrase = find_phrase(text, [p for p in phrases if p.intent != "greeting"])
+    item_text = text
+    if phrase is not None:  # a taught phrase wins over the seed keywords; its words are no product
+        learned.append(phrase.learned_id)
+        item_text = _phrase_re(phrase.normalized_text).sub(" ", text)
+    keyword_intent = phrase.intent if phrase else find_intent(text)
+    items = _items(item_text, aliases, full_sizes, context_product_id,
+                   allow_unknown=keyword_intent in PRODUCT_INTENTS, known_words=known_words or {}, learned=learned)
     named = [i for i in items if i.match != "context"]
-    intent = find_intent(text, has_product_or_size=any(i.product_id or i.size_ml or i.is_full_bottle for i in named))
+    intent = phrase.intent if phrase else find_intent(
+        text, has_product_or_size=any(i.product_id or i.size_ml or i.is_full_bottle for i in named))
+    learned_ids = tuple(dict.fromkeys(learned))
     if intent is None and phone:
         intent = "address"  # contact details
     if intent not in PRODUCT_INTENTS and intent is not None:
@@ -372,12 +493,12 @@ def parse(normalized_text: str, aliases: list[Alias], full_sizes: dict[int, int]
     if intent is None:
         if not items:
             # Nothing product-related: chit-chat, thanks...
-            return ParseOutcome("other", None, None, 1, 0.7, (), phone)
+            return ParseOutcome("other", None, None, 1, 0.7, (), phone, learned_ids)
         intent = "unknown"
     if intent == "remove" and not items and CANCEL_ORDER_RE.search(text):
         intent = "cancel_order"  # no product named: the whole order
     if intent in ("address", "confirm", "done", "ask_delivery", "cancel_order") or (intent == "remove" and not items):
-        return ParseOutcome(intent, product_id, size_ml, quantity, 0.8, items_t, phone)
+        return ParseOutcome(intent, product_id, size_ml, quantity, 0.8, items_t, phone, learned_ids)
 
     intent_score = 0.0 if intent == "unknown" else 0.3
     product_score = min((_MATCH_SCORE[i.match] for i in items), default=0.0)
@@ -387,4 +508,5 @@ def parse(normalized_text: str, aliases: list[Alias], full_sizes: dict[int, int]
     confidence = intent_score + product_score + (0.2 if has_size else 0.0)
     if intent == "unknown":
         confidence = min(confidence, 0.5)  # always ask a human
-    return ParseOutcome(intent, product_id, size_ml, quantity, round(max(confidence, 0.0), 2), items_t, phone)
+    return ParseOutcome(intent, product_id, size_ml, quantity, round(max(confidence, 0.0), 2), items_t, phone,
+                        learned_ids)

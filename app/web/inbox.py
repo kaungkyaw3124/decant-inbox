@@ -141,8 +141,13 @@ def inbox(
     from app.web import auto as auto_pages  # late import: auto_pages imports this module
 
     first_page = page == 1 and not f["q"] and not f["product"]
+    from app.web.learning import card_context
+
+    needs_you = auto_pages.needs_you(db) if first_page else None
     return templates.TemplateResponse(request, "inbox.html", {
-        "needs_you": auto_pages.needs_you(db) if first_page else None,
+        **(card_context(db) if needs_you and (needs_you["teach"] or any(r.card for r in needs_you["unanswered"]))
+           else {}),
+        "needs_you": needs_you,
         "handled": auto_pages.handled_feed(db) if first_page else [],
         "rows": [row_context(*r, infos[r[0].id]) for r in rows[:PAGE_SIZE]], "f": f,
         "newer_url": page_url(page - 1) if page > 1 else None,
@@ -172,7 +177,12 @@ def message_detail(request: Request, message_id: int, back: str = "/", db: Sessi
     customer = db.get(Customer, message.customer_id)
     info = quick_infos(db, [(message, customer, current[0])])[message_id]
     open_unknown = unknown.open_unknowns(db, message)
+    from app.learning import cards  # late import: cards -> orders -> this module's helpers
+    from app.web.learning import card_context
+
+    card = cards.build(db, message)
     return templates.TemplateResponse(request, "message.html", {
+        "card": card, **(card_context(db) if card else {}),
         "unknowns": [(u, unknown.suggestions(db, u.text, first=u.candidate_id)) for u in open_unknown],
         "all_products": products_for_select(db) if open_unknown else [],
         "resolved": db.scalars(select(UnknownRequest).where(UnknownRequest.message_id == message_id)).all(),
@@ -190,7 +200,7 @@ def edit_parse(
     request: Request, message_id: int,
     intent: str = Form(...), product_id: str = Form(""), size_ml: str = Form(""),
     quantity: str = Form("1"), full_bottle: str = Form(""), alias: str = Form(""), back: str = Form("/"),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db), user: User = Depends(current_user),
 ):
     get_message(db, message_id)
     if intent not in INTENTS:
@@ -202,6 +212,14 @@ def edit_parse(
     size = None if full else int(size_ml) if size_ml.strip().isdigit() and 0 < int(size_ml) < 1000 else None
     qty = int(quantity) if quantity.strip().isdigit() and 0 < int(quantity) < 100 else 1
 
+    previous = db.scalar(select(ParseResult).where(ParseResult.message_id == message_id, ParseResult.is_current))
+    if previous is not None and previous.learned_ids:  # a 📘 learned guess the admin changed (4.2)
+        from app.learning import patterns
+        from app.models import LearnedPattern
+
+        wrong = [p.id for p in db.scalars(select(LearnedPattern).where(LearnedPattern.id.in_(previous.learned_ids)))
+                 if (p.kind == "nickname" and p.product_id != pid) or (p.kind == "intent_phrase" and p.intent != intent)]
+        patterns.add_corrections(db, wrong, user, message_id)
     db.execute(update(ParseResult).where(ParseResult.message_id == message_id, ParseResult.is_current)
                .values(is_current=False))
     db.flush()

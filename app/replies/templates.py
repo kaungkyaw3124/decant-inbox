@@ -25,6 +25,8 @@ _ITEMS = "• Stronger With You Intensely 5ml – 18,000 ကျပ်\n• Avent
 TEMPLATES: tuple[TemplateDef, ...] = (
     TemplateDef("greeting", "Greeting (added in front if we haven't messaged them for 6 h)",
                 "မင်္ဂလာပါ။", {}),
+    TemplateDef("greeting_reply", "Reply to a message that is only a greeting (“hi”), if we haven't messaged them for 6 h",
+                "မင်္ဂလာပါ။ ဘာကူညီပေးရမလဲ။", {}),
     TemplateDef("price_one", "Price: one size",
                 "{product} {size} က {price} ကျပ်ပါ။ မှာယူချင်ရင် ပြောပေးပါနော်။",
                 {"product": "Stronger With You Intensely", "size": "5ml", "price": "18,000"}),

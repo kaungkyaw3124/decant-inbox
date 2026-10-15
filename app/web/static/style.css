@@ -181,3 +181,19 @@ summary.button.danger { color: var(--danger); }
 .bar-chart text { fill: var(--muted); font-size: 11px; }
 .scroll { overflow-x: auto; }
 table.sales td.num, table.sales th.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* teaching cards (v4 4.2): big tap targets, most likely answer first */
+.teach fieldset { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; margin: 0; display: grid; gap: 8px; }
+.teach legend { font-weight: 600; padding: 0 4px; }
+.choices { display: flex; flex-wrap: wrap; gap: 8px; }
+.choice { display: inline-flex; color: var(--text); }
+.choice input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.choice span { display: inline-flex; align-items: center; gap: 6px; min-height: 48px; padding: 8px 14px;
+  border: 1px solid var(--line); border-radius: 10px; background: var(--card); cursor: pointer; font-size: 1rem; }
+.choice small { color: var(--muted); }
+.choice input:checked + span { border-color: var(--accent); background: var(--accent); color: var(--accent-text); }
+.choice input:checked + span small { color: inherit; }
+.choice input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
+.teach .learn { background: var(--bg); }
+button.big, a.button.big { min-height: 52px; font-size: 1.05rem; padding: 10px 20px; }
+.big-line { font-size: 1.15rem; font-weight: 600; margin: 0 0 8px; }
+details.teach-box > summary { cursor: pointer; display: inline-flex; }

@@ -18,6 +18,10 @@ For each message at most ONE action is offered, chosen from its parse and the ca
                                         screenshot came: nothing (Needs you, admin decides)
   FAQ question          -> faq          the FAQ answer (Step 7): first for other/unknown; for a
                                         price/stock/delivery question only when nothing else fits
+  greeting              -> greeting     "မင်္ဂလာပါ။ ဘာကူညီပေးရမလဲ။" when the message is only a greeting
+                                        and we haven't messaged them for 6 h (docs/SPEC-v4.md 4.2)
+Learned patterns (4.2) that are not approved yet still give the action, marked "📘", but only
+as a one-tap button (auto mode skips them); accepting it unchanged counts a use.
 So every customer reply gets exactly one next action: list -> confirm -> phone -> address
 -> payment info.
 
@@ -37,8 +41,10 @@ from sqlalchemy import exists, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
+from app.learning import patterns
 from app.models import (
-    AuditLog, Customer, Message, MessageReview, Order, Outbox, ParseItem, ParseResult, Product, QuickAction, User,
+    AuditLog, Customer, LearnedPattern, Message, MessageReview, Order, Outbox, ParseItem, ParseResult, Product,
+    QuickAction, UnknownRequest, User,
 )
 from app.models.outbox import UNDO_SECONDS
 from app.orders import cart, delivery, unknown
@@ -81,6 +87,7 @@ class Suggestion:
     fingerprint: str
     edit_url: str | None
     address: str | None = None
+    learned_pending: bool = False  # uses a learned pattern that is not approved yet (one-tap only)
 
     @property
     def preview(self) -> str:
@@ -172,6 +179,10 @@ def _faq(match: faq.Match) -> Outcome:
 
 def _apply(session: Session, message: Message, result: ParseResult, texts: dict[str, str],
            address_override: str | None = None) -> Outcome | None:
+    if result.intent == "greeting":
+        if not patterns.settings(session)["greeting"] or not compose.needs_greeting(session, message.customer_id):
+            return None  # switched off, or we talked to them in the last 6 h
+        return Outcome("greeting", "👋 Reply greeting", texts["greeting_reply"], "greeting")
     match = faq.for_message(session, message, result)
     if match is not None and result.intent in faq.FIRST_INTENTS:
         return _faq(match)
@@ -368,18 +379,24 @@ def _eligible(session: Session, message: Message, result: ParseResult | None, no
     if result.method != "human" and result.confidence < NEEDS_REVIEW_BELOW and not _resolved(session, message, result) \
             and faq.for_message(session, message, result) is None:
         return False
-    if session.scalar(select(exists().where(QuickAction.message_id == message.id, QuickAction.undone_at.is_(None)))):
-        return False  # already handled with a one-tap action
+    if session.scalar(select(exists().where(QuickAction.message_id == message.id, QuickAction.undone_at.is_(None),
+                                            QuickAction.kind != "teach"))):
+        return False  # already handled with a one-tap action (a teaching card alone is not an answer)
     if session.scalar(select(exists().where(Outbox.customer_id == message.customer_id,
                                             Outbox.status.in_(("queued", "sending"))))):
         return False  # a reply is waiting to go out: don't race it
+    from app.learning import cards  # late import: cards uses the unknown-item helpers of this package
+
+    if cards.waiting_for_price(session, message.id):
+        return False  # a staff member added a product without a price: the owner prices it first
     if result.intent in ("ask_price", "ask_stock"):
         return True
     if now - message.received_at > CONTEXT_WINDOW:
         return False
     # cart actions only for messages newer than the customer's last one-tap action
     last = session.scalar(select(Message.received_at).join(QuickAction, QuickAction.message_id == Message.id)
-                          .where(QuickAction.customer_id == message.customer_id, QuickAction.undone_at.is_(None))
+                          .where(QuickAction.customer_id == message.customer_id, QuickAction.undone_at.is_(None),
+                                 QuickAction.kind != "teach")
                           .order_by(Message.received_at.desc()).limit(1))
     return last is None or message.received_at > last
 
@@ -397,9 +414,25 @@ def _resolved(session: Session, message: Message, result: ParseResult) -> bool:
 
 
 def _with_greeting(session: Session, outcome: Outcome, customer_id: int, texts: dict[str, str], now: datetime):
-    if outcome.text:
+    if outcome.text and outcome.kind != "greeting":
         outcome.text = compose.with_greeting(outcome.text, texts, compose.needs_greeting(session, customer_id, now))
     return outcome
+
+
+def learned_used(session: Session, message: Message, result: ParseResult) -> list[int]:
+    """Learned patterns this message's answer relies on: nicknames / intent phrases of the
+    parse, and not_stocked patterns that answer its unknown items."""
+    ids = list(result.learned_ids or [])
+    return ids + [p.id for p in unknown.learned_not_stocked(session, message.id).values() if p.id not in ids]
+
+
+def describe(p: LearnedPattern, session: Session) -> str:
+    if p.kind == "nickname":
+        product = session.get(Product, p.product_id)
+        return f"“{p.text}” = {product.name if product else '?'}"
+    if p.kind == "intent_phrase":
+        return f"“{p.text}” = {p.intent.replace('_', ' ')}"
+    return f"“{p.text}” = we don't sell it"
 
 
 def suggest(session: Session, message: Message, result: ParseResult | None, texts: dict[str, str],
@@ -416,8 +449,14 @@ def suggest(session: Session, message: Message, result: ParseResult | None, text
         savepoint.rollback()
     if outcome is None:
         return None
+    waiting = patterns.not_certain(session, learned_used(session, message, result))
+    if waiting:
+        outcome.label = "📘 " + outcome.label
+        outcome.note = ("📘 learned (waiting approval): " + ", ".join(describe(p, session) for p in waiting)
+                        + ". " + outcome.note).strip()
     return Suggestion(outcome.kind, outcome.label, outcome.text, outcome.note,
-                      fingerprint(outcome.kind, outcome.text), _edit_url(message, outcome), outcome.address)
+                      fingerprint(outcome.kind, outcome.text), _edit_url(message, outcome), outcome.address,
+                      bool(waiting))
 
 
 def _edit_url(message: Message, outcome: Outcome) -> str | None:
@@ -445,6 +484,14 @@ def perform(session: Session, message: Message, expect: str, user: User | None, 
         raise Refused("Not sent: the reply changed (price, cart or parse). Check and try again.")
     review = session.scalar(select(MessageReview).where(MessageReview.message_id == message.id))
     outcome.undo["review"] = review.status if review else "new"
+    used = learned_used(session, message, result)
+    if used:
+        outcome.undo["learned"] = used  # "handled by learned patterns" counter (Learning page)
+        waiting = [p.id for p in patterns.not_certain(session, used) if p.status == "pending"]
+        if waiting and not auto:  # an admin accepted the 📘 suggestion unchanged
+            outcome.undo["learned_confirmed"] = waiting
+            outcome.undo["learned_approved"] = patterns.confirm_uses(session, waiting, user)
+        outcome.undo["unknown_requests"] = _record_learned_not_stocked(session, message, user_id)
     outbox_id = None
     if outcome.text:
         box = Outbox(customer_id=message.customer_id, text=outcome.text, reply_kind=outcome.reply_kind,
@@ -464,6 +511,27 @@ def perform(session: Session, message: Message, expect: str, user: User | None, 
         "actor": "auto" if auto else "admin", "quick_action_id": action.id, "message_id": message.id,
         "customer_id": message.customer_id, "order_id": outcome.order_id, "outbox_id": outbox_id}))
     return action
+
+
+def _record_learned_not_stocked(session: Session, message: Message, user_id: int | None) -> list[int]:
+    """Items answered by a learned not_stocked pattern count in "Wanted but not stocked"."""
+    rows = []
+    hits = unknown.learned_not_stocked(session, message.id)
+    result = session.scalar(select(ParseResult).where(ParseResult.message_id == message.id, ParseResult.is_current))
+    items = {normalize(i.unknown_text): i for i in _items(session, result) if i.unknown_text} if hits else {}
+    for norm, pattern in hits.items():
+        if session.scalar(select(UnknownRequest.id).where(UnknownRequest.message_id == message.id,
+                                                          UnknownRequest.normalized_text == norm)):
+            continue
+        item = items.get(norm)
+        row = UnknownRequest(message_id=message.id, customer_id=message.customer_id,
+                             text=(item.unknown_text if item else pattern.text)[:255], normalized_text=norm, size_ml=item.size_ml if item else None,
+                             is_full_bottle=item.is_full_bottle if item else False, resolution="not_stocked",
+                             resolved_by=user_id)
+        session.add(row)
+        session.flush()
+        rows.append(row.id)
+    return rows
 
 
 def undo(session: Session, action: QuickAction, user: User) -> None:
@@ -503,6 +571,16 @@ def undo(session: Session, action: QuickAction, user: User) -> None:
         if u.get("created_order") and cart.view(session, order).empty:
             cart.cancel(session, order)
         cart.touch(session, order)
+    if u.get("learned_confirmed"):
+        patterns.unconfirm_uses(session, u["learned_confirmed"], u.get("learned_approved") or [])
+    for row_id in u.get("unknown_requests") or []:
+        row = session.get(UnknownRequest, row_id)
+        if row is not None:
+            session.delete(row)
+    if u.get("teach"):
+        from app.learning import cards  # late import: cards uses this module
+
+        cards.undo(session, u["teach"])
     upsert_review(session, action.message_id, u.get("review") or "new", user)
     action.undone_at = datetime.now(UTC)
     session.add(AuditLog(user_id=user.id, action="quick.undo", details={"quick_action_id": action.id}))

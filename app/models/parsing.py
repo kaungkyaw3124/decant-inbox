@@ -3,12 +3,13 @@ from datetime import datetime
 from sqlalchemy import (
     Boolean, CheckConstraint, Float, ForeignKey, Index, Integer, String, false, text,
 )
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.base import Base, created_at_column
 
 INTENTS = ("buy", "ask_stock", "ask_price", "other", "unknown", "remove", "confirm", "done", "address",
-           "ask_delivery", "cancel_order")
+           "ask_delivery", "cancel_order", "greeting")
 PARSE_METHODS = ("rules", "ai", "human")
 
 
@@ -38,6 +39,8 @@ class ParseResult(Base):
     is_current: Mapped[bool] = mapped_column(Boolean)
     created_at: Mapped[datetime] = created_at_column()
     phone: Mapped[str | None] = mapped_column(String(20))  # Myanmar mobile found in the text
+    # docs/SPEC-v4.md 4.2: learned_patterns this parse used (nicknames, intent phrases)
+    learned_ids: Mapped[list[int]] = mapped_column(JSONB, server_default=text("'[]'::jsonb"), default=list)
 
 
 class ParseItem(Base):
@@ -58,3 +61,4 @@ class ParseItem(Base):
     match: Mapped[str | None] = mapped_column(String(16))  # exact | fuzzy | inherited | ... (auto: exact only)
     # 4.1 partial match ("hawas for him" with alias "hawas"): the alias' product, a suggestion only
     candidate_product_id: Mapped[int | None] = mapped_column(ForeignKey("products.id"))
+    name_text: Mapped[str | None] = mapped_column(String(255))  # the customer's words for the product (4.2)

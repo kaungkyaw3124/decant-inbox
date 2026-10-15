@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.models import AuditLog, Customer, FaqEntry, Message, Outbox, Product, QuickAction, User
 from app.models.outbox import UNDO_SECONDS
+from app.learning import cards, patterns
 from app.orders import auto, followups, payments, unknown
 from app.replies import compose, faq
 from app.replies import templates as replies
@@ -155,12 +156,22 @@ def needs_you(db: Session, now: datetime | None = None) -> dict:
                                                    Message.received_at > hand).limit(1))
         if newer:
             paused.append((customer, until))
+    teach = cards.to_teach(db, now)
+    taught_ids = {m.id for m, _ in teach}
+    unknown_msgs = [m for m in unknown_msgs if m.id not in taught_ids]  # their card asks about them
     customers = {c.id: c for c in db.scalars(select(Customer).where(
-        Customer.id.in_([m.customer_id for m in unknown_msgs])))}
+        Customer.id.in_([m.customer_id for m in unknown_msgs] + [m.customer_id for m, _ in teach])))}
     to_check = payments.to_check(db)
     cancels = followups.cancel_requests(db, now)
     unpaid = [(d, why) for d in followups.due(db, now) if (why := followups.blocked(db, d.customer, now))]
     unanswered = followups.unanswered(db, now)
+    cards_by_id = dict(teach)
+    for row in unanswered:  # the teaching card of an unanswered message goes on its row
+        mid = next((mid for mid in reversed(row.message_ids) if mid in cards_by_id), None)
+        if mid is not None:
+            row.card = (db.get(Message, mid), cards_by_id[mid])
+    on_rows = {row.card[0].id for row in unanswered if row.card}
+    teach = [(m, card) for m, card in teach if m.id not in on_rows]
     for row in unanswered:  # an FAQ question nobody answered yet (auto OFF): offer the one-tap answer
         for mid in reversed(row.message_ids):
             if match := faq.for_message(db, db.get(Message, mid)):
@@ -174,11 +185,17 @@ def needs_you(db: Session, now: datetime | None = None) -> dict:
             row.faq = row.faq or (message.id, match)
         else:
             hints.append((message, customer, match))
-    return {"faq_hints": hints,"payments": to_check, "cancels": cancels, "unpaid": unpaid, "unanswered": unanswered,
+    price_needed = cards.price_needed(db)
+    to_approve = patterns.pending_count(db)
+    conflicts = patterns.conflicts(db)
+    return {"faq_hints": hints, "payments": to_check, "cancels": cancels, "unpaid": unpaid, "unanswered": unanswered,
             "unknown": [(m, customers[m.customer_id], unknown.open_unknowns(db, m)) for m in unknown_msgs],
+            "teach": [(m, customers[m.customer_id], card) for m, card in teach],
+            "price_needed": price_needed, "to_approve": to_approve, "conflicts": conflicts,
             "failed": failed, "paused": paused, "auto_cancelled": followups.auto_cancelled(db, now),
             "count": len(to_check) + len(cancels) + len(unpaid) + len(unknown_msgs) + len(unanswered)
-                     + len(hints) + len(failed) + len(paused)}
+                     + len(hints) + len(failed) + len(paused) + len(teach) + len(price_needed)
+                     + (1 if to_approve else 0) + len(conflicts)}
 
 
 def handled_feed(db: Session, limit: int = 30) -> list:

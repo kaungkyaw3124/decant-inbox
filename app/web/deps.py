@@ -20,18 +20,22 @@ def csrf_token(request: Request) -> str:
 
 
 def _template_context(request: Request) -> dict:
-    auto_on, payments_open, to_pack = False, 0, 0
+    auto_on, payments_open, to_pack, role, to_learn = False, 0, 0, None, 0
     if request.session.get("user_id"):  # the switch and the badges are on every page
         from sqlalchemy import func, select
 
-        from app.models import Order
+        from app.learning import patterns
+        from app.models import Order, User
         from app.orders import auto, payments  # late import: avoids an import cycle at startup
 
         with SessionLocal() as session:
             auto_on, payments_open = auto.enabled(session), payments.count_open(session)
             to_pack = session.scalar(select(func.count()).select_from(Order).where(Order.status == "paid"))
+            role = session.scalar(select(User.role).where(User.id == request.session["user_id"]))
+            to_learn = patterns.pending_count(session)
     return {"csrf": csrf_token(request), "flash": request.session.pop("flash", None),
-            "path": request.url.path, "auto_on": auto_on, "payments_open": payments_open, "to_pack": to_pack}
+            "path": request.url.path, "auto_on": auto_on, "payments_open": payments_open, "to_pack": to_pack,
+            "user_role": role, "to_learn": to_learn}
 
 
 templates = Jinja2Templates(
