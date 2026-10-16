@@ -8,12 +8,13 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.ai import hints
 from app.learning import cards, patterns
 from app.models import (
-    AuditLog, Customer, LearnedPattern, Message, MessageReview, Product, ProductPrice, QuickAction, UnknownRequest,
-    User,
+    AuditLog, Customer, LearnedPattern, Message, MessageReview, Outbox, Product, ProductPrice, QuickAction,
+    UnknownRequest, User,
 )
-from app.models.outbox import UNDO_SECONDS
+from app.models.outbox import MAX_TEXT, UNDO_SECONDS
 from app.orders import actions
 from app.parser.service import current_result
 from app.replies import templates as replies
@@ -57,13 +58,16 @@ async def teach_preview(request: Request, message_id: int, db: Session = Depends
         if applied.result is not None and not applied.price_needed:
             suggestion = actions.suggest(db, message, applied.result, texts)
         line = cards.preview_line(db, applied, suggestion)
+        draft = _draft(answers) if applied.intent == "question" else None
+        if draft:
+            line = "ဒီအဖြေကို ဖောက်သည်ဆီ ပို့မယ်။"
     except cards.CardError as exc:
         savepoint.rollback()
         return _card_error(request, message_id, back, str(exc))
     savepoint.rollback()
     return templates.TemplateResponse(request, "card_preview.html", {
         "m": message, "c": db.get(Customer, message.customer_id), "line": line,
-        "reply": suggestion.text if suggestion else None, "learned": applied.learned, "learn": answers.learn,
+        "reply": draft or (suggestion.text if suggestion else None), "learned": applied.learned, "learn": answers.learn,
         "warnings": applied.warnings, "fields": _form_fields(form), "expect": suggestion.fingerprint if suggestion else "",
         "back": back, "undo_seconds": UNDO_SECONDS})
 
@@ -77,11 +81,20 @@ async def teach_confirm(request: Request, message_id: int, db: Session = Depends
     message = get_message(db, message_id)
     texts = replies.load(db)
     try:
-        applied = cards.apply(db, message, cards.read_form(form), user)
-        if applied.intent == "question":
-            db.rollback()
-            return RedirectResponse(f"/chats/{message.customer_id}#reply", status_code=303)
+        answers = cards.read_form(form)
+        applied = cards.apply(db, message, answers, user)
         review = db.scalar(select(MessageReview.status).where(MessageReview.message_id == message.id)) or "new"
+        if applied.intent == "question" and not _draft(answers):
+            db.rollback()
+            if hints.record(db, message.id, form, user):
+                db.commit()
+            return RedirectResponse(f"/chats/{message.customer_id}#reply", status_code=303)
+        if applied.intent == "question":
+            note = _send_draft(db, message, _draft(answers), applied, review, user)
+            hints.record(db, message.id, form, user)
+            db.commit()
+            flash(request, note)
+            return RedirectResponse(back if back != "/" else "/", status_code=303)
         suggestion = None
         if applied.result is not None and not applied.price_needed:
             suggestion = actions.suggest(db, message, applied.result, texts)
@@ -105,12 +118,37 @@ async def teach_confirm(request: Request, message_id: int, db: Session = Depends
         db.flush()
         db.add(AuditLog(user_id=user.id, action="learning.card_confirm", details={
             "message_id": message.id, "quick_action_id": action.id, "intent": applied.intent}))
+        hints.record(db, message.id, form, user)
         db.commit()
     except (cards.CardError, actions.Refused) as exc:
         db.rollback()
         return _card_error(request, message_id, back, str(exc))
     flash(request, " ".join([note, *applied.learned, *applied.warnings]))
     return RedirectResponse(back if back != "/" else "/", status_code=303)
+
+
+def _draft(answers: cards.Answers) -> str:
+    return answers.draft[:MAX_TEXT]
+
+
+def _send_draft(db: Session, message: Message, text: str, applied: cards.Applied, review: str, user: User) -> str:
+    """A question answered with the (edited) AI draft: an admin click, queued with the usual
+    Undo time. Never automatic (docs/SPEC-v4.6-ai.md S3)."""
+    now = datetime.now(UTC)
+    box = Outbox(customer_id=message.customer_id, text=text, reply_kind="custom", status="queued",
+                 idempotency_key=f"draft-{message.id}-{now.timestamp()}", created_by=user.id,
+                 send_after=now + timedelta(seconds=UNDO_SECONDS), source_message_id=message.id,
+                 previous_review_status=review)
+    db.add(box)
+    db.flush()
+    action = QuickAction(message_id=message.id, customer_id=message.customer_id, kind="teach", outbox_id=box.id,
+                         undo={"teach": applied.undo, "review": review}, created_by=user.id)
+    db.add(action)
+    actions.upsert_review(db, message.id, "done", user)
+    db.flush()
+    db.add(AuditLog(user_id=user.id, action="ai.draft_sent", details={
+        "message_id": message.id, "quick_action_id": action.id, "outbox_id": box.id, "chars": len(text)}))
+    return f"Done. The answer goes out in {UNDO_SECONDS} s unless you undo."
 
 
 # ---------- price needed ----------

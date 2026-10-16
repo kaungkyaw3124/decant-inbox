@@ -188,12 +188,16 @@ def needs_you(db: Session, now: datetime | None = None, owner: bool = True) -> d
     price_needed = cards.price_needed(db)
     to_approve = patterns.pending_count(db) if owner else 0  # approving is the owner's job (4.4)
     conflicts = patterns.conflicts(db) if owner else []
+    from app.ai import report as ai_report  # late import: ai -> orders -> this module's imports
+
+    ai_notices = ai_report.notices(db, now)  # docs/SPEC-v4.6-ai.md S5: errors, no credit, limits
     return {"faq_hints": hints, "payments": to_check, "cancels": cancels, "unpaid": unpaid, "unanswered": unanswered,
             "unknown": [(m, customers[m.customer_id], unknown.open_unknowns(db, m)) for m in unknown_msgs],
             "teach": [(m, customers[m.customer_id], card) for m, card in teach],
             "price_needed": price_needed, "to_approve": to_approve, "conflicts": conflicts,
             "failed": failed, "paused": paused, "auto_cancelled": followups.auto_cancelled(db, now),
-            "count": len(to_check) + len(cancels) + len(unpaid) + len(unknown_msgs) + len(unanswered)
+            "ai_notices": ai_notices,
+            "count": len(ai_notices) + len(to_check) + len(cancels) + len(unpaid) + len(unknown_msgs) + len(unanswered)
                      + len(hints) + len(failed) + len(paused) + len(teach) + len(price_needed)
                      + (1 if to_approve else 0) + len(conflicts)}
 

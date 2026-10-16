@@ -23,6 +23,7 @@
     {% if m.raw_text %}<p class="text">{{ m.raw_text }}</p>{% endif %}
     <div class="bubble-meta">
       {% if m.id in auto_msgs %}<span title="{{ t('Sent by auto-reply') }}">🤖</span> · {% endif %}
+      {% if m.id in ai_reasons %}<span class="ai-mark" title="{{ ai_reasons[m.id] }}">🧠</span> · {% endif %}
       {% if m.direction == "in" %}<a href="/messages/{{ m.id }}?back=/chats/{{ c.id }}">{{ t("details") }}</a> · {% endif %}
       <time>{{ m.received_at | local_time }}</time>
     </div>

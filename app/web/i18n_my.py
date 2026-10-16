@@ -30,6 +30,9 @@ CODES = {
     "parse": "ပြင်ဆင်", "settings": "ဆက်တင်", "template": "စာပုံစံ", "needs_you": "ကိုယ်တိုင်လုပ်ရန်",
     "message": "စာ", "payment_method": "ငွေပေးနည်း", "reply_template": "အသင့်ဖြေစာ", "order_rules": "အော်ဒါ ဆက်တင်",
     "vial_costs": "ပုလင်းသေး ကုန်ကျစရိတ်",
+    # AI calls (docs/SPEC-v4.6-ai.md)
+    "shadow": "🧠 အကြံပြုထား", "accepted": "✅ လက်ခံ", "corrected": "✏️ ပြင်ပြီး", "error": "⚠️ အမှား",
+    "cap": "တစ်ရက် အကန့်အသတ်ပြည့်", "budget": "လစဉ် ဘတ်ဂျက်ကုန်", "unused": "မသုံး",
 }
 
 MY = {
@@ -501,4 +504,46 @@ MY = {
     "“The previous one”: several earlier items – ask which ({options} = numbered lines)":
         "“အရင်ကဟာ”: အရင်ကဟာ အများကြီး – ဘယ်ဟာလဲ မေး ({options} = နံပါတ်တပ် စာကြောင်းများ)",
     "Customer cancelled the order": "ဖောက်သည်က အော်ဒါ ပယ်",
+    # AI page + AI on cards / Needs you (docs/SPEC-v4.6-ai.md)
+    "AI": "AI", "AI helper": "AI အကူ", "AI calls": "AI ခေါ်ခဲ့တာ", "Mode": "မုဒ်", "Model": "မော်ဒယ်",
+    "Reasoning": "စဉ်းစားမှု", "Now": "အခု", "Numbers": "ကိန်းဂဏန်းများ", "Evaluation": "စမ်းသပ်စစ်ဆေးချက်",
+    "Passed": "အောင်", "Failed": "ကျ", "cost": "ကုန်ကျ", "Cost (USD)": "ကုန်ကျ (USD)", "Accuracy": "မှန်ကန်မှု",
+    "Average answer time": "ပျမ်းမျှ ဖြေချိန်", "average answer time": "ပျမ်းမျှ ဖြေချိန်",
+    "Accepted unchanged": "မပြင်ဘဲ လက်ခံ", "Corrected by a person": "လူက ပြင်ပေး",
+    "Handled automatically by the AI": "AI က အလိုအလျောက် လုပ်ပေး",
+    "Errors / refused by our checker": "အမှား / ကိုယ့်စစ်ဆေးချက်က ငြင်း",
+    "Not called (limit or budget)": "မခေါ်ဖြစ် (အကန့်အသတ် / ဘတ်ဂျက်)",
+    "Answered with learned patterns (no AI needed)": "သင်ထားတာနဲ့ ဖြေပြီး (AI မလို)",
+    "Calls per day (limit)": "တစ်ရက် ခေါ်နိုင်တဲ့ အကြိမ် (အများဆုံး)", "Monthly budget (USD)": "တစ်လ ဘတ်ဂျက် (USD)",
+    "AUTO: act when at least this sure (0.5-1)": "AUTO: ဒီလောက် သေချာမှ လုပ်မယ် (0.5-1)",
+    "Run evaluation": "စမ်းသပ်စစ်ဆေးမယ်", "Running…": "စစ်နေတယ်…", "No evaluation yet.": "မစစ်ရသေးပါ။",
+    "Last 50 AI calls": "နောက်ဆုံး AI ခေါ်ခဲ့တာ ၅၀", "No AI calls yet.": "AI မခေါ်ရသေးပါ။",
+    "intent + products right": "လုပ်ချင်တာ + ပစ္စည်း မှန်", "wrong products": "ပစ္စည်းမှား", "{n} messages": "စာ {n} စောင်",
+    "acts when the AI is at least {p}% sure": "AI က {p}% အထက် သေချာမှ လုပ်မယ်",
+    "SHADOW: suggests on teaching cards": "SHADOW: သင်ပေးကတ်မှာ အကြံပြုမယ်",
+    "AUTO: acts when sure": "AUTO: သေချာရင် ကိုယ်တိုင်လုပ်မယ်",
+    "The AI only reads messages the rules are not sure about. It never writes to customers: replies come from your templates and prices.":
+        "AI က စည်းမျဉ်းတွေ မသေချာတဲ့ စာတွေကိုပဲ ဖတ်တယ်။ ဖောက်သည်ဆီ ဘယ်တော့မှ ကိုယ်တိုင် မရေးဘူး — ဖြေစာတွေက ကိုယ့်စာပုံစံ၊ ကိုယ့်ဈေးနှုန်းကပဲ လာတယ်။",
+    "OFF: no AI. SHADOW: the AI fills in teaching cards, a person checks. AUTO: when the AI is sure, the app acts by itself with the usual safety rules.":
+        "ပိတ်: AI မသုံး။ SHADOW: AI က သင်ပေးကတ်ကို ဖြည့်ပေး၊ လူက စစ်တယ်။ AUTO: AI သေချာရင် ပုံမှန် ဘေးကင်းစည်းမျဉ်းတွေနဲ့ App က ကိုယ်တိုင်လုပ်တယ်။",
+    "Runs the test messages (tests/fixtures/ai_eval.csv) against the real AI: costs about one cent. Pass = intent and products at least 90% right and never a wrong product.":
+        "စမ်းသပ်စာတွေကို တကယ့် AI နဲ့ စစ်တယ် (ဒေါ်လာ ၁ ဆင့်လောက် ကုန်)။ အောင်ရင် = လုပ်ချင်တာနဲ့ ပစ္စည်း ၉၀% အထက်မှန်ပြီး ပစ္စည်းမှား လုံးဝမရှိ။",
+    "Done. The answer goes out in {n} s unless you undo.": "ပြီးပြီ။ ပြန်မဖျက်ရင် {n} စက္ကန့်အတွင်း အဖြေ ပို့မယ်။",
+    "Not saved: {why}": "မသိမ်းရသေးပါ: {why}",
+    "Not saved: type numbers for the limit, budget and threshold.": "မသိမ်းရသေးပါ: အကန့်အသတ်၊ ဘတ်ဂျက်၊ threshold မှာ ဂဏန်းရိုက်ပါ။",
+    "The evaluation is already running.": "စစ်ဆေးချက် လုပ်နေဆဲပါ။",
+    "Evaluation started. It takes about 2 minutes; reload this page.": "စစ်ဆေးချက် စပြီ။ ၂ မိနစ်လောက်ကြာမယ် — စာမျက်နှာ ပြန်ဖွင့်ပါ။",
+    "🧠 AI is on, but OPENAI_API_KEY is missing in .env. Messages go to Needs you as before.":
+        "🧠 AI ဖွင့်ထားပေမယ့် .env ထဲမှာ OPENAI_API_KEY မရှိဘူး။ စာတွေက အရင်လို ကိုယ်တိုင်လုပ်ရန် ထဲ ရောက်မယ်။",
+    "🧠 AI stopped working: {why}. Messages go to Needs you as before.":
+        "🧠 AI အလုပ်မလုပ်တော့ဘူး: {why}။ စာတွေက အရင်လို ကိုယ်တိုင်လုပ်ရန် ထဲ ရောက်မယ်။",
+    "the API key was refused (check OPENAI_API_KEY in .env)": "API key ကို လက်မခံဘူး (.env ထဲက OPENAI_API_KEY စစ်ပါ)",
+    "no credit left: add credit in OpenAI Billing": "credit ကုန်ပြီ: OpenAI Billing မှာ credit ထည့်ပါ",
+    "OpenAI refuses this country / region": "OpenAI က ဒီနိုင်ငံ / ဒေသကို လက်မခံဘူး",
+    "🧠 AI: {errors} of the last {n} calls failed (network / API). See the AI page.":
+        "🧠 AI: နောက်ဆုံး {n} ကြိမ်ထဲက {errors} ကြိမ် မအောင်မြင်ဘူး (network / API)။ AI စာမျက်နှာ ကြည့်ပါ။",
+    "🧠 AI: daily limit of {n} calls reached. Until tomorrow, unsure messages go to Needs you without AI help.":
+        "🧠 AI: တစ်ရက် {n} ကြိမ် ပြည့်ပြီ။ မနက်ဖြန်အထိ မသေချာတဲ့စာတွေ AI အကူမပါဘဲ ကိုယ်တိုင်လုပ်ရန် ထဲ ရောက်မယ်။",
+    "🧠 AI: monthly budget of ${n} used up. Raise it on the AI page, or wait for next month.":
+        "🧠 AI: တစ်လ ဘတ်ဂျက် ${n} ကုန်ပြီ။ AI စာမျက်နှာမှာ တိုးပါ (သို့) နောက်လ စောင့်ပါ။",
 }

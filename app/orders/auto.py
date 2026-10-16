@@ -17,6 +17,8 @@ Runs in the parser worker (database only). Extra rules on top of the one-tap one
 - at most one auto decision per incoming message (auto_runs).
 Never automatic: photos, intents other/unknown (except an FAQ answer, Step 7), unknown items
 (those go to "Needs you"), learned patterns not approved yet (docs/SPEC-v4.md 4.2: one-tap "📘").
+AI (docs/SPEC-v4.6-ai.md): in AUTO AI mode an unsure message waits for the AI's answer; an AI
+parse result (method "ai") is acted on only while the AI mode is AUTO.
 """
 import logging
 import random
@@ -40,8 +42,9 @@ DEFAULT_SPEED = {"quiet_s": 1, "delay_min_s": 2, "delay_max_s": 3}  # ~3 s from 
 SPEED_LIMITS = {"quiet_s": (0, 30), "delay_min_s": (1, 60), "delay_max_s": (1, 60)}
 AUTO_INTENTS = ("ask_price", "ask_stock", "buy", "remove", "done", "confirm", "address", "ask_delivery",
                 "cancel_order", "greeting", "previous_item")
-# learned = an approved learned nickname (4.2); choice = picked by number from our list (4.3)
-CERTAIN_MATCHES = ("exact", "inherited", "human", "learned", "choice")
+# learned = an approved learned nickname (4.2); choice = picked by number from our list (4.3);
+# ai = written by the AI in AUTO mode after our checker and the threshold (docs/SPEC-v4.6-ai.md S4)
+CERTAIN_MATCHES = ("exact", "inherited", "human", "learned", "choice", "ai")
 PAUSE_AFTER_HAND_REPLY = timedelta(hours=2)
 LINK_GRACE = timedelta(seconds=30)  # a dashboard send is linked to its outbox row within ms
 DAILY_CAP = 300
@@ -132,8 +135,9 @@ def _skip(session: Session, message_id: int, reason: str) -> str:
     return f"skipped: {reason}"
 
 
-def decide(session: Session, message: Message, now: datetime) -> str | None:
-    """Handle one message. Returns what happened, or None = not yet (try again later)."""
+def decide(session: Session, message: Message, now: datetime, ai_mode: str | None = None) -> str | None:
+    """Handle one message. Returns what happened, or None = not yet (try again later).
+    ai_mode: the AI mode (off | shadow | auto), read once per pass by run_once()."""
     customer = session.get(Customer, message.customer_id)
     result = session.scalar(select(ParseResult).where(ParseResult.message_id == message.id, ParseResult.is_current))
     if result is None:
@@ -144,6 +148,14 @@ def decide(session: Session, message: Message, now: datetime) -> str | None:
         return _skip(session, message.id, "auto-reply off for this customer")
     if message.kind != "text":
         return _skip(session, message.id, "photo / file")
+    from app.ai import service as ai, settings as ai_settings  # late import: ai -> orders
+
+    if ai_mode is None:
+        ai_mode = ai_settings.mode(session)
+    if ai_mode == "auto" and ai.waiting_for_ai(session, message, result):
+        return None  # AUTO AI mode: the AI looks at it first (the worker asks right before this)
+    if result.method == "ai" and ai_mode != "auto":
+        return _skip(session, message.id, "AI result, AI mode is not auto")
     if result.intent not in AUTO_INTENTS and faq.for_message(session, message, result) is None:
         return _skip(session, message.id, f"intent {result.intent}")
     if answered_by_human(session, message):
@@ -196,15 +208,18 @@ def candidates(session: Session, now: datetime) -> list[int]:
 def run_once(now: datetime | None = None) -> dict[str, int]:
     """One pass over undecided messages (each in its own transaction). Returns counts."""
     now = now or datetime.now(UTC)
+    from app.ai import settings as ai_settings  # late import: ai -> orders
+
     with SessionLocal() as session:
         ids = candidates(session, now)
+        ai_mode = ai_settings.mode(session) if ids else None
     stats: dict[str, int] = {}
     for message_id in ids:
         try:
             with SessionLocal.begin() as session:
                 if not enabled(session):
                     break  # switched off meanwhile
-                outcome = decide(session, session.get(Message, message_id), now)
+                outcome = decide(session, session.get(Message, message_id), now, ai_mode)
         except Exception:
             log.exception("auto decision failed for message=%s", message_id)
             continue

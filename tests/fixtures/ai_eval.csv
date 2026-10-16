@@ -1,0 +1,49 @@
+id,message,history,cart,last_paid,expect_intent,expect_items,allowed,note
+o01,ysl edp 10 ml ရောယူပါမယ်,,,,buy,Y Eau de Parfum@10ml,,owner: nickname typo
+o02,hawas for him 10ml ယူမယ်,,,,buy,!hawas for him@10ml,,owner: not in list (we sell Hawas Ice only)
+o03,"Good girl 5ml, swy 10ml, liquid brun 10ml ယူပါမယ်",,,,buy,Good Girl@5ml;Stronger With You@10ml;!liquid brun@10ml,,"owner: 3 items, 3rd not in list"
+o04,ဟိုနေ့ကဟာ ၂ခု ထပ်ယူမယ်,,,Good Girl 5ml x1,previous_item/buy,Good Girl@5ml*2,,owner: previous item from last paid order
+o05,ဒီအနံ့က ဘယ်လိုမျိုးလဲ ညနေဘက်သုံးလို့ရလား,,,,question,,,owner: question
+o06,stonger with u intense 5ml ဈေးဘယ်လောက်လဲ,,,,ask_price,Stronger With You Intensely@5ml,,owner: typos; rules pick the wrong product
+o07,ysl ကို မယူတော့ဘူး,,Sauvage Eau de Parfum 5ml x1; Y Eau de Parfum 5ml x1,,remove,Y Eau de Parfum@any,,owner: remove from cart
+o08,ရန်ကင်း သုခလမ်း အမှတ်၁၂ ကိုပို့ပေးပါ ဖုန်း ၀၉၇၇၇၁၂၃၄၅၆,,,,address,,,owner: address + phone (masked)
+o09,hi ဘာတွေရလဲ,,,,greeting/question,,,owner: greeting / question
+o10,ဘလူးဒီချန်နယ် အပြည့်ဗူး ရှိလား,,,,ask_stock,Bleu de Chanel Eau de Parfum@full,,"owner: Burmese name, full bottle"
+c01,10ml ဘယ်လောက်လဲ,C: sauvage ရှိလား|S: ရှိပါတယ်ရှင့်,,,ask_price,Sauvage Eau de Parfum@10ml,,context product
+c02,10ml ပေးပါ,"C: good girl 5ml ဘယ်လောက်လဲ|S: Good Girl 5ml – 15,000 ကျပ်ပါ",,,buy,Good Girl@10ml,,"context product, polite buy"
+c03,အဲ့ဒါ ဘယ်လောက်လဲ,C: aventus 5ml ရှိလား|S: ရှိပါတယ်ရှင့်,,,ask_price,Aventus@any,,'that one' from the chat
+c04,same as before pls,,,Bleu de Chanel Eau de Parfum 10ml x1,previous_item/buy,Bleu de Chanel Eau de Parfum@10ml,,"previous item, English"
+c05,ငွေလွှဲပြီးပါပြီ,S: KPay – [NUMBER],,,other/confirm,,,payment sent (not a product)
+c06,ဒီအနံ့က ဘယ်လောက်ကြာကြာ မွှေးလဲ,C: aventus 5ml ရှိလား|S: ရှိပါတယ်ရှင့်,,,question,*,Aventus,longevity question about the chat's product
+c07,original လား,"C: sauvage 10ml ဘယ်လောက်လဲ|S: Sauvage Eau de Parfum 10ml – 38,000 ကျပ်ပါ",,,question,*,Sauvage Eau de Parfum,authenticity question
+n01,sauvage noir 10ml ယူမယ်,,,,buy,!sauvage noir@10ml,,flanker not in list
+n02,"good girl 5ml, eros flame 10ml ယူမယ်",,,,buy,Good Girl@5ml;!eros flame@10ml,,flanker not in list
+n03,le male le parfum 10ml ရှိလား,,,,ask_stock,!le male le parfum@10ml,,"we have Le Male Elixir, not Le Parfum"
+n04,dior homme intense 5ml ဈေးဘယ်လောက်လဲ,,,,ask_price,!dior homme intense@5ml,,not in list
+n05,tom ford tobacco vanille 5ml ရှိလား,,,,ask_stock,!tobacco vanille@5ml,,"not in list, brand we sell"
+n06,ysl myslf 10ml ယူမယ်,,,,buy,!ysl myslf@10ml,,"not in list, brand we sell"
+n07,good girl blush 5ml ရလား,,,,ask_stock,!good girl blush@5ml,,flanker not in list
+n08,stronger with you absolutely 5ml ယူမယ်,,,,buy,!stronger with you absolutely@5ml,,flanker not in list
+n09,sauvage elixir 5ml ယူမယ်,,,,buy,Sauvage Elixir@5ml,,flanker that IS in the list
+n10,Hawas ice 5ml ယူမယ်,,,,buy,Hawas Ice@5ml,,in list (vs o02)
+n11,ysl 5ml ယူမယ်,,,,buy,?ysl@5ml,,ambiguous: Y or Libre -> must stay null
+t01,savage edp 10ml ယူမယ်,,,,buy,Sauvage Eau de Parfum@10ml,,typo
+t02,bleu chanel 5ml ရှိလား,,,,ask_stock,Bleu de Chanel Eau de Parfum@5ml,,typo
+t03,good gril 5ml ဘယ်လောက်လဲ,,,,ask_price,Good Girl@5ml,,typo
+t04,aventis 10ml ယူမယ်,,,,buy,Aventus@10ml,,typo
+t05,baccarat rogue 2ml ရလား,,,,ask_stock,Baccarat Rouge 540@2ml,,typo
+t06,la vie est bell 5ml ပေးပါ,,,,buy,La Vie Est Belle@5ml,,typo
+t07,one milion 10ml ဈေး,,,,ask_price,1 Million@10ml,,typo
+t08,versace eross 5ml ယူမယ်,,,,buy,Eros@5ml,,typo
+t09,le male elixer 10ml ရှိသေးလား,,,,ask_stock,Le Male Elixir@10ml,,typo
+t10,aqua di gio 5ml ဘယ်လောက်လဲ,,,,ask_price,Acqua di Gio Profumo@5ml,,typo
+t11,aventus 100ml ဘယ်လောက်လဲ,,,,ask_price,Aventus@full,,bottle size = full
+t12,stw intensely 5ml လေးထည့်ထားပေး,,,,buy,Stronger With You Intensely@5ml,,new buy phrase
+t13,good girl 5ml ၂ခု နဲ့ miss dior 10ml,,,,buy/ask_price/ask_stock,Good Girl@5ml*2;Miss Dior@10ml,,"no verb, quantity"
+z01,ေဆာ္ေဗ့ ၅ မီလီ ဘယ္ေလာက္လဲ,,,,ask_price,Sauvage Eau de Parfum@5ml,,Zawgyi
+z02,ဘက္ကာရတ္ ၂ မီလီ ဝယ္ခ်င္တယ္,,,,buy,Baccarat Rouge 540@2ml,,Zawgyi
+z03,ဘလူးဒီခ်န္နယ္ ၁၀ မီလီ ရွိေသးလား,,,,ask_stock,Bleu de Chanel Eau de Parfum@10ml,,Zawgyi
+q01,kpay နဲ့ ရလား,,,,question,,,payment question (FAQ topic)
+q02,ဘယ်တော့ ရောက်မလဲ,,,,ask_delivery,,,delivery status
+q03,ကျေးဇူးပါ,,,,other,,,thanks
+q04,ပို့ခ ဘယ်လောက်လဲ,,,,question/ask_delivery/ask_price,,,delivery fee question

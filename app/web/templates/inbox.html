@@ -11,6 +11,9 @@
   <h2>🟡 {{ t("Needs you") }} ({{ needs_you.count }}) {{ ui.help("Messages the app could not answer by itself. Work from top to bottom; each line says what to do.") }}</h2>
   {% if not needs_you.count %}<p class="muted small">{{ t("Nothing waiting for you.") }}</p>{% endif %}
   <ul class="feed">
+  {% for n in needs_you.ai_notices %}
+    <li class="problem-text">{% if user_role == "owner" %}<a href="/ai">{{ tr(n) }}</a>{% else %}{{ tr(n) }}{% endif %}</li>
+  {% endfor %}
   {% for check, order, c in needs_you.payments %}
     <li><a href="/payments/{{ check.id }}"><b>💳 {{ c.display_name or c.username or customer }}</b>:
       {{ t("several photos — ask for one") if check.decision == "several" else t("payment screenshot to check") }}</a>

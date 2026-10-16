@@ -1049,3 +1049,136 @@ system decided (🤖 = automatic).
 5. ပိုင်ရှင်က မေးမယ်: "ငွေမရောက်ဘဲ screenshot ပဲ ပို့ရင် ဘာလုပ်မလဲ?"၊ "ဈေးမသိရင်?"၊ "ဖောက်သည် ဒေါသထွက်ရင်?"
    → လမ်းညွှန်ထဲက **❗ မလုပ်ရမယ့်အရာများ** နဲ့ **🙋 မသိရင် ဘယ်သူ့ကို မေးမလဲ** အတိုင်း ဖြေနိုင်ရမယ်။
 6. **အောင်မြင်တယ်** ဆိုတာ: ပိုင်ရှင် မကူဘဲ အပေါ်က ၁-၅ အကုန် လုပ်နိုင်တာ၊ ဖောက်သည်ဆီ စာမှား မရောက်တာ။
+
+## 2026-10-16 — v4.6: AI helper (OpenAI) with an evaluation gate (docs/SPEC-v4.6-ai.md)
+**S0 key check:** OK. One tiny call to gpt-6-luna succeeded; the key was never printed.
+
+**What was built**
+- `app/ai/`: provider interface (`openai` = official SDK 3.31, Responses API, strict JSON schema, `store=false`,
+  prompt-cache key; `fake` for tests), privacy masking, prompt (static instructions + product list with ids,
+  nicknames, sizes sold and bottle size, approved "we don't sell" words and FAQ titles FIRST, then the masked
+  message, the last 10 chat messages, the cart and the last paid order), checker, service (when to call,
+  caps, AUTO), hints (SHADOW card), report (AI page numbers and notices).
+- `ai_calls` table (tokens, cached tokens, cost, latency, ok, error kind, checked result, decision) and
+  `learned_patterns.via_ai`. Migration e29f24a992e0; down/up round trip tested.
+- Parser worker: after the rules, an AI step for fresh (24 h) unsure messages only, then auto mode.
+  "Unsure" = intent other/unknown without an FAQ, an unknown / partial / fuzzy / ambiguous / context item, a
+  product question with no product, or previous_item with no history. Never: photos, rules-certain messages,
+  approved learned patterns, pending 📘 patterns (they are already a one-tap suggestion), ignored customers,
+  handled messages. At most one call per message; every call or skipped call is one ai_calls row.
+- SHADOW (the default, deployed): the AI's answers are pre-selected on the 📘 teaching card ("🧠 AI suggests"
+  + reason + %). If the AI's product is not among the card's options, it is added. not_in_list at ≥ 0.85 →
+  "🚫 ဒီပစ္စည်း မရှိဘူး" pre-selected. If the AI's intent differs from the rules', the card asks "what do they
+  want?" with the AI's answer pre-selected. Questions show the AI's Burmese draft in an editable box: ✅ sends
+  it (admin click, 10 s Undo); it is never automatic. ✅ unchanged → ai_calls.decision = accepted; anything
+  changed (also the draft) → corrected. Patterns from the card are pending, shown as "🧠 AI + <user>".
+- AUTO (owner switch, OFF until the owner turns it on): checker OK + confidence ≥ threshold (0.85) + allowed
+  intent + every item a product (buys need a size) or not_in_list ≥ 0.9; cancel_order only with an open
+  cart; previous_item only if every item is in the customer's history. Then: parse result method="ai",
+  not_in_list → unknown_requests "not_stocked" (Wanted report), learn entries → PENDING patterns (taught by
+  "🧠 AI"), and the normal auto engine continues with all its safety rules. In AUTO mode the auto engine
+  waits for the AI's answer on unsure messages. Otherwise → SHADOW behaviour. Re-parsing keeps AI results
+  (like human ones). 🧠 in the chat on AI-understood messages (hover = reason).
+- AI page `/ai` (owner): mode OFF / SHADOW / AUTO, today and this month (calls, cost, average time, accepted,
+  corrected, accuracy, auto, errors / refused, not called, answered with learned patterns), settings (daily
+  cap 300, monthly budget $5, threshold, model, reasoning), last 50 calls, "Run evaluation" + latest report.
+- Needs you notices: key refused / no credit / country (from the newest call), ≥ 50% of the last 20 calls
+  failed, daily cap reached, monthly budget used up.
+- Errors: 8 s timeout; 1 retry on network errors only; 401/403/429/no credit/timeout → decision "error", no
+  crash, the message stays in Needs you. Invalid JSON or any checker problem → "rejected".
+- Staff guide: a short "🧠 AI အကြံပြုချက်" section. All new screens are translated into Burmese.
+
+**Decisions**
+- Live messages are masked before sending. Phones become [PHONE], house numbers / streets / wards become
+  [ADDRESS], runs of 6+ digits become [NUMBER]. Sizes, quantities, prices up to 5 digits and township names
+  stay. Photos become "[photo]". Our payment / contact replies become "[contact / payment details]".
+  Customer names are never sent.
+- Product ids and sizes are enums in the strict schema, so the model cannot even write an unknown id; the
+  checker still checks everything (active, size sold, qty 1-20, learn text really in the message).
+- One prompt rule was added after an evaluation run mapped "ysl 5ml" to Y EDP: a brand name alone is not a
+  product when we sell more than one of that brand. It stays null unless the chat or cart shows which.
+  Afterwards "ysl edp" is sometimes left for the person to pick (the safe direction).
+- The worker remembers "no AI needed" per (message, parse result), so certain messages are not re-checked
+  every second.
+- The auto engine reads the AI mode once per pass (a per-message query made a timing test flaky).
+
+**S2 evaluation gate (real API, tests/fixtures/ai_eval.csv: 48 cases, the owner's 10 examples, context,
+not-in-list flankers, typos, Zawgyi, questions)** — PASS
+| run (gpt-6-luna, reasoning low) | intent+products | wrong product ids | not_in_list mapped | sizes | cost | avg time |
+|---|---|---|---|---|---|---|
+| final (after the brand rule) | **100%** | **0** | **0** | 100% | $0.0041 | 1.9 s |
+| 3 runs after the brand rule | 98-100% | 0 | 0 | 100% | ~$0.0045 each | 2.2-2.3 s |
+| run before the brand rule | 98% | 1 ("ysl 5ml" → Y EDP) → FAIL | 0 | 100% | $0.0046 | 2.3 s |
+- Prompt caching works: ~99% of input tokens were cached. One real call costs about $0.0001.
+- One run had a single 8 s timeout. That case simply goes to Needs you, which is the designed fallback.
+- Reports are in data/exports/ai_eval_*.json (git-ignored); the AI page shows the latest.
+
+**Tests:** 332 passed, 1 skipped (was 297 + 1). 35 new tests in tests/test_v46_ai.py cover F1-F11 and the AI
+page. F1: checker rejections → Needs you, nothing sent. F2: what leaves the server is masked; no photos, no
+payment details. F3: cap, next day, budget. F4: every error kind + OpenAI SDK error mapping + store=false.
+F5-F8: SHADOW / AUTO / not-in-list / questions. F9-F10: no calls when the rules are sure or a pattern is
+approved. F11: cost. All tests use the fake provider (AI_PROVIDER=off in tests). The synthetic fixture has
+no regressions. /ai is part of the "every page Burmese" test.
+
+**Deployed:** backup product_requests_2026-10-16T1820Z.dump, migration at head, AI mode = SHADOW, parser +
+web restarted, /healthz ok, scripts/status.sh ok. AUTO stays off until the owner switches it on at /ai.
+
+## OWNER TEST SCRIPT v4.6 (AI helper)
+Before you start: Chats > your test account > "Cancel cart", so the cart is empty. Auto-reply can stay as it
+is for part A. Each AI answer takes 2-4 s, so wait about 5 s, then reload the Inbox. The 📘 card is in
+"🟡 Needs you" and on the message page.
+
+**A. SHADOW (as deployed).** Send these from the second Telegram account, one at a time:
+1. `ysl edp 10 ml ရောယူပါမယ်` → card: "🧠 AI suggests · …ysl edp = Y Eau de Parfum…".
+   - Y Eau de Parfum 🧠 is selected, and the learn box says "ysl edp".
+   - Tap ဆက်လုပ်မယ် → ✅. Expect the cart list with "• Y Eau de Parfum 10ml – … ကျပ်".
+2. `hawas for him 10ml ယူမယ်` → card: "🚫 ဒီပစ္စည်း မရှိဘူး 🧠" is selected. Tap ဆက်လုပ်မယ် → ✅. Expect
+   "hawas for him ကတော့ လောလောဆယ် မရှိသေးပါဘူးနော်။".
+3. `Good girl 5ml, swy 10ml, liquid brun 10ml ယူပါမယ်` → the card asks only about "liquid brun", with 🚫 🧠
+   selected. Tap ✅. Expect Good Girl 5ml + Stronger With You 10ml in the list, plus the "liquid brun …
+   မရှိသေးပါဘူး" line.
+4. `ဟိုနေ့ကဟာ ၂ခု ထပ်ယူမယ်` → no 🧠. The rules find it in your history: a one-tap button or the
+   numbered "which one?" list, as in v4. The AI is only asked when there is no history.
+5. `ဒီအနံ့က ဘယ်လိုမျိုးလဲ ညနေဘက်သုံးလို့ရလား` → in Needs you at once.
+   - The card shows "မေးခွန်း — ကိုယ်တိုင်ဖြေမယ် 🧠" and a box with the AI's Burmese draft.
+   - Read it and edit it (remove anything wrong).
+   - ဆက်လုပ်မယ် shows "ဒီအဖြေကို ဖောက်သည်ဆီ ပို့မယ်။" and your text. ✅ sends exactly that text after 10 s
+     (Undo possible). Nothing is ever sent without your ✅.
+6. `stonger with u intense 5ml ဈေးဘယ်လောက်လဲ` → the rules guessed "Stronger With You" (wrong); the card shows
+   Stronger With You Intensely 🧠 selected. ✅ → the price of Stronger With You **Intensely** 5ml.
+7. `ysl ကို မယူတော့ဘူး` (Y EDP is in the cart from step 1) → card: Y Eau de Parfum 🧠. ✅ → Y EDP removed and
+   the list sent again.
+8. `ရန်ကင်း သုခလမ်း အမှတ်၁၂ ကိုပို့ပေးပါ ဖုန်း ၀၉၇၇၇၁၂၃၄၅၆` → no 🧠 (the rules know addresses). The phone /
+   address buttons work as in v4.
+9. `hi ဘာတွေရလဲ` → card: "နှုတ်ဆက်တာ 🧠" (or "မေးခွန်း 🧠" with a draft) is selected. Tap ✅ (or edit the draft).
+10. `ဘလူးဒီချန်နယ် အပြည့်ဗူး ရှိလား` → no 🧠. The rules already know it (Bleu de Chanel, full bottle): a
+    one-tap button, or an automatic answer if auto-reply is ON.
+- To see a "corrected" answer: in step 6 or 7, choose a different product than the 🧠 one before ✅.
+- Learning page: "ysl edp", "hawas for him", "liquid brun" … show "taught by 🧠 AI + owner", waiting for
+  approval.
+
+**B. AUTO (3 messages).** Cancel the cart. At /ai press "AUTO: acts when sure". The 🤖 Auto-reply in the header
+must be ON. Use new words, because the words taught in part A are now learned patterns: the rules handle
+those without the AI (no AI call, no cost).
+1. `savage edp 10ml ယူမယ်` → automatic list with "• Sauvage Eau de Parfum 10ml – …", sent 2-3 s later.
+   - Chats: your message has 🧠; hover shows the reason.
+   - Learning: "savage edp" → Sauvage, "taught by 🧠 AI", waiting.
+2. `dior homme intense 5ml ဈေးဘယ်လောက်လဲ` → automatic "dior homme intense ကတော့ လောလောဆယ် မရှိသေးပါဘူးနော်။".
+   Reports > Wanted lists it.
+3. `ဒီအနံ့က ဘယ်လောက်ကြာကြာ မွှေးလဲ` → NOT answered automatically (questions never are). The card with the
+   draft is in Needs you.
+- Bonus: send `ysl edp 5ml ယူမယ်` → the 📘 one-tap button, with no AI call (the AI page count does not go
+  up).
+- At the end, switch /ai back to SHADOW, unless you want to keep AUTO.
+
+**C. AI page numbers.** Open /ai.
+- Today: about 9-12 AI calls.
+- Cost: well under $0.01 (about $0.0001 per call).
+- Average time: about 2-3 s.
+- Accepted / corrected match what you did in A; accuracy = accepted ÷ (accepted + corrected).
+- "Handled automatically by the AI" = 2. "Answered with learned patterns" counts the 📘 taps.
+- The last 50 calls list shows each message's intent, products, 🧠 reason, cost and time.
+- "▶ Run evaluation" runs the 48 test messages against the real AI (about 1 cent, about 2 minutes). Reload:
+  expect "✅ Passed", intent + products 100% (at least 90% needed), wrong products 0.
+- Limits test (optional): set "Calls per day" to 1 and send two unknown names. The second gets no 🧠, and Needs
+  you shows "🧠 AI: daily limit of 1 calls reached…". Set it back to 300.

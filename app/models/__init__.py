@@ -1,4 +1,5 @@
 """Import every model so Base.metadata is complete (Alembic autogenerate relies on it)."""
+from app.models.ai import AICall
 from app.models.audit import AuditLog
 from app.models.catalog import Product, ProductAlias
 from app.models.customers import Customer
@@ -15,5 +16,5 @@ from app.models.pricing import ProductCost, ProductPrice
 from app.models.settings import AppSetting, PaymentMethod, ReplyTemplate
 from app.models.users import User
 
-__all__ = ["AppSetting", "AuditLog", "AutoRun", "ChoicePrompt", "Customer", "CustomerPhone", "FaqEntry", "LearnedPattern", "MediaDownload", "Message", "MessageReview", "Order", "OrderEvent", "OrderItem", "Outbox", "ParseItem", "PaymentCheck", "ParseResult", "PaymentMethod", "Product",
+__all__ = ["AICall", "AppSetting", "AuditLog", "AutoRun", "ChoicePrompt", "Customer", "CustomerPhone", "FaqEntry", "LearnedPattern", "MediaDownload", "Message", "MessageReview", "Order", "OrderEvent", "OrderItem", "Outbox", "ParseItem", "PaymentCheck", "ParseResult", "PaymentMethod", "Product",
            "ProductAlias", "ProductCost", "ProductPrice", "QuickAction", "ReplyTemplate", "ServiceHeartbeat", "UnknownRequest", "User"]

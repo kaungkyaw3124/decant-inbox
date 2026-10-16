@@ -1,6 +1,6 @@
 """Re-parse every stored message with the current rules (after the parser, the
 aliases or normalize() change). Adds a new parse_results row only where the outcome
-or parser version changed; old rows stay as history. Human edits are never replaced.
+or parser version changed; old rows stay as history. Human edits and AI results are never replaced.
 
 Usage: .venv/bin/python -m scripts.reparse_all [--dry-run]
 Prints counts only, never message text.
@@ -50,7 +50,7 @@ def main() -> None:
     stats = reparse_all(args.dry_run)
     mode = "DRY RUN, nothing saved" if args.dry_run else "saved"
     print(f"{mode} ({PARSER_VERSION}): " + ", ".join(
-        f"{k}={stats[k]}" for k in ("new", "changed", "unchanged", "human")))
+        f"{k}={stats[k]}" for k in ("new", "changed", "unchanged", "human", "ai")))
 
 
 if __name__ == "__main__":

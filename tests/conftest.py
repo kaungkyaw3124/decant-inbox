@@ -9,6 +9,7 @@ from app.core.config import get_settings
 TEST_DB = get_settings().db_name + "_test"
 os.environ["DB_NAME"] = TEST_DB  # must be set before app.core.db is imported
 os.environ["WEB_SECRET_KEY"] = "test-only-secret-key"
+os.environ["AI_PROVIDER"] = "off"  # never the real AI in tests: AI tests install providers.FakeProvider
 get_settings.cache_clear()
 
 

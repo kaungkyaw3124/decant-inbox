@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, Integer, String, text
+from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Index, Integer, String, false, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.base import Base, created_at_column
@@ -39,3 +39,5 @@ class LearnedPattern(Base):
     confirmed_uses: Mapped[int] = mapped_column(Integer, server_default="0", default=0)
     corrections: Mapped[int] = mapped_column(Integer, server_default="0", default=0)
     source_message_id: Mapped[int | None] = mapped_column(ForeignKey("messages.id"))
+    # docs/SPEC-v4.6-ai.md: the AI proposed it (shown as "AI + <user>", or "AI" in AUTO mode)
+    via_ai: Mapped[bool] = mapped_column(Boolean, server_default=false(), default=False)

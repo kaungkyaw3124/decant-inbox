@@ -3,7 +3,8 @@
 Writes parse_results + parse_items (and refreshes messages.normalized_text). Phone numbers
 are only found here (parse_results.phone); they are saved on the customer when an admin
 taps "Save phone" (Step 4b). Never replaces a human result: once someone has edited a
-message in the dashboard, rules leave it alone.
+message in the dashboard, rules leave it alone. AI results (method "ai", docs/SPEC-v4.6-ai.md
+AUTO mode) are kept the same way: they were already acted on.
 """
 from dataclasses import astuple
 from datetime import timedelta
@@ -109,14 +110,14 @@ def parse_message(session: Session, message: Message, aliases: list[Alias],
                   known_words: dict[int, frozenset[str]] | None = None,
                   phrases: list[Phrase] | None = None) -> str:
     """Parse one message and store the result. Returns what happened:
-    new | changed | unchanged | human (kept the human edit)."""
+    new | changed | unchanged | human (kept the human edit) | ai (kept the AI result, AUTO mode)."""
     normalized = normalize(message.raw_text, keep_newlines=True)
     if message.normalized_text != normalized:
         message.normalized_text = normalized
 
     current = current_result(session, message.id)
-    if current is not None and current.method == "human":
-        return "human"
+    if current is not None and current.method in ("human", "ai"):
+        return current.method
     if full_sizes is None:
         full_sizes = load_full_sizes(session)
     if known_words is None:

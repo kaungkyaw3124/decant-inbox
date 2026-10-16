@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% import "_ui.html" as ui with context %}
+{% block title %}{{ t("AI helper") }} · Decant Inbox{% endblock %}
+{% block content %}
+<h1>🧠 {{ t("AI helper") }}</h1>
+<p class="muted small">{{ t("The AI only reads messages the rules are not sure about. It never writes to customers: replies come from your templates and prices.") }}</p>
+{% for n in notices %}<p class="flash problem-text">{{ tr(n) }}</p>{% endfor %}
+
+<section class="card">
+  <h2>{{ t("Mode") }} {{ ui.help("OFF: no AI. SHADOW: the AI fills in teaching cards, a person checks. AUTO: when the AI is sure, the app acts by itself with the usual safety rules.") }}</h2>
+  <form method="post" action="/ai/mode" class="buttons">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    {% for value, label in modes.items() %}
+    <button name="mode" value="{{ value }}" class="{{ 'primary' if cfg.mode == value else 'quiet' }}" {% if cfg.mode == value %}aria-pressed="true"{% endif %}>{{ t(label) }}</button>
+    {% endfor %}
+  </form>
+  <p class="small muted">{{ t("Now") }}: <b>{{ t(modes[cfg.mode]) }}</b>{% if cfg.mode == "auto" %} · {{ t("acts when the AI is at least {p}% sure", p=(cfg.threshold * 100) | round | int) }}{% endif %}</p>
+</section>
+
+<section class="card">
+  <h2>{{ t("Numbers") }}</h2>
+  <table>
+    <thead><tr><th></th><th>{{ t("Today") }}</th><th>{{ t("This month") }}</th></tr></thead>
+    <tbody>
+      <tr><th>{{ t("AI calls") }}</th><td>{{ today.calls }}</td><td>{{ month.calls }}</td></tr>
+      <tr><th>{{ t("Cost (USD)") }}</th><td>${{ "%.4f" | format(today.cost) }}</td><td>${{ "%.4f" | format(month.cost) }} / ${{ "%.2f" | format(cfg.monthly_budget_usd) }}</td></tr>
+      <tr><th>{{ t("Average answer time") }}</th><td>{{ (today.latency_ms / 1000) | round(1) }} s</td><td>{{ (month.latency_ms / 1000) | round(1) }} s</td></tr>
+      <tr><th>{{ t("Accepted unchanged") }}</th><td>{{ today.accepted }}</td><td>{{ month.accepted }}</td></tr>
+      <tr><th>{{ t("Corrected by a person") }}</th><td>{{ today.corrected }}</td><td>{{ month.corrected }}</td></tr>
+      <tr><th>{{ t("Accuracy") }}</th><td>{{ today.accuracy ~ "%" if today.accuracy is not none else "–" }}</td><td>{{ month.accuracy ~ "%" if month.accuracy is not none else "–" }}</td></tr>
+      <tr><th>{{ t("Handled automatically by the AI") }}</th><td>{{ today.auto }}</td><td>{{ month.auto }}</td></tr>
+      <tr><th>{{ t("Errors / refused by our checker") }}</th><td>{{ today.errors }} / {{ today.rejected }}</td><td>{{ month.errors }} / {{ month.rejected }}</td></tr>
+      <tr><th>{{ t("Not called (limit or budget)") }}</th><td>{{ today.skipped }}</td><td>{{ month.skipped }}</td></tr>
+      <tr><th>{{ t("Answered with learned patterns (no AI needed)") }}</th><td>{{ today.saved }}</td><td>{{ month.saved }}</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section class="card">
+  <h2>{{ t("Settings") }}</h2>
+  <form method="post" action="/ai/settings" class="grid">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <label>{{ t("Calls per day (limit)") }} <input name="daily_cap" value="{{ cfg.daily_cap }}" inputmode="numeric"></label>
+    <label>{{ t("Monthly budget (USD)") }} <input name="monthly_budget_usd" value="{{ cfg.monthly_budget_usd }}" inputmode="decimal"></label>
+    <label>{{ t("AUTO: act when at least this sure (0.5-1)") }} <input name="threshold" value="{{ cfg.threshold }}" inputmode="decimal"></label>
+    <label>{{ t("Model") }} <input name="model" value="{{ cfg.model }}" maxlength="64"></label>
+    <label>{{ t("Reasoning") }}
+      <select name="reasoning">{% for r in reasonings %}<option value="{{ r }}" {% if r == cfg.reasoning %}selected{% endif %}>{{ r }}</option>{% endfor %}</select></label>
+    <button class="primary">{{ t("Save") }}</button>
+  </form>
+</section>
+
+<section class="card">
+  <h2>{{ t("Evaluation") }} {{ ui.help("Runs the test messages (tests/fixtures/ai_eval.csv) against the real AI: costs about one cent. Pass = intent and products at least 90% right and never a wrong product.") }}</h2>
+  {% if evaluation %}
+  {% set s = evaluation.summary %}
+  <p>{{ "✅ " ~ t("Passed") if s.passed else "❌ " ~ t("Failed") }} · {{ s.at | replace("T", " ") }} · {{ s.model }} ({{ s.reasoning }})</p>
+  <p class="small">{{ t("{n} messages", n=s.cases) }} · {{ t("intent + products right") }} <b>{{ (s.intent_and_products * 100) | round | int }}%</b> ·
+    {{ t("wrong products") }} <b>{{ s.wrong_product_cases }}</b> · {{ t("cost") }} ${{ "%.4f" | format(s.cost_usd) }} ·
+    {{ t("average answer time") }} {{ (s.avg_latency_ms / 1000) | round(1) }} s</p>
+  {% set bad = evaluation.cases | rejectattr("ok") | list %}
+  {% if bad %}<ul class="small">{% for c in bad %}<li>❌ {{ c.id }}: {{ c.notes | join("; ") }}</li>{% endfor %}</ul>{% endif %}
+  {% else %}<p class="muted small">{{ t("No evaluation yet.") }}</p>{% endif %}
+  <form method="post" action="/ai/evaluate">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <button class="quiet" {% if eval_running %}disabled{% endif %}>{{ t("Running…") if eval_running else "▶ " ~ t("Run evaluation") }}</button>
+  </form>
+</section>
+
+<section class="card">
+  <h2>{{ t("Last 50 AI calls") }}</h2>
+  {% if not calls %}<p class="muted small">{{ t("No AI calls yet.") }}</p>{% endif %}
+  <ul class="feed small">
+  {% for row in calls %}{% set c = row.call %}
+    <li><a href="/messages/{{ c.message_id }}">{{ c.created_at | local_time }}</a> ·
+      <b>{{ code(c.decision) }}</b>{% if row.summary %} · {{ row.summary }}{% endif %}
+      {% if row.reason %}<br><span class="muted">🧠 {{ row.reason }}</span>{% endif %}
+      {% if c.error %}<br><span class="problem-text">{{ c.error }}</span>{% endif %}
+      <span class="muted"> · ${{ "%.5f" | format(c.cost_usd) }} · {{ c.latency_ms }} ms</span></li>
+  {% endfor %}
+  </ul>
+</section>
+{% endblock %}

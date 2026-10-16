@@ -30,7 +30,7 @@
   <ul class="aliases">
   {% for p, product, teacher, msg in pending[kind] %}
     <li id="pattern-{{ p.id }}"><span>“<b>{{ p.text }}</b>” → {% if kind == "nickname" %}{{ product.name if product else "?" }}{% elif kind == "intent_phrase" %}{{ dict(intents).get(p.intent, p.intent) }}{% else %}{{ t("we don't sell it") }}{% endif %}
-      <br><span class="small muted">{{ t("taught by") }} {{ teacher.username if teacher else "?" }} · {{ p.taught_at | local_time }} · {{ t("used {n}×", n=p.confirmed_uses) }}{% if p.corrections %} · <span class="error">{{ t("corrected {n}×", n=p.corrections) }}</span>{% endif %}{% if msg %} · {{ t("e.g.") }} “{{ msg.raw_text | truncate(60) }}”{% endif %}</span></span>
+      <br><span class="small muted">{{ t("taught by") }} {% if p.via_ai %}🧠 AI{% if teacher %} + {% endif %}{% endif %}{{ teacher.username if teacher else ("" if p.via_ai else "?") }} · {{ p.taught_at | local_time }} · {{ t("used {n}×", n=p.confirmed_uses) }}{% if p.corrections %} · <span class="error">{{ t("corrected {n}×", n=p.corrections) }}</span>{% endif %}{% if msg %} · {{ t("e.g.") }} “{{ msg.raw_text | truncate(60) }}”{% endif %}</span></span>
       <form method="post" action="/learning/{{ p.id }}/decide" class="inline"><input type="hidden" name="csrf" value="{{ csrf }}">
         <button name="status" value="approved" class="primary">✅ {{ t("Approve") }}</button>
         <button name="status" value="rejected" class="danger">❌ {{ t("Reject") }}</button></form>

@@ -1,18 +1,27 @@
-{# Teaching card (docs/SPEC-v4.md 4.2). Needs: card, m (message), back. #}
+{# Teaching card (docs/SPEC-v4.md 4.2). Needs: card, m (message), back.
+   card.ai (docs/SPEC-v4.6-ai.md): the AI's answers are pre-selected; a person checks them. #}
+{% set ai = card.ai %}
 <form method="post" action="{{ card_action or "/messages/" ~ m.id ~ "/teach/preview" }}" class="teach stack" id="card-{{ m.id }}">
   <input type="hidden" name="csrf" value="{{ csrf }}">
   <input type="hidden" name="back" value="{{ back }}">
+  {% if ai %}
+  <input type="hidden" name="ai_call" value="{{ ai.call_id }}">
+  <input type="hidden" name="ai_hint" value="{{ ai.preset_json }}">
+  <p class="ai-hint">🧠 <b>AI suggests</b> · {{ ai.reason }} <small class="muted">({{ ai.percent }}%)</small><br>
+    <small class="muted">AI ရွေးထားတာကို စစ်ပြီး မှန်ရင် ဆက်လုပ်ပါ၊ မှားရင် ပြောင်းပါ။</small></p>
+  {% endif %}
   {% for q in card.products %}
+  {% set pre = ai.products.get(q.position) if ai else none %}
   <fieldset class="question">
     <legend>“{{ q.words }}” ဆိုတာ ဘယ်ပစ္စည်းလဲ?{% if q.is_full_bottle %} · {{ t("full bottle") }}{% elif q.size_ml %} · {{ q.size_ml }}ml{% endif %}</legend>
     {% if q.kind == "partial" and q.options %}<p class="small muted">“{{ q.options[0].name }}” ရဲ့ nickname ပါပေမယ့် တခြားစာလုံးတွေလည်း ပါတယ် — ဒီပစ္စည်းပဲလား?</p>{% endif %}
     <div class="choices">
       {% for p in q.options %}
-      <label class="choice"><input type="radio" name="p{{ q.position }}" value="{{ p.id }}" {% if loop.first %}checked{% endif %}><span>{{ p.name }} <small>{{ p.brand }}</small></span></label>
+      <label class="choice"><input type="radio" name="p{{ q.position }}" value="{{ p.id }}" {% if (pre and pre == p.id | string) or (not pre and loop.first) %}checked{% endif %}><span>{{ p.name }} <small>{{ p.brand }}</small>{% if pre and pre == p.id | string %} 🧠{% endif %}</span></label>
       {% endfor %}
-      <label class="choice"><input type="radio" name="p{{ q.position }}" value="search" {% if not q.options %}checked{% endif %}><span>🔍 ရှာမယ်</span></label>
+      <label class="choice"><input type="radio" name="p{{ q.position }}" value="search" {% if not q.options and not pre %}checked{% endif %}><span>🔍 ရှာမယ်</span></label>
       <label class="choice"><input type="radio" name="p{{ q.position }}" value="new"><span>➕ ပစ္စည်းအသစ်</span></label>
-      <label class="choice"><input type="radio" name="p{{ q.position }}" value="not_stocked"><span>🚫 ဒီပစ္စည်း မရှိဘူး</span></label>
+      <label class="choice"><input type="radio" name="p{{ q.position }}" value="not_stocked" {% if pre == "not_stocked" %}checked{% endif %}><span>🚫 ဒီပစ္စည်း မရှိဘူး{% if pre == "not_stocked" %} 🧠{% endif %}</span></label>
     </div>
     <label>🔍 ပစ္စည်းအားလုံး
       <select name="search{{ q.position }}">
@@ -40,17 +49,23 @@
     <legend>ဖောက်သည်က ဘာလုပ်ချင်တာလဲ?</legend>
     <div class="choices">
       {% for value, label in intent_choices %}
-      <label class="choice"><input type="radio" name="intent" value="{{ value }}" {% if loop.first %}checked{% endif %}><span>{{ label }}</span></label>
+      <label class="choice"><input type="radio" name="intent" value="{{ value }}" {% if (ai and ai.intent == value) or (not (ai and ai.intent) and loop.first) %}checked{% endif %}><span>{{ label }}{% if ai and ai.intent == value %} 🧠{% endif %}</span></label>
       {% endfor %}
     </div>
+    {% if ai and ai.draft is not none %}
+    <label>🧠 AI ရေးထားတဲ့ အဖြေ (“မေးခွန်း” ရွေးရင် ✅ နှိပ်မှ ပို့မယ် — စစ်ပြီး ပြင်ပါ)
+      <textarea name="draft" rows="3" maxlength="1000">{{ ai.draft }}</textarea></label>
+    {% endif %}
   </fieldset>
   {% endif %}
   {% for q in card.sizes %}
+  {% set pre = ai.sizes.get(q.position) if ai else none %}
   <fieldset class="question">
     <legend>ဘယ် size လဲ?{% if q.label %} · {{ q.label }}{% endif %}</legend>
     <div class="choices">
       {% for s in q.sizes %}
-      <label class="choice"><input type="radio" name="size{{ q.position }}" value="{{ s if s else 'full' }}" {% if loop.first %}checked{% endif %}><span>{{ s ~ "ml" if s else t("Full bottle") }}</span></label>
+      {% set v = s | string if s else 'full' %}
+      <label class="choice"><input type="radio" name="size{{ q.position }}" value="{{ v }}" {% if (pre and pre == v) or (not pre and loop.first) %}checked{% endif %}><span>{{ s ~ "ml" if s else t("Full bottle") }}{% if pre == v %} 🧠{% endif %}</span></label>
       {% endfor %}
     </div>
   </fieldset>
@@ -58,10 +73,10 @@
   <fieldset class="learn">
     <label class="check"><input type="checkbox" name="learn" value="1" checked> 📘 နောက်တစ်ခါ ဒီလိုရေးရင် အလိုအလျောက် လုပ်ပေးပါ</label>
     {% for q in card.products %}
-    <label>သင်ပေးမယ့် စာလုံး (ပစ္စည်း) <input name="nick{{ q.position }}" value="{{ q.nickname }}" maxlength="255"></label>
+    <label>သင်ပေးမယ့် စာလုံး (ပစ္စည်း) <input name="nick{{ q.position }}" value="{{ ai.nicknames.get(q.position, q.nickname) if ai else q.nickname }}" maxlength="255"></label>
     {% endfor %}
     {% if card.ask_intent %}
-    <label>သင်ပေးမယ့် စာလုံး (လုပ်ချင်တာ) <input name="phrase" value="{{ card.phrase }}" maxlength="120"></label>
+    <label>သင်ပေးမယ့် စာလုံး (လုပ်ချင်တာ) <input name="phrase" value="{{ (ai.phrase if ai and ai.phrase) or card.phrase }}" maxlength="120"></label>
     {% endif %}
   </fieldset>
   <button class="primary big">ဆက်လုပ်မယ် →</button>

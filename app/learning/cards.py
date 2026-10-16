@@ -22,7 +22,7 @@ from sqlalchemy.orm import Session
 
 from app.learning import patterns
 from app.models import (
-    AuditLog, Customer, Message, MessageReview, ParseItem, ParseResult, Product, ProductAlias, ProductPrice,
+    AICall, AuditLog, Customer, Message, MessageReview, ParseItem, ParseResult, Product, ProductAlias, ProductPrice,
     QuickAction, UnknownRequest, User,
 )
 from app.orders import previous, unknown
@@ -81,6 +81,7 @@ class Card:
     ask_intent: bool = False
     sizes: list[SizeQuestion] = field(default_factory=list)
     phrase: str = ""  # proposed intent phrase
+    ai: object | None = None  # app.ai.hints.Hint: the AI's answers, pre-selected (docs/SPEC-v4.6-ai.md S3)
 
     @property
     def count(self) -> int:
@@ -176,6 +177,9 @@ def build(session: Session, message: Message) -> Card | None:
     card.products = card.products[:MAX_QUESTIONS]
     card.ask_intent = card.ask_intent and len(card.products) < MAX_QUESTIONS
     card.sizes = card.sizes[:MAX_QUESTIONS - len(card.products) - int(card.ask_intent)]
+    from app.ai import hints  # late import: ai -> learning
+
+    hints.apply(session, card)
     return card if card.count else None
 
 
@@ -190,12 +194,13 @@ def to_teach(session: Session, now: datetime | None = None) -> list[tuple[Messag
     reviewed = exists().where(MessageReview.message_id == Message.id, MessageReview.status.in_(("done", "ignored")))
     unsure = exists().where(ParseItem.parse_result_id == ParseResult.id, or_(
         ParseItem.unknown_text.is_not(None), ParseItem.product_id.is_(None), ParseItem.match.in_(ASK_PRODUCT_MATCHES)))
+    ai_hint = exists().where(AICall.message_id == Message.id, AICall.ok, AICall.decision == "shadow")
     rows = session.scalars(
         select(Message).join(ParseResult, and_(ParseResult.message_id == Message.id, ParseResult.is_current))
         .join(Customer, Customer.id == Message.customer_id)
         .where(Message.direction == "in", Message.kind == "text", Message.received_at >= now - TEACH_WINDOW,
                Customer.ignored.is_(False), ParseResult.method != "human", ~acted, ~reviewed,
-               or_(ParseResult.intent.in_(("other", "unknown", "previous_item")), unsure))
+               or_(ParseResult.intent.in_(("other", "unknown", "previous_item")), unsure, ai_hint))
         .order_by(Message.received_at.desc()).limit(MAX_TEACH * 3)).all()
     found = []
     unanswered: set[int] | None = None
@@ -203,7 +208,8 @@ def to_teach(session: Session, now: datetime | None = None) -> list[tuple[Messag
         card = build(session, message)
         if card is None:
             continue
-        if not card.products and not card.sizes:  # only "what do they want?" (chit-chat like "ကျေးဇူးပါ"):
+        ai_knows = card.ai is not None and card.ai.intent not in (None, "ignore")
+        if not card.products and not card.sizes and not ai_knows:  # only "what do they want?" ("ကျေးဇူးပါ"):
             if unanswered is None:  # listed once nobody answered it for a while, like the safety net
                 from app.orders import followups  # late import: followups imports the orders package
 
@@ -235,6 +241,8 @@ class Answers:
     learn: bool = True
     nicknames: dict[int, str] = field(default_factory=dict)
     phrase: str = ""
+    via_ai: bool = False  # the card showed the AI's answers: patterns are "AI + <user>"
+    draft: str = ""  # the (edited) AI draft answer to a question
 
 
 def _int(value: str, low: int, high: int) -> int | None:
@@ -245,7 +253,8 @@ def _int(value: str, low: int, high: int) -> int | None:
 def read_form(form) -> Answers:
     """Answers from the card form (see _card.html)."""
     a = Answers(learn=form.get("learn") == "1", phrase=str(form.get("phrase", "")).strip(),
-                intent=str(form.get("intent") or "") or None)
+                intent=str(form.get("intent") or "") or None, via_ai=str(form.get("ai_call") or "").isdigit(),
+                draft=str(form.get("draft") or "").replace("\r\n", "\n").strip())
     for key in form.keys():
         if m := re.fullmatch(r"p(\d+)", key):
             pos = int(m.group(1))
@@ -268,6 +277,7 @@ class Applied:
     intent: str
     undo: dict  # what Undo reverses (patterns, resolutions, parse)
     learned: list[str] = field(default_factory=list)  # lines for the admin ("📘 'ysl edp' = Y EDP")
+    via_ai: bool = False
     warnings: list[str] = field(default_factory=list)
     price_needed: list[Product] = field(default_factory=list)  # staff added it without a price
 
@@ -331,7 +341,7 @@ def apply(session: Session, message: Message, answers: Answers, user: User) -> A
 
     if card.result.intent == "previous_item" and card.products:
         intent = "buy"  # the admin named the earlier item
-    applied = Applied(None, intent, undo)
+    applied = Applied(None, intent, undo, via_ai=answers.via_ai)
     learned_before = list(card.result.learned_ids or [])
     items = _items(session, card.result)
     known = {i.position for i in items}
@@ -352,7 +362,9 @@ def apply(session: Session, message: Message, answers: Answers, user: User) -> A
             words = q.words
             nickname = answers.nicknames.get(q.position, q.nickname) if answers.learn else ""
             if answer == "not_stocked":
-                pid, unknown_text, match = None, unknown_text or words, "human"
+                # an AI card: the confirmed words are the customer's own ("hawas for him", not "hawas him")
+                words_ai = answers.nicknames.get(q.position, "") if answers.via_ai else ""
+                pid, unknown_text, match = None, words_ai or unknown_text or words, "human"
                 rid = _resolution(session, message, unknown_text, size, full, "not_stocked", None, user)
                 if rid:
                     undo["unknown_requests"].append(rid)
@@ -421,7 +433,7 @@ def apply(session: Session, message: Message, answers: Answers, user: User) -> A
 
 def _learn(session: Session, applied: Applied, kind: str, text: str, user: User, message: Message, line: str,
            **target) -> None:
-    taught = patterns.teach(session, kind, text, user, message_id=message.id, **target)
+    taught = patterns.teach(session, kind, text, user, message_id=message.id, via_ai=applied.via_ai, **target)
     if taught.status == "saved":
         applied.undo["patterns"].append(taught.pattern.id)
         applied.learned.append("📘 " + line)

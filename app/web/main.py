@@ -18,7 +18,7 @@ from starlette.middleware.sessions import SessionMiddleware
 from app.core.config import get_settings
 from app.models import AuditLog, User
 from app.web import (
-    auto as auto_pages, catalog, chats, health, help as help_pages, i18n, inbox, learning, orders, payments, practice,
+    ai as ai_pages, auto as auto_pages, catalog, chats, health, help as help_pages, i18n, inbox, learning, orders, payments, practice,
     prices, sales, settings as settings_pages, users,
 )
 from app.web.auth import LoginRequired, authenticate, client_ip, current_user, locked_out, login, verify_csrf
@@ -48,6 +48,7 @@ app.include_router(sales.router)
 app.include_router(prices.router)
 app.include_router(settings_pages.router)
 app.include_router(learning.router)
+app.include_router(ai_pages.router)
 app.include_router(users.router)
 app.include_router(health.router)
 app.include_router(help_pages.router)

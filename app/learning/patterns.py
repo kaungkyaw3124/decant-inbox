@@ -123,7 +123,8 @@ def _product_name(session: Session, product_id: int) -> str:
 
 
 def teach(session: Session, kind: str, text: str, user: User | None, *, product_id: int | None = None,
-          intent: str | None = None, message_id: int | None = None, approved: bool = False) -> Taught:
+          intent: str | None = None, message_id: int | None = None, approved: bool = False,
+          via_ai: bool = False) -> Taught:
     """Save a new pattern (pending, or approved when the owner decides directly), unless it is
     already known or conflicts with something else (then the owner is asked)."""
     text = " ".join(text.split())[:255]
@@ -171,12 +172,13 @@ def teach(session: Session, kind: str, text: str, user: User | None, *, product_
     pattern = LearnedPattern(kind=kind, text=text, normalized_text=norm, product_id=product_id, intent=intent,
                              status="approved" if approved else "pending", taught_by=user.id if user else None,
                              source_message_id=message_id,
-                             approved_by=user.id if approved and user else None, approved_at=now if approved else None)
+                             approved_by=user.id if approved and user else None, approved_at=now if approved else None,
+                             via_ai=via_ai)
     session.add(pattern)
     session.flush()
     session.add(AuditLog(user_id=user.id if user else None, action="learning.taught", details={
         "pattern_id": pattern.id, "kind": kind, "text": text, "product_id": product_id, "intent": intent,
-        "message_id": message_id, "status": pattern.status}))
+        "message_id": message_id, "status": pattern.status, "via_ai": via_ai}))
     return Taught("saved", pattern)
 
 

@@ -128,7 +128,7 @@ def test_e1_every_page_burmese(shop, db, tmp_path, monkeypatch):
     me, my_token = burmese_client(db, "owner", "owner")  # the shop fixture's owner, now in Burmese
     staff, staff_token = burmese_client(db, "staffmy", "staff")
     data = shop_data(db)
-    owner_only = ["/prices", "/settings", "/learning", "/users", "/activity"]
+    owner_only = ["/prices", "/settings", "/learning", "/users", "/activity", "/ai"]
     found = {}
     for who, c in (("owner", me), ("staff", staff)):
         for path in pages(ids) + (owner_only if who == "owner" else []):

@@ -12,6 +12,7 @@ import time
 
 from sqlalchemy.exc import IntegrityError
 
+from app.ai import service as ai
 from app.core.db import SessionLocal
 from app.core.heartbeat import beat
 from app.models import Message
@@ -103,6 +104,16 @@ def follow_up() -> None:
         log.exception("payment follow-ups failed")
 
 
+def understand_with_ai() -> None:
+    """docs/SPEC-v4.6-ai.md: messages the rules are not sure about (before auto mode looks at them)."""
+    try:
+        stats = ai.run_once()
+        if stats:
+            log.info("AI: %s", stats)
+    except Exception:
+        log.exception("AI step failed")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--once", action="store_true", help="parse what is pending, then exit")
@@ -129,6 +140,7 @@ def main() -> None:
             log.info("parsed %d messages", parsed)
             continue  # there may be more
         scan_payments()
+        understand_with_ai()
         auto.run_once()  # auto mode (does nothing while it is switched off)
         if args.once:
             return

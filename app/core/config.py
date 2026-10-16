@@ -30,6 +30,17 @@ class Settings(BaseSettings):
     web_cookie_secure: bool = True  # HTTPS via the Cloudflare tunnel (localhost over SSH also counts)
     timezone: str = "Asia/Yangon"
 
+    # AI helper (docs/SPEC-v4.6-ai.md). The key lives only in .env; never print or log it.
+    openai_api_key: SecretStr | None = None
+    ai_provider: str = "openai"  # openai | off
+    ai_model: str = "gpt-6-luna"
+    ai_reasoning: str = "low"  # low | medium | high
+    ai_timeout_s: float = 8.0
+    # USD per 1M tokens (gpt-6-luna); cost per call = tokens x these prices
+    ai_price_in: float = 0.10
+    ai_price_cached_in: float = 0.01
+    ai_price_out: float = 0.50
+
     @property
     def database_url(self) -> URL:
         return URL.create(

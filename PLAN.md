@@ -2,14 +2,13 @@
 
 Read CLAUDE.md first. This file tracks where we are.
 
-## RESUME HERE (updated 2026-10-16 by planning chat)
+## RESUME HERE (updated 2026-10-16 by VPS Claude Code)
 - v1-v4 (4.1-4.5) DONE. Owner testing v4.
-- NOW: epic 4.6 AI helper with OpenAI — docs/SPEC-v4.6-ai.md. Steps S0 (key check, stop if
-  it fails) -> S1 -> S2 EVALUATION GATE (must pass before anything is visible) -> S3 shadow ->
-  S4 auto (switch stays OFF/SHADOW until the owner turns AUTO on) -> S5 AI page.
-  Same loop: tests -> fix -> green -> self-review -> deploy -> report.
+- Epic 4.6 AI helper (OpenAI, docs/SPEC-v4.6-ai.md) DONE: S0 key OK, S1-S5 built, S2 evaluation gate PASSED
+  (48 cases, intent+products 100%, 0 wrong products). Deployed with AI mode = SHADOW; AUTO is off until the
+  owner switches it on at /ai. Owner test: "OWNER TEST SCRIPT v4.6" in REPORT.md.
 - OPENAI_API_KEY is in .env (owner). Never print/log/commit it.
-- Owner checks: `bash scripts/status.sh`.
+- Owner checks: `bash scripts/status.sh`; AI numbers at /ai.
 
 ## Status
 | Phase | What | Status |
@@ -18,12 +17,13 @@ Read CLAUDE.md first. This file tracks where we are.
 | 1 | Database models, migration, seed products/aliases | ✅ Done |
 | 2 | Telethon listener + history import | ✅ Done (30-day import run, listener live) |
 | 3 | Rule-based parser + tests | ✅ Done (worker live; needs real catalog + labelled samples) |
-| 3b | AI fallback (optional) | ⬜ Not started |
+| 3b | AI fallback (optional) | ✅ Replaced by v4.6 AI helper |
 | 4 | Dashboard + Tailscale (private access) | ✅ Dashboard verified by owner via SSH tunnel (2026-10-11). Tailscale (phone access) still optional |
 | 5 | Run 24/7, backups, health page | ✅ Done: reboot test passed 2026-10-11 (all services back, health ok, new tunnel URL) |
 | 6 | v2: replies, cart, payment check, orders (docs/SPEC-orders.md) | ✅ Steps 1-5 done |
 | 7 | v3 (docs/SPEC-v3.md): after payment, FAQ, sales | ✅ Steps 6-8 done (owner test pending) |
 | 8 | v4 (docs/SPEC-v4.md): Learning Inbox | ✅ 4.1-4.5 done (owner test + staff test pending) |
+| 9 | v4.6 (docs/SPEC-v4.6-ai.md): AI helper, OpenAI | ✅ S0-S5 done, eval gate passed, live in SHADOW (owner test pending) |
 
 ## Phase 0 checklist
 - [x] Step 0: rollback safety net scripts in ~/hardening/

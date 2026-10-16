@@ -16,7 +16,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
 from app.models import (
-    AuditLog, Customer, MediaDownload, Message, Order, OrderItem, Outbox, PaymentCheck, Product, QuickAction, User,
+    AICall, AuditLog, Customer, MediaDownload, Message, Order, OrderItem, Outbox, PaymentCheck, Product, QuickAction, User,
 )
 from app.models.orders import MAX_PHONES, OPEN_STATUSES
 from app.models.outbox import MAX_TEXT, MEDIA_DIR
@@ -95,8 +95,13 @@ def thread_context(db: Session, customer: Customer) -> dict:
     auto_msgs |= set(db.scalars(select(Outbox.sent_message_id).where(
         Outbox.customer_id == customer.id, Outbox.reply_kind == "faq", Outbox.sent_message_id.is_not(None))))
     auto_box |= {o.id for o in pending if o.reply_kind == "faq"}
+    # docs/SPEC-v4.6-ai.md S4: 🧠 on messages the AI understood (hover: its reason)
+    ai_reasons = {mid: f"{(result or {}).get('reason') or ''} ({decision})".strip()
+                  for mid, result, decision in db.execute(select(AICall.message_id, AICall.result_json, AICall.decision)
+                                                          .where(AICall.message_id.in_([m.id for m in messages]),
+                                                                 AICall.ok))}
     return {
-        "auto_msgs": auto_msgs, "auto_box": auto_box,
+        "auto_msgs": auto_msgs, "auto_box": auto_box, "ai_reasons": ai_reasons,
         "c": customer, "messages": messages, "downloads": downloads, "pending": pending, "albums": albums,
         "stuck": {o.id for o in pending if o.status == "sending" and now - o.created_at > STUCK_AFTER},
         "polling": any(o.status in ("queued", "sending") for o in pending)
