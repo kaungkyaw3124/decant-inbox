@@ -2,12 +2,13 @@
 
 Read CLAUDE.md first. This file tracks where we are.
 
-## RESUME HERE (updated 2026-10-17 by planning chat)
-- v1-v4 + 4.6 AI helper DONE (AI mode = SHADOW, eval passed 100%, 0 wrong products).
-- NOW: epic 4.7 docs/SPEC-v4.7-graduation.md — automatic SHADOW -> AUTO graduation after
-  >= 7 days, >= 50 decisions, >= 95% accuracy, 0 wrong products; safety brake back to SHADOW;
-  weekly aggregate AI summary pushed to reports/ai-weekly.md. Same loop: tests -> fix ->
-  green -> self-review -> deploy -> report.
+## RESUME HERE (updated 2026-10-17 by VPS Claude Code)
+- v1-v4, 4.6 AI helper and 4.7 graduation DONE. AI mode = SHADOW, auto-graduate ON (window since
+  2026-10-16 18:21 UTC): it switches to AUTO by itself after >= 7 days, >= 50 checked suggestions,
+  >= 95% accuracy, 0 wrong products, < 10% errors; the safety brake switches back. Progress at /ai.
+- Weekly aggregate summary: reports/ai-weekly.md, pushed by the parser worker every Monday 09:00 Yangon
+  (first: 2026-10-19).
+- Owner tests pending: v4 script, staff test, v4.6 script, v4.7 short test (REPORT.md).
 - Owner checks: `bash scripts/status.sh`; AI numbers at /ai.
 
 ## Status
@@ -24,6 +25,7 @@ Read CLAUDE.md first. This file tracks where we are.
 | 7 | v3 (docs/SPEC-v3.md): after payment, FAQ, sales | ✅ Steps 6-8 done (owner test pending) |
 | 8 | v4 (docs/SPEC-v4.md): Learning Inbox | ✅ 4.1-4.5 done (owner test + staff test pending) |
 | 9 | v4.6 (docs/SPEC-v4.6-ai.md): AI helper, OpenAI | ✅ S0-S5 done, eval gate passed, live in SHADOW (owner test pending) |
+| 10 | v4.7 (docs/SPEC-v4.7-graduation.md): SHADOW -> AUTO graduation, brake, weekly summary | ✅ Done, live (auto-graduate ON) |
 
 ## Phase 0 checklist
 - [x] Step 0: rollback safety net scripts in ~/hardening/

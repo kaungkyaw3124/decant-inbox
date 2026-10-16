@@ -146,9 +146,18 @@ def record(session: Session, message_id: int, form, user: User) -> str | None:
         if " ".join(str(form.get("draft") or "").split()) != " ".join((_draft(call) or "").split()):
             changed.append("draft")
     decision = "unused" if not preset else "corrected" if changed else "accepted"
-    call.decision, call.decided_by = decision, user.id
+    # wrong product (docs/SPEC-v4.7-graduation.md): the AI named a product, the admin chose another one
+    # (or "we don't sell it"); the AI's "we don't sell it" changed to a product is a normal correction
+    wrong = any(k.startswith("p") and preset[k].isdigit() and str(form.get(_field(k, form)) or "") != preset[k]
+                for k in changed if k in preset)
     session.add(AuditLog(user_id=user.id, action=f"ai.{decision}", details={
-        "ai_call_id": call.id, "message_id": message_id, "changed": changed}))
+        "ai_call_id": call.id, "message_id": message_id, "changed": changed, "wrong_product": wrong}))
+    if decision == "unused":
+        call.decision, call.decided_by = decision, user.id
+        return decision
+    from app.ai import graduation  # late import: graduation -> service -> this package
+
+    graduation.record_decision(session, call, decision, user, wrong)
     return decision
 
 

@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import Boolean, CheckConstraint, ForeignKey, Index, Integer, Numeric, String
+from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Index, Integer, Numeric, String, false
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -42,4 +42,8 @@ class AICall(Base):
     result_json: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     decision: Mapped[str] = mapped_column(String(16))
     decided_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+    # docs/SPEC-v4.7-graduation.md: when a person accepted / corrected it, and whether the correction
+    # changed the AI's product to a different one ("wrong product": blocks graduation, brakes AUTO)
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    wrong_product: Mapped[bool] = mapped_column(Boolean, server_default=false(), default=False)
     created_at: Mapped[datetime] = created_at_column()

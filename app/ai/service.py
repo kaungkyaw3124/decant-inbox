@@ -272,6 +272,16 @@ def run_once(now: datetime | None = None) -> dict[str, int]:
                 log.exception("could not record the AI failure for message=%s", message_id)
             outcome = "error"
         stats[outcome] = stats.get(outcome, 0) + 1
+    if ids:
+        from app.ai import graduation  # late import: graduation imports this module
+
+        try:
+            with SessionLocal.begin() as session:
+                if reason := graduation.check_brake(session, now):
+                    stats["brake"] = 1
+                    log.warning("AI safety brake: %s", reason)
+        except Exception:
+            log.exception("AI brake check failed")
     return stats
 
 
@@ -332,7 +342,7 @@ def auto_apply(session: Session, message: Message, rules: ParseResult, ai: AIRes
                                            text=item.not_in_list[:255], normalized_text=norm, size_ml=item.size_ml,
                                            is_full_bottle=item.is_full, resolution="not_stocked", resolved_by=None))
     taught = learn(session, ai, None, message.id)
-    call.decision = "auto"
+    call.decision, call.decided_at = "auto", datetime.now(UTC)
     session.add(AuditLog(user_id=None, action="ai.auto", details={
         "message_id": message.id, "ai_call_id": call.id, "parse_result_id": result.id, "intent": intent,
         "confidence": ai.confidence, "patterns": taught}))

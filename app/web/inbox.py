@@ -182,8 +182,13 @@ def message_detail(request: Request, message_id: int, back: str = "/", db: Sessi
     from app.web.learning import card_context
 
     card = cards.build(db, message)
+    from app.ai import corrections  # late import: ai -> orders -> this module's helpers
+
+    ai_fix = corrections.card(db, message)
     return templates.TemplateResponse(request, "message.html", {
         "card": card, **(card_context(db) if card else {}),
+        "ai_fix": ai_fix, "ai_reason": (ai_fix.call.result_json or {}).get("reason") if ai_fix else None,
+        "ai_intents": corrections.INTENTS,
         "unknowns": [(u, unknown.suggestions(db, u.text, first=u.candidate_id)) for u in open_unknown],
         "all_products": products_for_select(db) if open_unknown else [],
         "resolved": db.scalars(select(UnknownRequest).where(UnknownRequest.message_id == message_id)).all(),
@@ -194,6 +199,28 @@ def message_detail(request: Request, message_id: int, back: str = "/", db: Sessi
         "intents": INTENTS, "statuses": REVIEW_STATUSES, "products": products_for_select(db),
         "back": safe_back(back, "/"), "needs_review_below": NEEDS_REVIEW_BELOW,
     })
+
+
+@router.post("/messages/{message_id}/ai-wrong")
+async def ai_wrong(request: Request, message_id: int, db: Session = Depends(get_db),
+                   user: User = Depends(current_user)):
+    """docs/SPEC-v4.7-graduation.md: "🧠 AI was wrong" on a message the AI handled in AUTO mode."""
+    from app.ai import corrections
+
+    form = await request.form()
+    message = get_message(db, message_id)
+    try:
+        wrong, brake = corrections.apply(db, message, form, user)
+    except corrections.FixError as exc:
+        db.rollback()
+        flash(request, str(exc))
+        return RedirectResponse(detail_url(message_id, "/") + "#ai-wrong", status_code=303)
+    db.commit()
+    note = "Saved as an AI mistake. Fix the cart or reply in the chat (Undo works while the reply has not gone out)."
+    if brake:
+        note += " The AI is back in SHADOW: " + brake + "."
+    flash(request, note)
+    return RedirectResponse(f"/chats/{message.customer_id}#cart", status_code=303)
 
 
 @router.post("/messages/{message_id}/parse")
@@ -214,6 +241,13 @@ def edit_parse(
     qty = int(quantity) if quantity.strip().isdigit() and 0 < int(quantity) < 100 else 1
 
     previous = db.scalar(select(ParseResult).where(ParseResult.message_id == message_id, ParseResult.is_current))
+    ai_call = None
+    if previous is not None and previous.method == "ai":  # editing an AUTO AI result = a correction (4.7)
+        from app.ai import corrections
+
+        fix = corrections.card(db, get_message(db, message_id))
+        ai_call = fix.call if fix else None
+        ai_products = {i.product_id for i in fix.items if i.product_id} if fix else set()
     if previous is not None and previous.learned_ids:  # a 📘 learned guess the admin changed (4.2)
         from app.learning import patterns
         from app.models import LearnedPattern
@@ -251,6 +285,11 @@ def edit_parse(
     elif alias_norm:
         note = "Saved. Alias not added: choose a product first."
     audit.record(db, user, "message.correct", message_id=message_id, intent=intent, product_id=pid, size_ml=size)
+    if ai_call is not None:
+        from app.ai import graduation
+
+        if reason := graduation.record_decision(db, ai_call, "corrected", user, bool(ai_products - {pid})):
+            note += f" The AI is back in SHADOW: {reason}."
     db.commit()
     flash(request, note)
     return RedirectResponse(detail_url(message_id, back), status_code=303)

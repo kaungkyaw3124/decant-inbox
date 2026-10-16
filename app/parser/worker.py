@@ -12,7 +12,7 @@ import time
 
 from sqlalchemy.exc import IntegrityError
 
-from app.ai import service as ai
+from app.ai import graduation, service as ai
 from app.core.db import SessionLocal
 from app.core.heartbeat import beat
 from app.models import Message
@@ -105,13 +105,19 @@ def follow_up() -> None:
 
 
 def understand_with_ai() -> None:
-    """docs/SPEC-v4.6-ai.md: messages the rules are not sure about (before auto mode looks at them)."""
+    """docs/SPEC-v4.6-ai.md: messages the rules are not sure about (before auto mode looks at them).
+    docs/SPEC-v4.7-graduation.md: daily graduation / brake check and the weekly summary."""
     try:
         stats = ai.run_once()
         if stats:
             log.info("AI: %s", stats)
     except Exception:
         log.exception("AI step failed")
+    try:
+        for line in graduation.tick():
+            log.info("AI graduation: %s", line)
+    except Exception:
+        log.exception("AI graduation check failed")
 
 
 def main() -> None:

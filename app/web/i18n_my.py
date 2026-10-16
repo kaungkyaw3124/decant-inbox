@@ -546,4 +546,46 @@ MY = {
         "🧠 AI: တစ်ရက် {n} ကြိမ် ပြည့်ပြီ။ မနက်ဖြန်အထိ မသေချာတဲ့စာတွေ AI အကူမပါဘဲ ကိုယ်တိုင်လုပ်ရန် ထဲ ရောက်မယ်။",
     "🧠 AI: monthly budget of ${n} used up. Raise it on the AI page, or wait for next month.":
         "🧠 AI: တစ်လ ဘတ်ဂျက် ${n} ကုန်ပြီ။ AI စာမျက်နှာမှာ တိုးပါ (သို့) နောက်လ စောင့်ပါ။",
+    # SHADOW -> AUTO graduation (docs/SPEC-v4.7-graduation.md)
+    "AI was wrong": "AI မှားတယ်", "Save correction": "ပြင်တာ သိမ်းမယ်",
+    "Answer again what the customer wanted. It counts as an AI correction; then fix the cart or reply in the chat.":
+        "ဖောက်သည် ဘာလိုချင်တာလဲ ပြန်ဖြေပါ။ AI ပြင်ချက်အဖြစ် မှတ်မယ်။ ပြီးရင် Chat ထဲမှာ ခြင်း (သို့) ဖြေစာကို ပြင်ပါ။",
+    "Line {n}: which product?": "စာကြောင်း {n}: ဘယ်ပစ္စည်းလဲ?", "What did the customer want?": "ဖောက်သည်က ဘာလုပ်ချင်တာလဲ?",
+    "Auto-graduation": "AUTO ကို ကိုယ်တိုင်ပြောင်း", "Graduation progress": "AUTO ဖြစ်ဖို့ အခြေအနေ",
+    "Auto-graduate: switch SHADOW → AUTO by itself when the numbers are good":
+        "ကိန်းဂဏန်းတွေ ကောင်းရင် SHADOW → AUTO ကို ကိုယ်တိုင် ပြောင်းမယ်",
+    "Auto-graduation is OFF: the mode only changes when you switch it.":
+        "ကိုယ်တိုင်ပြောင်းခြင်း ပိတ်ထားတယ်: ကိုယ်ပြောင်းမှပဲ မုဒ် ပြောင်းမယ်။",
+    "Everything is ✅: the switch to AUTO happens at the next 09:00 check.":
+        "အားလုံး ✅: နောက် မနက် ၉ နာရီ စစ်ချိန်မှာ AUTO ပြောင်းမယ်။",
+    "Graduation: accuracy at least (%)": "AUTO ဖြစ်ဖို့: မှန်ကန်မှု အနည်းဆုံး (%)",
+    "Graduation: at least this many checked suggestions": "AUTO ဖြစ်ဖို့: စစ်ပြီးသား အကြံပြုချက် အနည်းဆုံး",
+    "Graduation: at least this many days in SHADOW": "AUTO ဖြစ်ဖို့: SHADOW မှာ အနည်းဆုံး ရက်",
+    "In SHADOW, the app switches the AI to AUTO by itself (checked every day at 09:00) when all lines are ✅. In AUTO, a wrong product, low accuracy or many errors switch it back to SHADOW.":
+        "SHADOW မှာ စာကြောင်းအားလုံး ✅ ဖြစ်ရင် App က AUTO ကို ကိုယ်တိုင်ပြောင်းတယ် (နေ့တိုင်း မနက် ၉ နာရီ စစ်)။ AUTO မှာ ပစ္စည်းမှား၊ မှန်ကန်မှုနည်း (သို့) အမှားများရင် SHADOW ကို ပြန်ပြောင်းတယ်။",
+    "The AI is in AUTO. The safety brake watches it.": "AI က AUTO မှာ ရှိတယ်။ ဘေးကင်းဘရိတ်က စောင့်ကြည့်နေတယ်။",
+    "Window since {date}": "{date} ကစပြီး တွက်တယ်",
+    "Days in SHADOW": "SHADOW မှာ ရက်", "Checked AI suggestions (14 days)": "စစ်ပြီးသား AI အကြံပြုချက် (၁၄ ရက်)",
+    "Accuracy (14 days)": "မှန်ကန်မှု (၁၄ ရက်)", "Wrong products (14 days)": "ပစ္စည်းမှား (၁၄ ရက်)",
+    "Errors (7 days)": "အမှား (၇ ရက်)", "{n} more days": "နောက်ထပ် {n} ရက်",
+    "{n} more checked suggestions": "နောက်ထပ် စစ်ပြီးသား {n} ခု", "accuracy must reach {p}": "မှန်ကန်မှု {p} ရောက်ရမယ်",
+    "no wrong product allowed in 14 days": "၁၄ ရက်အတွင်း ပစ္စည်းမှား မရှိရ", "errors must be under {p}": "အမှား {p} အောက် ဖြစ်ရမယ်",
+    "🧠 AI switched to AUTO: accuracy {p} on {n} decisions, {w} wrong products":
+        "🧠 AI က AUTO ပြောင်းပြီ: စစ်ချက် {n} ခုမှာ မှန်ကန်မှု {p}၊ ပစ္စည်းမှား {w}",
+    "🧠 AI switched back to SHADOW: {why}": "🧠 AI က SHADOW ပြန်ပြောင်းပြီ: {why}",
+    "an admin changed the product of an AUTO-handled message": "AUTO ဖြေထားတဲ့စာရဲ့ ပစ္စည်းကို admin က ပြင်လိုက်တယ်",
+    "accuracy {p} on the last {n} decided AI results": "နောက်ဆုံး AI ရလဒ် {n} ခုမှာ မှန်ကန်မှု {p}",
+    "{p} of the last {n} AI calls failed": "နောက်ဆုံး AI ခေါ်ချက် {n} ခုထဲက {p} မအောင်မြင်",
+    "Saved. Auto-graduation is OFF now (you chose the mode yourself); turn it on again below.":
+        "သိမ်းပြီး။ ကိုယ်တိုင် ရွေးလိုက်လို့ AUTO ကိုယ်တိုင်ပြောင်းခြင်း ပိတ်လိုက်ပြီ — အောက်မှာ ပြန်ဖွင့်လို့ရတယ်။",
+    "Saved as an AI mistake.": "AI အမှားအဖြစ် သိမ်းပြီး။",
+    "Fix the cart or reply in the chat (Undo works while the reply has not gone out).":
+        "Chat ထဲမှာ ခြင်း (သို့) ဖြေစာ ပြင်ပါ (ဖြေစာ မထွက်သေးရင် ပြန်ဖျက်လို့ရတယ်)။",
+    "The AI is back in SHADOW: {why}.": "AI က SHADOW ပြန်ရောက်ပြီ: {why}။",
+    "Nothing to correct: this message was not handled by the AI.": "ပြင်စရာ မရှိပါ: ဒီစာကို AI က မဖြေခဲ့ပါ။",
+    "Choose a product (or “we don't sell it”) for every line.": "စာကြောင်းတိုင်းအတွက် ပစ္စည်း (သို့) “မရှိဘူး” ရွေးပါ။",
+    "Choose what the customer wanted.": "ဖောက်သည် ဘာလိုချင်တာလဲ ရွေးပါ။",
+    "Not saved: type numbers for the limits, budget, threshold and graduation rules.":
+        "မသိမ်းရသေးပါ: အကန့်အသတ်၊ ဘတ်ဂျက်၊ threshold နဲ့ AUTO စည်းမျဉ်းတွေမှာ ဂဏန်းရိုက်ပါ။",
+    "Not saved: Mode: off, shadow or auto.": "မသိမ်းရသေးပါ: မုဒ်က off, shadow, auto ပဲ ရွေးလို့ရတယ်။",
 }

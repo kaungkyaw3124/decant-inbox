@@ -9,7 +9,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.ai import report
+from app.ai import graduation, report
 from app.ai import settings as ai_settings
 from app.ai.types import AIResult
 from app.core.config import BASE_DIR
@@ -50,7 +50,7 @@ def ai_page(request: Request, db: Session = Depends(get_db)):
         "cfg": ai_settings.load(db), "modes": MODE_LABELS, "reasonings": ai_settings.REASONING,
         "today": report.period(db, report.today_start(now)), "month": report.period(db, report.month_start(now)),
         "notices": report.notices(db, now), "calls": _call_rows(db), "evaluation": report.latest_eval(),
-        "eval_running": report.eval_running(now)})
+        "eval_running": report.eval_running(now), "progress": graduation.progress(db, now)})
 
 
 def _save(request: Request, db: Session, user: User, values: dict, what: str) -> RedirectResponse:
@@ -71,18 +71,33 @@ def _save(request: Request, db: Session, user: User, values: dict, what: str) ->
 @router.post("/mode")
 def set_mode(request: Request, mode: str = Form(...), db: Session = Depends(get_db),
              user: User = Depends(current_user)):
-    return _save(request, db, user, {"mode": mode}, "mode")
+    """A manual switch also turns auto-graduate OFF (docs/SPEC-v4.7-graduation.md)."""
+    if mode not in ai_settings.MODES:
+        flash(request, "Not saved: Mode: off, shadow or auto.")
+        return RedirectResponse("/ai", status_code=303)
+    before = ai_settings.load(db)
+    graduation.manual_switch(db, mode, user)
+    db.add(AuditLog(user_id=user.id, action="ai.mode", details={
+        "before": {"mode": before["mode"], "auto_graduate": before["auto_graduate"]},
+        "after": {"mode": mode, "auto_graduate": False}}))
+    db.commit()
+    flash(request, "Saved. Auto-graduation is OFF now (you chose the mode yourself); turn it on again below.")
+    return RedirectResponse("/ai", status_code=303)
 
 
 @router.post("/settings")
 def set_settings(request: Request, daily_cap: str = Form(...), monthly_budget_usd: str = Form(...),
                  threshold: str = Form(...), model: str = Form(...), reasoning: str = Form(...),
+                 auto_graduate: str = Form(""), min_days: str = Form("7"), min_decisions: str = Form("50"),
+                 min_accuracy: str = Form("95"),
                  db: Session = Depends(get_db), user: User = Depends(current_user)):
     try:
         values = {"daily_cap": int(daily_cap), "monthly_budget_usd": float(monthly_budget_usd),
-                  "threshold": float(threshold), "model": model.strip(), "reasoning": reasoning}
+                  "threshold": float(threshold), "model": model.strip(), "reasoning": reasoning,
+                  "auto_graduate": auto_graduate == "1", "min_days": int(min_days),
+                  "min_decisions": int(min_decisions), "min_accuracy": float(min_accuracy) / 100}
     except ValueError:
-        flash(request, "Not saved: type numbers for the limit, budget and threshold.")
+        flash(request, "Not saved: type numbers for the limits, budget, threshold and graduation rules.")
         return RedirectResponse("/ai", status_code=303)
     return _save(request, db, user, values, "settings")
 

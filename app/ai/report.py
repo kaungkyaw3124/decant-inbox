@@ -57,10 +57,12 @@ def period(session: Session, since: datetime) -> Period:
 
 def notices(session: Session, now: datetime) -> list[str]:
     """Problems the owner should know about (shown on Needs you and the AI page)."""
+    from app.ai import graduation  # late import: graduation -> service
+
     cfg = ai_settings.load(session)
+    out = graduation.notices(session, now)  # "switched to AUTO" / "back to SHADOW" (last 3 days)
     if cfg["mode"] == "off":
-        return []
-    out = []
+        return out
     s = get_settings()
     if s.ai_provider == "openai" and providers.get() is None:
         out.append("🧠 AI is on, but OPENAI_API_KEY is missing in .env. Messages go to Needs you as before.")

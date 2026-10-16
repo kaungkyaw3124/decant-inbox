@@ -1182,3 +1182,81 @@ those without the AI (no AI call, no cost).
   expect "✅ Passed", intent + products 100% (at least 90% needed), wrong products 0.
 - Limits test (optional): set "Calls per day" to 1 and send two unknown names. The second gets no 🧠, and Needs
   you shows "🧠 AI: daily limit of 1 calls reached…". Set it back to 300.
+
+## 2026-10-17 — v4.7: SHADOW → AUTO graduation, safety brake, weekly AI summary (docs/SPEC-v4.7-graduation.md)
+**What was built**
+- `app/ai/graduation.py`: graduation, safety brake and the weekly summary.
+  - Graduation is checked by the parser worker every day at 09:00 Asia/Yangon. Rules: SHADOW +
+    auto-graduate ON + at least 7 days + at least 50 checked suggestions + accuracy ≥ 95% + 0 wrong
+    products + errors < 10%. Then: AUTO, an audit row (actor "auto-graduation"), and the Needs you notice
+    "🧠 AI switched to AUTO: accuracy X% on N decisions, 0 wrong products".
+  - The brake is checked after every decided suggestion, after every AI step and daily. AUTO goes back to
+    SHADOW when: a product of an AUTO-handled message is changed, OR accuracy of the last 30 decided
+    results is < 90%, OR ≥ 50% of the last 20 calls failed. The notice gives the reason, and the window
+    restarts at the brake time.
+- `ai_calls.decided_at` and `ai_calls.wrong_product` (migration c409d2aafcbe; down/up tested; old decided
+  rows get decided_at = created_at).
+- "🧠 AI was wrong" on the message page of an AUTO-handled message: a card-style form (product per line or
+  "we don't sell it", size, quantity, what the customer wanted). Saving it stores a human parse result,
+  counts the call as corrected (wrong product if a product changed), counts corrections on the AI's pending
+  patterns from that message, runs the brake, and opens the chat to fix the cart or reply (Undo works while
+  the reply waits). Editing an AUTO AI result with the existing "edit parse" form counts the same way.
+- /ai: the "🎓 Graduation progress" section shows days, checked suggestions, accuracy, wrong products and
+  errors, each ✅ / ⏳ / ❌, with what is missing. New settings: auto-graduate, min days, min decisions,
+  min accuracy. A manual mode switch turns auto-graduate OFF; the checkbox turns it on again.
+- Weekly summary: from Monday 09:00 Yangon the worker writes reports/ai-weekly.md for the last full
+  Monday-Sunday week (Yangon). It holds week, mode, calls, cost, average time, accepted, corrected, wrong
+  products, accuracy, errors / refused, not called, AUTO-handled, AI patterns approved / pending, and
+  graduation progress. It contains only numbers.
+  - It is committed alone ("AI weekly summary", `git commit --only`; other staged files stay staged) and
+    pushed with the deploy key.
+  - If the branch has unpushed local commits, it is not pushed (a push would send them too).
+  - A failed push is logged and the worker keeps going.
+  - First run: the current week is only remembered; no summary is written for weeks before the deploy.
+
+**Decisions**
+- Wrong product = the AI named a product and the admin chose a different one, or "we don't sell it".
+  The AI saying "we don't sell it" and the admin choosing a product is a normal correction (the safe
+  direction). Changing only size, quantity or intent is a normal correction.
+- For the brake's "last 30 decided results", an AUTO-handled result counts as right until someone presses
+  "🧠 AI was wrong". Otherwise only the low-confidence SHADOW cards would count, and the brake would fire
+  for no real reason.
+- Window: the last 14 days, never before SHADOW (re)started. The window start is exclusive, so the
+  correction that fires a brake belongs to the old window.
+- The spec says "opens the teaching card". The 4.2 card is built from the rules' unsure items, which an
+  AUTO message does not have, so "🧠 AI was wrong" opens a correction card with the same questions for
+  every line the AI handled.
+- The worker's tick touches the database only when something is due (not every second). git has a 60 s
+  timeout, so a weekly push can pause the parser for at most a minute.
+
+**Tests:** 351 passed, 1 skipped (was 332 + 1). 19 new tests in tests/test_v47_graduation.py:
+- G1: graduation, notice, audit, once a day, only from 09:00.
+- G2: each missing condition — 6 days / 40 decisions / 94% / 1 wrong product / 12% errors — stays SHADOW
+  and the page shows what is missing; decisions older than 14 days don't count.
+- G3: product correction on an AUTO message via "AI was wrong" and via the edit form; size-only correction
+  doesn't brake; 87% on the last 30 brakes, 90% doesn't; 50% errors brakes; the brake runs after the AI
+  step; the window restarts after a brake.
+- G4: a manual switch turns auto-graduate off; turning it on again works.
+- G5: the summary has none of the customer name, username, phone, address, message text or AI result
+  texts used in the test, and no Burmese text at all; it covers the right week, is written once per week,
+  and nothing is written for the past on the first run. publish() was tested against a throwaway local git
+  remote: only the summary file is committed, staged work stays staged, unpushed local commits make it skip,
+  and a failed push returns a message instead of raising.
+
+**Deployed:** backup product_requests_2026-10-16T1903Z.dump, migration at head, AI mode = SHADOW,
+auto-graduate ON, window since 2026-10-16 18:21 UTC (the 4.6 deploy), parser + web restarted, health ok.
+git ls-remote works from the systemd user environment. Earliest possible graduation: 2026-10-24 09:00
+Yangon, if 50 suggestions have been checked by then. First weekly summary: Monday 2026-10-19 09:00 Yangon
+(week 2026-10-12 to 10-18).
+
+**Owner test (short)**
+1. /ai → "🎓 Graduation progress": days 0-1 / 7 ⏳, checked suggestions n / 50 ⏳, accuracy, wrong products 0 ✅,
+   errors ✅. Auto-graduation: ON.
+2. Keep answering 🧠 cards normally for 1-2 weeks. Change the product only when the AI is really wrong; that
+   is what counts as a wrong product.
+3. To try the brake safely now: press AUTO at /ai (auto-graduate turns OFF; the page says so). Send
+   `savage edp 10ml ယူမယ်` from the test account; the AI handles it automatically (🧠 in the chat). Open the
+   message → "🧠 AI was wrong" → choose another product → Save. Expect: the chat opens, Needs you shows
+   "🧠 AI switched back to SHADOW: an admin changed the product of an AUTO-handled message", and /ai shows
+   SHADOW. Then tick "Auto-graduate" in the settings and Save, so it can graduate by itself again.
+4. Monday after 09:00: reports/ai-weekly.md on GitHub, commit "AI weekly summary", numbers only.

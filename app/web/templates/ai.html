@@ -14,7 +14,21 @@
     <button name="mode" value="{{ value }}" class="{{ 'primary' if cfg.mode == value else 'quiet' }}" {% if cfg.mode == value %}aria-pressed="true"{% endif %}>{{ t(label) }}</button>
     {% endfor %}
   </form>
-  <p class="small muted">{{ t("Now") }}: <b>{{ t(modes[cfg.mode]) }}</b>{% if cfg.mode == "auto" %} · {{ t("acts when the AI is at least {p}% sure", p=(cfg.threshold * 100) | round | int) }}{% endif %}</p>
+  <p class="small muted">{{ t("Now") }}: <b>{{ t(modes[cfg.mode]) }}</b>{% if cfg.mode == "auto" %} · {{ t("acts when the AI is at least {p}% sure", p=(cfg.threshold * 100) | round | int) }}{% endif %}
+    · {{ t("Auto-graduation") }}: <b>{{ t("ON") if cfg.auto_graduate else t("OFF") }}</b></p>
+</section>
+
+<section class="card" id="graduation">
+  <h2>🎓 {{ t("Graduation progress") }} {{ ui.help("In SHADOW, the app switches the AI to AUTO by itself (checked every day at 09:00) when all lines are ✅. In AUTO, a wrong product, low accuracy or many errors switch it back to SHADOW.") }}</h2>
+  {% if progress.mode == "auto" %}<p class="small">{{ t("The AI is in AUTO. The safety brake watches it.") }}</p>
+  {% elif not progress.auto_graduate %}<p class="small muted">{{ t("Auto-graduation is OFF: the mode only changes when you switch it.") }}</p>{% endif %}
+  <p class="small muted">{{ t("Window since {date}", date=progress.since | local_time("%d %b %Y %H:%M")) }}</p>
+  <ul class="feed small">
+  {% for c in progress.conditions %}
+    <li>{{ c.icon }} {{ t(c.label) }}: <b>{{ c.value }}</b>{% if c.missing %} <span class="muted">— {{ tr(c.missing) }}</span>{% endif %}</li>
+  {% endfor %}
+  </ul>
+  {% if progress.mode == "shadow" and progress.ready %}<p class="small">{{ t("Everything is ✅: the switch to AUTO happens at the next 09:00 check.") }}</p>{% endif %}
 </section>
 
 <section class="card">
@@ -44,6 +58,10 @@
     <label>{{ t("Monthly budget (USD)") }} <input name="monthly_budget_usd" value="{{ cfg.monthly_budget_usd }}" inputmode="decimal"></label>
     <label>{{ t("AUTO: act when at least this sure (0.5-1)") }} <input name="threshold" value="{{ cfg.threshold }}" inputmode="decimal"></label>
     <label>{{ t("Model") }} <input name="model" value="{{ cfg.model }}" maxlength="64"></label>
+    <label class="check"><input type="checkbox" name="auto_graduate" value="1" {% if cfg.auto_graduate %}checked{% endif %}> {{ t("Auto-graduate: switch SHADOW → AUTO by itself when the numbers are good") }}</label>
+    <label>{{ t("Graduation: at least this many days in SHADOW") }} <input name="min_days" value="{{ cfg.min_days }}" inputmode="numeric"></label>
+    <label>{{ t("Graduation: at least this many checked suggestions") }} <input name="min_decisions" value="{{ cfg.min_decisions }}" inputmode="numeric"></label>
+    <label>{{ t("Graduation: accuracy at least (%)") }} <input name="min_accuracy" value="{{ (cfg.min_accuracy * 100) | round | int }}" inputmode="numeric"></label>
     <label>{{ t("Reasoning") }}
       <select name="reasoning">{% for r in reasonings %}<option value="{{ r }}" {% if r == cfg.reasoning %}selected{% endif %}>{{ r }}</option>{% endfor %}</select></label>
     <button class="primary">{{ t("Save") }}</button>

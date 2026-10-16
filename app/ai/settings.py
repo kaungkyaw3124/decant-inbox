@@ -9,13 +9,17 @@ from app.models import AppSetting, User
 SETTING = "ai"
 MODES = ("off", "shadow", "auto")
 REASONING = ("low", "medium", "high")
-LIMITS = {"daily_cap": (0, 5000), "monthly_budget_usd": (0.0, 500.0), "threshold": (0.5, 1.0)}
+LIMITS = {"daily_cap": (0, 5000), "monthly_budget_usd": (0.0, 500.0), "threshold": (0.5, 1.0),
+          "min_days": (1, 60), "min_decisions": (1, 1000), "min_accuracy": (0.5, 1.0)}
 
 
 def defaults() -> dict:
     s = get_settings()
     return {"mode": "shadow", "daily_cap": 300, "monthly_budget_usd": 5.0, "threshold": 0.85,
-            "model": s.ai_model, "reasoning": s.ai_reasoning}
+            "model": s.ai_model, "reasoning": s.ai_reasoning,
+            # docs/SPEC-v4.7-graduation.md: SHADOW -> AUTO by itself when the numbers are good enough
+            "auto_graduate": True, "min_days": 7, "min_decisions": 50, "min_accuracy": 0.95,
+            "shadow_since": None}  # ISO time SHADOW (re)started: the graduation window
 
 
 def load(session: Session) -> dict:
@@ -40,6 +44,9 @@ def save(session: Session, values: dict, user: User | None) -> None:
         if not low <= float(value[key]) <= high:
             raise ValueError(f"{key.replace('_', ' ')} must be {low}-{high}.")
     value["daily_cap"] = int(value["daily_cap"])
+    value["min_days"], value["min_decisions"] = int(value["min_days"]), int(value["min_decisions"])
+    value["min_accuracy"] = round(float(value["min_accuracy"]), 3)
+    value["auto_graduate"] = bool(value["auto_graduate"])
     value["monthly_budget_usd"] = round(float(value["monthly_budget_usd"]), 2)
     value["threshold"] = round(float(value["threshold"]), 2)
     stmt = insert(AppSetting).values(key=SETTING, value=value, updated_by=user.id if user else None)
