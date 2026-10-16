@@ -2,18 +2,13 @@
 
 Read CLAUDE.md first. This file tracks where we are.
 
-## RESUME HERE (updated 2026-10-16 by VPS Claude Code)
-- v1, v2, v3 DONE (v3 owner testing in parallel).
-- NOW: Release v4 "Learning Inbox" — docs/SPEC-v4.md. Epics 4.1 -> 4.5 in order, each with
-  acceptance tests, loop test -> fix until green, self-review vs GOAL, deploy, report, next.
-  - 4.1 partial name matches: ✅ done (rules-4, migration 92fe0f25b1bf, tests/test_v4_partial.py).
-  - 4.2 teaching cards: ✅ done (rules-5, migration d16b1c96eac6, tests/test_v4_teaching.py).
-  - 4.3 "the previous one": ✅ done (rules-6, migration 814861587f85, tests/test_v4_previous.py).
-  - 4.4 roles, permissions: ✅ done (migration 222274ae7a9b, /users, /activity, tests/test_v4_roles.py).
-  - 4.5 Burmese dashboard, help, practice: ✅ done (app/web/i18n*.py, /help = docs/STAFF-GUIDE-my.md,
-    /practice, tests/test_v4_i18n.py). No migration.
-  - v4 BUILD DONE. NEXT: owner runs "OWNER TEST SCRIPT v4" and the "STAFF TEST" in REPORT.md.
-- No external AI (not available in Myanmar). Epic 4.6 (AI) only when the owner asks.
+## RESUME HERE (updated 2026-10-16 by planning chat)
+- v1-v4 (4.1-4.5) DONE. Owner testing v4.
+- NOW: epic 4.6 AI helper with OpenAI — docs/SPEC-v4.6-ai.md. Steps S0 (key check, stop if
+  it fails) -> S1 -> S2 EVALUATION GATE (must pass before anything is visible) -> S3 shadow ->
+  S4 auto (switch stays OFF/SHADOW until the owner turns AUTO on) -> S5 AI page.
+  Same loop: tests -> fix -> green -> self-review -> deploy -> report.
+- OPENAI_API_KEY is in .env (owner). Never print/log/commit it.
 - Owner checks: `bash scripts/status.sh`.
 
 ## Status
