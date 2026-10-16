@@ -2,12 +2,12 @@
 
 Read CLAUDE.md first. This file tracks where we are.
 
-## RESUME HERE (updated 2026-10-16 by VPS Claude Code)
-- v1-v4 (4.1-4.5) DONE. Owner testing v4.
-- Epic 4.6 AI helper (OpenAI, docs/SPEC-v4.6-ai.md) DONE: S0 key OK, S1-S5 built, S2 evaluation gate PASSED
-  (48 cases, intent+products 100%, 0 wrong products). Deployed with AI mode = SHADOW; AUTO is off until the
-  owner switches it on at /ai. Owner test: "OWNER TEST SCRIPT v4.6" in REPORT.md.
-- OPENAI_API_KEY is in .env (owner). Never print/log/commit it.
+## RESUME HERE (updated 2026-10-17 by planning chat)
+- v1-v4 + 4.6 AI helper DONE (AI mode = SHADOW, eval passed 100%, 0 wrong products).
+- NOW: epic 4.7 docs/SPEC-v4.7-graduation.md — automatic SHADOW -> AUTO graduation after
+  >= 7 days, >= 50 decisions, >= 95% accuracy, 0 wrong products; safety brake back to SHADOW;
+  weekly aggregate AI summary pushed to reports/ai-weekly.md. Same loop: tests -> fix ->
+  green -> self-review -> deploy -> report.
 - Owner checks: `bash scripts/status.sh`; AI numbers at /ai.
 
 ## Status

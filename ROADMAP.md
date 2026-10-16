@@ -23,4 +23,5 @@ Detailed specs live in docs/; status and "resume here" in PLAN.md; build log in 
 - 4.3 Reorder "the previous one" from history + numbered choice
 - 4.4 Roles (owner/staff), permissions, owner approval of learning
 - 4.5 Burmese dashboard, help, practice mode, staff guide
+- 4.7 Shadow -> Auto graduation + safety brake + weekly AI summary — docs/SPEC-v4.7-graduation.md
 - 4.6 AI helper (OpenAI gpt-6-luna) with evaluation gate, shadow -> auto — docs/SPEC-v4.6-ai.md
