@@ -2,13 +2,11 @@
 
 Read CLAUDE.md first. This file tracks where we are.
 
-## RESUME HERE (updated 2026-10-17 by VPS Claude Code)
-- v1-v4, 4.6 AI helper and 4.7 graduation DONE. AI mode = SHADOW, auto-graduate ON (window since
-  2026-10-16 18:21 UTC): it switches to AUTO by itself after >= 7 days, >= 50 checked suggestions,
-  >= 95% accuracy, 0 wrong products, < 10% errors; the safety brake switches back. Progress at /ai.
-- Weekly aggregate summary: reports/ai-weekly.md, pushed by the parser worker every Monday 09:00 Yangon
-  (first: 2026-10-19).
-- Owner tests pending: v4 script, staff test, v4.6 script, v4.7 short test (REPORT.md).
+## RESUME HERE (updated 2026-10-17 by planning chat)
+- v1-v4.7 DONE (AI SHADOW, auto-graduate ON).
+- NOW: epic 4.8 docs/SPEC-v4.8-change-info.md — LIVE BUG: "လိပ်စာ ပြောင်းချင်ပါတယ်" was taken
+  as an address/agreement and payment info went out with the old address. Fix + change
+  address/phone flow. Same loop: tests H1-H8 -> fix -> green -> self-review -> deploy -> report.
 - Owner checks: `bash scripts/status.sh`; AI numbers at /ai.
 
 ## Status
