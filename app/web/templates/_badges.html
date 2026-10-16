@@ -1,12 +1,12 @@
 {% if r %}
-  <span class="badge intent-{{ r.intent }}">{{ r.intent | replace("_", " ") }}</span>
+  <span class="badge intent-{{ r.intent }}">{{ code(r.intent) }}</span>
   {% if items %}
     {% for it, ip in items %}
-    <span class="badge product{% if it.unknown_text %} warn{% endif %}" {% if it.from_context %}title="Product taken from the customer's previous message"{% endif %}>
-      {%- if ip %}{{ ip.name }}{% elif it.unknown_text %}❓ {{ it.unknown_text }}{% else %}? product{% endif -%}
-      {%- if it.is_full_bottle %} · full{% elif it.size_ml %} · {{ it.size_ml }}ml{% endif -%}
+    <span class="badge product{% if it.unknown_text %} warn{% endif %}" {% if it.from_context %}title="{{ t('Product taken from the customer’s previous message') }}"{% endif %}>
+      {%- if ip %}{{ ip.name }}{% elif it.unknown_text %}❓ {{ it.unknown_text }}{% else %}? {{ t("product") }}{% endif -%}
+      {%- if it.is_full_bottle %} · {{ t("full") }}{% elif it.size_ml %} · {{ it.size_ml }}ml{% endif -%}
       {%- if it.quantity > 1 %} × {{ it.quantity }}{% endif -%}
-      {%- if it.from_context %} (from previous message){% endif -%}
+      {%- if it.from_context %} ({{ t("from previous message") }}){% endif -%}
     </span>
     {% endfor %}
   {% else %}
@@ -15,8 +15,8 @@
   {% if r.quantity and r.quantity > 1 %}<span class="badge">× {{ r.quantity }}</span>{% endif %}
   {% endif %}
   {% if r.phone %}<span class="badge">📞 {{ r.phone }}</span>{% endif %}
-  {% if r.method == "human" %}<span class="badge human">edited</span>{% endif %}
+  {% if r.method == "human" %}<span class="badge human">{{ t("edited") }}</span>{% endif %}
 {% else %}
-  <span class="badge">not parsed yet</span>
+  <span class="badge">{{ t("not parsed yet") }}</span>
 {% endif %}
-{% if needs_review %}<span class="badge warn">needs review</span>{% endif %}
+{% if needs_review %}<span class="badge warn">{{ t("needs review") }}</span>{% endif %}

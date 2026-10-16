@@ -40,7 +40,7 @@ INTENT_CHOICES = (
     ("ask_price", "ဈေးမေးတာ"),
     ("ask_stock", "ရှိလားမေးတာ"),
     ("remove", "ဖြုတ်မယ်"),
-    ("cancel_order", "အော်ဒါ cancel"),
+    ("cancel_order", "အော်ဒါ ပယ်ဖျက်"),
     ("ask_delivery", "ပစ္စည်းရောက်ပြီလားမေး"),
     ("previous_item", "အရင်ကဟာ ပြန်ယူမယ်"),
     ("greeting", "နှုတ်ဆက်တာ"),
@@ -478,7 +478,7 @@ def preview_line(session: Session, applied: Applied, suggestion) -> str:
         "not_stocked": "မရှိဘူးလို့ ပြန်ပြောမယ်။",
         "greeting": "နှုတ်ဆက်စာ ပြန်ပို့မယ်။",
         "delivery": "ပို့ဆောင်မှု အခြေအနေ ပြန်ပြောမယ်။",
-        "cancel_order": "အော်ဒါကို cancel လုပ်ပြီး ပြန်ပြောမယ်။",
+        "cancel_order": "အော်ဒါကို ပယ်ဖျက်ပြီး ပြန်ပြောမယ်။",
         "faq": "FAQ အဖြေ ပို့မယ်။",
         "cart_list": "ခြင်းထဲက စာရင်း ပို့မယ်။",
     }.get(suggestion.kind, suggestion.label)

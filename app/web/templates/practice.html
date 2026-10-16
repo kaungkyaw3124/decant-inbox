@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% import "_ui.html" as ui with context %}
+{% block title %}{{ t("Practice") }} · Decant Inbox{% endblock %}
+{% macro show(a) -%}
+  {{ code(a.intent) if a.intent else "—" }}{% if a.product == not_stocked %} · 🚫 {{ t("we don't sell it") }}{% elif a.product %} · {{ a.product }}{% endif %}{% if a.size_ml %} · {{ a.size_ml }}ml{% endif %}
+{%- endmacro %}
+{% block content %}
+<section class="card practice-head">
+  <h1>🎓 {{ t("Practice") }} {{ ui.help("Practice messages: try the buttons and teaching cards. Nothing is saved and nothing is sent to anyone.") }}</h1>
+  <p class="notice small">{{ t("Practice mode: nothing is saved, nothing is sent.") }}</p>
+  <p class="big-line">{{ t("Score") }}: <b>{{ right_count }} / {{ done_count }}</b>{% if step != "home" %} · {{ t("Message {n} of {total}", n=n, total=total) }}{% endif %}</p>
+</section>
+
+{% if step == "home" %}
+<section class="card stack">
+  <p>{{ t("You get {n} practice messages, like real customers write. For each one, do what you would do in the inbox: tap the button if the app's reply is right, or answer the teaching card.", n=total) }}</p>
+  <p>{{ t("After each answer you see if it was right and what the customer would get.") }}</p>
+  <form method="post" action="/practice/reset" class="buttons">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <button class="primary big">{{ t("Start") }} →</button>
+  </form>
+  <p class="small"><a href="/help">❓ {{ t("Read the staff guide first") }}</a></p>
+</section>
+
+{% elif step == "question" %}
+<section class="card">
+  <div class="meta"><span class="who">{{ t("Practice customer") }}</span></div>
+  <p class="text big">{{ m.raw_text }}</p>
+</section>
+{% if error %}<p class="flash bad" role="alert">{{ tr(error) }}</p>{% endif %}
+{% if card %}
+<section class="card notice" id="card">
+  <h2>📘 သင်ပေးမယ်</h2>
+  <p class="muted small">{{ t("The app is not sure. Answer the questions like in the inbox.") }}</p>
+  {% include "_card.html" %}
+</section>
+{% elif quick %}
+<section class="card quick-card">
+  <h2>{{ t("Quick reply") }}</h2>
+  <p class="small">{{ t("The app understood:") }} <b>{{ show(app_understood) }}</b></p>
+  <p class="quick-preview">{{ quick.preview if quick.text else tr(quick.preview) }}</p>
+  {% if quick.text and quick.note %}<p class="small muted">{{ tr(quick.note) }}</p>{% endif %}
+  <form method="post" action="/practice/{{ n }}" class="buttons">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <button class="primary big" name="choice" value="tap">{{ tr(quick.label) }}</button>
+    <button class="big" name="choice" value="wrong">❌ {{ t("This is wrong — don't send") }}</button>
+  </form>
+  <p class="small muted">{{ t("Check the product, size and price before you tap.") }}</p>
+</section>
+{% else %}
+<section class="card">
+  <p>{{ t("The app can't answer this one by itself. In the real inbox you would open the chat and reply yourself.") }}</p>
+  <p class="buttons">{% if n < total %}<a class="button primary" href="/practice/{{ n + 1 }}">{{ t("Next") }} →</a>{% endif %}</p>
+</section>
+{% endif %}
+
+{% else %}
+<section class="card {{ 'notice' if ok else 'problem' }}">
+  <h2>{{ "✅ " ~ t("Right!") if ok else "❌ " ~ t("Not right") }}</h2>
+  <p class="text big">{{ m.raw_text }}</p>
+  <p>{{ t("Right answer") }}: <b>{{ show(exercise) }}</b></p>
+  {% if choice in ("tap", "wrong") %}
+    <p>{{ t("The app understood") }}: <b>{{ show(app_answer) }}</b> — {{ t("so tapping was right.") if app_right else t("so the button was wrong: don't tap, answer the card or reply yourself.") }}</p>
+  {% else %}
+    <p>{{ t("Your answer") }}: <b>{{ show(given) }}</b></p>
+  {% endif %}
+  {% if reply %}<p class="small muted">{{ t("The customer would get (practice — not sent):") }}</p><pre class="example">{{ reply }}</pre>{% endif %}
+  <p class="buttons">
+    <a class="button" href="/practice/{{ n }}">↺ {{ t("Try again") }}</a>
+    {% if n < total %}<a class="button primary" href="/practice/{{ n + 1 }}">{{ t("Next") }} →</a>
+    {% else %}<a class="button primary" href="/practice">🏁 {{ t("Finish") }}</a>{% endif %}
+  </p>
+</section>
+{% endif %}
+{% endblock %}

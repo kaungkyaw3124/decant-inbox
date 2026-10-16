@@ -1,158 +1,159 @@
 {% extends "base.html" %}
-{% block title %}Message · Decant Inbox{% endblock %}
+{% import "_ui.html" as ui with context %}
+{% block title %}{{ t("Message") }} · Decant Inbox{% endblock %}
 {% block content %}
-<p class="buttons"><a href="{{ back }}">← Back</a> <a href="/chats/{{ c.id }}#reply">Open chat and reply →</a></p>
+<p class="buttons"><a href="{{ back }}">← {{ t("Back") }}</a> <a href="/chats/{{ c.id }}#reply">{{ t("Open chat and reply") }} →</a></p>
 
 <section class="card">
   <div class="meta">
-    <span class="who">{{ c.display_name or "Customer" }}{% if c.username %} · @{{ c.username }}{% endif %}</span>
+    <span class="who">{{ c.display_name or t("Customer") }}{% if c.username %} · @{{ c.username }}{% endif %}</span>
     <time>{{ m.received_at | local_time("%d %b %Y %H:%M") }}</time>
   </div>
   <p class="text big">{{ m.raw_text }}</p>
   {% if m.normalized_text and m.normalized_text != m.raw_text %}
-  <p class="muted small">Normalized: {{ m.normalized_text }}</p>
+  <p class="muted small">{{ t("Normalized") }}: {{ m.normalized_text }}</p>
   {% endif %}
   <div class="badges">{% set needs_review = r is none or (r.method != "human" and r.confidence < needs_review_below) %}{% include "_badges.html" %}
-    {% if r and r.method != "human" %}<span class="muted small">confidence {{ "%.2f" | format(r.confidence) }}</span>{% endif %}
+    {% if r and r.method != "human" %}<span class="muted small">{{ t("confidence") }} {{ "%.2f" | format(r.confidence) }}</span>{% endif %}
   </div>
 </section>
 
 {% if card %}
 <section class="card notice" id="card">
-  <h2>📘 သင်ပေးမယ် <span class="small muted">(teach the app)</span></h2>
+  <h2>📘 သင်ပေးမယ်{% if lang != "my" %} <span class="small muted">(teach the app)</span>{% endif %} {{ ui.help("Answer the questions: the app finishes this customer’s request and remembers the answer for next time.") }}</h2>
   <p class="muted small">ဖြေလိုက်ရင် ဒီဖောက်သည်ကို ဆက်ဖြေပေးမယ်၊ နောက်တစ်ခါ အလိုလို သိမယ်။</p>
   {% include "_card.html" %}
 </section>
 {% elif unknowns %}
 <section class="card notice" id="unknown">
-  <h2>❓ Not in your product list</h2>
-  <p class="muted small">Resolve each item; then the reply continues by itself (auto-reply ON) or the one-tap button appears.</p>
+  <h2>❓ {{ t("Not in your product list") }}</h2>
+  <p class="muted small">{{ t("Resolve each item; then the reply continues by itself (auto-reply ON) or the one-tap button appears.") }}</p>
   {% for u, sugg in unknowns %}
   <div class="unknown-item">
-    <h3>“{{ u.text }}”{% if u.is_full_bottle %} · full bottle{% elif u.size_ml %} · {{ u.size_ml }}ml{% endif %}</h3>
-    {% if u.partial %}<p class="small">Contains the nickname of <b>{{ sugg[0].name }}</b>, plus other words: is it the same perfume?</p>{% endif %}
+    <h3>“{{ u.text }}”{% if u.is_full_bottle %} · {{ t("full bottle") }}{% elif u.size_ml %} · {{ u.size_ml }}ml{% endif %}</h3>
+    {% if u.partial %}<p class="small">{{ t("Contains the nickname of {name}, plus other words: is it the same perfume?", name=sugg[0].name) }}</p>{% endif %}
     {% if user_role == "owner" %}
     <form method="post" action="/messages/{{ m.id }}/unknown/{{ u.position }}/map" class="inline-form">
       <input type="hidden" name="csrf" value="{{ csrf }}">
       <input type="hidden" name="back" value="{{ back }}">
-      <select name="product_id" required aria-label="Product">
-        <option value="">It's in my list: choose…</option>
-        <optgroup label="Most similar">{% for p in sugg %}<option value="{{ p.id }}" {% if u.partial and loop.first %}selected{% endif %}>{{ p.name }} · {{ p.brand }}</option>{% endfor %}</optgroup>
-        <optgroup label="All products">{% for p in all_products if p.active %}<option value="{{ p.id }}">{{ p.name }} · {{ p.brand }}</option>{% endfor %}</optgroup>
+      <select name="product_id" required aria-label="{{ t('Product') }}">
+        <option value="">{{ t("It's in my list: choose…") }}</option>
+        <optgroup label="{{ t('Most similar') }}">{% for p in sugg %}<option value="{{ p.id }}" {% if u.partial and loop.first %}selected{% endif %}>{{ p.name }} · {{ p.brand }}</option>{% endfor %}</optgroup>
+        <optgroup label="{{ t('All products') }}">{% for p in all_products if p.active %}<option value="{{ p.id }}">{{ p.name }} · {{ p.brand }}</option>{% endfor %}</optgroup>
       </select>
-      <button class="primary">Save as alias</button>
+      <button class="primary">{{ t("Save as alias") }}</button>
     </form>
     <details>
-      <summary class="small">New product</summary>
+      <summary class="small">{{ t("New product") }}</summary>
       <form method="post" action="/messages/{{ m.id }}/unknown/{{ u.position }}/new" class="stack">
         <input type="hidden" name="csrf" value="{{ csrf }}">
         <input type="hidden" name="back" value="{{ back }}">
         <div class="grid">
-          <label>Brand <input name="brand" required></label>
-          <label>Name <input name="name" value="{{ u.text | title }}" required></label>
+          <label>{{ t("Brand") }} <input name="brand" required></label>
+          <label>{{ t("Name") }} <input name="name" value="{{ u.text | title }}" required></label>
           {% if u.size_ml or u.is_full_bottle %}
-          <label>Price for {{ "the full bottle" if u.is_full_bottle else u.size_ml ~ "ml" }} (ကျပ်) <input name="asked_price" inputmode="numeric" required></label>
+          <label>{{ t("Price for {what} (ကျပ်)", what=t("the full bottle") if u.is_full_bottle else u.size_ml ~ "ml") }} <input name="asked_price" inputmode="numeric" required></label>
           {% endif %}
-          <label>Bottle size (ml) <input name="full_size_ml" inputmode="numeric"></label>
+          <label>{{ t("Bottle size (ml)") }} <input name="full_size_ml" inputmode="numeric"></label>
         </div>
         <div class="grid">
-          {% for s in (2, 5, 10) if s != u.size_ml %}<label>{{ s }}ml price <input name="p{{ s }}" inputmode="numeric"></label>{% endfor %}
-          {% if not u.is_full_bottle %}<label>Full bottle price <input name="pfull" inputmode="numeric"></label>{% endif %}
+          {% for s in (2, 5, 10) if s != u.size_ml %}<label>{{ t("{size}ml price", size=s) }} <input name="p{{ s }}" inputmode="numeric"></label>{% endfor %}
+          {% if not u.is_full_bottle %}<label>{{ t("Full bottle price") }} <input name="pfull" inputmode="numeric"></label>{% endif %}
         </div>
-        <label class="check"><input type="checkbox" name="in_stock" value="1" checked> In stock</label>
-        <button class="primary">Add product + price</button>
+        <label class="check"><input type="checkbox" name="in_stock" value="1" checked> {{ t("In stock") }}</label>
+        <button class="primary">{{ t("Add product + price") }}</button>
       </form>
     </details>
     {% endif %}
     <form method="post" action="/messages/{{ m.id }}/unknown/{{ u.position }}/not-stocked" class="inline">
       <input type="hidden" name="csrf" value="{{ csrf }}">
       <input type="hidden" name="back" value="{{ back }}">
-      <button class="quiet">We don't have it</button>
+      <button class="quiet">{{ t("We don't have it") }}</button>
     </form>
   </div>
   {% endfor %}
 </section>
 {% endif %}
 {% if resolved %}
-<p class="muted small">Resolved: {% for r in resolved %}“{{ r.text }}” → {{ {"mapped": "alias", "new_product": "new product", "not_stocked": "we don't have it"}[r.resolution] }}{% if not loop.last %}, {% endif %}{% endfor %}</p>
+<p class="muted small">{{ t("Resolved") }}: {% for r in resolved %}“{{ r.text }}” → {{ tr({"mapped": "alias", "new_product": "new product", "not_stocked": "we don't have it"}[r.resolution]) }}{% if not loop.last %}, {% endif %}{% endfor %}</p>
 {% endif %}
 
 {% if quick or quick_action %}
 <section class="card quick-card">
-  <h2>Quick reply</h2>
+  <h2>{{ t("Quick reply") }} {{ ui.help("The app made this reply. Read the preview; if it is right, tap the button. You have a few seconds to Undo.") }}</h2>
   {% with in_row = false %}{% include "_quick.html" %}{% endwith %}
-  {% if quick %}<p class="muted small">{% if quick.text %}Sent {{ undo_seconds }} s after the tap; you can undo until then. {% endif %}Marks this message done.{% if quick.text and quick.note %} {{ quick.note }}{% endif %}</p>{% endif %}
+  {% if quick %}<p class="muted small">{% if quick.text %}{{ t("Sent {n} s after the tap; you can undo until then.", n=undo_seconds) }} {% endif %}{{ t("Marks this message done.") }}{% if quick.text and quick.note %} {{ tr(quick.note) }}{% endif %}</p>{% endif %}
 </section>
 {% endif %}
 
 <section class="card">
-  <h2>Status: {{ status }}</h2>
-  {% if review and review.reviewed_at %}<p class="muted small">by {{ reviewer.username if reviewer else "?" }}, {{ review.reviewed_at | local_time }}</p>{% endif %}
+  <h2>{{ t("Status") }}: {{ code(status) }}</h2>
+  {% if review and review.reviewed_at %}<p class="muted small">{{ t("by") }} {{ reviewer.username if reviewer else "?" }}, {{ review.reviewed_at | local_time }}</p>{% endif %}
   <form method="post" action="/messages/{{ m.id }}/review" class="stack">
     <input type="hidden" name="csrf" value="{{ csrf }}">
     <input type="hidden" name="back" value="{{ back }}">
-    <label>Note <textarea name="note" rows="2">{{ review.note if review and review.note else "" }}</textarea></label>
+    <label>{{ t("Note") }} <textarea name="note" rows="2">{{ review.note if review and review.note else "" }}</textarea></label>
     <div class="buttons">
       {% for s in statuses %}
-      <button name="status" value="{{ s }}" {% if s == status %}class="primary"{% endif %}>{{ "Mark " ~ s if s != "new" else "Back to new" }}</button>
+      <button name="status" value="{{ s }}" {% if s == status %}class="primary"{% endif %}>{{ t("Mark {status}", status=code(s)) if s != "new" else t("Back to new") }}</button>
       {% endfor %}
     </div>
   </form>
 </section>
 
 <section class="card">
-  <h2>Correct the parse</h2>
+  <h2>{{ t("Correct the parse") }} {{ ui.help("Only if the app understood the message wrong: choose what the customer really wants and save.") }}</h2>
   <form method="post" action="/messages/{{ m.id }}/parse" class="stack">
     <input type="hidden" name="csrf" value="{{ csrf }}">
     <input type="hidden" name="back" value="{{ back }}">
     <div class="grid">
-      <label>Intent
+      <label>{{ t("Intent") }}
         <select name="intent">
-          {% for i in intents %}<option value="{{ i }}" {% if r and r.intent == i %}selected{% endif %}>{{ i | replace("_", " ") }}</option>{% endfor %}
+          {% for i in intents %}<option value="{{ i }}" {% if r and r.intent == i %}selected{% endif %}>{{ code(i) }}</option>{% endfor %}
         </select>
       </label>
-      <label>Product
+      <label>{{ t("Product") }}
         <select name="product_id">
-          <option value="">— none —</option>
-          {% for prod in products %}<option value="{{ prod.id }}" {% if r and r.product_id == prod.id %}selected{% endif %}>{{ prod.brand }} · {{ prod.name }}{% if not prod.active %} (inactive){% endif %}</option>{% endfor %}
+          <option value="">— {{ t("none") }} —</option>
+          {% for prod in products %}<option value="{{ prod.id }}" {% if r and r.product_id == prod.id %}selected{% endif %}>{{ prod.brand }} · {{ prod.name }}{% if not prod.active %} ({{ t("inactive") }}){% endif %}</option>{% endfor %}
         </select>
       </label>
-      <label>Size (ml) <input name="size_ml" inputmode="numeric" pattern="[0-9]*" value="{{ r.size_ml if r and r.size_ml else '' }}"></label>
-      <label>Quantity <input name="quantity" inputmode="numeric" pattern="[0-9]*" value="{{ r.quantity if r else 1 }}"></label>
+      <label>{{ t("Size (ml)") }} <input name="size_ml" inputmode="numeric" pattern="[0-9]*" value="{{ r.size_ml if r and r.size_ml else '' }}"></label>
+      <label>{{ t("Quantity") }} <input name="quantity" inputmode="numeric" pattern="[0-9]*" value="{{ r.quantity if r else 1 }}"></label>
     </div>
-    <label class="check"><input type="checkbox" name="full_bottle" value="1" {% if items and items[0][0].is_full_bottle %}checked{% endif %}> Full bottle</label>
-    {% if items|length > 1 %}<p class="muted small">This message has {{ items|length }} items; saving a correction keeps only this one.</p>{% endif %}
-    <label>Save as alias (optional): the words in this message that name the product
-      <input name="alias" placeholder="e.g. ဆော်ဗေ့">
+    <label class="check"><input type="checkbox" name="full_bottle" value="1" {% if items and items[0][0].is_full_bottle %}checked{% endif %}> {{ t("Full bottle") }}</label>
+    {% if items|length > 1 %}<p class="muted small">{{ t("This message has {n} items; saving a correction keeps only this one.", n=items|length) }}</p>{% endif %}
+    <label>{{ t("Save as alias (optional): the words in this message that name the product") }}
+      <input name="alias" placeholder="{{ t('e.g.') }} ဆော်ဗေ့">
     </label>
-    <button class="primary">Save correction</button>
+    <button class="primary">{{ t("Save correction") }}</button>
   </form>
 </section>
 
 <section class="card">
-  <h2>Customer</h2>
+  <h2>{{ t("Customer") }}</h2>
   <p>{{ c.display_name or "—" }}{% if c.username %} · @{{ c.username }}{% endif %} <span class="muted small">({{ c.channel }} id {{ c.external_user_id }})</span></p>
   <form method="post" action="/customers/{{ c.id }}/ignored">
     <input type="hidden" name="csrf" value="{{ csrf }}">
     <input type="hidden" name="back" value="{{ request.url.path }}?back={{ back | urlencode }}">
     {% if c.ignored %}
-    <p class="muted small">Ignored: their messages are hidden from the inbox (still saved).</p>
-    <button name="ignored" value="0">Stop ignoring</button>
+    <p class="muted small">{{ t("Ignored: their messages are hidden from the inbox (still saved).") }}</p>
+    <button name="ignored" value="0">{{ t("Stop ignoring") }}</button>
     {% else %}
-    <button name="ignored" value="1" class="quiet">Ignore this customer (friends, family, spam)</button>
+    <button name="ignored" value="1" class="quiet">{{ t("Ignore this customer (friends, family, spam)") }}</button>
     {% endif %}
   </form>
 </section>
 
 <details class="card">
-  <summary>Parse history ({{ history | length }})</summary>
+  <summary>{{ t("Parse history") }} ({{ history | length }})</summary>
   <table>
-    <thead><tr><th>When</th><th>By</th><th>Intent</th><th>Product</th><th>Size</th><th>Qty</th><th>Conf.</th></tr></thead>
+    <thead><tr><th>{{ t("When") }}</th><th>{{ t("By") }}</th><th>{{ t("Intent") }}</th><th>{{ t("Product") }}</th><th>{{ t("Size") }}</th><th>{{ t("Qty") }}</th><th>{{ t("Conf.") }}</th></tr></thead>
     <tbody>
     {% for h, hp in history %}
       <tr {% if h.is_current %}class="current"{% endif %}>
-        <td>{{ h.created_at | local_time }}</td><td>{{ h.method }} {{ h.parser_version if h.method != "human" else "" }}</td>
-        <td>{{ h.intent }}</td><td>{{ hp.name if hp else "—" }}</td><td>{{ h.size_ml or "—" }}</td><td>{{ h.quantity }}</td>
+        <td>{{ h.created_at | local_time }}</td><td>{{ code(h.method) }} <code>{{ h.parser_version if h.method != "human" else "" }}</code></td>
+        <td>{{ code(h.intent) }}</td><td>{{ hp.name if hp else "—" }}</td><td>{{ h.size_ml or "—" }}</td><td>{{ h.quantity }}</td>
         <td>{{ "%.2f" | format(h.confidence) }}</td>
       </tr>
     {% endfor %}

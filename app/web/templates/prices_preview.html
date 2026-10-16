@@ -1,29 +1,29 @@
 {% extends "base.html" %}
-{% block title %}Check prices · Decant Inbox{% endblock %}
+{% block title %}{{ t("Check prices") }} · Decant Inbox{% endblock %}
 {% block content %}
-<p><a href="/prices">← Price list</a></p>
-<h1>Check before saving</h1>
-<p class="muted small">{{ filename }} · {{ sheet.rows|length }} perfumes. Nothing is saved yet.</p>
-{% if error %}<p class="flash bad" role="alert">{{ error }}</p>{% endif %}
+<p><a href="/prices">← {{ t("Price list") }}</a></p>
+<h1>{{ t("Check before saving") }}</h1>
+<p class="muted small">{{ filename }} · {{ t("{n} perfumes. Nothing is saved yet.", n=sheet.rows|length) }}</p>
+{% if error %}<p class="flash bad" role="alert">{{ tr(error) }}</p>{% endif %}
 
 {% if sheet.errors %}
 <section class="card problem">
-  <h2>Fix these in the file, then upload again</h2>
-  <ul>{% for e in sheet.errors %}<li>{{ e }}</li>{% endfor %}</ul>
+  <h2>{{ t("Fix these in the file, then upload again") }}</h2>
+  <ul>{% for e in sheet.errors %}<li>{{ tr(e) }}</li>{% endfor %}</ul>
 </section>
 {% endif %}
 {% if sheet.warnings %}
 <section class="card notice">
-  <h2>Please check</h2>
-  <ul>{% for w in sheet.warnings %}<li>{{ w }}</li>{% endfor %}</ul>
+  <h2>{{ t("Please check") }}</h2>
+  <ul>{% for w in sheet.warnings %}<li>{{ tr(w) }}</li>{% endfor %}</ul>
 </section>
 {% endif %}
 
 <p class="badges">
-  <span class="badge">{{ plan.count("changed") }} changed</span>
-  <span class="badge">{{ plan.count("new") }} new</span>
-  <span class="badge {% if plan.count('ambiguous') %}warn{% endif %}">{{ plan.count("ambiguous") }} to decide</span>
-  <span class="badge">{{ plan.count("same") }} no change</span>
+  <span class="badge">{{ t("{n} changed", n=plan.count("changed")) }}</span>
+  <span class="badge">{{ t("{n} new", n=plan.count("new")) }}</span>
+  <span class="badge {% if plan.count('ambiguous') %}warn{% endif %}">{{ t("{n} to decide", n=plan.count("ambiguous")) }}</span>
+  <span class="badge">{{ t("{n} no change", n=plan.count("same")) }}</span>
 </p>
 
 <form method="post" action="/prices/import/confirm" class="stack">
@@ -31,62 +31,62 @@
   {% if payload %}<input type="hidden" name="payload" value="{{ payload }}">{% endif %}
 
   {% for r in plan.rows if r.status == "ambiguous" %}
-  {% if loop.first %}<h2>Not sure which product</h2>{% endif %}
+  {% if loop.first %}<h2>{{ t("Not sure which product") }}</h2>{% endif %}
   <section class="card notice">
-    <p><b>{{ r.row.brand }} {{ r.row.name }}</b> <span class="muted small">row {{ r.row.row }}</span></p>
-    {% if r.changes %}<ul class="small">{% for c in r.changes %}<li>{{ c }}</li>{% endfor %}</ul>{% endif %}
-    <label>This is
+    <p><b>{{ r.row.brand }} {{ r.row.name }}</b> <span class="muted small">{{ t("row {n}", n=r.row.row) }}</span></p>
+    {% if r.changes %}<ul class="small">{% for c in r.changes %}<li>{{ tr(c) }}</li>{% endfor %}</ul>{% endif %}
+    <label>{{ t("This is") }}
       <select name="choice_{{ r.row.row }}" required>
-        <option value="" {% if not choices.get(r.row.row) %}selected{% endif %}>— choose —</option>
+        <option value="" {% if not choices.get(r.row.row) %}selected{% endif %}>— {{ t("choose") }} —</option>
         {% for pid, label in r.candidates %}
-        <option value="{{ pid }}" {% if choices.get(r.row.row) == pid|string %}selected{% endif %}>{{ label }} (update it)</option>
+        <option value="{{ pid }}" {% if choices.get(r.row.row) == pid|string %}selected{% endif %}>{{ label }} ({{ t("update it") }})</option>
         {% endfor %}
-        <option value="new" {% if choices.get(r.row.row) == "new" %}selected{% endif %}>a new product</option>
-        <option value="skip" {% if choices.get(r.row.row) == "skip" %}selected{% endif %}>skip this row</option>
+        <option value="new" {% if choices.get(r.row.row) == "new" %}selected{% endif %}>{{ t("a new product") }}</option>
+        <option value="skip" {% if choices.get(r.row.row) == "skip" %}selected{% endif %}>{{ t("skip this row") }}</option>
       </select>
     </label>
   </section>
   {% endfor %}
 
   {% for r in plan.rows if r.status == "new" %}
-  {% if loop.first %}<h2>New products</h2>{% endif %}
+  {% if loop.first %}<h2>{{ t("New products") }}</h2>{% endif %}
   <section class="card">
-    <p><b>{{ r.row.brand }} {{ r.row.name }}</b> <span class="muted small">row {{ r.row.row }}</span></p>
-    <ul class="small">{% for c in r.changes %}<li>{{ c }}</li>{% else %}<li class="muted">no prices</li>{% endfor %}</ul>
+    <p><b>{{ r.row.brand }} {{ r.row.name }}</b> <span class="muted small">{{ t("row {n}", n=r.row.row) }}</span></p>
+    <ul class="small">{% for c in r.changes %}<li>{{ tr(c) }}</li>{% else %}<li class="muted">{{ t("no prices") }}</li>{% endfor %}</ul>
     <label>
       <select name="choice_{{ r.row.row }}">
-        <option value="new" {% if choices.get(r.row.row, "new") == "new" %}selected{% endif %}>Add as new product</option>
-        <option value="skip" {% if choices.get(r.row.row) == "skip" %}selected{% endif %}>Skip this row</option>
+        <option value="new" {% if choices.get(r.row.row, "new") == "new" %}selected{% endif %}>{{ t("Add as new product") }}</option>
+        <option value="skip" {% if choices.get(r.row.row) == "skip" %}selected{% endif %}>{{ t("Skip this row") }}</option>
       </select>
     </label>
   </section>
   {% endfor %}
 
   {% for r in plan.rows if r.status == "changed" %}
-  {% if loop.first %}<h2>Changes</h2>{% endif %}
+  {% if loop.first %}<h2>{{ t("Changes") }}</h2>{% endif %}
   <section class="card">
-    <p><b>{{ r.row.brand }} {{ r.row.name }}</b> <span class="muted small">row {{ r.row.row }}</span></p>
+    <p><b>{{ r.row.brand }} {{ r.row.name }}</b> <span class="muted small">{{ t("row {n}", n=r.row.row) }}</span></p>
     <ul class="small">
-      {% if r.reactivate %}<li>product is inactive → will be activated</li>{% endif %}
-      {% for c in r.changes %}<li>{{ c }}</li>{% endfor %}
+      {% if r.reactivate %}<li>{{ t("product is inactive → will be activated") }}</li>{% endif %}
+      {% for c in r.changes %}<li>{{ tr(c) }}</li>{% endfor %}
     </ul>
   </section>
   {% endfor %}
 
   {% if plan.untouched %}
   <details class="card">
-    <summary>{{ plan.untouched|length }} products not in this file (left as they are)</summary>
+    <summary>{{ t("{n} products not in this file (left as they are)", n=plan.untouched|length) }}</summary>
     <ul class="small">{% for name in plan.untouched %}<li>{{ name }}</li>{% endfor %}</ul>
   </details>
   {% endif %}
 
   {% if payload %}
   <div class="buttons sticky-actions">
-    <button class="primary">Confirm and save</button>
-    <a class="button" href="/prices">Cancel</a>
+    <button class="primary">{{ t("Confirm and save") }}</button>
+    <a class="button" href="/prices">{{ t("Cancel") }}</a>
   </div>
   {% else %}
-  <p class="flash bad">Can't save: fix the problems above in the file and upload it again.</p>
+  <p class="flash bad">{{ t("Can't save: fix the problems above in the file and upload it again.") }}</p>
   {% endif %}
 </form>
 {% endblock %}

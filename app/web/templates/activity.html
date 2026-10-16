@@ -1,29 +1,29 @@
 {% extends "base.html" %}
-{% block title %}Activity · Decant Inbox{% endblock %}
+{% block title %}{{ t("Activity") }} · Decant Inbox{% endblock %}
 {% block content %}
-<h1>📜 Activity</h1>
+<h1>📜 {{ t("Activity") }}</h1>
 <form method="get" class="filters">
-  <select name="who" aria-label="Who">
-    <option value="">Everyone</option>
-    <option value="auto" {% if who == "auto" %}selected{% endif %}>🤖 Automatic</option>
+  <select name="who" aria-label="{{ t('Who') }}">
+    <option value="">{{ t("Everyone") }}</option>
+    <option value="auto" {% if who == "auto" %}selected{% endif %}>🤖 {{ t("Automatic") }}</option>
     {% for u in users %}<option value="{{ u.id }}" {% if who == u.id | string %}selected{% endif %}>{{ u.username }}</option>{% endfor %}
   </select>
-  <button>Show</button>
-  <span class="muted small">{{ today }} today</span>
+  <button>{{ t("Show") }}</button>
+  <span class="muted small">{{ t("{n} today", n=today) }}</span>
 </form>
 <div class="scroll"><table>
-  <thead><tr><th>When</th><th>Who</th><th>What</th><th>Details</th></tr></thead>
+  <thead><tr><th>{{ t("When") }}</th><th>{{ t("Who") }}</th><th>{{ t("What") }}</th><th>{{ t("Details") }}</th></tr></thead>
   <tbody>
   {% for a, u, details in rows %}
-    <tr><td class="nowrap">{{ a.created_at | local_time }}</td><td>{{ u.username if u else "🤖 auto" }}</td>
-      <td>{{ a.action }}</td><td class="small muted">{{ details }}</td></tr>
+    <tr><td class="nowrap">{{ a.created_at | local_time }}</td><td>{{ u.username if u else "🤖 " ~ t("auto") }}</td>
+      <td>{% if lang == "my" %}{{ code(a.action.split(".")[0]) }} · <code>{{ a.action }}</code>{% else %}{{ a.action }}{% endif %}</td><td class="small muted"><code>{{ details }}</code></td></tr>
   {% else %}
-    <tr><td colspan="4" class="empty">Nothing yet.</td></tr>
+    <tr><td colspan="4" class="empty">{{ t("Nothing yet.") }}</td></tr>
   {% endfor %}
   </tbody>
 </table></div>
 <nav class="pager">
-  {% if page > 1 %}<a href="?who={{ who }}&page={{ page - 1 }}">← Newer</a>{% else %}<span></span>{% endif %}
-  {% if more %}<a href="?who={{ who }}&page={{ page + 1 }}">Older →</a>{% endif %}
+  {% if page > 1 %}<a href="?who={{ who }}&page={{ page - 1 }}">← {{ t("Newer") }}</a>{% else %}<span></span>{% endif %}
+  {% if more %}<a href="?who={{ who }}&page={{ page + 1 }}">{{ t("Older") }} →</a>{% endif %}
 </nav>
 {% endblock %}

@@ -1,0 +1,4 @@
+{# Small UI helpers. Import with: {% import "_ui.html" as ui with context %} #}
+{% macro help(text) -%}
+<details class="help"><summary aria-label="{{ t('Help') }}">?</summary><p>{{ t(text) }}</p></details>
+{%- endmacro %}

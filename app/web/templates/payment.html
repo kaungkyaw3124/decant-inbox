@@ -1,13 +1,14 @@
 {% extends "base.html" %}
-{% block title %}Payment check · Decant Inbox{% endblock %}
+{% import "_ui.html" as ui with context %}
+{% block title %}{{ t("Payment check") }} · Decant Inbox{% endblock %}
 {% block content %}
-<p><a href="/payments">← Payments</a> · <a href="/chats/{{ c.id }}">Open chat</a></p>
+<p><a href="/payments">← {{ t("Payments") }}</a> · <a href="/chats/{{ c.id }}">{{ t("Open chat") }}</a></p>
 <section class="card">
-  <h1>💳 {{ c.display_name or c.username or "Customer" }}</h1>
-  <p class="muted small">{{ check.created_at | local_time("%d %b %H:%M") }} · order status: {{ order.status }}{% if order.order_no %} · Order #{{ order.order_no }}{% endif %}</p>
+  <h1>💳 {{ c.display_name or c.username or t("Customer") }}</h1>
+  <p class="muted small">{{ check.created_at | local_time("%d %b %H:%M") }} · {{ t("order status") }}: {{ code(order.status) }}{% if order.order_no %} · {{ t("Order #{no}", no=order.order_no) }}{% endif %}</p>
   <table class="cart-items">
     <tbody>{% for i, p in cart.lines %}<tr><td>{{ p.name if p else i.unknown_text }} <span class="muted small">{{ item_size(i, p) }}</span></td><td class="num">{{ format_mmk((i.unit_price_mmk or 0) * i.quantity) }}</td></tr>{% endfor %}</tbody>
-    <tfoot><tr><th>Expected total</th><th class="num">{{ format_mmk(cart.total) }} ကျပ်</th></tr></tfoot>
+    <tfoot><tr><th>{{ t("Expected total") }}</th><th class="num">{{ format_mmk(cart.total) }} ကျပ်</th></tr></tfoot>
   </table>
   <p class="small">📞 {{ order.phones | join(", ") or "—" }} · 📍 {{ order.address or "—" }}</p>
 </section>
@@ -15,15 +16,15 @@
 {% if check.decision in ("several", "pending") and not may_decide %}
 <section class="card">
   {% if check.decision == "pending" %}{% include "_payment_shot.html" %}{% endif %}
-  <p class="notice small">ငွေစစ်တာကို ပိုင်ရှင်က လုပ်ပါမယ် (only the owner checks payments now).</p>
+  <p class="notice small">ငွေစစ်တာကို ပိုင်ရှင်က လုပ်ပါမယ်{% if lang != "my" %} (only the owner checks payments now){% endif %}.</p>
 </section>
 {% elif check.decision == "several" %}
 <section class="card notice">
-  <h2>📷 Several photos ({{ check.photo_count }})</h2>
-  <p class="small">Not downloaded. Ask the customer for one screenshot with the transaction ID.</p>
+  <h2>📷 {{ t("Several photos ({n})", n=check.photo_count) }}</h2>
+  <p class="small">{{ t("Not downloaded. Ask the customer for one screenshot with the transaction ID.") }}</p>
   <div class="buttons">
-    <form method="post" action="/payments/{{ check.id }}/ask-one" class="inline"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="primary">Ask for one screenshot</button></form>
-    <form method="post" action="/payments/{{ check.id }}/not-payment" class="inline"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="quiet">🚫 Not a payment</button></form>
+    <form method="post" action="/payments/{{ check.id }}/ask-one" class="inline"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="primary">{{ t("Ask for one screenshot") }}</button></form>
+    <form method="post" action="/payments/{{ check.id }}/not-payment" class="inline"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="quiet">🚫 {{ t("Not a payment") }}</button></form>
   </div>
 </section>
 {% elif check.decision == "pending" %}
@@ -32,32 +33,33 @@
 </section>
 <form method="post" action="/payments/{{ check.id }}/approve" class="card stack">
   <input type="hidden" name="csrf" value="{{ csrf }}">
-  {% if error %}<p class="flash bad" role="alert">{{ error }}</p>{% endif %}
+  {% if error %}<p class="flash bad" role="alert">{{ tr(error) }}</p>{% endif %}
   {% if warnings %}
-    <div class="flash warnbox" role="alert"><b>Please check:</b><ul>{% for w in warnings %}<li>{{ w }}</li>{% endfor %}</ul></div>
+    <div class="flash warnbox" role="alert"><b>{{ t("Please check") }}:</b><ul>{% for w in warnings %}<li>{{ tr(w) }}</li>{% endfor %}</ul></div>
     <input type="hidden" name="confirmed" value="1">
   {% endif %}
+  {{ ui.help("Open your KPay / AYA app, find this payment, copy its transaction ID and the amount here. Approve only if the money really arrived.") }}
   <div class="grid">
-    <label>Transaction ID (from your KPay / AYA history) <input name="transaction_id" value="{{ form.transaction_id }}" required maxlength="64" autocomplete="off"></label>
-    <label>Amount received (ကျပ်) <input name="amount" value="{{ form.amount_mmk or '' }}" inputmode="numeric"></label>
-    <label>Method
+    <label>{{ t("Transaction ID (from your KPay / AYA history)") }} <input name="transaction_id" value="{{ form.transaction_id }}" required maxlength="64" autocomplete="off"></label>
+    <label>{{ t("Amount received (ကျပ်)") }} <input name="amount" value="{{ form.amount_mmk or '' }}" inputmode="numeric"></label>
+    <label>{{ t("Method") }}
       <select name="method">{% for m in methods %}<option {% if form.method == m.name %}selected{% endif %}>{{ m.name }}</option>{% endfor %}</select>
     </label>
   </div>
-  <button class="primary">{{ "✅ Approve anyway" if warnings else "✅ Approve" }}</button>
-  <p class="muted small">Gives the Order ID and sends the confirmation (10 s, Cancel in the chat).</p>
+  <button class="primary">{{ "✅ " ~ t("Approve anyway") if warnings else "✅ " ~ t("Approve") }}</button>
+  <p class="muted small">{{ t("Gives the Order ID and sends the confirmation (10 s, Cancel in the chat).") }}</p>
   <details>
-    <summary>❌ Reject</summary>
+    <summary>❌ {{ t("Reject") }}</summary>
     <div class="buttons">
       {% for key, label in reasons.items() %}
-      <button formaction="/payments/{{ check.id }}/reject" formnovalidate name="reason" value="{{ key }}">{{ label }}</button>
+      <button formaction="/payments/{{ check.id }}/reject" formnovalidate name="reason" value="{{ key }}">{{ tr(label) }}</button>
       {% endfor %}
     </div>
-    <p class="muted small">"Amount too low" uses the amount received above to ask for the rest.</p>
+    <p class="muted small">{{ t("“Amount too low” uses the amount received above to ask for the rest.") }}</p>
   </details>
-  <button formaction="/payments/{{ check.id }}/not-payment" formnovalidate class="quiet">🚫 Not a payment (nothing sent)</button>
+  <button formaction="/payments/{{ check.id }}/not-payment" formnovalidate class="quiet">🚫 {{ t("Not a payment (nothing sent)") }}</button>
 </form>
 {% else %}
-<section class="card"><p>Decided: <b>{{ check.decision }}</b>{% if check.reason %} ({{ reasons[check.reason] }}){% endif %}{% if check.transaction_id %} · transaction {{ check.transaction_id }}{% endif %}</p></section>
+<section class="card"><p>{{ t("Decided") }}: <b>{{ code(check.decision) }}</b>{% if check.reason %} ({{ tr(reasons[check.reason]) }}){% endif %}{% if check.transaction_id %} · {{ t("transaction") }} {{ check.transaction_id }}{% endif %}</p></section>
 {% endif %}
 {% endblock %}

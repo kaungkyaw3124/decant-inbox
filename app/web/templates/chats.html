@@ -1,33 +1,35 @@
 {% extends "base.html" %}
-{% block title %}Chats · Decant Inbox{% endblock %}
+{% import "_ui.html" as ui with context %}
+{% block title %}{{ t("Chats") }} · Decant Inbox{% endblock %}
 {% block content %}
 <form method="get" action="/chats" class="filters">
-  <label class="check"><input type="checkbox" name="show_ignored" value="1" {% if show_ignored %}checked{% endif %}> Show ignored customers</label>
-  <button>Apply</button>
+  <label class="check"><input type="checkbox" name="show_ignored" value="1" {% if show_ignored %}checked{% endif %}> {{ t("Show ignored customers") }}</label>
+  <button>{{ t("Apply") }}</button>
+  {{ ui.help("Every customer conversation, latest first. “waiting for reply” = the customer wrote last.") }}
 </form>
 <ul class="rows">
 {% for c, m in rows %}
   <li class="row">
     <a class="row-main" href="/chats/{{ c.id }}">
       <div class="meta">
-        <span class="who">{{ c.display_name or ("@" ~ c.username if c.username else "Customer " ~ c.external_user_id) }}</span>
+        <span class="who">{{ c.display_name or ("@" ~ c.username if c.username else t("Customer") ~ " " ~ c.external_user_id) }}</span>
         <time>{{ m.received_at | local_time }}</time>
       </div>
-      <p class="text">{% if m.direction == "out" %}<span class="muted">You: </span>{% endif %}{% if m.kind == "photo" %}📷 {% endif %}{{ m.raw_text or ("Photo" if m.kind == "photo" else "(sticker / file)") }}</p>
+      <p class="text">{% if m.direction == "out" %}<span class="muted">{{ t("You") }}: </span>{% endif %}{% if m.kind == "photo" %}📷 {% endif %}{{ m.raw_text or (t("Photo") if m.kind == "photo" else "(" ~ t("sticker / file") ~ ")") }}</p>
       <div class="badges">
-        {% if m.direction == "in" %}<span class="badge warn">waiting for reply</span>{% endif %}
-        {% if c.ignored %}<span class="badge">ignored</span>{% endif %}
+        {% if m.direction == "in" %}<span class="badge warn">{{ t("waiting for reply") }}</span>{% endif %}
+        {% if c.ignored %}<span class="badge">{{ t("ignored") }}</span>{% endif %}
         {% set st = carts.get(c.id) %}
-        {% if st %}<span class="badge">{{ {"cart": "🛒 cart", "confirmed": "✅ confirmed", "waiting_payment": "💳 waiting payment", "photo_received": "📷 payment photo"}[st] }}</span>{% endif %}
+        {% if st %}<span class="badge">{{ tr({"cart": "🛒 cart", "confirmed": "✅ confirmed", "waiting_payment": "💳 waiting payment", "photo_received": "📷 payment photo"}[st]) }}</span>{% endif %}
       </div>
     </a>
   </li>
 {% else %}
-  <li class="empty">No chats yet.</li>
+  <li class="empty">{{ t("No chats yet.") }}</li>
 {% endfor %}
 </ul>
 <nav class="pager">
-  {% if page > 1 %}<a href="/chats?page={{ page - 1 }}{% if show_ignored %}&show_ignored=1{% endif %}">← Newer</a>{% else %}<span></span>{% endif %}
-  {% if more %}<a href="/chats?page={{ page + 1 }}{% if show_ignored %}&show_ignored=1{% endif %}">Older →</a>{% endif %}
+  {% if page > 1 %}<a href="/chats?page={{ page - 1 }}{% if show_ignored %}&show_ignored=1{% endif %}">← {{ t("Newer") }}</a>{% else %}<span></span>{% endif %}
+  {% if more %}<a href="/chats?page={{ page + 1 }}{% if show_ignored %}&show_ignored=1{% endif %}">{{ t("Older") }} →</a>{% endif %}
 </nav>
 {% endblock %}

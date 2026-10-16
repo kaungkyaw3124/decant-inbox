@@ -197,3 +197,19 @@ table.sales td.num, table.sales th.num { font-variant-numeric: tabular-nums; whi
 button.big, a.button.big { min-height: 52px; font-size: 1.05rem; padding: 10px 20px; }
 .big-line { font-size: 1.15rem; font-weight: 600; margin: 0 0 8px; }
 details.teach-box > summary { cursor: pointer; display: inline-flex; }
+/* v4 4.5: help "?" tips, language switch, staff guide, practice */
+.help { display: inline-block; position: relative; vertical-align: middle; font-size: .9rem; font-weight: 400; }
+.help summary { list-style: none; display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 50%;
+  border: 1px solid var(--line); color: var(--muted); cursor: pointer; font-size: .85rem; }
+.help summary::-webkit-details-marker { display: none; }
+.help[open] summary { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+.help p { position: absolute; z-index: 2; left: 0; top: 30px; width: min(320px, 80vw); margin: 0; padding: 10px 12px;
+  background: var(--card); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 4px 16px rgb(0 0 0 / .15);
+  color: var(--text); line-height: 1.5; }
+.lang-switch button { white-space: nowrap; }
+.guide { line-height: 1.7; }
+.guide h2 { margin-top: 22px; padding-top: 12px; border-top: 1px solid var(--line); }
+.guide li { margin: 4px 0; }
+.toc { background: var(--bg); border-radius: 10px; padding: 8px 12px; margin-bottom: 8px; }
+.practice-head .big-line { margin: 6px 0 0; }
+.top nav { flex-wrap: wrap; row-gap: 6px; }

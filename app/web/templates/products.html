@@ -1,40 +1,42 @@
 {% extends "base.html" %}
-{% block title %}Products · Decant Inbox{% endblock %}
+{% import "_ui.html" as ui with context %}
+{% block title %}{{ t("Products") }} · Decant Inbox{% endblock %}
 {% block content %}
 <form method="get" action="/products" class="filters">
-  <input type="search" name="q" value="{{ q }}" placeholder="Search product or alias" aria-label="Search">
-  <button class="primary">Search</button>
+  <input type="search" name="q" value="{{ q }}" placeholder="{{ t('Search product or alias') }}" aria-label="{{ t('Search') }}">
+  <button class="primary">{{ t("Search") }}</button>
+  {{ ui.help("Every perfume we sell, with prices and the nicknames customers use for it.") }}
 </form>
 
 <table class="products">
-  <thead><tr><th>Brand</th><th>Product</th><th>Prices (ကျပ်)</th><th>Aliases</th><th>Messages</th><th></th></tr></thead>
+  <thead><tr><th>{{ t("Brand") }}</th><th>{{ t("Product") }}</th><th>{{ t("Prices (ကျပ်)") }}</th><th>{{ t("Aliases") }}</th><th>{{ t("Messages") }}</th><th></th></tr></thead>
   <tbody>
   {% for p, n_alias, n_msg in rows %}
     <tr {% if not p.active %}class="inactive"{% endif %}>
       <td>{{ p.brand }}</td>
       <td><a href="/products/{{ p.id }}">{{ p.name }}</a></td>
-      <td class="small">{% for pr in prices.get(p.id, []) %}<span class="nowrap">{{ size_label(pr.size_ml, p.full_size_ml) }} {{ format_mmk(pr.price_mmk) }}</span>{% if not loop.last %} · {% endif %}{% else %}<span class="problem-text">no prices</span>{% endfor %}
-        {% if prices.get(p.id) and not prices[p.id]|selectattr("in_stock")|list %}<span class="badge warn">out of stock</span>{% endif %}</td>
+      <td class="small">{% for pr in prices.get(p.id, []) %}<span class="nowrap">{{ size_label(pr.size_ml, p.full_size_ml) }} {{ format_mmk(pr.price_mmk) }}</span>{% if not loop.last %} · {% endif %}{% else %}<span class="problem-text">{{ t("no prices") }}</span>{% endfor %}
+        {% if prices.get(p.id) and not prices[p.id]|selectattr("in_stock")|list %}<span class="badge warn">{{ t("out of stock") }}</span>{% endif %}</td>
       <td>{{ n_alias }}</td>
       <td><a href="/?intent=all&status=all&product={{ p.id }}">{{ n_msg }}</a></td>
-      <td class="muted small">{% if not p.active %}inactive{% endif %}{% if p.source == "manual" %} added here{% endif %}</td>
+      <td class="muted small">{% if not p.active %}{{ t("inactive") }}{% endif %}{% if p.source == "manual" %} {{ t("added here") }}{% endif %}</td>
     </tr>
   {% else %}
-    <tr><td colspan="6" class="empty">No products.</td></tr>
+    <tr><td colspan="6" class="empty">{{ t("No products.") }}</td></tr>
   {% endfor %}
   </tbody>
 </table>
 
 {% if user_role == "owner" %}
 <form method="post" action="/products" class="card stack">
-  <h2>Add product</h2>
+  <h2>{{ t("Add product") }}</h2>
   <input type="hidden" name="csrf" value="{{ csrf }}">
   <div class="grid">
-    <label>Brand <input name="brand" required></label>
-    <label>Name <input name="name" required></label>
+    <label>{{ t("Brand") }} <input name="brand" required></label>
+    <label>{{ t("Name") }} <input name="name" required></label>
   </div>
-  <button class="primary">Add</button>
-  <p class="muted small">The main list is the <a href="/prices">price list (Excel)</a>; a new row there also adds a product. Products added here are included in the Excel download.</p>
+  <button class="primary">{{ t("Add") }}</button>
+  <p class="muted small">{{ t("The main list is the price list (Excel); a new row there also adds a product. Products added here are included in the Excel download.") }} <a href="/prices">{{ t("Price list") }} →</a></p>
 </form>
 {% endif %}
 {% endblock %}

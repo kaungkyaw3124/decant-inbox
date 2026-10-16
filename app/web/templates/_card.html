@@ -1,10 +1,10 @@
 {# Teaching card (docs/SPEC-v4.md 4.2). Needs: card, m (message), back. #}
-<form method="post" action="/messages/{{ m.id }}/teach/preview" class="teach stack" id="card-{{ m.id }}">
+<form method="post" action="{{ card_action or "/messages/" ~ m.id ~ "/teach/preview" }}" class="teach stack" id="card-{{ m.id }}">
   <input type="hidden" name="csrf" value="{{ csrf }}">
   <input type="hidden" name="back" value="{{ back }}">
   {% for q in card.products %}
   <fieldset class="question">
-    <legend>“{{ q.words }}” ဆိုတာ ဘယ်ပစ္စည်းလဲ?{% if q.is_full_bottle %} · full bottle{% elif q.size_ml %} · {{ q.size_ml }}ml{% endif %}</legend>
+    <legend>“{{ q.words }}” ဆိုတာ ဘယ်ပစ္စည်းလဲ?{% if q.is_full_bottle %} · {{ t("full bottle") }}{% elif q.size_ml %} · {{ q.size_ml }}ml{% endif %}</legend>
     {% if q.kind == "partial" and q.options %}<p class="small muted">“{{ q.options[0].name }}” ရဲ့ nickname ပါပေမယ့် တခြားစာလုံးတွေလည်း ပါတယ် — ဒီပစ္စည်းပဲလား?</p>{% endif %}
     <div class="choices">
       {% for p in q.options %}
@@ -23,10 +23,10 @@
     <details class="new-product">
       <summary class="small">➕ ပစ္စည်းအသစ် အချက်အလက်</summary>
       <div class="grid">
-        <label>Brand <input name="brand{{ q.position }}" maxlength="255"></label>
+        <label>{{ t("Brand") }} <input name="brand{{ q.position }}" maxlength="255"></label>
         <label>နာမည် <input name="name{{ q.position }}" value="{{ q.words | title }}" maxlength="255"></label>
         {% if user_role == "owner" %}
-        <label>ဈေး ({{ "full bottle" if q.is_full_bottle else (q.size_ml ~ "ml" if q.size_ml else "size") }}, ကျပ်) <input name="price{{ q.position }}" inputmode="numeric"></label>
+        <label>ဈေး ({{ t("full bottle") if q.is_full_bottle else (q.size_ml ~ "ml" if q.size_ml else "size") }}, ကျပ်) <input name="price{{ q.position }}" inputmode="numeric"></label>
         <label>ပုလင်း size (ml) <input name="bottle{{ q.position }}" inputmode="numeric"></label>
         {% else %}
         <p class="small muted">ဈေးကို ပိုင်ရှင်ကို မေးမယ် — ဈေးရမှ ဖောက်သည်ဆီ စာရင်းပို့မယ်။</p>
@@ -50,7 +50,7 @@
     <legend>ဘယ် size လဲ?{% if q.label %} · {{ q.label }}{% endif %}</legend>
     <div class="choices">
       {% for s in q.sizes %}
-      <label class="choice"><input type="radio" name="size{{ q.position }}" value="{{ s if s else 'full' }}" {% if loop.first %}checked{% endif %}><span>{{ s ~ "ml" if s else "Full bottle" }}</span></label>
+      <label class="choice"><input type="radio" name="size{{ q.position }}" value="{{ s if s else 'full' }}" {% if loop.first %}checked{% endif %}><span>{{ s ~ "ml" if s else t("Full bottle") }}</span></label>
       {% endfor %}
     </div>
   </fieldset>

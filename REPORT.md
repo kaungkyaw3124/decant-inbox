@@ -889,3 +889,163 @@ system decided (🤖 = automatic).
   D3 staff-taught pattern → owner approve → parser uses it → reject → ignored; staff alias waits;
   D4 auto_approve_after=0 keeps it pending after 5 uses; D5 disabled login + open session; users
   page + activity names; create_user script). Full suite: 290 passed, 1 skipped.
+
+## 2026-10-16 — v4 4.5: Burmese dashboard, help, practice mode, staff guide
+- Spec: docs/SPEC-v4.md 4.5. No migration (users.language came with 4.4).
+- **Two languages, per user.**
+  - Every page, button, menu, status name, empty state, error page and flash note now comes from one
+    translation table: `app/web/i18n.py` (helpers) and `app/web/i18n_my.py` (about 800 Burmese texts).
+  - Templates use `t("English text")` for fixed words, `tr(value)` for texts made in Python (button labels,
+    notes, errors) and `code(value)` for intents and statuses.
+  - Texts made in Python with numbers or names in them ("Order #1001: 📦 Packed. Undo for 60 s.") are matched
+    by pattern, sentence by sentence. Unknown text (customer words, product names) is never changed.
+  - Staff start in Burmese. The owner account stays English until you switch it.
+  - **🌐 in the header** switches your own language. It is saved on your user, so it stays after you log out
+    and log in again. The login page uses the language of whoever logged out last (Burmese for a new browser).
+- **"?" help**: a small ? next to each main section (Needs you, inbox filters, teaching card, quick reply,
+  correct the parse, cart, chat reply, chats, payments, payment approve, orders, products, sales, wanted,
+  practice). Tap it to see one Burmese sentence.
+- **❓ Help page** (`/help`, everyone logged in) shows `docs/STAFF-GUIDE-my.md`. Sections:
+  - what each screen is;
+  - "a message came — what do I do?" and the cart steps;
+  - teaching cards;
+  - checking payments (open the KPay app, find the transaction, type its ID);
+  - packed → sent → delivered;
+  - what NOT to do;
+  - who to ask;
+  - practice.
+  The guide is plain Markdown, so you can edit it on GitHub.
+- **🎓 Practice** (`/practice`, everyone):
+  - Uses the one-item rows of `tests/fixtures/synthetic_messages.csv` whose product exists in today's catalog,
+    plus 4 v4 examples ("ysl edp", "လေးထည့်ထားပေး", "liquid brun" = we don't sell it, "လည်း ယူမယ်").
+  - Each message goes through the real parser, the real teaching card or one-tap button, and the real reply.
+  - On a one-tap message the trainee either taps the button or presses "❌ This is wrong — don't send". Tapping
+    is right only when the app understood the message correctly.
+  - The result shows ✅/❌, the right answer, the reply the customer would have got, and a running score.
+  - Nothing is saved: each step runs in one database transaction that is always rolled back (the code's own
+    commits only close savepoints). The listener and worker never see it, so nothing is sent. The score lives
+    in the browser session.
+- **Errors** (403/404/…) are now a small page in your language, not raw JSON. HTMX requests still get plain text.
+- Decisions:
+  - The teaching card stays Burmese for both languages. It was Burmese-first in 4.2, and the tests check its
+    exact words. The Q-intent button "အော်ဒါ cancel" is now "အော်ဒါ ပယ်ဖျက်", so the Burmese UI has no
+    English word.
+  - Loan words kept: ml, ကျပ်, KPay/AYA, FAQ, ID, Telegram, Excel, screenshot, size (card question), App.
+  - Customer-facing reply templates were NOT changed (that is shop content, editable in Settings).
+  - Activity in Burmese shows a Burmese group ("ငွေစစ် · payment.approve"). English shows the code as before.
+  - Login errors in Burmese also show the English text in brackets, because the login page doesn't know who
+    you are yet.
+- Tests: `tests/test_v4_i18n.py`:
+  - E1: owner and staff in Burmese open 28 pages plus 6 pages reached by POST (card preview, practice result,
+    price preview, error page, login after logout, fresh login). All of them have data: a card, a one-tap
+    reply, a cart, a payment to check, a paid order, a learned pattern, an unanswered question. The test scans
+    the visible text, titles, placeholders, aria-labels and alt texts for about 150 English UI words. Product
+    names, brands, customer texts and shop data are removed before the scan.
+  - E1b: every t("…") in the templates has a Burmese entry, and so do all intents, statuses and Python-made labels.
+  - E1c: pattern translation, and values are escaped.
+  - E2: practice changes the row count of no table, nothing ends up in the outbox, no practice customer is
+    left, and the score counts right and wrong answers.
+  - E2b: exercises follow the catalog.
+  - E3: the help page shows the guide, needs a login, and the renderer escapes HTML.
+  - E4: the switch is saved per user, survives a new login, and doesn't change the owner's language.
+  Full suite: 297 passed, 1 skipped (was 290 + 7 new). Fixture rows all pass (no regression).
+- Deployed: backup product_requests_2026-10-16T0348Z.dump, web + parser restarted, /healthz ok, status.sh ok.
+
+## OWNER TEST SCRIPT v4 (epics 4.1-4.5)
+**Setup**
+- Find the dashboard address with `bash scripts/status.sh`. Log in as admin. The header must show
+  "🤖 Auto-reply: ON".
+- Use a SECOND Telegram account.
+- Before you start, open Chats > that account. If it has an open cart, tap "Cancel cart" at the bottom of the cart.
+- Each automatic reply arrives ~3 s after your message. A one-tap or teaching-card reply arrives 10 s after ✅.
+- The first reply after 6 quiet hours starts with "မင်္ဂလာပါ။" on its own line. It is left out below.
+
+**A. Greeting (4.2). Do this first, while the account had no message from us for 6 h.**
+1. Send `hi`. Expect "မင်္ဂလာပါ။ ဘာကူညီပေးရမလဲ။" (🤖 in the chat).
+2. Send `hi` again. Expect no reply (we wrote less than 6 h ago).
+3. Send `hi stw intensely 5ml ဘယ်လောက်လဲ`. Expect "Stronger With You Intensely 5ml က 18,000 ကျပ်ပါ။
+   မှာယူချင်ရင် ပြောပေးပါနော်။" (not just a greeting, so it is answered as a price question).
+
+**B. Partial names (4.1)**
+1. Send `hawas for him 10ml ယူမယ်`. Expect NO reply.
+2. Inbox > 🟡 Needs you shows "📘 <you>: hawas for him 10ml ယူမယ်" with "❓ hawas for him".
+3. Open "📘 သင်ပေးမယ်". The first choice is Hawas Ice, with the line "“Hawas Ice” ရဲ့ nickname ပါပေမယ့်…".
+4. Choose "🚫 ဒီပစ္စည်း မရှိဘူး", then "ဆက်လုပ်မယ် →". The preview says "မရှိဘူးလို့ ပြန်ပြောမယ်။".
+5. Press ✅. Expect "hawas for him ကတော့ လောလောဆယ် မရှိသေးပါဘူးနော်။".
+6. Send `hawas 10ml ယူမယ်`. Expect an automatic list:
+   "• Hawas Ice 10ml – 20,000 ကျပ်\nစုစုပေါင်း 20,000 ကျပ်ပါ။\nဝယ်ယူမယ်ဆိုရင် ဖုန်းနံပါတ် ပို့ပေးပါနော်။"
+7. Chats > your account > "Cancel cart".
+
+**C. Teaching cards and learning (4.2)**
+1. Send `ysl edp 10 ml ရောယူပါမယ်`. Expect NO reply. Open its 📘 card: the first choice is Y Eau de Parfum.
+   The learn box is ticked and shows "ysl edp".
+2. Press "ဆက်လုပ်မယ် →". The preview says "Y Eau de Parfum 10ml ကို ခြင်းထဲထည့်ပြီး စာရင်းပို့မယ်။" and
+   "📘 “ysl edp” = Y Eau de Parfum". Press ✅. Expect
+   "• Y Eau de Parfum 10ml – 34,000 ကျပ်\nစုစုပေါင်း 34,000 ကျပ်ပါ။\nဝယ်ယူမယ်ဆိုရင် ဖုန်းနံပါတ် ပို့ပေးပါနော်။".
+3. Open Learning (nav badge 2). Nicknames shows "ysl edp" → Y Eau de Parfum, and "We don't sell" shows
+   "hawas for him", both "taught by admin". Press ✅ Approve on both.
+4. Cancel the cart again. Send `ysl edp 5ml ယူမယ်`. Expect an AUTOMATIC list with Y Eau de Parfum 5ml –
+   18,000 (the nickname is approved now).
+5. Send `liquid brun 5ml ရှိလား`. Expect NO reply. Card > "🚫 ဒီပစ္စည်း မရှိဘူး" > ဆက်လုပ်မယ် > ✅. Expect
+   "liquid brun ကတော့ လောလောဆယ် မရှိသေးပါဘူးနော်။".
+6. Learning > approve "liquid brun". Send `liquid brun ရှိလား`. Expect the same reply, automatically.
+   Reports (Wanted) shows liquid brun, asked 2 times.
+7. Undo test:
+   - Send `stw intensely 5ml လေးထည့်ထားပေး`. The card asks "ဖောက်သည်က ဘာလုပ်ချင်တာလဲ?". Choose ဝယ်မယ်,
+     then ဆက်လုပ်မယ်, then ✅.
+   - Within 10 s, press Undo on that message in the Inbox.
+   - Expect: nothing arrives, and Learning shows no "လေးထည့်ထားပေး".
+
+**D. "The previous one" (4.3)** (needs a paid order or a cart from before; step C left one)
+1. Send `ဟိုနေ့ကဟာ ထပ်ယူမယ်`. You get one of these:
+   - one earlier item: the list plus "<product> <size> (အရင်ယူထားတဲ့ဟာ) ဟုတ်တယ်နော်။ မဟုတ်ရင် ပြောပေးပါ။";
+   - several: "အရင်က ယူထားတာတွေပါ –\n1. …\n2. …\nဘယ်ဟာလဲ နံပါတ်လေး ပြောပေးပါနော်။".
+2. If you got the numbered list, send `၁`. Item 1 is added and the list comes back.
+3. Wait 25 h is not practical, so skip the expiry test (it is covered by test C4).
+
+**E. Staff, permissions (4.4)**
+1. Users > Add a user. Username `staff1`, a password of 10+ characters, role staff, language မြန်မာ.
+2. In a private browser window, log in as staff1. Check:
+   - the menu is Burmese and has no Prices / Learning / Settings / Users;
+   - auto-reply shows ON but can't be clicked;
+   - opening `<address>/settings` shows "ခွင့်မပြုပါ" and "ဒါကို ပိုင်ရှင်ပဲ လုပ်နိုင်တယ်။";
+   - Sales (အရောင်း) shows ရောင်းရငွေ but no cost or profit.
+3. From the test account send a misspelled name, e.g. `savage edp 10ml ယူမယ်`. As staff1, open its 📘 card,
+   choose Sauvage Eau de Parfum and press ✅. In your owner window, Learning shows the nickname "taught by staff1",
+   waiting for approval.
+4. Users > "What staff may do": untick payments, Save. staff1 opening a payment sees
+   "ငွေစစ်တာကို ပိုင်ရှင်က လုပ်ပါမယ်" and no Approve button. Tick it again.
+5. Users > Activity: staff1's actions are listed with their name.
+
+**F. Burmese dashboard, help, practice (4.5)**
+1. As staff1, every page is Burmese.
+   - Tap a "?" next to a section: one Burmese sentence appears.
+   - Tap "🌐 English": the page is English. Log out and in again: still English.
+   - Tap "🌐 မြန်မာ" to go back.
+2. "❓ အကူအညီ" shows the staff guide with a contents list.
+3. "🎓 လေ့ကျင့်ခန်း" > "စမယ် →". Answer 3-4 messages, tapping the button or answering the card. Each answer
+   shows ✅ or ❌, the right answer, and the reply the customer would have got. The score goes up.
+4. Check that nothing was saved or sent:
+   - your test Telegram account received nothing;
+   - Chats has no "🎓 လေ့ကျင့်ခန်း ဖောက်သည်";
+   - the Inbox has no new practice message.
+5. As owner, tap "🌐 မြန်မာ" in the header: your own dashboard turns Burmese, and staff1 is unaffected. Switch
+   back with "🌐 English".
+6. Users > staff1 > Disable. staff1's next click goes to the login page, and logging in fails.
+
+## STAFF TEST (ဝန်ထမ်း စမ်းသပ်ချက် — ပိုင်ရှင် ဘေးကကြည့်ပြီး ၁ နာရီ)
+ပိုင်ရှင်က ဝန်ထမ်းအကောင့် ဖွင့်ပေးပါ (Users > Add a user၊ ဘာသာ မြန်မာ)။ ဝန်ထမ်းက ဖုန်းနဲ့ လုပ်ပါ။
+1. Dashboard လိပ်စာကိုဖွင့်ပြီး ကိုယ့်နာမည်၊ စကားဝှက်နဲ့ **ဝင်မယ်**။ Menu အားလုံး မြန်မာလို ဖြစ်ရမယ်။
+2. **❓ အကူအညီ** ကိုဖွင့်ပြီး လမ်းညွှန်ကို ဖတ်ပါ (၁၅ မိနစ်)။
+3. **🎓 လေ့ကျင့်ခန်း → စမယ်**။ စာအားလုံး ဖြေပါ။ **အမှတ် ၈၀% အထက်** ရရမယ်။ မရရင် နောက်တစ်ခေါက် ထပ်လုပ်ပါ။
+4. ပိုင်ရှင်က တခြား Telegram အကောင့်ကနေ ဒီစာတွေ ပို့မယ်။ ဝန်ထမ်းက တစ်ယောက်တည်း ဖြေပါ:
+   - `good girl 5ml ဘယ်လောက်လဲ` → App ဖြေပြီးသား ဖြစ်ရမယ် (🤖)၊ မဖြေရသေးရင် **💬 ဈေး ပြန်ပြောမယ်** ကို ဖတ်ပြီး နှိပ်။
+   - `ysl edp 10 ml ရောယူပါမယ်` → **📘 သင်ပေးမယ်** → Y Eau de Parfum ရွေး → ဆက်လုပ်မယ် → ✅။
+   - `ဒီအနံ့က ဘယ်လိုမျိုးလဲ` → **စကားပြော ဖွင့်ပြီး** ကိုယ်တိုင် ဖြေ။
+   - ဖုန်းနံပါတ်နဲ့ လိပ်စာ ပို့ → ခြင်းထဲ **နောက်တစ်ဆင့်** ခလုတ်အတိုင်း လုပ် → ငွေလွှဲ အချက်အလက် ပို့။
+   - Screenshot တစ်ပုံ ပို့ → **ငွေစစ်ရန်** → ပိုင်ရှင်ရဲ့ KPay မှာ စစ်တဲ့ပုံ လုပ်ပြ → ID ရိုက် → ✅ အတည်ပြုမယ်။
+   - **အော်ဒါများ** → 📦 ထုပ်ပြီး → 🚚 ပို့လိုက်ပြီ → ✅ ရောက်ပြီ။
+   - တစ်ခုကို မှားနှိပ်ပြီး **↩ ပြန်ဖျက်** နဲ့ ပြန်ဖျက်ပြ။
+5. ပိုင်ရှင်က မေးမယ်: "ငွေမရောက်ဘဲ screenshot ပဲ ပို့ရင် ဘာလုပ်မလဲ?"၊ "ဈေးမသိရင်?"၊ "ဖောက်သည် ဒေါသထွက်ရင်?"
+   → လမ်းညွှန်ထဲက **❗ မလုပ်ရမယ့်အရာများ** နဲ့ **🙋 မသိရင် ဘယ်သူ့ကို မေးမလဲ** အတိုင်း ဖြေနိုင်ရမယ်။
+6. **အောင်မြင်တယ်** ဆိုတာ: ပိုင်ရှင် မကူဘဲ အပေါ်က ၁-၅ အကုန် လုပ်နိုင်တာ၊ ဖောက်သည်ဆီ စာမှား မရောက်တာ။

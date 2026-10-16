@@ -2,7 +2,7 @@
 
 Read CLAUDE.md first. This file tracks where we are.
 
-## RESUME HERE (updated 2026-10-15 by VPS Claude Code)
+## RESUME HERE (updated 2026-10-16 by VPS Claude Code)
 - v1, v2, v3 DONE (v3 owner testing in parallel).
 - NOW: Release v4 "Learning Inbox" — docs/SPEC-v4.md. Epics 4.1 -> 4.5 in order, each with
   acceptance tests, loop test -> fix until green, self-review vs GOAL, deploy, report, next.
@@ -10,9 +10,10 @@ Read CLAUDE.md first. This file tracks where we are.
   - 4.2 teaching cards: ✅ done (rules-5, migration d16b1c96eac6, tests/test_v4_teaching.py).
   - 4.3 "the previous one": ✅ done (rules-6, migration 814861587f85, tests/test_v4_previous.py).
   - 4.4 roles, permissions: ✅ done (migration 222274ae7a9b, /users, /activity, tests/test_v4_roles.py).
-  - NEXT: 4.5 Burmese dashboard, help, practice mode, staff guide.
+  - 4.5 Burmese dashboard, help, practice: ✅ done (app/web/i18n*.py, /help = docs/STAFF-GUIDE-my.md,
+    /practice, tests/test_v4_i18n.py). No migration.
+  - v4 BUILD DONE. NEXT: owner runs "OWNER TEST SCRIPT v4" and the "STAFF TEST" in REPORT.md.
 - No external AI (not available in Myanmar). Epic 4.6 (AI) only when the owner asks.
-- At the end: OWNER TEST SCRIPT v4 + STAFF TEST in REPORT.md.
 - Owner checks: `bash scripts/status.sh`.
 
 ## Status
@@ -27,6 +28,7 @@ Read CLAUDE.md first. This file tracks where we are.
 | 5 | Run 24/7, backups, health page | ✅ Done: reboot test passed 2026-10-11 (all services back, health ok, new tunnel URL) |
 | 6 | v2: replies, cart, payment check, orders (docs/SPEC-orders.md) | ✅ Steps 1-5 done |
 | 7 | v3 (docs/SPEC-v3.md): after payment, FAQ, sales | ✅ Steps 6-8 done (owner test pending) |
+| 8 | v4 (docs/SPEC-v4.md): Learning Inbox | ✅ 4.1-4.5 done (owner test + staff test pending) |
 
 ## Phase 0 checklist
 - [x] Step 0: rollback safety net scripts in ~/hardening/

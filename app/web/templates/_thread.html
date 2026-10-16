@@ -4,48 +4,48 @@
     {% if m.kind == "photo" %}
       {% set d = downloads.get(m.id) %}
       <div class="photo">
-        {% if m.grouped_id and albums.get(m.grouped_id, 0) > 1 %}<span class="badge warn">several photos sent together</span>{% endif %}
+        {% if m.grouped_id and albums.get(m.grouped_id, 0) > 1 %}<span class="badge warn">{{ t("several photos sent together") }}</span>{% endif %}
         {% if d and d.status == "done" %}
-          <a href="/media/{{ m.id }}" target="_blank" rel="noopener"><img src="/media/{{ m.id }}" alt="Photo from the chat" class="thumb"></a>
+          <a href="/media/{{ m.id }}" target="_blank" rel="noopener"><img src="/media/{{ m.id }}" alt="{{ t('Photo from the chat') }}" class="thumb"></a>
         {% elif d and d.status == "queued" %}
-          <span class="muted small">Loading photo…</span>
+          <span class="muted small">{{ t("Loading photo…") }}</span>
         {% else %}
-          {% if d and d.status == "failed" %}<p class="error small">Could not load: {{ d.error }}</p>{% endif %}
+          {% if d and d.status == "failed" %}<p class="error small">{{ t("Could not load") }}: {{ tr(d.error) }}</p>{% endif %}
           <form method="post" action="/messages/{{ m.id }}/photo" class="inline">
             <input type="hidden" name="csrf" value="{{ csrf }}">
-            <button>📷 Show photo{% if m.media_size %} ({{ (m.media_size / 1024) | round | int }} KB){% endif %}</button>
+            <button>📷 {{ t("Show photo") }}{% if m.media_size %} ({{ (m.media_size / 1024) | round | int }} KB){% endif %}</button>
           </form>
         {% endif %}
       </div>
     {% elif m.kind == "other" and not m.raw_text %}
-      <span class="muted small">(sticker, voice or file — open Telegram to see it)</span>
+      <span class="muted small">({{ t("sticker, voice or file — open Telegram to see it") }})</span>
     {% endif %}
     {% if m.raw_text %}<p class="text">{{ m.raw_text }}</p>{% endif %}
     <div class="bubble-meta">
-      {% if m.id in auto_msgs %}<span title="Sent by auto-reply">🤖</span> · {% endif %}
-      {% if m.direction == "in" %}<a href="/messages/{{ m.id }}?back=/chats/{{ c.id }}">details</a> · {% endif %}
+      {% if m.id in auto_msgs %}<span title="{{ t('Sent by auto-reply') }}">🤖</span> · {% endif %}
+      {% if m.direction == "in" %}<a href="/messages/{{ m.id }}?back=/chats/{{ c.id }}">{{ t("details") }}</a> · {% endif %}
       <time>{{ m.received_at | local_time }}</time>
     </div>
   </div>
 {% else %}
-  <p class="empty">No messages.</p>
+  <p class="empty">{{ t("No messages.") }}</p>
 {% endfor %}
 {% for o in pending %}
   <div class="bubble out pending status-{{ o.status }}">
     <p class="text">{{ o.text }}</p>
     <div class="bubble-meta">
       {% if o.id in auto_box %}🤖 {% endif %}
-      {% if o.status == "queued" and o.send_after > now() %}<span data-send-at="{{ o.send_after.isoformat() }}">Sending in {{ ((o.send_after - now()).total_seconds()) | round | int }} s</span>
-      {% elif o.status == "queued" %}⏳ queued{% if o.error %} · {{ o.error }}{% endif %}
-      {% elif o.status == "sending" and o.id in stuck %}<span class="error">⚠ unknown: check Telegram whether it arrived</span>
-      {% elif o.status == "sending" %}sending…
-      {% elif o.status == "failed" %}<span class="error">✖ not sent: {{ o.error }}</span>{% endif %}
+      {% if o.status == "queued" and o.send_after > now() %}<span data-send-at="{{ o.send_after.isoformat() }}">{{ t("Sending in {n} s", n=((o.send_after - now()).total_seconds()) | round | int) }}</span>
+      {% elif o.status == "queued" %}⏳ {{ t("queued") }}{% if o.error %} · {{ tr(o.error) }}{% endif %}
+      {% elif o.status == "sending" and o.id in stuck %}<span class="error">⚠ {{ t("unknown: check Telegram whether it arrived") }}</span>
+      {% elif o.status == "sending" %}{{ t("sending…") }}
+      {% elif o.status == "failed" %}<span class="error">✖ {{ t("not sent") }}: {{ tr(o.error) }}</span>{% endif %}
     </div>
     {% if o.status == "failed" or o.status == "queued" or o.id in stuck %}
     <form method="post" class="buttons">
       <input type="hidden" name="csrf" value="{{ csrf }}">
-      {% if o.status == "failed" %}<button formaction="/chats/{{ c.id }}/outbox/{{ o.id }}/retry">Try again</button>{% endif %}
-      <button class="link danger" formaction="/chats/{{ c.id }}/outbox/{{ o.id }}/cancel">{{ "Cancel" if o.status == "queued" else "Dismiss" }}</button>
+      {% if o.status == "failed" %}<button formaction="/chats/{{ c.id }}/outbox/{{ o.id }}/retry">{{ t("Try again") }}</button>{% endif %}
+      <button class="link danger" formaction="/chats/{{ c.id }}/outbox/{{ o.id }}/cancel">{{ t("Cancel") if o.status == "queued" else t("Dismiss") }}</button>
     </form>
     {% endif %}
   </div>

@@ -2,9 +2,11 @@
 {% set target = 'hx-target="#msg-' ~ m.id ~ '" hx-swap="outerHTML"' if in_row else '' %}
 {% set kind_done = {"price": "price reply", "cart_add": "added + cart list", "cart_remove": "removed + cart list",
                     "cart_list": "cart list", "confirm": "confirmed", "address": "address saved",
-                    "contact": "phone/address saved"} %}
+                    "contact": "phone/address saved", "not_stocked": "we don't have it", "delivery": "delivery status",
+                    "cancel_order": "order cancelled", "faq": "FAQ answer", "greeting": "greeting",
+                    "choose_previous": "asked which earlier item", "teach": "taught"} %}
 <div class="quick">
-  {% if quick_error %}<p class="error small" role="alert">{{ quick_error }}</p>{% endif %}
+  {% if quick_error %}<p class="error small" role="alert">{{ tr(quick_error) }}</p>{% endif %}
   {% if quick_action %}
     {% set a, o = quick_action %}
     {% set undo_form %}
@@ -12,21 +14,21 @@
             {% if in_row %}hx-post="/quick/{{ a.id }}/undo" {{ target | safe }}{% endif %}>
         <input type="hidden" name="csrf" value="{{ csrf }}">
         <input type="hidden" name="back" value="{{ back | default('/') }}">
-        <button class="primary">Undo</button>
+        <button class="primary">{{ t("Undo") }}</button>
       </form>
     {% endset %}
     {% if o and o.status == "queued" and o.send_after > now() %}
-      <span class="small" data-send-at="{{ o.send_after.isoformat() }}" title="{{ o.text }}">Sending in {{ ((o.send_after - now()).total_seconds()) | round | int }} s</span>
+      <span class="small" data-send-at="{{ o.send_after.isoformat() }}" title="{{ o.text }}">{{ t("Sending in {n} s", n=((o.send_after - now()).total_seconds()) | round | int) }}</span>
       {{ undo_form }}
     {% elif o and o.status in ("queued", "sending") %}
-      <span class="small muted" title="{{ o.text }}">💬 sending…</span>
+      <span class="small muted" title="{{ o.text }}">💬 {{ t("sending…") }}</span>
     {% elif o and o.status == "sent" %}
-      <span class="small done-text" title="{{ o.text }}">✓ {{ kind_done[a.kind] }} sent</span>
+      <span class="small done-text" title="{{ o.text }}">✓ {{ t("{what} sent", what=tr(kind_done.get(a.kind, a.kind))) }}</span>
     {% elif o and o.status == "failed" %}
-      <span class="small error">✖ not sent: {{ o.error }}</span>
-      <a class="small" href="/chats/{{ m.customer_id }}#reply">open chat</a>
+      <span class="small error">✖ {{ t("not sent") }}: {{ tr(o.error) }}</span>
+      <a class="small" href="/chats/{{ m.customer_id }}#reply">{{ t("open chat") }}</a>
     {% elif not o %}
-      <span class="small done-text">✓ {{ kind_done[a.kind] }}</span>
+      <span class="small done-text">✓ {{ tr(kind_done.get(a.kind, a.kind)) }}</span>
       {% if (now() - a.created_at).total_seconds() < 60 %}{{ undo_form }}{% endif %}
     {% endif %}
   {% elif quick %}
@@ -35,12 +37,12 @@
       <input type="hidden" name="csrf" value="{{ csrf }}">
       <input type="hidden" name="expect" value="{{ quick.fingerprint }}">
       <input type="hidden" name="back" value="{{ back | default('/') }}">
-      {% if quick.address and not in_row %}<label class="small">Address to save (you can fix it first)
+      {% if quick.address and not in_row %}<label class="small">{{ t("Address to save (you can fix it first)") }}
         <textarea name="address" rows="2" maxlength="500">{{ quick.address }}</textarea></label>{% endif %}
-      <button class="primary" title="{{ quick.tooltip }}">{{ quick.label }}</button>
+      <button class="primary" title="{{ quick.tooltip }}">{{ tr(quick.label) }}</button>
     </form>
-    <p class="quick-preview small muted" title="{{ quick.tooltip }}">{{ quick.preview }}</p>
-    {% if quick.text and quick.note %}<p class="quick-preview small">{{ quick.note }}</p>{% endif %}
-    {% if not in_row and quick.edit_url %}<a class="small" href="{{ quick.edit_url }}">Edit before send</a>{% endif %}
+    <p class="quick-preview small muted" title="{{ quick.tooltip }}">{{ quick.preview if quick.text else tr(quick.preview) }}</p>
+    {% if quick.text and quick.note %}<p class="quick-preview small">{{ tr(quick.note) }}</p>{% endif %}
+    {% if not in_row and quick.edit_url %}<a class="small" href="{{ quick.edit_url }}">{{ t("Edit before send") }}</a>{% endif %}
   {% endif %}
 </div>

@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}{{ t("Error") }} · Decant Inbox{% endblock %}
+{% block content %}
+<section class="card problem">
+  <h1>{{ tr(title) }}</h1>
+  <p>{{ tr(detail) }}</p>
+  <p><a href="/" class="button">← {{ t("Inbox") }}</a></p>
+</section>
+{% endblock %}

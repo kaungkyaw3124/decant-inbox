@@ -1,18 +1,19 @@
 {% extends "base.html" %}
-{% block title %}Payments · Decant Inbox{% endblock %}
+{% import "_ui.html" as ui with context %}
+{% block title %}{{ t("Payments") }} · Decant Inbox{% endblock %}
 {% block content %}
-<h1>💳 Payments to check</h1>
+<h1>💳 {{ t("Payments to check") }} {{ ui.help("Payment screenshots from customers. Open one, find the same transaction in your KPay / AYA app, type its ID and approve.") }}</h1>
 <ul class="rows">
 {% for check, order, c in rows %}
   <li class="row">
     <a class="row-main" href="/payments/{{ check.id }}">
-      <div class="meta"><span class="who">{{ c.display_name or c.username or "Customer" }}</span>
+      <div class="meta"><span class="who">{{ c.display_name or c.username or t("Customer") }}</span>
         <time>{{ check.created_at | local_time }}</time></div>
-      <p class="text">{% if check.decision == "several" %}📷 Several photos ({{ check.photo_count }}) — ask for one{% else %}📷 Screenshot · total {{ format_mmk(order.total_mmk) }} ကျပ်{% endif %}</p>
+      <p class="text">{% if check.decision == "several" %}📷 {{ t("Several photos ({n}) — ask for one", n=check.photo_count) }}{% else %}📷 {{ t("Screenshot · total {total} ကျပ်", total=format_mmk(order.total_mmk)) }}{% endif %}</p>
     </a>
   </li>
 {% else %}
-  <li class="empty">Nothing to check.</li>
+  <li class="empty">{{ t("Nothing to check.") }}</li>
 {% endfor %}
 </ul>
 {% endblock %}

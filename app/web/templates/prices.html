@@ -1,40 +1,40 @@
 {% extends "base.html" %}
-{% block title %}Prices · Decant Inbox{% endblock %}
+{% block title %}{{ t("Prices") }} · Decant Inbox{% endblock %}
 {% block content %}
-<h1>Price list</h1>
-{% if error %}<p class="flash bad" role="alert">{{ error }}</p>{% endif %}
+<h1>{{ t("Price list") }}</h1>
+{% if error %}<p class="flash bad" role="alert">{{ tr(error) }}</p>{% endif %}
 
 <section class="card stack">
-  <h2>1. Download</h2>
-  <p class="muted small">The current prices of every active product, in the same format as the upload. Edit it in Excel (or Google Sheets, then download as .xlsx).</p>
-  <p><a class="button primary" href="/prices/export.xlsx">Download current prices (.xlsx)</a></p>
+  <h2>1. {{ t("Download") }}</h2>
+  <p class="muted small">{{ t("The current prices of every active product, in the same format as the upload. Edit it in Excel (or Google Sheets, then download as .xlsx).") }}</p>
+  <p><a class="button primary" href="/prices/export.xlsx">{{ t("Download current prices (.xlsx)") }}</a></p>
 </section>
 
 <form method="post" action="/prices/import" enctype="multipart/form-data" class="card stack">
-  <h2>2. Upload</h2>
+  <h2>2. {{ t("Upload") }}</h2>
   <input type="hidden" name="csrf" value="{{ csrf }}">
-  <label>Price list (.xlsx, max 2 MB)
+  <label>{{ t("Price list (.xlsx, max 2 MB)") }}
     <input type="file" name="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" required>
   </label>
-  <button class="primary">Check file</button>
-  <p class="muted small">You see a preview first. Nothing is saved until you press Confirm.</p>
+  <button class="primary">{{ t("Check file") }}</button>
+  <p class="muted small">{{ t("You see a preview first. Nothing is saved until you press Confirm.") }}</p>
 </form>
 
 <details class="card">
-  <summary>File format</summary>
+  <summary>{{ t("File format") }}</summary>
   <table>
-    <thead><tr><th>brand</th><th>name</th><th>full_size_ml</th><th>full_price</th><th>2ml</th><th>5ml</th><th>10ml</th><th>in_stock</th></tr></thead>
-    <tbody><tr><td>Creed</td><td>Aventus</td><td>100</td><td>1,150,000</td><td>28,000</td><td>65,000</td><td>125,000</td><td>yes</td></tr></tbody>
+    <thead><tr><th><code>brand</code></th><th><code>name</code></th><th><code>full_size_ml</code></th><th><code>full_price</code></th><th><code>2ml</code></th><th><code>5ml</code></th><th><code>10ml</code></th><th><code>in_stock</code></th></tr></thead>
+    <tbody><tr><td>Creed</td><td>Aventus</td><td>100</td><td>1,150,000</td><td>28,000</td><td>65,000</td><td>125,000</td><td><code>yes</code></td></tr></tbody>
   </table>
   <ul class="small">
-    <li>Any header like <b>3ml</b> or <b>15ml</b> adds that decant size.</li>
-    <li>Empty price cell = that size is not sold. A size column missing from the file leaves that size unchanged.</li>
-    <li><b>in_stock</b>: yes / no for the whole perfume; empty = unchanged.</li>
-    <li>A new brand + name adds a product. Names close to an existing product are shown for you to decide.</li>
+    <li>{{ t("Any header like 3ml or 15ml adds that decant size.") }}</li>
+    <li>{{ t("Empty price cell = that size is not sold. A size column missing from the file leaves that size unchanged.") }}</li>
+    <li><code>in_stock</code>: <code>yes</code> / <code>no</code> — {{ t("for the whole perfume; empty = unchanged.") }}</li>
+    <li>{{ t("A new brand + name adds a product. Names close to an existing product are shown for you to decide.") }}</li>
   </ul>
 </details>
 
 {% if last_import %}
-<p class="muted small">Last upload: {{ last_import.created_at|local_time }} · {{ last_import.details.filename }} · {{ last_import.details.prices_written }} price changes</p>
+<p class="muted small">{{ t("Last upload") }}: {{ last_import.created_at|local_time }} · {{ last_import.details.filename }} · {{ t("{n} price changes", n=last_import.details.prices_written) }}</p>
 {% endif %}
 {% endblock %}

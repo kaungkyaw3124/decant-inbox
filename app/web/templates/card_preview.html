@@ -2,17 +2,17 @@
 {% block title %}သင်ပေးမယ် · Decant Inbox{% endblock %}
 {% block content %}
 <section class="card">
-  <div class="meta"><span class="who">{{ c.display_name or c.username or "Customer" }}</span><time>{{ m.received_at | local_time }}</time></div>
+  <div class="meta"><span class="who">{{ c.display_name or c.username or t("Customer") }}</span><time>{{ m.received_at | local_time }}</time></div>
   <p class="text big">{{ m.raw_text }}</p>
 </section>
 <section class="card notice">
   <h2>ဒါလုပ်မယ်</h2>
   <p class="big-line">{{ line }}</p>
-  {% if reply %}<p class="small muted">ဖောက်သည်ဆီ ပို့မယ့်စာ ({{ undo_seconds }} s အတွင်း Undo လုပ်လို့ရတယ်):</p>
+  {% if reply %}<p class="small muted">ဖောက်သည်ဆီ ပို့မယ့်စာ ({{ undo_seconds }} စက္ကန့်အတွင်း “{{ t("Undo") }}” နှိပ်ပြီး ပြန်ဖျက်လို့ရတယ်):</p>
   <pre class="example">{{ reply }}</pre>{% endif %}
-  {% for line in learned %}<p class="small">{{ line }}</p>{% endfor %}
+  {% for line in learned %}<p class="small">{{ tr(line) }}</p>{% endfor %}
   {% if not learned and learn %}<p class="small muted">📘 အသစ် သင်စရာ မရှိပါ (သိပြီးသား)။</p>{% endif %}
-  {% for w in warnings %}<p class="small problem-text">{{ w }}</p>{% endfor %}
+  {% for w in warnings %}<p class="small problem-text">{{ tr(w) }}</p>{% endfor %}
   <form method="post" action="/messages/{{ m.id }}/teach" class="buttons">
     {% for key, value in fields %}<input type="hidden" name="{{ key }}" value="{{ value }}">{% endfor %}
     <input type="hidden" name="expect" value="{{ expect }}">

@@ -8,18 +8,20 @@ Usage: .venv/bin/uvicorn app.web.main:app --host 127.0.0.1 --port 8080 --no-acce
 import sys
 from pathlib import Path
 
-from fastapi import Depends, FastAPI, Form, Request
+from fastapi import Depends, FastAPI, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.sessions import SessionMiddleware
 
 from app.core.config import get_settings
+from app.models import AuditLog, User
 from app.web import (
-    auto as auto_pages, catalog, chats, health, inbox, learning, orders, payments, prices, sales, settings as settings_pages,
-    users,
+    auto as auto_pages, catalog, chats, health, help as help_pages, i18n, inbox, learning, orders, payments, practice,
+    prices, sales, settings as settings_pages, users,
 )
-from app.web.auth import LoginRequired, authenticate, client_ip, locked_out, login, verify_csrf
+from app.web.auth import LoginRequired, authenticate, client_ip, current_user, locked_out, login, verify_csrf
 from app.web.deps import get_db, templates
 
 settings = get_settings()
@@ -48,6 +50,10 @@ app.include_router(settings_pages.router)
 app.include_router(learning.router)
 app.include_router(users.router)
 app.include_router(health.router)
+app.include_router(help_pages.router)
+app.include_router(practice.router)
+
+ERROR_TITLES = {400: "Can't do that", 403: "Not allowed", 404: "Not found", 409: "Already changed"}
 
 
 @app.exception_handler(LoginRequired)
@@ -55,6 +61,16 @@ def redirect_to_login(request: Request, exc: LoginRequired):
     if request.headers.get("hx-request"):  # make htmx do a full-page redirect
         return HTMLResponse("", headers={"HX-Redirect": "/login"})
     return RedirectResponse(f"/login?next={exc.next_url}", status_code=303)
+
+
+@app.exception_handler(StarletteHTTPException)
+def error_page(request: Request, exc: StarletteHTTPException):
+    """Errors as a page in the user's language (the detail is translated in error.html)."""
+    if exc.status_code < 400 or request.headers.get("hx-request"):
+        return HTMLResponse(str(exc.detail), status_code=exc.status_code, headers=exc.headers)
+    return templates.TemplateResponse(request, "error.html", {
+        "title": ERROR_TITLES.get(exc.status_code, "Something went wrong"), "detail": str(exc.detail)},
+        status_code=exc.status_code, headers=exc.headers)
 
 
 @app.middleware("http")
@@ -92,6 +108,21 @@ def login_submit(
 
 
 @app.post("/logout", dependencies=[Depends(verify_csrf)])
-def logout(request: Request):
+def logout(request: Request, db: Session = Depends(get_db)):
+    user = db.get(User, request.session.get("user_id") or 0)
     request.session.clear()
+    if user is not None:
+        request.session["lang"] = user.language  # the login page stays in their language
     return RedirectResponse("/login", status_code=303)
+
+
+@app.post("/language", dependencies=[Depends(verify_csrf)])
+def set_language(request: Request, language: str = Form(...), back: str = Form("/"), db: Session = Depends(get_db),
+                 user: User = Depends(current_user)):
+    """The header switch: every user picks their own dashboard language (saved on the user)."""
+    if language not in i18n.LANGUAGES:
+        raise HTTPException(400, "Unknown language")
+    user.language = language
+    db.add(AuditLog(user_id=user.id, action="user.language", details={"user_id": user.id, "language": language}))
+    db.commit()
+    return RedirectResponse(inbox.safe_back(back, "/"), status_code=303)

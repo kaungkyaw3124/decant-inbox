@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}{{ t("Help") }} · Decant Inbox{% endblock %}
+{% block content %}
+<article class="card guide" lang="my">
+  {% if toc %}<nav class="toc" aria-label="{{ t('Contents') }}"><ol>{% for anchor, title in toc %}<li><a href="#{{ anchor }}">{{ title }}</a></li>{% endfor %}</ol></nav>{% endif %}
+  {{ body }}
+  <p class="buttons"><a class="button primary" href="/practice">🎓 {{ t("Practice") }} →</a></p>
+</article>
+{% endblock %}

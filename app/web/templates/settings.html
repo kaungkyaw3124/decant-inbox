@@ -1,123 +1,123 @@
 {% extends "base.html" %}
-{% block title %}Settings · Decant Inbox{% endblock %}
+{% block title %}{{ t("Settings") }} · Decant Inbox{% endblock %}
 {% block content %}
-<h1>Settings</h1>
+<h1>{{ t("Settings") }}</h1>
 
 <form method="post" action="/settings/auto-speed" class="card stack" id="auto-speed">
-  <h2>🤖 Auto-reply speed</h2>
+  <h2>🤖 {{ t("Auto-reply speed") }}</h2>
   <input type="hidden" name="csrf" value="{{ csrf }}">
-  <p class="muted small">Time from the customer's message to an automatic reply ≈ quiet + delay. Shorter = faster, but looks more like a bot.</p>
-  {% if speed_error %}<p class="error" role="alert">{{ speed_error }}</p>{% endif %}
+  <p class="muted small">{{ t("Time from the customer's message to an automatic reply ≈ quiet + delay. Shorter = faster, but looks more like a bot.") }}</p>
+  {% if speed_error %}<p class="error" role="alert">{{ tr(speed_error) }}</p>{% endif %}
   <div class="grid">
-    <label>Wait for the customer to stop typing (s) <input name="quiet_s" type="number" min="{{ speed_limits.quiet_s[0] }}" max="{{ speed_limits.quiet_s[1] }}" value="{{ speed.quiet_s }}" required></label>
-    <label>Shortest delay (s) <input name="delay_min_s" type="number" min="{{ speed_limits.delay_min_s[0] }}" max="{{ speed_limits.delay_min_s[1] }}" value="{{ speed.delay_min_s }}" required></label>
-    <label>Longest delay (s) <input name="delay_max_s" type="number" min="{{ speed_limits.delay_max_s[0] }}" max="{{ speed_limits.delay_max_s[1] }}" value="{{ speed.delay_max_s }}" required></label>
+    <label>{{ t("Wait for the customer to stop typing (s)") }} <input name="quiet_s" type="number" min="{{ speed_limits.quiet_s[0] }}" max="{{ speed_limits.quiet_s[1] }}" value="{{ speed.quiet_s }}" required></label>
+    <label>{{ t("Shortest delay (s)") }} <input name="delay_min_s" type="number" min="{{ speed_limits.delay_min_s[0] }}" max="{{ speed_limits.delay_min_s[1] }}" value="{{ speed.delay_min_s }}" required></label>
+    <label>{{ t("Longest delay (s)") }} <input name="delay_max_s" type="number" min="{{ speed_limits.delay_max_s[0] }}" max="{{ speed_limits.delay_max_s[1] }}" value="{{ speed.delay_max_s }}" required></label>
   </div>
-  <button class="primary">Save speed</button>
+  <button class="primary">{{ t("Save speed") }}</button>
 </form>
 
 <form method="post" action="/settings/order-rules" class="card stack" id="order-rules">
-  <h2>📦 Orders & payments</h2>
+  <h2>📦 {{ t("Orders & payments") }}</h2>
   <input type="hidden" name="csrf" value="{{ csrf }}">
-  <p class="muted small">Reminder and cancel are sent only while auto-reply is ON; otherwise the order waits in “Needs you” with a button.</p>
-  {% if rules_error %}<p class="error" role="alert">{{ rules_error }}</p>{% endif %}
+  <p class="muted small">{{ t("Reminder and cancel are sent only while auto-reply is ON; otherwise the order waits in “Needs you” with a button.") }}</p>
+  {% if rules_error %}<p class="error" role="alert">{{ tr(rules_error) }}</p>{% endif %}
   <div class="grid">
-    <label>Payment reminder after (hours) <input name="reminder_hours" type="number" min="{{ rule_limits.reminder_hours[0] }}" max="{{ rule_limits.reminder_hours[1] }}" value="{{ order_rules.reminder_hours }}" required></label>
-    <label>Cancel unpaid order after (hours) <input name="cancel_hours" type="number" min="{{ rule_limits.cancel_hours[0] }}" max="{{ rule_limits.cancel_hours[1] }}" value="{{ order_rules.cancel_hours }}" required></label>
-    <label>Sent out → delivered after (days) <input name="auto_delivered_days" type="number" min="{{ rule_limits.auto_delivered_days[0] }}" max="{{ rule_limits.auto_delivered_days[1] }}" value="{{ order_rules.auto_delivered_days }}" required></label>
+    <label>{{ t("Payment reminder after (hours)") }} <input name="reminder_hours" type="number" min="{{ rule_limits.reminder_hours[0] }}" max="{{ rule_limits.reminder_hours[1] }}" value="{{ order_rules.reminder_hours }}" required></label>
+    <label>{{ t("Cancel unpaid order after (hours)") }} <input name="cancel_hours" type="number" min="{{ rule_limits.cancel_hours[0] }}" max="{{ rule_limits.cancel_hours[1] }}" value="{{ order_rules.cancel_hours }}" required></label>
+    <label>{{ t("Sent out → delivered after (days)") }} <input name="auto_delivered_days" type="number" min="{{ rule_limits.auto_delivered_days[0] }}" max="{{ rule_limits.auto_delivered_days[1] }}" value="{{ order_rules.auto_delivered_days }}" required></label>
   </div>
-  <label class="check"><input type="checkbox" name="thank_you" value="1" {% if order_rules.thank_you %}checked{% endif %}> Send thank-you on delivered</label>
-  <button class="primary">Save</button>
+  <label class="check"><input type="checkbox" name="thank_you" value="1" {% if order_rules.thank_you %}checked{% endif %}> {{ t("Send thank-you on delivered") }}</label>
+  <button class="primary">{{ t("Save") }}</button>
 </form>
 
 <form method="post" action="/settings/vial-costs" class="card stack" id="vial-costs">
-  <h2>🧪 Vial cost per decant size</h2>
+  <h2>🧪 {{ t("Vial cost per decant size") }}</h2>
   <input type="hidden" name="csrf" value="{{ csrf }}">
-  <p class="muted small">Cost of the empty vial / packaging, added to the perfume cost of each decant (Sales page). Bottle costs come from the price list (bottle_cost column). Saved on each order when it is paid.</p>
-  {% if vial_error %}<p class="error" role="alert">{{ vial_error }}</p>{% endif %}
+  <p class="muted small">{{ t("Cost of the empty vial / packaging, added to the perfume cost of each decant (Sales page). Bottle costs come from the price list (bottle_cost column). Saved on each order when it is paid.") }}</p>
+  {% if vial_error %}<p class="error" role="alert">{{ tr(vial_error) }}</p>{% endif %}
   <div class="grid">
-    {% for size in vial_sizes %}<label>{{ size }}ml vial (ကျပ်) <input name="vial_{{ size }}" inputmode="numeric" value="{{ vials.get(size, 0) }}"></label>{% endfor %}
+    {% for size in vial_sizes %}<label>{{ t("{size}ml vial (ကျပ်)", size=size) }} <input name="vial_{{ size }}" inputmode="numeric" value="{{ vials.get(size, 0) }}"></label>{% endfor %}
   </div>
-  <button class="primary">Save vial costs</button>
+  <button class="primary">{{ t("Save vial costs") }}</button>
 </form>
 
 <section class="card stack" id="faq">
-  <h2>💬 FAQ answers</h2>
-  <p class="muted small">Common questions. A message that names no product and matches keywords gets the answer (automatically when auto-reply is ON, otherwise a one-tap “💬 Send FAQ” button). Keywords: comma separated, Burmese or English. Most keywords found wins.</p>
+  <h2>💬 {{ t("FAQ answers") }}</h2>
+  <p class="muted small">{{ t("Common questions. A message that names no product and matches keywords gets the answer (automatically when auto-reply is ON, otherwise a one-tap “💬 Send FAQ” button). Keywords: comma separated, Burmese or English. Most keywords found wins.") }}</p>
   {% for e in faqs %}
   <form method="post" action="/settings/faq/{{ e.id }}" class="template {% if not e.active %}inactive{% endif %}" id="faq-{{ e.id }}">
     <input type="hidden" name="csrf" value="{{ csrf }}">
-    {% if faq_error and faq_error_id == e.id %}<p class="error" role="alert">{{ faq_error }}</p>{% endif %}
-    <label>Title {% if not e.edited %}<span class="badge warn">edit me</span>{% endif %} <input name="title" value="{{ e.title }}" maxlength="64" required></label>
-    <label>Keywords <input name="keywords" value="{{ e.keywords }}" required></label>
-    <label>Answer <textarea name="answer" rows="{{ [e.answer.count('\n') + 2, 2]|max }}" maxlength="2000" required>{{ e.answer }}</textarea></label>
+    {% if faq_error and faq_error_id == e.id %}<p class="error" role="alert">{{ tr(faq_error) }}</p>{% endif %}
+    <label>{{ t("Title") }} {% if not e.edited %}<span class="badge warn">{{ t("edit me") }}</span>{% endif %} <input name="title" value="{{ e.title }}" maxlength="64" required></label>
+    <label>{{ t("Keywords") }} <input name="keywords" value="{{ e.keywords }}" required></label>
+    <label>{{ t("Answer") }} <textarea name="answer" rows="{{ [e.answer.count('\n') + 2, 2]|max }}" maxlength="2000" required>{{ e.answer }}</textarea></label>
     <div class="buttons">
-      <label class="check"><input type="checkbox" name="active" value="1" {% if e.active %}checked{% endif %}> Active</label>
-      <button class="primary">Save</button>
-      <button class="link danger" formaction="/settings/faq/{{ e.id }}/delete">delete</button>
+      <label class="check"><input type="checkbox" name="active" value="1" {% if e.active %}checked{% endif %}> {{ t("Active") }}</label>
+      <button class="primary">{{ t("Save") }}</button>
+      <button class="link danger" formaction="/settings/faq/{{ e.id }}/delete">{{ t("delete") }}</button>
     </div>
   </form>
   {% endfor %}
   <form method="post" action="/settings/faq" class="stack add-method">
     <input type="hidden" name="csrf" value="{{ csrf }}">
-    <h3>Add FAQ</h3>
-    {% if faq_error and faq_error_id == "new" %}<p class="error" role="alert">{{ faq_error }}</p>{% endif %}
-    <label>Title <input name="title" maxlength="64" required></label>
-    <label>Keywords <input name="keywords" placeholder="ဘယ်နှစ်ရက်, delivery time" required></label>
-    <label>Answer <textarea name="answer" rows="2" maxlength="2000" required></textarea></label>
-    <button class="primary">Add</button>
+    <h3>{{ t("Add FAQ") }}</h3>
+    {% if faq_error and faq_error_id == "new" %}<p class="error" role="alert">{{ tr(faq_error) }}</p>{% endif %}
+    <label>{{ t("Title") }} <input name="title" maxlength="64" required></label>
+    <label>{{ t("Keywords") }} <input name="keywords" placeholder="ဘယ်နှစ်ရက်, delivery time" required></label>
+    <label>{{ t("Answer") }} <textarea name="answer" rows="2" maxlength="2000" required></textarea></label>
+    <button class="primary">{{ t("Add") }}</button>
   </form>
 </section>
 
 <section class="card stack" id="payment-methods">
-  <h2>Payment methods</h2>
-  <p class="muted small">Active methods are listed in the payment info message to customers.</p>
+  <h2>{{ t("Payment methods") }}</h2>
+  <p class="muted small">{{ t("Active methods are listed in the payment info message to customers.") }}</p>
   {% for m in methods %}
   <form method="post" action="/settings/payment-methods/{{ m.id }}" class="method {% if not m.active %}inactive{% endif %}">
     <input type="hidden" name="csrf" value="{{ csrf }}">
     <div class="grid">
-      <label>Name <input name="name" value="{{ m.name }}" required maxlength="64"></label>
-      <label>Account number <input name="account_number" value="{{ m.account_number }}" required maxlength="64"></label>
-      <label>Account name <input name="account_name" value="{{ m.account_name }}" required maxlength="128"></label>
+      <label>{{ t("Name") }} <input name="name" value="{{ m.name }}" required maxlength="64"></label>
+      <label>{{ t("Account number") }} <input name="account_number" value="{{ m.account_number }}" required maxlength="64"></label>
+      <label>{{ t("Account name") }} <input name="account_name" value="{{ m.account_name }}" required maxlength="128"></label>
     </div>
     <div class="buttons">
-      <label class="check"><input type="checkbox" name="active" value="1" {% if m.active %}checked{% endif %}> Active</label>
-      <button class="primary">Save</button>
-      <button class="link danger" formaction="/settings/payment-methods/{{ m.id }}/delete">delete</button>
+      <label class="check"><input type="checkbox" name="active" value="1" {% if m.active %}checked{% endif %}> {{ t("Active") }}</label>
+      <button class="primary">{{ t("Save") }}</button>
+      <button class="link danger" formaction="/settings/payment-methods/{{ m.id }}/delete">{{ t("delete") }}</button>
     </div>
   </form>
   {% else %}
-  <p class="problem-text">No payment methods yet. Add at least one before sending payment info.</p>
+  <p class="problem-text">{{ t("No payment methods yet. Add at least one before sending payment info.") }}</p>
   {% endfor %}
   <form method="post" action="/settings/payment-methods" class="stack add-method">
     <input type="hidden" name="csrf" value="{{ csrf }}">
-    <h3>Add payment method</h3>
+    <h3>{{ t("Add payment method") }}</h3>
     <div class="grid">
-      <label>Name <input name="name" placeholder="KPay" required maxlength="64"></label>
-      <label>Account number <input name="account_number" placeholder="09…" required maxlength="64"></label>
-      <label>Account name <input name="account_name" required maxlength="128"></label>
+      <label>{{ t("Name") }} <input name="name" placeholder="KPay" required maxlength="64"></label>
+      <label>{{ t("Account number") }} <input name="account_number" placeholder="09…" required maxlength="64"></label>
+      <label>{{ t("Account name") }} <input name="account_name" required maxlength="128"></label>
     </div>
-    <button class="primary">Add</button>
+    <button class="primary">{{ t("Add") }}</button>
   </form>
 </section>
 
 <section class="card stack">
-  <h2>Reply templates</h2>
-  <p class="muted small">Texts the dashboard suggests when you reply to a customer. You can still edit each message before it is sent. Words in {braces} are filled in automatically.</p>
-  {% for t in templates %}
-  <form method="post" action="/settings/templates/{{ t.def.key }}" class="template {% if t.error %}has-error{% endif %}" id="t-{{ t.def.key }}">
+  <h2>{{ t("Reply templates") }}</h2>
+  <p class="muted small">{{ t("Texts the dashboard suggests when you reply to a customer. You can still edit each message before it is sent. Words in {braces} are filled in automatically.") }}</p>
+  {% for tpl in templates %}
+  <form method="post" action="/settings/templates/{{ tpl.def.key }}" class="template {% if tpl.error %}has-error{% endif %}" id="t-{{ tpl.def.key }}">
     <input type="hidden" name="csrf" value="{{ csrf }}">
-    <label>{{ t.def.label }}{% if t.customized %} <span class="badge">edited</span>{% endif %}
-      <textarea name="text" rows="{{ [t.text.count('\n') + 2, 2]|max }}" maxlength="2000">{{ t.text }}</textarea>
+    <label>{{ tr(tpl.def.label) }}{% if tpl.customized %} <span class="badge">{{ t("edited") }}</span>{% endif %}
+      <textarea name="text" rows="{{ [tpl.text.count('\n') + 2, 2]|max }}" maxlength="2000">{{ tpl.text }}</textarea>
     </label>
-    {% if t.error %}<p class="error" role="alert">{{ t.error }}</p>{% endif %}
+    {% if tpl.error %}<p class="error" role="alert">{{ tr(tpl.error) }}</p>{% endif %}
     <p class="muted small">
-      {% if t.def.example %}Placeholders: {% for name in t.def.example %}<code>{{ "{" ~ name ~ "}" }}</code>{% if not loop.last %} {% endif %}{% endfor %}{% else %}No placeholders.{% endif %}
+      {% if tpl.def.example %}{{ t("Placeholders") }}: {% for name in tpl.def.example %}<code>{{ "{" ~ name ~ "}" }}</code>{% if not loop.last %} {% endif %}{% endfor %}{% else %}{{ t("No placeholders.") }}{% endif %}
     </p>
-    {% if t.def.example and t.example %}<p class="example small">{{ t.example }}</p>{% endif %}
+    {% if tpl.def.example and tpl.example %}<p class="example small"><samp>{{ tpl.example }}</samp></p>{% endif %}
     <div class="buttons">
-      <button class="primary">Save</button>
-      {% if t.customized %}<button class="link" formaction="/settings/templates/{{ t.def.key }}/reset">reset to default</button>{% endif %}
+      <button class="primary">{{ t("Save") }}</button>
+      {% if tpl.customized %}<button class="link" formaction="/settings/templates/{{ tpl.def.key }}/reset">{{ t("reset to default") }}</button>{% endif %}
     </div>
   </form>
   {% endfor %}

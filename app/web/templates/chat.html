@@ -1,34 +1,35 @@
 {% extends "base.html" %}
-{% block title %}{{ c.display_name or "Chat" }} · Decant Inbox{% endblock %}
+{% import "_ui.html" as ui with context %}
+{% block title %}{{ c.display_name or t("Chat") }} · Decant Inbox{% endblock %}
 {% block main_class %}wide{% endblock %}
 {% block content %}
-<p><a href="/chats">← Chats</a></p>
+<p><a href="/chats">← {{ t("Chats") }}</a></p>
 <header class="chat-head card">
   <div>
-    <h1>{{ c.display_name or ("@" ~ c.username if c.username else "Customer") }}</h1>
-    <p class="muted small">{% if c.username %}@{{ c.username }} · {% endif %}{{ c.channel }} id {{ c.external_user_id }}{% if c.ignored %} · ignored{% endif %}</p>
+    <h1>{{ c.display_name or ("@" ~ c.username if c.username else t("Customer")) }}</h1>
+    <p class="muted small">{% if c.username %}@{{ c.username }} · {% endif %}{{ c.channel }} id {{ c.external_user_id }}{% if c.ignored %} · {{ t("ignored") }}{% endif %}</p>
   </div>
   <div class="buttons">
-    <a class="button" href="{{ tg_link }}">Open in Telegram</a>
+    <a class="button" href="{{ tg_link }}">{{ t("Open in Telegram") }}</a>
     <form method="post" action="/customers/{{ c.id }}/auto" class="inline">
       <input type="hidden" name="csrf" value="{{ csrf }}">
-      {% if c.auto_reply_off %}<button name="off" value="0" class="quiet">Allow auto-reply</button>
-      {% else %}<button name="off" value="1" class="quiet">Never auto-reply to this customer</button>{% endif %}
+      {% if c.auto_reply_off %}<button name="off" value="0" class="quiet">{{ t("Allow auto-reply") }}</button>
+      {% else %}<button name="off" value="1" class="quiet">{{ t("Never auto-reply to this customer") }}</button>{% endif %}
     </form>
   </div>
 </header>
-{% if c.auto_reply_off %}<p class="flash warnbox">🤖 Auto-reply is off for this customer.</p>{% endif %}
+{% if c.auto_reply_off %}<p class="flash warnbox">🤖 {{ t("Auto-reply is off for this customer.") }}</p>{% endif %}
 {% if paused_until %}
 <form method="post" action="/customers/{{ c.id }}/resume-auto" class="flash warnbox paused">
   <input type="hidden" name="csrf" value="{{ csrf }}">
-  ⏸ Paused — you're replying by hand (until {{ paused_until | local_time("%H:%M") }}).
-  <button>Resume auto</button>
+  ⏸ {{ t("Paused — you're replying by hand (until {time}).", time=paused_until | local_time("%H:%M")) }}
+  <button>{{ t("Resume auto") }}</button>
 </form>
 {% endif %}
 
-<nav class="tabs phone-tabs" aria-label="View">
-  <a href="/chats/{{ c.id }}" {% if tab != "cart" %}aria-current="page"{% endif %}>Chat</a>
-  <a href="/chats/{{ c.id }}?tab=cart#cart" {% if tab == "cart" %}aria-current="page"{% endif %}>Cart{% if cart and not cart.empty %} ({{ cart.lines|length }}){% endif %}</a>
+<nav class="tabs phone-tabs" aria-label="{{ t('View') }}">
+  <a href="/chats/{{ c.id }}" {% if tab != "cart" %}aria-current="page"{% endif %}>{{ t("Chat") }}</a>
+  <a href="/chats/{{ c.id }}?tab=cart#cart" {% if tab == "cart" %}aria-current="page"{% endif %}>{{ t("Cart") }}{% if cart and not cart.empty %} ({{ cart.lines|length }}){% endif %}</a>
 </nav>
 
 <div class="chat-layout">
@@ -40,19 +41,20 @@
   {% include "_cart.html" %}
 
   <section class="card reply-pane {% if tab == 'cart' %}phone-hidden{% endif %}" id="reply">
-    <nav class="tabs" aria-label="Reply type">
-      <a href="/chats/{{ c.id }}?compose=custom#reply" {% if mode == "custom" %}aria-current="page"{% endif %}>Custom</a>
-      <a href="/chats/{{ c.id }}?compose=price#reply" {% if mode == "price" %}aria-current="page"{% endif %}>Price</a>
+    <nav class="tabs" aria-label="{{ t('Reply type') }}">
+      <a href="/chats/{{ c.id }}?compose=custom#reply" {% if mode == "custom" %}aria-current="page"{% endif %}>{{ t("Custom") }}</a>
+      <a href="/chats/{{ c.id }}?compose=price#reply" {% if mode == "price" %}aria-current="page"{% endif %}>{{ t("Price") }}</a>
       {% if cart and not cart.empty %}
-      <a href="/chats/{{ c.id }}?compose=cart#reply" {% if mode == "cart" %}aria-current="page"{% endif %}>Cart list</a>
-      <a href="/chats/{{ c.id }}?compose=ask_phone#reply" {% if mode == "ask_phone" %}aria-current="page"{% endif %}>Ask phone</a>
-      <a href="/chats/{{ c.id }}?compose=ask_address#reply" {% if mode == "ask_address" %}aria-current="page"{% endif %}>Ask address</a>
-      <a href="/chats/{{ c.id }}?compose=payment_info#reply" {% if mode == "payment_info" %}aria-current="page"{% endif %}>Payment info</a>
+      <a href="/chats/{{ c.id }}?compose=cart#reply" {% if mode == "cart" %}aria-current="page"{% endif %}>{{ t("Cart list") }}</a>
+      <a href="/chats/{{ c.id }}?compose=ask_phone#reply" {% if mode == "ask_phone" %}aria-current="page"{% endif %}>{{ t("Ask phone") }}</a>
+      <a href="/chats/{{ c.id }}?compose=ask_address#reply" {% if mode == "ask_address" %}aria-current="page"{% endif %}>{{ t("Ask address") }}</a>
+      <a href="/chats/{{ c.id }}?compose=payment_info#reply" {% if mode == "payment_info" %}aria-current="page"{% endif %}>{{ t("Payment info") }}</a>
       {% endif %}
     </nav>
+    {{ ui.help("Write your own reply, or pick a ready reply (price, cart list, ask phone…). You can edit it before Send.") }}
 
     {% if not can_send %}
-    <p class="problem-text">This customer has never messaged us, so we can't message them.</p>
+    <p class="problem-text">{{ t("This customer has never messaged us, so we can't message them.") }}</p>
     {% else %}
 
     {% if mode == "price" %}
@@ -61,39 +63,39 @@
       <input type="hidden" name="make" value="1">
       {% for item in items %}
       <div class="grid pick-row">
-        <label>Product {{ loop.index }}
+        <label>{{ t("Product") }} {{ loop.index }}
           <select name="p{{ loop.index }}">
             <option value="">—</option>
             {% for p in products %}<option value="{{ p.id }}" {% if p.id == item.product_id %}selected{% endif %}>{{ p.name }} · {{ p.brand }}</option>{% endfor %}
           </select>
         </label>
-        <label>Size
+        <label>{{ t("Size") }}
           <select name="s{{ loop.index }}">
-            <option value="all" {% if item.size == "all" %}selected{% endif %}>all sizes</option>
+            <option value="all" {% if item.size == "all" %}selected{% endif %}>{{ t("all sizes") }}</option>
             {% for s in sizes %}<option value="{{ s }}" {% if item.size == s|string %}selected{% endif %}>{{ s }}ml</option>{% endfor %}
-            <option value="full" {% if item.size == "full" %}selected{% endif %}>full bottle</option>
+            <option value="full" {% if item.size == "full" %}selected{% endif %}>{{ t("full bottle") }}</option>
           </select>
         </label>
       </div>
       {% endfor %}
-      <button>Make price reply</button>
-      <p class="muted small">Pre-filled from what the customer asked in the last 24 h.</p>
+      <button>{{ t("Make price reply") }}</button>
+      <p class="muted small">{{ t("Pre-filled from what the customer asked in the last 24 h.") }}</p>
     </form>
     {% endif %}
 
-    {% for p in result.problems %}<p class="flash bad" role="alert">{{ p }}</p>{% endfor %}
-    {% for n in result.notes %}<p class="flash warnbox">{{ n }}</p>{% endfor %}
+    {% for p in result.problems %}<p class="flash bad" role="alert">{{ tr(p) }}</p>{% endfor %}
+    {% for n in result.notes %}<p class="flash warnbox">{{ tr(n) }}</p>{% endfor %}
 
     {% if mode == "custom" or (result.text.strip() and not result.problems) %}
     <form method="post" action="/chats/{{ c.id }}/send" class="stack">
       <input type="hidden" name="csrf" value="{{ csrf }}">
       <input type="hidden" name="key" value="{{ key }}">
       <input type="hidden" name="reply_kind" value="{{ mode }}">
-      <label>Message (you can edit it)
+      <label>{{ t("Message (you can edit it)") }}
         <textarea name="text" rows="{{ [result.text.count('\n') + 3, 4]|max }}" maxlength="{{ max_text }}" required>{{ result.text }}</textarea>
       </label>
-      {% if greet %}<p class="muted small">Starts with the greeting: we haven't messaged them in the last 6 hours.</p>{% endif %}
-      <button class="primary">Send</button>
+      {% if greet %}<p class="muted small">{{ t("Starts with the greeting: we haven't messaged them in the last 6 hours.") }}</p>{% endif %}
+      <button class="primary">{{ t("Send") }}</button>
     </form>
     {% endif %}
     {% endif %}
