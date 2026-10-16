@@ -2,12 +2,11 @@
 
 Read CLAUDE.md first. This file tracks where we are.
 
-## RESUME HERE (updated 2026-10-17 by VPS Claude Code)
-- v1-v4.8 DONE. 4.8 fixed the live bug ("လိပ်စာ ပြောင်းချင်ပါတယ်" sent payment info) and added the change
-  address / phone flow (rules-7, change_info). AI: SHADOW, auto-graduate ON.
-- Open owner decision: live order 28 / customer 11 have the address "လိပ်စာ ပြောင်းချင်ပါတယ်" (the bug's
-  damage, see REPORT.md v4.8). Not changed yet.
-- Owner tests pending: v4, staff, v4.6, v4.7, v4.8 (REPORT.md).
+## RESUME HERE (updated 2026-10-17 by planning chat)
+- v1-v4.8 DONE (AI SHADOW, auto-graduate ON).
+- NOW: epic 4.9 docs/SPEC-v4.9-greeting.md — "hi" from a customer with an open order got no
+  reply. Smart, state-aware greeting replies (30 min repeat window). Same loop: tests I1-I6 ->
+  fix -> green -> self-review -> deploy -> report.
 - Owner checks: `bash scripts/status.sh`; AI numbers at /ai.
 
 ## Status
