@@ -26,7 +26,7 @@ DEFAULTS = {"auto_approve_after": 3, "greeting": True, "auto_not_stocked": True}
 MAX_AUTO_APPROVE = 20
 LIVE = ("pending", "approved")
 LEARNABLE_INTENTS = ("buy", "ask_price", "ask_stock", "remove", "cancel_order", "ask_delivery", "greeting",
-                     "previous_item")
+                     "previous_item", "change_info")
 
 
 # ---------- settings ----------

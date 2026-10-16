@@ -19,13 +19,16 @@ intent phrases (they win over the seed keywords; their words are not product nam
 greeting intent (a message that is ONLY a greeting). Items keep the customer's words (name_text).
 rules-6 (docs/SPEC-v4.md 4.3): previous_item ("ဟိုနေ့ကဟာ ထပ်ယူမယ်", "same as before") when no product is
 named and it is not a price / stock / remove question; parse_choice() reads "1", "1 နဲ့ 2", "အကုန်".
+rules-7 (docs/SPEC-v4.8-change-info.md): change_info ("လိပ်စာ ပြောင်းချင်ပါတယ်", "ဖုန်းအသစ်", "change address");
+an address needs real CONTENT (township, street, number, ward or a long text): keywords alone
+("လိပ်စာ", "ပို့ပေးပါ", "address") are not an address and never an agreement.
 """
 import re
 from dataclasses import dataclass, field
 
 from rapidfuzz import fuzz
 
-PARSER_VERSION = "rules-6"
+PARSER_VERSION = "rules-7"
 NEEDS_REVIEW_BELOW = 0.6  # dashboard shows results under this as "needs review"
 FUZZY_THRESHOLD = 88      # rapidfuzz partial_ratio, 0-100
 FUZZY_MIN_ALIAS_LEN = 5   # shorter aliases match too much by accident
@@ -73,6 +76,18 @@ DELI_WORD_RE = _rx(_w("deli"))
 DONE_RE = _rx("ဒါပဲ", "ဒါပါပဲ", "ဒီလောက်ပါပဲ", "ဒီလောက်ပဲ", "ဒါတွေပဲ", "ဒါတွေပါပဲ")
 CONFIRM_RE = _rx("အဆင်ပြေတယ်", "အဆင်ပြေပါတယ်", "ဟုတ်ကဲ့", "ရပါတယ်", _w("ok"), _w("okay"), _w("confirm"))
 PRODUCT_INTENTS = ("buy", "ask_price", "ask_stock", "remove")
+# Changing the delivery address / phone (docs/SPEC-v4.8-change-info.md). Checked before "address".
+CHANGE_ADDRESS_RE = _rx(r"လိပ်စာ\s*(?:ကို\s*)?ပြောင်း", r"လိပ်စာ\s*အသစ်", r"လိပ်စာ\s*မှား", r"တခြား\s*လိပ်စာ",
+                        r"ဒီ\s*လိပ်စာ\s*(?:မ\s*)?(?:ဟုတ်ဘူး|မဟုတ်)", _w(r"(?:change|new|wrong|different)\s+(?:the\s+|my\s+)?address"),
+                        _w(r"address\s+change"))
+CHANGE_PHONE_RE = _rx(r"ဖုန်း\s*(?:နံပါတ်\s*)?(?:ကို\s*)?ပြောင်း", r"ဖုန်း\s*(?:နံပါတ်\s*)?အသစ်", r"ဖုန်း\s*(?:နံပါတ်\s*)?မှား",
+                      r"တခြား\s*ဖုန်း", _w(r"(?:change|new|wrong|different)\s+(?:the\s+|my\s+)?(?:phone|number|ph)"))
+CHANGE_BOTH_RE = _rx(r"(?:လိပ်စာ|ဖုန်း(?:နံပါတ်)?)\s*(?:နဲ့|နှင့်|ရော|ကော)\s*(?:လိပ်စာ|ဖုန်း(?:နံပါတ်)?)\s*(?:ရော|ကော|ပါ)?\s*ပြောင်း",
+                     _w(r"(?:change|new)\s+(?:address\s+and\s+phone|phone\s+and\s+address)"))
+CHANGE_ANY_RE = _rx(r"^\s*ပြောင်း(?:မယ်|ချင်)")  # "I'll change it" (what is not said: unclear)
+# "Send it to THIS address": a new address that replaces the saved one (not a "keep the old one")
+REPLACE_RE = _rx(r"ဒီ\s*လိပ်စာ\s*(?:ကို|ကိုပဲ)?\s*ပို့", r"ဒီ\s*ကို\s*(?:ပဲ\s*)?ပို့", _w("this address"),
+                 _w(r"send (?:it )?here"))
 # "The previous one" (4.3): the items come from the customer's history, not from the text.
 PREVIOUS_RE = _rx("ဟိုနေ့က(?:ဟာ|ဟို|ပစ္စည်း)", "အရင်က(?:ဟာ|ဟို|ပစ္စည်း)", "အရင်ယူတဲ့(?:ဟာ|ဟို)", "ပြီးခဲ့တဲ့တစ်ခါက(?:ဟာ)?",
                   "အဲ့ဒါ", "အဲ့ဟာ", "အဲဒါ", _w("same one"), _w("last time"), _w("same as before"), _w("same again"))
@@ -153,12 +168,54 @@ def find_intent(text: str, has_product_or_size: bool = False) -> str | None:
             return intent
     if has_product_or_size and POLITE_BUY_RE.search(text):
         return "buy"
+    if change_kind(text):
+        return "change_info"
     for intent, pattern in (("ask_delivery", ASK_DELIVERY_RE), ("address", ADDRESS_RE), ("done", DONE_RE),
                             ("confirm", CONFIRM_RE)):
         if pattern.search(text):
             return intent
     if DELI_WORD_RE.search(text) and not _PHONE_RE.search(text):
         return "ask_delivery"
+    return None
+
+
+def change_kind(text: str) -> str | None:
+    """address | phone | both | unclear, or None when the message does not ask to change them."""
+    address, phone = bool(CHANGE_ADDRESS_RE.search(text)), bool(CHANGE_PHONE_RE.search(text))
+    if (address and phone) or CHANGE_BOTH_RE.search(text):
+        return "both"
+    if address or phone:
+        return "address" if address else "phone"
+    return "unclear" if CHANGE_ANY_RE.search(text) else None
+
+
+def replace_words(text: str) -> bool:
+    """"ဒီလိပ်စာကိုပို့ပေးပါ …", "ဒီကိုပို့ပါ", "this address", or change words: the new info REPLACES."""
+    return bool(REPLACE_RE.search(text) or change_kind(text))
+
+
+# What is left of an address once these are removed must still say WHERE (rules-7).
+_ADDRESS_KEYWORDS_RE = _rx(
+    r"ဒီ\s*လိပ်စာ\s*(?:ကို|ကိုပဲ)?", r"လိပ်စာ\s*(?:အသစ်)?\s*(?:က|ကို|ပါ)?", r"(?:ကို\s*)?ပို့\s*(?:ပေး)?\s*(?:ပါ|မယ်)?",
+    r"ဒီ\s*ကို", r"ပြောင်း(?:ချင်|မယ်)?(?:ပါ)?(?:တယ်)?", r"မှားနေ(?:တယ်)?", r"အသစ်",
+    _w(r"(?:this|new|my|the|change|wrong)?\s*address"), _w("send"), _w("to"), _w("here"), _w("pls"), _w("please"),
+    r"နော်", r"ရှင့်", r"ရှင်", r"ခင်ဗျာ", r"ခင်ဗျ", r"ဗျ", r"ပါ", r"တယ်", r"လေး", r"ဖုန်း(?:နံပါတ်)?", _w("phone"))
+_ADDRESS_CONTENT_RE = _rx(r"\d", r"\S{2,}လမ်း", r"ရပ်ကွက်", r"မြို့နယ်", r"အိမ်", r"တိုက်", r"ကွက်", r"ဈေး", r"ဘုရား",
+                          r"ကျောင်း", r"ဆေးရုံ", *TOWNSHIPS, *(_w(t) for t in TOWNSHIPS_LATIN),
+                          _w(r"(?:street|st|road|rd|lane|ward|quarter|qtr|township|tsp|no|bldg|building|room)"))
+
+
+def address_content(text: str) -> str | None:
+    """The part of a (normalized) message that says WHERE, or None if it only has keywords
+    ("လိပ်စာ", "ပို့ပေးပါ", "address", "လိပ်စာ ပြောင်းချင်ပါတယ်"). Phones don't count."""
+    rest = _PHONE_RE.sub(" ", text)
+    rest = _ADDRESS_KEYWORDS_RE.sub(" ", rest)
+    rest = " ".join(re.sub(r"[^\w\s\u1000-\u109f/#-]|_", " ", rest).split())
+    if not rest:
+        return None
+    letters = sum(c.isalpha() for c in rest)
+    if _ADDRESS_CONTENT_RE.search(rest) or letters >= 12:
+        return rest
     return None
 
 
@@ -515,6 +572,8 @@ def parse(normalized_text: str, aliases: list[Alias], full_sizes: dict[int, int]
         return ParseOutcome("previous_item", None, None, find_quantity(text), 0.8, (), phone, learned_ids)
     if intent is None and phone:
         intent = "address"  # contact details
+    if intent == "address" and not phone and address_content(text) is None:
+        intent = None  # "လိပ်စာ" / "ပို့ပေးပါ" alone: not an address, never an agreement (rules-7)
     if intent not in PRODUCT_INTENTS and intent is not None:
         items = named  # no context guessing for address/confirm/done
     first = next((i for i in items if i.product_id), items[0] if items else None)
@@ -530,7 +589,8 @@ def parse(normalized_text: str, aliases: list[Alias], full_sizes: dict[int, int]
         intent = "unknown"
     if intent == "remove" and not items and CANCEL_ORDER_RE.search(text):
         intent = "cancel_order"  # no product named: the whole order
-    if intent in ("address", "confirm", "done", "ask_delivery", "cancel_order") or (intent == "remove" and not items):
+    if intent in ("address", "confirm", "done", "ask_delivery", "cancel_order", "change_info") \
+            or (intent == "remove" and not items):
         return ParseOutcome(intent, product_id, size_ml, quantity, 0.8, items_t, phone, learned_ids)
 
     intent_score = 0.0 if intent == "unknown" else 0.3

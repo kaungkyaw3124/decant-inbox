@@ -1260,3 +1260,95 @@ Yangon, if 50 suggestions have been checked by then. First weekly summary: Monda
    "🧠 AI switched back to SHADOW: an admin changed the product of an AUTO-handled message", and /ai shows
    SHADOW. Then tick "Auto-graduate" in the settings and Save, so it can graduate by itself again.
 4. Monday after 09:00: reports/ai-weekly.md on GitHub, commit "AI weekly summary", numbers only.
+
+## 2026-10-17 — v4.8: changing address / phone (live bug fix, docs/SPEC-v4.8-change-info.md)
+**The live bug, reproduced first.** Returning customer, cart list ending "…ကိုပဲ ပို့ပေးရမလား။" → reply
+"လိပ်စာ ပြောင်းချင်ပါတယ်".
+- The word လိပ်စာ made it intent=address, and the whole sentence counted as an address.
+- That counted as agreement: the cart was confirmed and payment info went out.
+- The order's AND the customer's saved address became the sentence "လိပ်စာ ပြောင်းချင်ပါတယ်" itself
+  (worse than reported).
+
+**What was built**
+- Parser rules-7:
+  - `change_info` from the seed phrases (address / phone / both / unclear), checked before "address".
+  - An address needs real content (township, street, number, ward, landmark or a long text);
+    "လိပ်စာ", "ပို့ပေးပါ", "address" alone are not an address and never an agreement.
+  - "မဟုတ်ဘူး / no / မဟုတ်ပါ / ပြောင်းမယ်" right after the returning question → change_info (unclear).
+  - `change_info` is learnable (teaching card choice "လိပ်စာ / ဖုန်း ပြောင်းချင်") and the AI may return it
+    (prompt + schema + checker; AUTO allowed).
+- Saving addresses: "ဒီလိပ်စာကိုပို့ပေးပါ - …" / "လိပ်စာအသစ် …" / "new address: …" prefixes are stripped, so only
+  the address is saved.
+- Change flow (new `orders.change_wanted`):
+  - Reply ask_new_address / ask_new_phone / ask_new_contact (editable templates).
+  - Payment info waits. Even "ok" meanwhile only repeats the question.
+  - The next address replaces the order's and the customer's address; the next phone becomes the order's
+    only phone and the customer's phone 1 (old ones kept below, max 3).
+  - A phone without change words is still added. "ဒီလိပ်စာကိုပို့ပေးပါ …" / "this address" replaces
+    without asking first.
+- Replies after a change, by order status:
+  - cart / confirmed: "လိပ်စာ ပြင်ပြီးပါပြီ – {address}" (phone_updated likewise), then payment info in the
+    same message.
+  - waiting_payment: that line only; payment info is never resent.
+  - photo_received / paid / packed: saved + the line + Needs you "📍 Order #N address changed after payment —
+    check before packing/sending" with a "✅ checked" button.
+  - sent_out / delivered: no change, no reply; Needs you "customer wants to change the address of an order
+    already sent".
+- Dashboard:
+  - The cart panel shows "📍 address changed at hh:mm (old: …)" for 24 h and "⏳ Waiting for the new address
+    from the customer" as the next step.
+  - The orders page has "Address / phone changes (n)" history (order_events kind "contact").
+  - Undo of the tap restores the address, phones, waiting state, and removes the change event.
+- Migration 45cb2f34b657: intent and quick-action checks, orders.change_wanted / change_asked_at,
+  order_events.kind (status | contact | address_checked; status Undo only sees "status"). Down/up tested.
+- Staff guide: a short "📍 လိပ်စာ / ဖုန်း ပြောင်းချင်ရင်" section; all new texts in Burmese.
+
+**Decisions**
+- Payment info itself still has no address line (unchanged template). "Payment info with the NEW address"
+  = the "လိပ်စာ ပြင်ပြီးပါပြီ – <new address>" line comes first in the same message, and the order holds the
+  new address. The order confirmation after payment uses the current order address (checked in H5).
+- "AI said we don't stock it" etc. is unaffected. The AI eval set grew to 50 cases (a change request in
+  new words; "လိပ်စာ" alone). Gate re-run after the prompt change: 100%, 0 wrong products (one earlier
+  run had a single timeout on the new case; it was right 3/3 when repeated).
+
+**Tests:** 387 passed, 1 skipped (was 351 + 1). 36 new tests in tests/test_v48_change_info.py:
+- H1: the exact live case, by one-tap and in auto mode; Undo; "ok" while waiting.
+- H2: "this address" replaces.
+- H3: keywords alone are not an address and not agreement.
+- H4: "no" to the returning question, then phone + address together; "no" without the question is not a
+  change.
+- H5: change after payment info, no resend; the confirmation shows the new address.
+- H6: change after paid, with Needs you and "checked"; after sent out, Needs you only.
+- H7: phone replace, then a plain number adds.
+- H8: no AI call for rules-certain change messages; the card offers change_info; every seed phrase and
+  every negative answer.
+- The synthetic fixture and all earlier tests pass.
+
+**Deployed:** backup product_requests_2026-10-16T1956Z.dump, migration at head, parser (rules-7) + web
+restarted, health ok. Re-parse: 26 rows got the new version; 2 meanings changed:
+- message 52 "ပို့ပေးပါ": address → other
+- message 60 "လိပ်စာ ပြောင်းချင်ပါတယ်": address → change_info
+
+**Live data the owner should look at (not changed by me):** order 28 (waiting_payment, customer 11) has the
+address "လိပ်စာ ပြောင်းချင်ပါတယ်", and customer 11's saved address is the same. That is the bug's damage.
+- Fix in the chat: ask the customer for the new address. When it arrives, the app saves it on the order
+  and the customer.
+- Or tell Claude Code to put order 28 into "waiting for the new address", so their next address is
+  confirmed with "လိပ်စာ ပြင်ပြီးပါပြီ – …".
+
+**Owner test (from a second Telegram account; Auto-reply ON)**
+1. Make the account "returning": it needs a saved phone + address from an earlier order. Send
+   `stw intensely 10ml ယူမယ်`. The list ends "ဖုန်း …၊ လိပ်စာ … ကိုပဲ ပို့ပေးရမလား။".
+2. Send `လိပ်စာ ပြောင်းချင်ပါတယ်`.
+   - Expect only "ပို့ပေးရမယ့် လိပ်စာအသစ် ပို့ပေးပါနော်။", NO payment info.
+   - Chats > cart shows "⏳ Waiting for the new address from the customer".
+3. Send `ok`. Expect the same question again, still no payment info.
+4. Send `ဗဟန်း ရွှေဂုံတိုင်လမ်း အမှတ် ၅`.
+   - Expect "လိပ်စာ ပြင်ပြီးပါပြီ – ဗဟန်း ရွှေဂုံတိုင်လမ်း အမှတ် 5" + the payment info in one message.
+   - The cart panel shows "📍 address changed at hh:mm (old: …)".
+5. Send `လိပ်စာ ပြောင်းချင်ပါတယ်` again, then `ဒဂုံ ၃လမ်း အမှတ် ၉`. Expect only "လိပ်စာ ပြင်ပြီးပါပြီ – ဒဂုံ 3လမ်း
+   အမှတ် 9" (payment info is not sent twice).
+6. Send `လိပ်စာ` alone. Expect no reply (it is not an address).
+7. Cancel the cart. Order again, then answer the returning question with `ဖုန်းပြောင်းချင်တယ်`. Expect
+   "ဖုန်းနံပါတ်အသစ် ပို့ပေးပါနော်။". Send a new number. Expect "ဖုန်းနံပါတ် ပြင်ပြီးပါပြီ – …" + payment info;
+   Chats shows the new number first.

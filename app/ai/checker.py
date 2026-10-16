@@ -6,7 +6,7 @@ from app.parser.normalize import normalize
 
 MAX_QTY = 20
 LEARN_INTENTS = ("buy", "ask_price", "ask_stock", "remove", "cancel_order", "ask_delivery", "greeting",
-                 "previous_item")
+                 "previous_item", "change_info")
 
 
 def parse(data: dict) -> tuple[AIResult | None, list[str]]:

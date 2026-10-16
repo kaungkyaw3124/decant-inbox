@@ -168,6 +168,8 @@ def cancel(session: Session, order: Order, user: User | None, texts: dict[str, s
 
 def undo(session: Session, event: OrderEvent, user: User, now: datetime | None = None) -> Order:
     now = now or datetime.now(UTC)
+    if event.kind != "status":
+        raise OrderError("Not a status change.")
     if event.undone_at is not None:
         raise OrderError("Already undone.")
     if now - event.created_at > UNDO_WINDOW:
@@ -197,7 +199,8 @@ def undoable(session: Session, order_ids: list[int], now: datetime | None = None
     if not order_ids:
         return {}
     rows = session.scalars(select(OrderEvent).where(
-        OrderEvent.order_id.in_(order_ids), OrderEvent.undone_at.is_(None), OrderEvent.created_by.is_not(None),
+        OrderEvent.order_id.in_(order_ids), OrderEvent.kind == "status", OrderEvent.undone_at.is_(None),
+        OrderEvent.created_by.is_not(None),
         OrderEvent.created_at >= now - UNDO_WINDOW).order_by(OrderEvent.id))
     return {e.order_id: e for e in rows}
 

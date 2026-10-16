@@ -2,11 +2,12 @@
 
 Read CLAUDE.md first. This file tracks where we are.
 
-## RESUME HERE (updated 2026-10-17 by planning chat)
-- v1-v4.7 DONE (AI SHADOW, auto-graduate ON).
-- NOW: epic 4.8 docs/SPEC-v4.8-change-info.md — LIVE BUG: "လိပ်စာ ပြောင်းချင်ပါတယ်" was taken
-  as an address/agreement and payment info went out with the old address. Fix + change
-  address/phone flow. Same loop: tests H1-H8 -> fix -> green -> self-review -> deploy -> report.
+## RESUME HERE (updated 2026-10-17 by VPS Claude Code)
+- v1-v4.8 DONE. 4.8 fixed the live bug ("လိပ်စာ ပြောင်းချင်ပါတယ်" sent payment info) and added the change
+  address / phone flow (rules-7, change_info). AI: SHADOW, auto-graduate ON.
+- Open owner decision: live order 28 / customer 11 have the address "လိပ်စာ ပြောင်းချင်ပါတယ်" (the bug's
+  damage, see REPORT.md v4.8). Not changed yet.
+- Owner tests pending: v4, staff, v4.6, v4.7, v4.8 (REPORT.md).
 - Owner checks: `bash scripts/status.sh`; AI numbers at /ai.
 
 ## Status
@@ -24,6 +25,7 @@ Read CLAUDE.md first. This file tracks where we are.
 | 8 | v4 (docs/SPEC-v4.md): Learning Inbox | ✅ 4.1-4.5 done (owner test + staff test pending) |
 | 9 | v4.6 (docs/SPEC-v4.6-ai.md): AI helper, OpenAI | ✅ S0-S5 done, eval gate passed, live in SHADOW (owner test pending) |
 | 10 | v4.7 (docs/SPEC-v4.7-graduation.md): SHADOW -> AUTO graduation, brake, weekly summary | ✅ Done, live (auto-graduate ON) |
+| 11 | v4.8 (docs/SPEC-v4.8-change-info.md): change address / phone, live bug fix | ✅ Done, live (owner test pending) |
 
 ## Phase 0 checklist
 - [x] Step 0: rollback safety net scripts in ~/hardening/

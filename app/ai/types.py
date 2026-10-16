@@ -2,7 +2,7 @@
 from dataclasses import asdict, dataclass
 
 INTENTS = ("buy", "ask_price", "ask_stock", "remove", "cancel_order", "confirm", "done", "address", "ask_delivery",
-           "greeting", "previous_item", "question", "other")
+           "greeting", "previous_item", "change_info", "question", "other")
 LEARN_KINDS = ("nickname", "intent_phrase", "not_stocked")
 
 

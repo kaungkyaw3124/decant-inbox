@@ -11,7 +11,7 @@ CODES = {
     "buy": "ဝယ်မယ်", "ask_stock": "ရှိလားမေး", "ask_price": "ဈေးမေး", "other": "အခြား", "unknown": "မသိ",
     "remove": "ဖြုတ်မယ်", "confirm": "အတည်ပြု", "address": "လိပ်စာ", "ask_delivery": "ရောက်ပြီလားမေး",
     "cancel_order": "အော်ဒါပယ်", "greeting": "နှုတ်ဆက်", "previous_item": "အရင်ကဟာ", "question": "မေးခွန်း",
-    "ignore": "ဘာမှမလုပ်",
+    "ignore": "ဘာမှမလုပ်", "change_info": "လိပ်စာ/ဖုန်း ပြောင်း",
     # message review
     "new": "အသစ်", "done": "ပြီးပြီ", "ignored": "လျစ်လျူရှုထား",
     # orders
@@ -588,4 +588,28 @@ MY = {
     "Not saved: type numbers for the limits, budget, threshold and graduation rules.":
         "မသိမ်းရသေးပါ: အကန့်အသတ်၊ ဘတ်ဂျက်၊ threshold နဲ့ AUTO စည်းမျဉ်းတွေမှာ ဂဏန်းရိုက်ပါ။",
     "Not saved: Mode: off, shadow or auto.": "မသိမ်းရသေးပါ: မုဒ်က off, shadow, auto ပဲ ရွေးလို့ရတယ်။",
+    # changing the address / phone (docs/SPEC-v4.8-change-info.md)
+    "Address / phone changes ({n})": "လိပ်စာ / ဖုန်း ပြောင်းခဲ့တာ ({n})",
+    "Address changed after the payment photo — check before packing/sending":
+        "ငွေလွှဲပုံ ပို့ပြီးမှ လိပ်စာ ပြောင်းထားတယ် — မထုပ်ခင်/မပို့ခင် စစ်ပါ",
+    "Order #{no} address changed after payment — check before packing/sending":
+        "အော်ဒါ #{no} ငွေချေပြီးမှ လိပ်စာ ပြောင်းထားတယ် — မထုပ်ခင်/မပို့ခင် စစ်ပါ",
+    "address changed at {time} (old: {old})": "{time} မှာ လိပ်စာ ပြောင်းထားတယ် (အဟောင်း: {old})",
+    "phone changed at {time} (old: {old})": "{time} မှာ ဖုန်း ပြောင်းထားတယ် (အဟောင်း: {old})",
+    "checked": "စစ်ပြီး",
+    "customer wants to change the address of an order already sent": "ပို့ပြီးသား အော်ဒါရဲ့ လိပ်စာ ပြောင်းချင်တယ်",
+    "Customer wants to change the address: ask the new one": "ဖောက်သည်က လိပ်စာ ပြောင်းချင်: အသစ် မေး",
+    "Customer wants to change the phone: ask the new one": "ဖောက်သည်က ဖုန်း ပြောင်းချင်: အသစ် မေး",
+    "Customer wants to change something (not clear what): ask both": "ဖောက်သည်က တစ်ခုခု ပြောင်းချင် (မရှင်း): နှစ်ခုလုံး မေး",
+    "New address saved (before payment info, or alone if it was sent already)":
+        "လိပ်စာအသစ် သိမ်းပြီး (ငွေလွှဲအချက်အလက်ရှေ့မှာ၊ ပို့ပြီးသားဆိုရင် ဒီစာကြောင်းပဲ)",
+    "New phone saved (before payment info, or alone if it was sent already)":
+        "ဖုန်းအသစ် သိမ်းပြီး (ငွေလွှဲအချက်အလက်ရှေ့မှာ၊ ပို့ပြီးသားဆိုရင် ဒီစာကြောင်းပဲ)",
+    "Waiting for the new address from the customer": "ဖောက်သည်ဆီက လိပ်စာအသစ် စောင့်နေတယ်",
+    "Waiting for the new phone number from the customer": "ဖောက်သည်ဆီက ဖုန်းနံပါတ်အသစ် စောင့်နေတယ်",
+    "Waiting for the new address / phone from the customer": "ဖောက်သည်ဆီက လိပ်စာ / ဖုန်း အသစ် စောင့်နေတယ်",
+    "📍 Ask for the new address": "📍 လိပ်စာအသစ် မေးမယ်", "📍 Ask for the new phone": "📍 ဖုန်းအသစ် မေးမယ်",
+    "📍 Ask for the new address + phone": "📍 လိပ်စာ + ဖုန်း အသစ် မေးမယ်",
+    " + confirm the change": " + ပြင်ပြီးကြောင်း ပြော",
+    "Not a status change.": "အခြေအနေ ပြောင်းတာ မဟုတ်ပါ။", "Marked as checked.": "စစ်ပြီးလို့ မှတ်ပြီး။",
 }

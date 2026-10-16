@@ -33,7 +33,7 @@ UNSURE_MATCHES = ("fuzzy", "multiple", "ambiguous", "partial", "context", "none"
 PRODUCT_INTENTS = ("buy", "ask_price", "ask_stock", "remove")
 # AUTO may act on these (cancel_order only with an open cart; previous_item only when the history has it)
 AUTO_INTENTS = ("buy", "ask_price", "ask_stock", "remove", "cancel_order", "confirm", "address", "greeting",
-                "ask_delivery", "previous_item")
+                "ask_delivery", "previous_item", "change_info")
 NOT_IN_LIST_AUTO = 0.9
 NOT_IN_LIST_HINT = 0.85
 CALL_KINDS = ("shadow", "accepted", "corrected", "auto", "rejected", "error", "unused")  # = a request was made

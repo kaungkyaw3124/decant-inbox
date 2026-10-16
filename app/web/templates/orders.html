@@ -21,6 +21,13 @@
       <p class="text">{% for i, p in v.lines %}{{ item_name(i, p) }}{% if not loop.last %}, {% endif %}{% endfor %}
         · <b>{{ format_mmk(o.total_mmk) }} ကျပ်</b></p>
       <p class="small">📞 {{ (o.phones or []) | join(", ") or "—" }}<br>📍 {{ o.address or "—" }}</p>
+      {% if contact_history.get(o.id) %}
+      <details class="small"><summary>{{ t("Address / phone changes ({n})", n=contact_history[o.id] | length) }}</summary>
+        <ul>{% for ev in contact_history[o.id] %}
+          <li>{{ ev.created_at | local_time }}: {% if ev.previous.address != ev.previous.new_address %}📍 {{ ev.previous.address or "—" }} → {{ ev.previous.new_address or "—" }}{% endif %}
+            {% if ev.previous.phones != ev.previous.new_phones %}📞 {{ ev.previous.phones | join(", ") or "—" }} → {{ ev.previous.new_phones | join(", ") }}{% endif %}</li>
+        {% endfor %}</ul></details>
+      {% endif %}
       {% if o.status == "sent_out" %}<p class="small muted">{{ t("Sent") }} {{ o.sent_out_at | local_time }}{% if o.deli_name or o.deli_phone %} · {{ t("Deli") }}: {{ o.deli_name or "" }} {{ o.deli_phone or "" }}{% endif %}{% if o.deli_note %} · {{ o.deli_note }}{% endif %}</p>{% endif %}
       {% if o.status == "cancelled" and o.cancel_note %}<p class="small muted">{{ t("Cancelled") }}: {{ tr(o.cancel_note) }}</p>{% endif %}
     </div>

@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from app.core import audit
 from app.models import Customer, Order, OrderEvent, User
 from app.models.orders import PAID_STATUSES
-from app.orders import cart, delivery, followups, reports
+from app.orders import cart, change, delivery, followups, reports
 from app.replies import templates as replies
 from app.web.auth import current_user, verify_csrf
 from app.web.deps import get_db, templates
@@ -52,7 +52,8 @@ def orders_page(request: Request, tab: str = "to_pack", db: Session = Depends(ge
     return templates.TemplateResponse(request, "orders.html", {
         "tab": tab, "tabs": TABS, "counts": counts, "status_labels": STATUS_LABELS,
         "rows": [(o, c, cart.view(db, o)) for o, c in rows], "item_name": cart.item_name,
-        "undo": delivery.undoable(db, [o.id for o, _ in rows]), "now": datetime.now(UTC)})
+        "undo": delivery.undoable(db, [o.id for o, _ in rows]), "now": datetime.now(UTC),
+        "contact_history": change.history(db, [o.id for o, _ in rows])})
 
 
 def _back(request: Request, back: str, order: Order) -> RedirectResponse:
@@ -126,6 +127,18 @@ def undo(request: Request, event_id: int, back: str = Form("/orders"), db: Sessi
         db.rollback()
         flash(request, str(exc))
     return RedirectResponse(safe_back(back, "/orders") + f"#order-{event.order_id}", status_code=303)
+
+
+@router.post("/orders/{order_id}/address-checked")
+def address_checked(request: Request, order_id: int, back: str = Form("/"), db: Session = Depends(get_db),
+                    user: User = Depends(current_user)):
+    """docs/SPEC-v4.8-change-info.md: an admin checked an address / phone changed after payment."""
+    order = _order(db, order_id)
+    change.mark_checked(db, order, user)
+    audit.record(db, user, "order.address_checked", order_id=order.id)
+    db.commit()
+    flash(request, "Marked as checked.")
+    return RedirectResponse(safe_back(back, "/"), status_code=303)
 
 
 @router.post("/needs-you/clear")

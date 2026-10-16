@@ -20,7 +20,7 @@ from app.models import (
 )
 from app.models.orders import MAX_PHONES, OPEN_STATUSES
 from app.models.outbox import MAX_TEXT, MEDIA_DIR
-from app.orders import actions, auto, cart, delivery
+from app.orders import actions, auto, cart, change, delivery
 from app.parser.normalize import normalize
 from app.parser.rules import find_phones
 from app.pricing.prices import current_prices
@@ -167,6 +167,10 @@ def next_step(db: Session, customer: Customer, order, view) -> dict | None:
     if order is None or view.empty:
         return None
     url = f"/chats/{customer.id}"
+    if order.change_wanted:  # docs/SPEC-v4.8-change-info.md: payment info waits for it
+        what = {"address": "the new address", "phone": "the new phone number"}.get(
+            order.change_wanted, "the new address / phone")
+        return {"label": f"Waiting for {what} from the customer", "wait": True}
     if order.status == "cart":
         if order.list_sent_at is None or order.updated_at > order.list_sent_at:
             return {"label": "Send cart list", "href": f"{url}?compose=cart#reply"}
@@ -201,6 +205,7 @@ def cart_context(db: Session, customer: Customer, texts: dict[str, str]) -> dict
             PaymentCheck.order_id == order.id, PaymentCheck.decision.in_(("pending", "several")),
             PaymentCheck.outbox_id.is_(None))) if order else None,
         "item_size": cart.item_size, "shipping": delivery.shipping_order(db, customer.id),
+        "contact_changes": change.recent_changes(db, order.id) if order else [],  # docs/SPEC-v4.8-change-info.md
     }
 
 

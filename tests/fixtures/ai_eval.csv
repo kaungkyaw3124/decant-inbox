@@ -47,3 +47,5 @@ q01,kpay နဲ့ ရလား,,,,question,,,payment question (FAQ topic)
 q02,ဘယ်တော့ ရောက်မလဲ,,,,ask_delivery,,,delivery status
 q03,ကျေးဇူးပါ,,,,other,,,thanks
 q04,ပို့ခ ဘယ်လောက်လဲ,,,,question/ask_delivery/ask_price,,,delivery fee question
+x01,အိမ်ပြောင်းသွားလို့ ပို့ရမယ့်နေရာ ပြောင်းပေးပါ,"S: ဖုန်း 09111222333၊ လိပ်စာ No. 5, Sanchaung ကိုပဲ ပို့ပေးရမလား။",Sauvage Eau de Parfum 5ml x1,,change_info,,,v4.8: wants another delivery place (not a seed phrase)
+x02,လိပ်စာ,"S: ဖုန်း 09111222333၊ လိပ်စာ No. 5, Sanchaung ကိုပဲ ပို့ပေးရမလား။",Sauvage Eau de Parfum 5ml x1,,other/question/change_info/confirm,,,v4.8: the keyword alone is not an address

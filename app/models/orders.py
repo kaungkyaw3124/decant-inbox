@@ -18,7 +18,9 @@ OPEN_STATUSES = ("cart", "confirmed", "waiting_payment", "photo_received")
 PAID_STATUSES = ("paid", "packed", "sent_out", "delivered")  # counted as sales
 SHIPPING_STATUSES = ("paid", "packed", "sent_out")  # paid, not delivered yet
 QUICK_KINDS = ("price", "cart_add", "cart_remove", "cart_list", "confirm", "address", "contact", "not_stocked",
-               "delivery", "cancel_order", "faq", "greeting", "teach", "choose_previous")
+               "delivery", "cancel_order", "faq", "greeting", "teach", "choose_previous", "change_info")
+CHANGE_WANTED = ("address", "phone", "both", "unclear")  # docs/SPEC-v4.8-change-info.md
+EVENT_KINDS = ("status", "contact", "address_checked")
 UNKNOWN_RESOLUTIONS = ("mapped", "new_product", "not_stocked")
 AUTO_STATUSES = ("replied", "skipped")
 # pending: one screenshot to check · several: more than one photo (ask for one) ·
@@ -35,6 +37,7 @@ class Order(Base):
     __tablename__ = "orders"
     __table_args__ = (
         CheckConstraint(f"status IN {ORDER_STATUSES}", name="status"),
+        CheckConstraint(f"change_wanted IN {CHANGE_WANTED}", name="change_wanted"),
         # one open cart per customer
         Index("uq_orders_open_per_customer", "customer_id", unique=True,
               postgresql_where=text(f"status IN {OPEN_STATUSES}")),
@@ -60,6 +63,10 @@ class Order(Base):
     deli_note: Mapped[str | None] = mapped_column(Text)  # for us only
     reminder_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))  # one payment reminder
     cancel_note: Mapped[str | None] = mapped_column(Text)  # why it was cancelled (admin / auto)
+    # docs/SPEC-v4.8-change-info.md: the customer wants to change the address / phone; we asked for the
+    # new one. While set, payment info waits and the next address / phone REPLACES the old one.
+    change_wanted: Mapped[str | None] = mapped_column(String(8))
+    change_asked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = created_at_column()
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(),
                                                  default=func.now())  # last change: idle carts expire
@@ -185,15 +192,20 @@ class AutoRun(Base):
 
 class OrderEvent(Base):
     """A delivery-status change of a paid order (or a cancel), with what is needed to undo it
-    within 60 s. created_by None = done by the system (auto-delivered, auto-cancel)."""
+    within 60 s. created_by None = done by the system (auto-delivered, auto-cancel).
+    kind "contact" (docs/SPEC-v4.8-change-info.md): the address / phones changed; previous = old
+    values, the order holds the new ones. kind "address_checked": an admin checked a change made
+    after payment."""
 
     __tablename__ = "order_events"
+    __table_args__ = (CheckConstraint(f"kind IN {EVENT_KINDS}", name="kind"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
     order_id: Mapped[int] = mapped_column(ForeignKey("orders.id"), index=True)
     from_status: Mapped[str] = mapped_column(String(20))
     to_status: Mapped[str] = mapped_column(String(20))
     previous: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)  # fields to restore on undo
+    kind: Mapped[str] = mapped_column(String(16), server_default="status", default="status")
     outbox_id: Mapped[int | None] = mapped_column(ForeignKey("outbox.id"))  # message it queued, if any
     created_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
     created_at: Mapped[datetime] = created_at_column()

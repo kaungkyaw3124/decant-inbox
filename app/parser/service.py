@@ -126,8 +126,11 @@ def parse_message(session: Session, message: Message, aliases: list[Alias],
         phrases = load_phrases(session)
     from app.orders import previous  # late import: orders -> parser
 
-    outcome = previous.as_choice(session, message, normalized) or parse(  # "1" answering a numbered list (4.3)
-        normalized, aliases, full_sizes, context_product(session, message), known_words, phrases)
+    from app.orders import change
+
+    outcome = (previous.as_choice(session, message, normalized)  # "1" answering a numbered list (4.3)
+               or change.negative_answer(session, message, normalized)  # "မဟုတ်ဘူး" to "…ကိုပဲ ပို့ပေးရမလား" (4.8)
+               or parse(normalized, aliases, full_sizes, context_product(session, message), known_words, phrases))
     if current is not None and _same(session, current, outcome):
         return "unchanged"
     if current is not None:

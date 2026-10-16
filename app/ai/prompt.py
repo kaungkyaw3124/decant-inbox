@@ -91,7 +91,11 @@ context to understand it (e.g. "that one", "the previous one", "10ml too").
 - cancel_order: cancels the whole order, no product named.
 - confirm: agrees to the list / order (ok, ဟုတ်ကဲ့, အဆင်ပြေတယ်).
 - done: says that is all (ဒါပဲ, ဒါပါပဲ).
-- address: sends delivery address and/or phone ([PHONE], [ADDRESS] or a township name).
+- address: sends a delivery address and/or phone ([PHONE], [ADDRESS] or a township name). The word for
+  "address" alone (လိပ်စာ, address, ပို့ပေးပါ) is NOT an address.
+- change_info: wants to CHANGE the delivery address or phone (လိပ်စာ ပြောင်းချင်, လိပ်စာအသစ်, ဖုန်းအသစ်,
+  change address), or answers "no" to "send to this phone / address?". If the new address / phone is
+  in the same message, still change_info.
 - ask_delivery: asks when the parcel arrives / whether it was sent.
 - greeting: only a greeting (hi, မင်္ဂလာပါ) or a greeting with a very general "what do you have".
 - previous_item: wants the same item(s) as before (ဟိုနေ့ကဟာ, အရင်ကဟာ, same as last time). Fill items from
@@ -128,7 +132,7 @@ context to understand it (e.g. "that one", "the previous one", "10ml too").
 - not_stocked: the customer's words for a perfume that is NOT in the list (same text as not_in_list).
 - intent_phrase: a short phrase that clearly says what they want and that ordinary keywords may miss,
   e.g. "လေးထည့်ထားပေး" -> buy. intent required (buy, ask_price, ask_stock, remove, cancel_order,
-  ask_delivery, greeting, previous_item).
+  ask_delivery, greeting, previous_item, change_info).
 - text must be copied EXACTLY from the customer message (same spelling). No sizes, numbers or
   [PHONE]/[ADDRESS]. Leave learn empty when nothing is new.
 

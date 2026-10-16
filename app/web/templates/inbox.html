@@ -14,6 +14,18 @@
   {% for n in needs_you.ai_notices %}
     <li class="problem-text">{% if user_role == "owner" %}<a href="/ai">{{ tr(n) }}</a>{% else %}{{ tr(n) }}{% endif %}</li>
   {% endfor %}
+  {% for o, c, ev in needs_you.changed_paid %}
+    <li><a href="/chats/{{ c.id }}"><b>📍 {% if o.order_no %}{{ t("Order #{no} address changed after payment — check before packing/sending", no=o.order_no) }}{% else %}{{ t("Address changed after the payment photo — check before packing/sending") }}{% endif %}</b></a>
+      <span class="small muted">{{ c.display_name or c.username or customer }}: {{ ev.previous.address or "—" }} → {{ o.address or "—" }}{% if ev.previous.phones != ev.previous.new_phones %} · 📞 {{ o.phones | join(", ") }}{% endif %}</span>
+      <form method="post" action="/orders/{{ o.id }}/address-checked" class="inline"><input type="hidden" name="csrf" value="{{ csrf }}">
+        <button class="link">✅ {{ t("checked") }}</button></form></li>
+  {% endfor %}
+  {% for m, c, o in needs_you.change_sent %}
+    <li><a href="/chats/{{ c.id }}"><b>📍 {{ c.display_name or c.username or customer }}</b>: {{ t("customer wants to change the address of an order already sent") }}{% if o.order_no %} (#{{ o.order_no }}){% endif %}</a>
+      <span class="small muted">“{{ m.raw_text | truncate(60) }}”</span>
+      <form method="post" action="/needs-you/clear" class="inline"><input type="hidden" name="csrf" value="{{ csrf }}">
+        <input type="hidden" name="message_id" value="{{ m.id }}"><button class="link">{{ t("done") }}</button></form></li>
+  {% endfor %}
   {% for check, order, c in needs_you.payments %}
     <li><a href="/payments/{{ check.id }}"><b>💳 {{ c.display_name or c.username or customer }}</b>:
       {{ t("several photos — ask for one") if check.decision == "several" else t("payment screenshot to check") }}</a>

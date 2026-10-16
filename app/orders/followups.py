@@ -110,7 +110,8 @@ def auto_cancelled(session: Session, now: datetime | None = None) -> list[tuple[
     now = now or datetime.now(UTC)
     return session.execute(select(Order, Customer).join(Customer, Customer.id == Order.customer_id)
                            .join(OrderEvent, OrderEvent.order_id == Order.id).where(
-        OrderEvent.to_status == "cancelled", OrderEvent.created_by.is_(None), OrderEvent.undone_at.is_(None),
+        OrderEvent.kind == "status", OrderEvent.to_status == "cancelled", OrderEvent.created_by.is_(None),
+        OrderEvent.undone_at.is_(None),
         OrderEvent.created_at >= now - INFO_WINDOW, Order.status == "cancelled").order_by(OrderEvent.id.desc())).all()
 
 

@@ -228,6 +228,18 @@ def add_phones(session: Session, order: Order | None, customer: Customer, phones
     return added
 
 
+def replace_phones(session: Session, order: Order, customer: Customer, phones: list[str],
+                   source_message_id: int | None) -> list[str]:
+    """docs/SPEC-v4.8-change-info.md: "my new number is …": the order has ONLY the new number(s); on
+    the customer they become phone 1 (2, …) and the old ones stay below (max 3)."""
+    new = list(dict.fromkeys(phones))[:MAX_PHONES]
+    rows = [r for r in phone_rows(session, customer.id) if r[0] not in new]
+    set_customer_phones(session, customer, [(p, source_message_id) for p in new] + rows)
+    order.phones = new
+    touch(session, order)
+    return new
+
+
 def set_address(session: Session, order: Order, customer: Customer, address: str | None) -> None:
     """Saved on the order and on the customer (offered again next time)."""
     order.address = customer.address = address
@@ -342,6 +354,11 @@ def payment_text(session: Session, order: Order, texts: dict[str, str]) -> str:
 
 _PHONE_IN_TEXT = re.compile(r"(?:\+?95[\s-]?|0)9(?:[\s-]?\d){7,9}")
 _TRAILING_ASK = re.compile(r"\s*(?:ကို)?\s*ပို့ပေးပါ(?:နော်|ရှင့်|ရှင်|ခင်ဗျာ)?\s*[။.!]*\s*$")
+# "ဒီလိပ်စာကိုပို့ပေးပါ - …", "လိပ်စာအသစ်က …", "new address: …" (docs/SPEC-v4.8-change-info.md): not part of it
+_LEADING_ASK = re.compile(
+    r"^\s*(?:(?:ဒီ\s*)?လိပ်စာ\s*(?:အသစ်)?\s*(?:ကိုပဲ|ကို|က)?\s*(?:ပြောင်း(?:ချင်|မယ်)?(?:ပါ)?(?:တယ်)?\s*)?"
+    r"(?:ပို့\s*(?:ပေး)?\s*ပါ(?:နော်|ရှင့်)?)?|ဒီ\s*ကို\s*(?:ပဲ\s*)?ပို့\s*(?:ပေး)?\s*ပါ|"
+    r"(?:(?:this|new|my|change)\s+)?address(?:\s+is)?)\s*[:：\-–,။]*\s*", re.IGNORECASE)
 _PHONE_WORDS = re.compile(
     r"(?i)(?:ဖုန်းနံပါတ်|ဖုန်း|(?<![a-z])(?:phone(?:\s*no)?|ph(?:\s*no)?|tel)(?![a-z])\.?)\s*[:：-]?\s*")
 
@@ -352,4 +369,5 @@ def address_from_message(raw_text: str) -> str:
     text = raw_text.translate(str.maketrans("၀၁၂၃၄၅၆၇၈၉", "0123456789"))
     text = _PHONE_WORDS.sub(" ", _PHONE_IN_TEXT.sub(" ", text))
     text = _TRAILING_ASK.sub("", re.sub(r"[ \t]+", " ", text).strip(" ,\n"))
+    text = _LEADING_ASK.sub("", text, count=1)
     return text.strip(" ,\n")[:500]

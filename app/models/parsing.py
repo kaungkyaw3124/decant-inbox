@@ -9,7 +9,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.core.base import Base, created_at_column
 
 INTENTS = ("buy", "ask_stock", "ask_price", "other", "unknown", "remove", "confirm", "done", "address",
-           "ask_delivery", "cancel_order", "greeting", "previous_item")
+           "ask_delivery", "cancel_order", "greeting", "previous_item", "change_info")
 PARSE_METHODS = ("rules", "ai", "human")
 
 

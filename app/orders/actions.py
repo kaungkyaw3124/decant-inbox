@@ -12,6 +12,9 @@ For each message at most ONE action is offered, chosen from its parse and the ca
                                         address) or send payment info when all is known
   phone(s) / address    -> contact      save them + ask what is still missing, or send
                                         payment info when everything is ready
+  change_info           -> change_info  "I want to change the address / phone" (docs/SPEC-v4.8-change-info.md):
+                                        ask for the new one; payment info waits; the next address /
+                                        phone REPLACES the old one ("လိပ်စာ ပြင်ပြီးပါပြီ – …")
   ask_delivery          -> delivery     "preparing" / "sent on {date}" for a paid order
                                         (docs/SPEC-v3.md 6.1); no paid order: nothing
   cancel_order          -> cancel_order cancel an unpaid order + reply (6.4); once a payment
@@ -45,20 +48,19 @@ from sqlalchemy.orm import Session
 
 from app.learning import patterns
 from app.models import (
-    AuditLog, ChoicePrompt, Customer, LearnedPattern, Message, MessageReview, Order, Outbox, ParseItem, ParseResult, Product,
-    QuickAction, UnknownRequest, User,
+    AuditLog, ChoicePrompt, Customer, LearnedPattern, Message, MessageReview, Order, OrderEvent, Outbox, ParseItem,
+    ParseResult, Product, QuickAction, UnknownRequest, User,
 )
 from app.models.outbox import UNDO_SECONDS
-from app.orders import cart, delivery, previous, unknown
+from app.orders import cart, change, delivery, previous, unknown
 from app.parser.normalize import normalize
-from app.parser.rules import ADDRESS_RE, NEEDS_REVIEW_BELOW, find_phones
+from app.parser.rules import CHANGE_PHONE_RE, NEEDS_REVIEW_BELOW, address_content, change_kind, find_phones, replace_words
 from app.pricing.prices import size_label
 from app.replies import compose, faq
 from app.replies.templates import render
 
 CONTEXT_WINDOW = timedelta(hours=24)
 UNDO_WITHOUT_REPLY = timedelta(seconds=60)  # actions that send nothing can be undone this long
-MIN_ADDRESS_LETTERS = 12  # a longer leftover counts as an address even without address words
 # "one more of the same": only then does a product+size already in the cart get +qty
 MORE_RE = re.compile(r"ထပ်|(?<![a-z])(?:more|another|again|extra)(?![a-z])|\+\s*1")
 
@@ -138,12 +140,12 @@ def _wanted(i: ParseItem) -> cart.WantedItem:
 
 
 def contact_in(message: Message) -> tuple[list[str], str | None]:
-    """(phones, address) found in a message. Address = the text without phones, if it
-    has address words or is long enough."""
+    """(phones, address) found in a message. Address = the text without phones and without
+    "ကိုပို့ပေးပါ" / "ဒီလိပ်စာကို…" words, only if it really says WHERE (township, street, number,
+    ward or a long text): "လိပ်စာ" or "ပို့ပေးပါ" alone is no address (docs/SPEC-v4.8-change-info.md)."""
     phones = find_phones(message.normalized_text or "")
     address = cart.address_from_message(message.raw_text)
-    letters = sum(c.isalpha() for c in address)
-    if not letters or not (ADDRESS_RE.search(address.lower()) or letters >= MIN_ADDRESS_LETTERS):
+    if not address or address_content(normalize(address)) is None:
         address = None
     return phones, address
 
@@ -153,7 +155,8 @@ def contact_in(message: Message) -> tuple[list[str], str | None]:
 def _order_state(order: Order) -> dict[str, Any]:
     return {"status": order.status, "closed_at": _iso(order.closed_at), "confirmed_at": _iso(order.confirmed_at),
             "payment_info_sent_at": _iso(order.payment_info_sent_at), "list_sent_at": _iso(order.list_sent_at),
-            "address": order.address, "phones": list(order.phones or [])}
+            "address": order.address, "phones": list(order.phones or []),
+            "change_wanted": order.change_wanted, "change_asked_at": _iso(order.change_asked_at)}
 
 
 def _iso(value: datetime | None) -> str | None:
@@ -161,7 +164,12 @@ def _iso(value: datetime | None) -> str | None:
 
 
 def _ask_next(session: Session, order: Order, texts: dict[str, str]) -> tuple[str | None, str | None, str]:
-    """For a confirmed cart: (reply, reply_kind, label suffix) for the next step, phone first."""
+    """For a confirmed cart: (reply, reply_kind, label suffix) for the next step, phone first.
+    While the customer's new address / phone is awaited (docs/SPEC-v4.8-change-info.md): ask for it
+    again, never payment info with the old one."""
+    if order.change_wanted:
+        key = {"address": "ask_new_address", "phone": "ask_new_phone"}.get(order.change_wanted, "ask_new_contact")
+        return texts[key], "contact", " + ask the new address / phone again"
     missing = cart.missing_contact(order)
     if "phone" in missing:
         return texts["ask_phone"], "ask_phone", " + ask phone"
@@ -256,8 +264,22 @@ def _apply_items(session: Session, message: Message, result: ParseResult, texts:
         return Outcome("cancel_order", "🚫 Cancel order + reply", texts["order_cancelled"], "cancel",
                        f"Cancels the {before['status'].replace('_', ' ')} order "
                        f"({order.total_mmk:,} ကျပ်).", order.id, {"order": before})
+    if intent == "change_info":
+        return _change(session, message, customer, texts, address_override)
     if intent == "buy":
         return _buy(session, message, customer, order, items, texts, dropped)
+    if intent == "address" and (order is None or order.status not in ("cart", "confirmed", "waiting_payment")):
+        paid = change.waiting_after_payment(session, customer.id)  # asked "change the address" after paying
+        if paid is None and order is not None and order.status == "photo_received" \
+                and replace_words(message.normalized_text or ""):
+            paid = order
+        if paid is not None:
+            phones, address = contact_in(message)
+            if address_override is not None and address is not None:
+                address = address_override.strip()[:500] or address
+            if phones or address:
+                return _contact(session, message, customer, paid, phones, address, texts, _order_state(paid), True)
+        return None
     if order is None or order.status not in ("cart", "confirmed", "waiting_payment"):
         return None
     before = _order_state(order)
@@ -365,27 +387,78 @@ def _previous(session: Session, message: Message, customer: Customer, order: Ord
                    undo={"prompt": prompt.id})
 
 
+def _change(session: Session, message: Message, customer: Customer, texts: dict[str, str],
+            address_override: str | None) -> Outcome | None:
+    """"လိပ်စာ ပြောင်းချင်ပါတယ်" (docs/SPEC-v4.8-change-info.md): ask for the new address / phone; the
+    order waits for it (no payment info meanwhile). With the new info in the same message
+    ("လိပ်စာအသစ် ဗဟန်း …"): replace at once. An order already sent out: nothing (Needs you)."""
+    order = change.target_order(session, customer.id)
+    if order is None or order.status in change.SENT:
+        return None
+    kind = change_kind(message.normalized_text or "") or "unclear"
+    before = _order_state(order)
+    phones, address = contact_in(message)
+    if address_override is not None and address is not None:
+        address = address_override.strip()[:500] or address
+    if phones or address:
+        order.change_wanted = kind
+        return _contact(session, message, customer, order, phones, address, texts, before, True)
+    order.change_wanted, order.change_asked_at = kind, datetime.now(UTC)
+    cart.touch(session, order)
+    key, what = {"address": ("ask_new_address", "address"), "phone": ("ask_new_phone", "phone")}.get(
+        kind, ("ask_new_contact", "address + phone"))
+    note = f"The customer wants to change the {what}. Payment info waits for the new one."
+    if order.status in change.AFTER_PAYMENT:
+        note += " Already paid: the new one is saved on the order and shown in Needs you to check."
+    return Outcome("change_info", f"📍 Ask for the new {what}", texts[key], "contact", note, order.id,
+                   {"order": before})
+
+
 def _contact(session: Session, message: Message, customer: Customer, order: Order, phones: list[str],
-             address: str | None, texts: dict[str, str], before: dict) -> Outcome | None:
+             address: str | None, texts: dict[str, str], before: dict, replace: bool = False) -> Outcome | None:
     """Save phone(s) and/or address, then ask for what is still missing (phone first) or
-    send payment info when everything is ready."""
+    send payment info when everything is ready.
+
+    replace (docs/SPEC-v4.8-change-info.md): after "change my address / phone", or with "ဒီလိပ်စာကို
+    ပို့ပေးပါ …" / "this address": the new address replaces the order's and the customer's; a new
+    phone becomes the order's only phone and the customer's phone 1. A phone without change words
+    is added (as before). The reply starts with "လိပ်စာ ပြင်ပြီးပါပြီ – …"; payment info follows if
+    it was not sent yet (never sent twice)."""
+    text_norm = message.normalized_text or ""
+    want = order.change_wanted
+    replace = replace or bool(want) or replace_words(text_norm)
     undo = {"order": before, "customer": {"address": customer.address},
             "phones": [list(r) for r in cart.phone_rows(session, customer.id)]}
+    old_address = order.address or customer.address
+    old_phones = list(order.phones or []) or cart.customer_phones(session, customer.id)
     agreed = order.status == "cart"  # Step 4d: a phone or address while "cart" = the customer agrees
     if agreed:
         cart.confirm(session, order)
-    added = cart.add_phones(session, order, customer, phones, message.id) if phones else []
-    phones_new_on_order = bool(set(order.phones or []) - set(before["phones"]))
-    new_address = address if address and address != order.address else None
+    replace_phone = bool(phones) and (want in ("phone", "both", "unclear") or bool(CHANGE_PHONE_RE.search(text_norm)))
+    if replace_phone:
+        added = cart.replace_phones(session, order, customer, phones, message.id)
+        phones_new_on_order = added != before["phones"]
+    else:
+        added = cart.add_phones(session, order, customer, phones, message.id) if phones else []
+        phones_new_on_order = bool(set(order.phones or []) - set(before["phones"]))
+    new_address = address if address and (address != order.address or (replace and address != old_address)) else None
     if new_address:
         cart.set_address(session, order, customer, new_address)
+    if want and (new_address or phones_new_on_order):
+        order.change_wanted = order.change_asked_at = None  # the new info came
     if not phones_new_on_order and not new_address:
         return None  # nothing new
     if order.status == "confirmed":  # a returning customer: keep the saved part they didn't change
         cart.use_saved_contact(session, order, customer)
+    updated = []
+    if replace and new_address:
+        updated.append(render(texts["address_updated"], address=new_address))
+    if replace_phone and phones_new_on_order:
+        updated.append(render(texts["phone_updated"], phone=", ".join(added)))
     shown_phones = ", ".join(added or [p for p in order.phones if p in phones])
-    parts = ([f"📞 Save phone{'s' if len(phones) > 1 else ''}"] if phones_new_on_order else []) + (
-        ["📍 Save address"] if new_address else [])
+    parts = ([f"📞 {'Replace' if replace_phone else 'Save'} phone{'s' if len(phones) > 1 else ''}"]
+             if phones_new_on_order else []) + (
+        [f"📍 {'Replace' if updated and replace else 'Save'} address"] if new_address else [])
     label, text, reply_kind = ("✅ " if agreed else "") + " & ".join(parts), None, None
     if order.status == "confirmed":
         if phones_new_on_order and not new_address and not order.address:
@@ -394,12 +467,30 @@ def _contact(session: Session, message: Message, customer: Customer, order: Orde
         else:
             text, reply_kind, suffix = _ask_next(session, order, texts)
             label += suffix
-    elif order.status == "waiting_payment" and added:  # payment info already sent: confirm the number
-        text, reply_kind = render(texts["phone_added"], phone=", ".join(added)), "contact"
-        label += " + reply"
+        if updated:  # "လိပ်စာ ပြင်ပြီးပါပြီ – …" first, then payment info / the next question
+            text, reply_kind = "\n".join(updated + ([text] if text else [])), reply_kind or "contact"
+            label += " + confirm the change" if reply_kind == "contact" else ""
+    elif order.status == "waiting_payment":  # payment info already sent: not again (amount unchanged)
+        if updated:
+            text, reply_kind, label = "\n".join(updated), "contact", label + " + confirm the change"
+        elif added:
+            text, reply_kind = render(texts["phone_added"], phone=", ".join(added)), "contact"
+            label += " + reply"
+    elif order.status in change.AFTER_PAYMENT and updated:
+        text, reply_kind, label = "\n".join(updated), "contact", label + " + confirm the change"
+    if (new_address and old_address and new_address != old_address) or (replace_phone and phones_new_on_order):
+        event = OrderEvent(order_id=order.id, from_status=order.status, to_status=order.status, kind="contact",
+                           previous={"address": old_address, "phones": old_phones,
+                                     "new_address": order.address, "new_phones": list(order.phones or []),
+                                     "message_id": message.id})
+        session.add(event)
+        session.flush()
+        undo["events"] = [event.id]
     saved = ", ".join(x for x in (shown_phones if phones_new_on_order else "", new_address or "") if x)
     problems = cart.view(session, order).problems
     note = (("Counts as agreement: cart confirmed. " if agreed else "") + f"Saves: {saved}."
+            + (f" Replaces the old one{'s' if replace_phone and len(old_phones) > 1 else ''}." if updated else "")
+            + (" Paid already: Needs you shows the change to check." if order.status in change.AFTER_PAYMENT else "")
             + (f" Still to check before payment: {', '.join(problems)}." if problems else ""))
     return Outcome("contact", label, text, reply_kind, note, order.id, undo, address=new_address)
 
@@ -601,9 +692,15 @@ def undo(session: Session, action: QuickAction, user: User) -> None:
                     order.cancel_note = None
             order.confirmed_at, order.payment_info_sent_at, order.list_sent_at = (
                 _dt(o["confirmed_at"]), _dt(o["payment_info_sent_at"]), _dt(o["list_sent_at"]))
+            if "change_wanted" in o:
+                order.change_wanted, order.change_asked_at = o["change_wanted"], _dt(o.get("change_asked_at"))
         if u.get("created_order") and cart.view(session, order).empty:
             cart.cancel(session, order)
         cart.touch(session, order)
+    for event_id in u.get("events") or []:  # the contact change never happened
+        event = session.get(OrderEvent, event_id)
+        if event is not None:
+            session.delete(event)
     if u.get("prompt"):
         prompt = session.get(ChoicePrompt, u["prompt"])
         if prompt is not None:

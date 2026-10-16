@@ -20,7 +20,7 @@ from app.models import AICall, AuditLog, Product, User
 # the AI's intent -> the card's "what do they want?" answer
 CARD_INTENT = {"buy": "buy", "ask_price": "ask_price", "ask_stock": "ask_stock", "remove": "remove",
                "cancel_order": "cancel_order", "ask_delivery": "ask_delivery", "previous_item": "previous_item",
-               "greeting": "greeting", "question": "question", "other": "ignore"}
+               "greeting": "greeting", "change_info": "change_info", "question": "question", "other": "ignore"}
 
 
 @dataclass
