@@ -33,6 +33,7 @@ Same "How to work" loop as docs/SPEC-v4.md (tests -> fix -> green -> self-review
      `လိပ်စာ ပြင်ပြီးပါပြီ – {address}` (or phone) and continue the flow: if payment info was
      NOT sent yet -> send it; if it WAS sent -> do not resend (amount unchanged), only the
      confirmation line. (Template address_updated / phone_updated.)
+   - (OVERRIDDEN by 4.10: paid orders are locked; photo_received -> Needs you, no auto change)
    - photo_received / paid / packed: save on the order + reply the confirmation line + Needs you
      notice "📍 Order #N address changed after payment — check before packing/sending".
    - sent_out / delivered: do NOT change automatically -> Needs you ("customer wants to change

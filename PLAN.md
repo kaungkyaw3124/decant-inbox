@@ -2,11 +2,12 @@
 
 Read CLAUDE.md first. This file tracks where we are.
 
-## RESUME HERE (updated 2026-10-17 by VPS Claude Code)
-- v1-v4.9 DONE. 4.9: a "hi" is always answered with a state-aware reply (not again within 30 min;
-  a repeated "hi" goes to Needs you). Decision to confirm: within 6 h of our last message the reply
-  starts without "မင်္ဂလာပါ။" (literal rule 1; see REPORT.md v4.9). AI: SHADOW, auto-graduate ON.
-- Owner tests pending: v4, staff, v4.6, v4.7, v4.8, v4.9 (REPORT.md).
+## RESUME HERE (updated 2026-10-17 by planning chat)
+- v1-v4.8 DONE (AI SHADOW, auto-graduate ON).
+- NOW, in order: epic 4.9 docs/SPEC-v4.9-greeting.md (smart greeting), then epic 4.10
+  docs/SPEC-v4.10-interruptions.md (interruptions + LOCKED paid orders; overrides 4.8 rule 6).
+  Same loop: tests -> fix -> green -> self-review -> deploy -> report. At the end: OWNER TEST
+  SCRIPT 4.9 + 4.10 in REPORT.md.
 - Owner checks: `bash scripts/status.sh`; AI numbers at /ai.
 
 ## Status
