@@ -25,8 +25,24 @@ _ITEMS = "• Stronger With You Intensely 5ml – 18,000 ကျပ်\n• Avent
 TEMPLATES: tuple[TemplateDef, ...] = (
     TemplateDef("greeting", "Greeting (added in front if we haven't messaged them for 6 h)",
                 "မင်္ဂလာပါ။", {}),
-    TemplateDef("greeting_reply", "Reply to a message that is only a greeting (“hi”), if we haven't messaged them for 6 h",
+    TemplateDef("greeting_reply", "Reply to a message that is only a greeting (“hi”): no open order",
                 "မင်္ဂလာပါ။ ဘာကူညီပေးရမလဲ။", {}),
+    # docs/SPEC-v4.9-greeting.md: the reply to "hi" follows where the customer is (the leading
+    # "မင်္ဂလာပါ။" is left out when we messaged them in the last 6 h)
+    TemplateDef("greeting_cart", "Reply to “hi”: open cart ({next_step} = the next question: phone / address / same as last time)",
+                "မင်္ဂလာပါ။ ခြင်းထဲမှာ ဒါတွေ ရှိပါတယ် –\n{items}\nစုစုပေါင်း {total} ကျပ်ပါ။\n{next_step}",
+                {"items": _ITEMS, "total": "83,000", "next_step": "ဝယ်ယူမယ်ဆိုရင် ဖုန်းနံပါတ် ပို့ပေးပါနော်။"}),
+    TemplateDef("greeting_waiting_payment", "Reply to “hi”: payment info sent, waiting for the payment",
+                "မင်္ဂလာပါ။ {items_short} အတွက် စုစုပေါင်း {total} ကျပ် လွှဲပြီးရင် transaction id ပါတဲ့ screenshot "
+                "ပို့ပေးပါနော်။ ဘာများ ထပ်ကူညီပေးရမလဲ။",
+                {"items_short": "Stronger With You Intensely 5ml, Aventus 10ml", "total": "83,000"}),
+    TemplateDef("greeting_photo_received", "Reply to “hi”: payment screenshot received, not checked yet",
+                "မင်္ဂလာပါ။ ငွေလွှဲ screenshot ရပါပြီ၊ စစ်ပြီး အကြောင်းပြန်ပေးပါမယ်နော်။", {}),
+    TemplateDef("greeting_preparing", "Reply to “hi”: order paid / packed",
+                "မင်္ဂလာပါ။ Order #{order_no} ကို ပြင်ဆင်နေပါတယ်။ ဘာများ ထပ်ကူညီပေးရမလဲ။", {"order_no": "1001"}),
+    TemplateDef("greeting_sent", "Reply to “hi”: order sent out",
+                "မင်္ဂလာပါ။ Order #{order_no} ကို {sent_date} မှာ ပို့ပြီးပါပြီ။ ဘာများ ထပ်ကူညီပေးရမလဲ။",
+                {"order_no": "1001", "sent_date": "17/10/2026"}),
     TemplateDef("price_one", "Price: one size",
                 "{product} {size} က {price} ကျပ်ပါ။ မှာယူချင်ရင် ပြောပေးပါနော်။",
                 {"product": "Stronger With You Intensely", "size": "5ml", "price": "18,000"}),

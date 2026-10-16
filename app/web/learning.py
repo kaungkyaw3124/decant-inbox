@@ -262,11 +262,14 @@ def conflict(request: Request, conflict_id: int, use_new: str = Form(...), db: S
 
 @router.post("/settings/learning", dependencies=[Depends(owner_only)])
 def learning_settings(request: Request, auto_approve_after: str = Form("3"), greeting: str = Form(""),
-                      auto_not_stocked: str = Form(""), db: Session = Depends(get_db),
-                      user: User = Depends(current_user)):
+                      auto_not_stocked: str = Form(""), greeting_repeat_minutes: str = Form(""),
+                      db: Session = Depends(get_db), user: User = Depends(current_user)):
     try:
-        patterns.set_settings(db, {"auto_approve_after": int(auto_approve_after) if auto_approve_after.isdigit() else -1,
-                                   "greeting": greeting == "1", "auto_not_stocked": auto_not_stocked == "1"}, user)
+        values = {"auto_approve_after": int(auto_approve_after) if auto_approve_after.isdigit() else -1,
+                  "greeting": greeting == "1", "auto_not_stocked": auto_not_stocked == "1"}
+        if greeting_repeat_minutes.strip():
+            values["greeting_repeat_minutes"] = int(greeting_repeat_minutes) if greeting_repeat_minutes.isdigit() else -1
+        patterns.set_settings(db, values, user)
         db.add(AuditLog(user_id=user.id, action="learning.settings", details={
             "auto_approve_after": auto_approve_after, "greeting": greeting == "1",
             "auto_not_stocked": auto_not_stocked == "1"}))

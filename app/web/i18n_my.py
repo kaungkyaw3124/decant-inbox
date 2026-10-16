@@ -476,8 +476,6 @@ MY = {
 
     # reply template names (Settings > Reply templates)
     "Greeting (added in front if we haven't messaged them for 6 h)": "နှုတ်ဆက်စာ (၆ နာရီအတွင်း စာမပို့ရသေးရင် ရှေ့မှာ ထည့်)",
-    "Reply to a message that is only a greeting (“hi”), if we haven't messaged them for 6 h":
-        "နှုတ်ဆက်ရုံ စာ (“hi”) ကို ပြန်ဖြေစာ (၆ နာရီအတွင်း စာမပို့ရသေးရင်)",
     "Price: one size": "ဈေး: ဆိုဒ်တစ်ခု", "Price: all sizes – first line": "ဈေး: ဆိုဒ်အားလုံး – ပထမစာကြောင်း",
     "Price: all sizes – one line per size": "ဈေး: ဆိုဒ်အားလုံး – ဆိုဒ်တစ်ခု တစ်ကြောင်း",
     "Cart / order: one line per item": "ခြင်း / အော်ဒါ: ပစ္စည်းတစ်ခု တစ်ကြောင်း", "Cart: total line": "ခြင်း: စုစုပေါင်း စာကြောင်း",
@@ -612,4 +610,15 @@ MY = {
     "📍 Ask for the new address + phone": "📍 လိပ်စာ + ဖုန်း အသစ် မေးမယ်",
     " + confirm the change": " + ပြင်ပြီးကြောင်း ပြော",
     "Not a status change.": "အခြေအနေ ပြောင်းတာ မဟုတ်ပါ။", "Marked as checked.": "စစ်ပြီးလို့ မှတ်ပြီး။",
+    # smart greeting (docs/SPEC-v4.9-greeting.md)
+    "Reply to a message that is only a greeting (“hi”): no open order": "နှုတ်ဆက်စာ (“hi”) ကို ပြန်ဖြေစာ: အော်ဒါ မရှိ",
+    "Reply to “hi”: open cart ({next_step} = the next question: phone / address / same as last time)":
+        "“hi” ကို ပြန်ဖြေစာ: ခြင်း ဖွင့်ထား ({next_step} = နောက်မေးခွန်း: ဖုန်း / လိပ်စာ / အရင်အတိုင်းလား)",
+    "Reply to “hi”: payment info sent, waiting for the payment": "“hi” ကို ပြန်ဖြေစာ: ငွေလွှဲအချက်အလက် ပို့ပြီး၊ ငွေစောင့်နေ",
+    "Reply to “hi”: payment screenshot received, not checked yet": "“hi” ကို ပြန်ဖြေစာ: ငွေလွှဲပုံ ရပြီ၊ မစစ်ရသေး",
+    "Reply to “hi”: order paid / packed": "“hi” ကို ပြန်ဖြေစာ: ငွေချေပြီး / ထုပ်ပြီး",
+    "Reply to “hi”: order sent out": "“hi” ကို ပြန်ဖြေစာ: ပို့လိုက်ပြီ",
+    "Greeting reply again only after this many minutes (a 2nd “hi” sooner waits for a person)":
+        "နှုတ်ဆက်စာ ထပ်ဖြေမယ့် မိနစ် (ဒီထက်စောတဲ့ ဒုတိယ “hi” ကို လူက ဖြေမယ်)",
+    "Greeting reply again after: 0-{n} minutes.": "နှုတ်ဆက်စာ ထပ်ဖြေမယ့်အချိန်: 0-{n} မိနစ်။",
 }

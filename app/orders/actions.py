@@ -21,8 +21,8 @@ For each message at most ONE action is offered, chosen from its parse and the ca
                                         screenshot came: nothing (Needs you, admin decides)
   FAQ question          -> faq          the FAQ answer (Step 7): first for other/unknown; for a
                                         price/stock/delivery question only when nothing else fits
-  greeting              -> greeting     "မင်္ဂလာပါ။ ဘာကူညီပေးရမလဲ။" when the message is only a greeting
-                                        and we haven't messaged them for 6 h (docs/SPEC-v4.md 4.2)
+  greeting              -> greeting     a message that is only a greeting: a reply that follows the order
+                                        state (docs/SPEC-v4.9-greeting.md); not again within 30 min
   previous_item         -> cart_add     one earlier item: add it + list with "(အရင်ယူထားတဲ့ဟာ)" (4.3)
                         -> choose_previous  2-5 earlier items: numbered list; the answer "1" is a buy
 Learned patterns (4.2) that are not approved yet still give the action, marked "📘", but only
@@ -189,10 +189,13 @@ def _faq(match: faq.Match) -> Outcome:
 
 def _apply(session: Session, message: Message, result: ParseResult, texts: dict[str, str],
            address_override: str | None = None) -> Outcome | None:
-    if result.intent == "greeting":
-        if not patterns.settings(session)["greeting"] or not compose.needs_greeting(session, message.customer_id):
-            return None  # switched off, or we talked to them in the last 6 h
-        return Outcome("greeting", "👋 Reply greeting", texts["greeting_reply"], "greeting")
+    if result.intent == "greeting":  # docs/SPEC-v4.9-greeting.md: always answered, by where the customer is
+        from app.orders import greeting  # late import: greeting -> cart / delivery
+
+        if not patterns.settings(session)["greeting"] or greeting.greeted_recently(session, message.customer_id):
+            return None  # switched off, or a greeting reply went out in the last 30 min (Needs you)
+        return Outcome("greeting", "👋 Reply greeting", greeting.reply(session, message.customer_id, texts),
+                       "greeting")
     match = faq.for_message(session, message, result)
     if match is not None and result.intent in faq.FIRST_INTENTS:
         return _faq(match)

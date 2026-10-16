@@ -1352,3 +1352,57 @@ address "လိပ်စာ ပြောင်းချင်ပါတယ်", a
 7. Cancel the cart. Order again, then answer the returning question with `ဖုန်းပြောင်းချင်တယ်`. Expect
    "ဖုန်းနံပါတ်အသစ် ပို့ပေးပါနော်။". Send a new number. Expect "ဖုန်းနံပါတ် ပြင်ပြီးပါပြီ – …" + payment info;
    Chats shows the new number first.
+
+## 2026-10-17 — v4.9: smart greeting (docs/SPEC-v4.9-greeting.md)
+**Live case:** order waiting for payment (payment info 01:47); "hi" at 02:31 got no reply. The old rule
+answered a greeting only if we hadn't messaged the customer for 6 h.
+
+**What was built**
+- A message that is only a greeting is always answered, unless a greeting reply already went to this
+  customer in the last 30 minutes (new setting on the Learning page, "Greeting reply again only after
+  this many minutes", default 30; 0 = always). A repeated "hi" inside the window gets no auto reply and
+  shows in Needs you as unanswered after 2 min (greeting added to the safety net's question intents).
+- The reply follows the customer's state (new editable templates):
+  - no order: greeting_reply
+  - open cart: greeting_cart = list + total + the same closing question as the cart list
+    (phone / address / "same as last time?")
+  - waiting for a new address / phone (4.8): the ask_new_* question again (never payment info)
+  - waiting_payment: greeting_waiting_payment (items, total, "send the screenshot")
+  - photo_received: greeting_photo_received
+  - paid / packed: greeting_preparing with Order #
+  - sent_out: greeting_sent with Order # and date
+- "hi swy 5ml ဘယ်လောက်လဲ" stays a price question.
+- Auto-reply OFF: the same text on the one-tap "👋 Reply greeting" button.
+- `cart.closing_line()` is now shared by the cart list and the greeting.
+
+**Decision to check (literal reading of rule 1).** The 6 h rule now only decides the leading "မင်္ဂလာပါ။".
+So when we messaged the customer in the last 6 h, as in the live case (44 min), the reply starts without
+it: "Stronger With You Intensely 5ml အတွက် စုစုပေါင်း 18,000 ကျပ် လွှဲပြီးရင် … ဘာများ ထပ်ကူညီပေးရမလဲ။". After 6 h
+it starts with "မင်္ဂလာပါ။ ". The greeting is never doubled. If the owner prefers "မင်္ဂလာပါ။" on every reply
+to "hi", it is a one-line change in app/orders/greeting.py.
+
+**Tests:** 397 passed, 1 skipped (was 387 + 1). 10 new tests in tests/test_v49_greeting.py:
+- I1: the exact live case, plus the after-6 h variant.
+- I2: no order; 30-min window; Needs you after 2 min; answered again after 35 min; the window setting.
+- I3: open cart without phone; auto OFF gives a one-tap button with the same text.
+- I4: payment photo, paid, sent out with the date.
+- I5: waiting for a new address.
+- I6: greeting + price question.
+- All earlier tests pass unchanged (B5 greetings included).
+
+**Deployed:** backup product_requests_2026-10-16T2016Z.dump (no migration), parser + web restarted,
+health ok. The earlier unanswered "hi" from the live case already has an auto decision, so it is not
+answered late.
+
+**Owner test (second Telegram account, Auto-reply ON)**
+1. With no order, send `hi` → "မင်္ဂလာပါ။ ဘာကူညီပေးရမလဲ။" (or without "မင်္ဂလာပါ။" if we wrote to you in the last
+   6 h).
+2. Send `hi` again at once → no reply. After 2 min it is in "🟡 Needs you" as unanswered.
+3. Send `stw intensely 5ml ယူမယ်` (the list comes), then `hi` → "ခြင်းထဲမှာ ဒါတွေ ရှိပါတယ် – … စုစုပေါင်း 18,000
+   ကျပ်ပါ။" + the phone question. (If the window from step 1 is still open, wait 30 min or set the minutes
+   on the Learning page to 1.)
+4. Send your phone and address → payment info. Then `hi` → "… အတွက် စုစုပေါင်း … ကျပ် လွှဲပြီးရင် transaction id
+   ပါတဲ့ screenshot ပို့ပေးပါနော်။ ဘာများ ထပ်ကူညီပေးရမလဲ။".
+5. Send a payment screenshot, then `hi` → "ငွေလွှဲ screenshot ရပါပြီ…". Approve it, then `hi` → "Order #N ကို
+   ပြင်ဆင်နေပါတယ်…". Mark it sent out, then `hi` → "Order #N ကို dd/mm/yyyy မှာ ပို့ပြီးပါပြီ…".
+6. Send `hi swy 5ml ဘယ်လောက်လဲ` → the price reply.

@@ -2,11 +2,11 @@
 
 Read CLAUDE.md first. This file tracks where we are.
 
-## RESUME HERE (updated 2026-10-17 by planning chat)
-- v1-v4.8 DONE (AI SHADOW, auto-graduate ON).
-- NOW: epic 4.9 docs/SPEC-v4.9-greeting.md — "hi" from a customer with an open order got no
-  reply. Smart, state-aware greeting replies (30 min repeat window). Same loop: tests I1-I6 ->
-  fix -> green -> self-review -> deploy -> report.
+## RESUME HERE (updated 2026-10-17 by VPS Claude Code)
+- v1-v4.9 DONE. 4.9: a "hi" is always answered with a state-aware reply (not again within 30 min;
+  a repeated "hi" goes to Needs you). Decision to confirm: within 6 h of our last message the reply
+  starts without "မင်္ဂလာပါ။" (literal rule 1; see REPORT.md v4.9). AI: SHADOW, auto-graduate ON.
+- Owner tests pending: v4, staff, v4.6, v4.7, v4.8, v4.9 (REPORT.md).
 - Owner checks: `bash scripts/status.sh`; AI numbers at /ai.
 
 ## Status
@@ -25,6 +25,7 @@ Read CLAUDE.md first. This file tracks where we are.
 | 9 | v4.6 (docs/SPEC-v4.6-ai.md): AI helper, OpenAI | ✅ S0-S5 done, eval gate passed, live in SHADOW (owner test pending) |
 | 10 | v4.7 (docs/SPEC-v4.7-graduation.md): SHADOW -> AUTO graduation, brake, weekly summary | ✅ Done, live (auto-graduate ON) |
 | 11 | v4.8 (docs/SPEC-v4.8-change-info.md): change address / phone, live bug fix | ✅ Done, live (owner test pending) |
+| 12 | v4.9 (docs/SPEC-v4.9-greeting.md): smart greeting | ✅ Done, live (owner test pending) |
 
 ## Phase 0 checklist
 - [x] Step 0: rollback safety net scripts in ~/hardening/

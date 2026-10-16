@@ -328,16 +328,20 @@ def cart_text(session: Session, order: Order, texts: dict[str, str], notes: list
     if cart.problems:
         lines.append(render(texts["unknown_items_note"], names=", ".join(cart.problems)))
     lines += notes or []  # e.g. out of stock / we don't have it: before the question
+    lines.append(closing_line(session, order, texts))
+    return "\n".join(lines)
+
+
+def closing_line(session: Session, order: Order, texts: dict[str, str]) -> str:
+    """The question that ends a cart list: phone, else address, else "same as last time?"."""
     customer = session.get(Customer, order.customer_id)
     phones = order.phones or customer_phones(session, customer.id)
     address = order.address or customer.address
     if not phones:
-        lines.append(texts["cart_ask_phone"])
-    elif not address:
-        lines.append(texts["ask_address"])
-    else:
-        lines.append(render(texts["cart_returning"], phones=", ".join(phones), address=address))
-    return "\n".join(lines)
+        return texts["cart_ask_phone"]
+    if not address:
+        return texts["ask_address"]
+    return render(texts["cart_returning"], phones=", ".join(phones), address=address)
 
 
 def payment_text(session: Session, order: Order, texts: dict[str, str]) -> str:
