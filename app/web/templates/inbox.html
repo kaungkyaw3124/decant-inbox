@@ -12,6 +12,12 @@
   <h2>🟡 {{ t("Needs you") }} ({{ needs_you.count }}) {{ ui.help("Messages the app could not answer by itself. Work from top to bottom; each line says what to do.") }}</h2>
   {% if not needs_you.count %}<p class="muted small">{{ t("Nothing waiting for you.") }}</p>{% endif %}
   <ul class="feed">
+  {% for c, m, held in needs_you.waiting %}
+    <li class="problem" id="waiting-{{ m.id }}"><a href="/chats/{{ c.id }}#bottom"><b>⏰ {{ c.display_name or c.username or customer }}: {{ t("customer waiting") }}</b></a>
+      <span class="small muted">“{{ m.raw_text | truncate(80) }}” · {{ t("“please wait” sent at {time}", time=held | local_time("%H:%M")) }}</span>
+      <form method="post" action="/needs-you/clear" class="inline"><input type="hidden" name="csrf" value="{{ csrf }}">
+        <input type="hidden" name="message_id" value="{{ m.id }}"><button class="link">{{ t("done") }}</button></form></li>
+  {% endfor %}
   {% for n in needs_you.ai_notices %}
     <li class="problem-text">{% if user_role == "owner" %}<a href="/ai">{{ tr(n) }}</a>{% else %}{{ tr(n) }}{% endif %}</li>
   {% endfor %}

@@ -97,6 +97,8 @@ TEMPLATES: tuple[TemplateDef, ...] = (
                 "ဒီ order ထဲ ထည့်ပေးရမလား။", {}),
     TemplateDef("ask_screenshot", "“I paid” without a screenshot",
                 "transaction id ပါတဲ့ screenshot လေး ပို့ပေးပါနော်။", {}),
+    TemplateDef("holding_reply", "Nobody could answer within 60 s: please wait (at most every 10 min)",
+                "ခဏစောင့်ပေးပါနော်၊ စစ်ပြီး ပြန်ပြောပေးပါမယ်။", {}),
     TemplateDef("hold_check", "We must check first (unknown item, or a change after the payment screenshot)",
                 "စစ်ပြီး ပြန်ပြောပေးပါမယ်နော်။", {}),
     TemplateDef("locked_new_order", "Paid order is locked: the new items become a NEW order (first line)",

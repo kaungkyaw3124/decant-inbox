@@ -733,4 +733,8 @@ MY = {
     "errors: {n}": "အမှား: {n}", "paid more": "ပိုလွှဲ", "paid less": "လျော့လွှဲ", "other receiver": "လက်ခံသူ မှား",
     "transaction no. used before": "transaction ထပ်", "before the payment info": "အချိန် စောနေ",
     "older than 3 days": "၃ ရက်ကျော်", "not successful": "မအောင်မြင်", "not a receipt": "ပြေစာ မဟုတ်",
+    # docs/SPEC-v4.13-hotfix.md
+    "customer waiting": "ဖောက်သည် စောင့်နေ", "“please wait” sent at {time}": "{time} မှာ “ခဏစောင့်” ပို့ပြီး",
+    "Nobody could answer within 60 s: please wait (at most every 10 min)":
+        "၆၀ စက္ကန့်အတွင်း ဘယ်သူမှ မဖြေနိုင်: ခဏစောင့်ခိုင်း (၁၀ မိနစ်မှာ အများဆုံး တစ်ခါ)",
 }

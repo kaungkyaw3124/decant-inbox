@@ -228,7 +228,11 @@ def needs_you(db: Session, now: datetime | None = None, owner: bool = True) -> d
     unpaid = [(d, why) for d in followups.due(db, now) if (why := followups.blocked(db, d.customer, now))]
     address_checks = address.to_check(db, now)  # docs/SPEC-v4.12-address-payment-ai.md N1
     checking = {m.id for m, *_ in address_checks}
-    unanswered = followups.unanswered(db, now)
+    from app.orders import holding  # docs/SPEC-v4.13-hotfix.md Q1
+
+    waiting = holding.waiting(db, now)
+    waiting_customers = {c.id for c, _, _ in waiting}
+    unanswered = [r for r in followups.unanswered(db, now) if r.customer.id not in waiting_customers]
     for row in unanswered:
         row.message_ids = [mid for mid in row.message_ids if mid not in checking]
     unanswered = [r for r in unanswered if r.message_ids]
@@ -301,8 +305,8 @@ def needs_you(db: Session, now: datetime | None = None, owner: bool = True) -> d
             "price_needed": price_needed, "to_approve": to_approve, "conflicts": conflicts,
             "failed": failed, "paused": paused, "auto_cancelled": followups.auto_cancelled(db, now),
             "ai_notices": ai_notices, "changed_paid": changed_paid, "change_sent": change_sent, "requests": requests,
-            "address_checks": address_checks, "payment_warnings": payment_warnings,
-            "count": len(address_checks) + len(ai_notices) + len(changed_paid) + len(change_sent) + len(requests) + len(to_check) + len(cancels) + len(unpaid) + len(unknown_msgs) + len(unanswered)
+            "address_checks": address_checks, "payment_warnings": payment_warnings, "waiting": waiting,
+            "count": len(waiting) + len(address_checks) + len(ai_notices) + len(changed_paid) + len(change_sent) + len(requests) + len(to_check) + len(cancels) + len(unpaid) + len(unknown_msgs) + len(unanswered)
                      + len(hints) + len(failed) + len(paused) + len(teach) + len(price_needed)
                      + (1 if to_approve else 0) + len(conflicts)}
 

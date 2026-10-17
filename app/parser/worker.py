@@ -17,7 +17,7 @@ from app.core.db import SessionLocal
 from app.core.heartbeat import beat
 from app.models import Message
 from app.learning import patterns
-from app.orders import auto, cart, delivery, followups, payments
+from app.orders import auto, cart, delivery, followups, holding, payments
 from app.parser.rules import PARSER_VERSION
 from app.parser.service import (
     load_aliases, load_full_sizes, load_known_words, load_phrases, parse_message, unparsed_message_ids,
@@ -104,6 +104,16 @@ def follow_up() -> None:
         log.exception("payment follow-ups failed")
 
 
+def catch_silence() -> None:
+    """docs/SPEC-v4.13-hotfix.md Q1: a waiting customer never gets silence (holding reply after 60 s)."""
+    try:
+        stats = holding.run_once()
+        if stats:
+            log.info("holding replies: %s", stats)
+    except Exception:
+        log.exception("silence watchdog failed")
+
+
 def read_screenshots() -> None:
     """docs/SPEC-v4.12-address-payment-ai.md N3: payment screenshots an admin opened, when the owner turned
     screenshot reading on."""
@@ -160,6 +170,7 @@ def main() -> None:
         read_screenshots()
         understand_with_ai()
         auto.run_once()  # auto mode (does nothing while it is switched off)
+        catch_silence()
         if args.once:
             return
         time.sleep(args.interval)
