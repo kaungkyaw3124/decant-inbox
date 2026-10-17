@@ -158,9 +158,34 @@ context to understand it (e.g. "that one", "the previous one", "10ml too").
   promises, no invented facts. If you do not know, null. For every other intent: null.
 """
 
+# docs/SPEC-v4.12-address-payment-ai.md N1 (only when the owner allows addresses to be sent: ai_address)
+ADDRESS_INSTRUCTIONS = """
+## address (a delivery address, or part of one, in the CUSTOMER MESSAGE; else null)
+- Fill it when the message gives WHERE to deliver: house / building number, street, ward (ရပ်ကွက်), township
+  (မြို့နယ်), city, landmark. Also when it is only a part, e.g. a street and number without the township,
+  or only a township answering our question "which township?" (see WE ASKED). Words that only SAY
+  "address" / "send here" / "change the address" (လိပ်စာ, ပို့ပေးပါ, ဒီကိုပို့ပေးပါ, လိပ်စာ ပြောင်းချင်ပါတယ်,
+  new address) are NOT an address: address = null and, for a change request, intent change_info.
+- full_text: ONLY the address, copied from the message as written (same spelling, same digits - Burmese
+  digits stay Burmese), in the customer's order. Leave out [PHONE], ဖုန်း / phone words, ကိုပို့ပေးပါ,
+  ဒီလိပ်စာကို, "new address:", greetings, product names and everything else that is not the address.
+- house_no, street, ward_or_quarter, township, city, landmark: the parts as written (null if not given).
+  township: the township NAME only (e.g. "ဗဟန်း", "Yankin"), without မြို့နယ် / township. Do not guess a
+  township that is not written; a well-known ward or street does not tell the township.
+- missing: what a delivery still needs: "township" when there is no township, "city" when there is
+  neither a township nor a city (outside Yangon a town name is the city), "street" / "house_no" when not
+  given. [] when complete.
+- is_change_request: true when the customer says this REPLACES the address we have (new / changed /
+  "send it here instead").
+- confidence 0-1: how sure you are that full_text is exactly the address and the parts are right.
+"""
 
-def static_part(catalog: Catalog) -> str:
-    lines = [INSTRUCTIONS, "## PRODUCT LIST (id | brand | name | nicknames | sizes sold)"]
+ADDRESS_PARTS = ("house_no", "street", "ward_or_quarter", "township", "city", "landmark", "full_text")
+
+
+def static_part(catalog: Catalog, with_address: bool = False) -> str:
+    lines = [INSTRUCTIONS + (ADDRESS_INSTRUCTIONS if with_address else ""),
+             "## PRODUCT LIST (id | brand | name | nicknames | sizes sold)"]
     for p in catalog.products:
         stock = "" if p.in_stock else " | out of stock now"
         sizes = [f"full ({p.full_size_ml}ml bottle)" if s == "full" and p.full_size_ml else s for s in p.sizes]
@@ -173,10 +198,28 @@ def static_part(catalog: Catalog) -> str:
     return "\n".join(lines)
 
 
-def schema(catalog: Catalog) -> dict:
+def address_schema() -> dict:
+    return {"anyOf": [{"type": "null"}, {
+        "type": "object", "additionalProperties": False,
+        "required": [*ADDRESS_PARTS, "missing", "is_change_request", "confidence"],
+        "properties": {**{k: {"type": ["string", "null"]} for k in ADDRESS_PARTS},
+                       "missing": {"type": "array", "items": {"type": "string",
+                                                              "enum": ["township", "city", "street", "house_no"]}},
+                       "is_change_request": {"type": "boolean"}, "confidence": {"type": "number"}}}]}
+
+
+def schema(catalog: Catalog, with_address: bool = False) -> dict:
     """Strict JSON schema: every field required, null where allowed; product ids and sizes are
-    enums, so the model cannot even write an unknown id."""
+    enums, so the model cannot even write an unknown id. with_address: the 4.12 "address" answer."""
     ids = [p.id for p in catalog.products]
+    out = _schema(catalog, ids)
+    if with_address:
+        out["required"].append("address")
+        out["properties"]["address"] = address_schema()
+    return out
+
+
+def _schema(catalog: Catalog, ids: list[int]) -> dict:
     return {
         "type": "object",
         "additionalProperties": False,
@@ -218,6 +261,9 @@ class Context:
     history: tuple[str, ...]  # "C: ..." / "S: ..."
     cart: tuple[str, ...]  # "Sauvage Eau de Parfum 5ml x1"
     last_paid: tuple[str, ...]
+    with_address: bool = False  # docs/SPEC-v4.12: addresses as written + the "address" answer
+    asked: str | None = None  # what we asked the customer for: "address" | "township" | "city" | None
+    partial_address: str | None = None  # the address part we have (waiting for the township / city)
 
 
 def _item_line(names: dict[int, str], item: OrderItem) -> str:
@@ -226,7 +272,7 @@ def _item_line(names: dict[int, str], item: OrderItem) -> str:
     return f"{name} {size} x{item.quantity or 1}".replace("  ", " ")
 
 
-def build_context(session: Session, message: Message) -> Context:
+def build_context(session: Session, message: Message, with_address: bool = False) -> Context:
     rows = session.scalars(select(Message).where(
         Message.customer_id == message.customer_id, Message.id != message.id,
         Message.received_at <= message.received_at, Message.received_at >= message.received_at - timedelta(days=7))
@@ -241,7 +287,7 @@ def build_context(session: Session, message: Message) -> Context:
         elif m.id in private:
             body = "[contact / payment details]"
         else:
-            body = mask(m.raw_text)[:HISTORY_CHARS]
+            body = mask(m.raw_text, with_address)[:HISTORY_CHARS]
         history.append(f"{who}: {body}")
     names = dict(session.execute(select(Product.id, Product.name)).all())
     cart = session.scalar(select(Order).where(Order.customer_id == message.customer_id,
@@ -256,7 +302,13 @@ def build_context(session: Session, message: Message) -> Context:
         return tuple(_item_line(names, i) for i in session.scalars(select(OrderItem).where(
             OrderItem.order_id == order.id, OrderItem.removed_at.is_(None)).order_by(OrderItem.id)))
 
-    return Context(mask(message.raw_text)[:MESSAGE_CHARS], tuple(history), lines(cart), lines(paid))
+    asked = partial = None
+    if with_address:
+        from app.orders import address  # late import: orders -> parser -> ai
+
+        asked, partial = address.asked_for(session, message.customer_id, cart, message.received_at)
+    return Context(mask(message.raw_text, with_address)[:MESSAGE_CHARS], tuple(history), lines(cart), lines(paid),
+                   with_address, asked, mask(partial, True) if partial else None)
 
 
 def dynamic_part(ctx: Context) -> str:
@@ -266,6 +318,9 @@ def dynamic_part(ctx: Context) -> str:
         "",
         "CART NOW: " + ("; ".join(ctx.cart) if ctx.cart else "(empty)"),
         "LAST PAID ORDER: " + ("; ".join(ctx.last_paid) if ctx.last_paid else "(none)"),
+        *(["WE ASKED: " + {"address": "the delivery address", "township": "the township of this address: ",
+                           "city": "the city of this address: "}[ctx.asked] + (ctx.partial_address or "")]
+          if ctx.with_address and ctx.asked else []),
         "",
         "CUSTOMER MESSAGE:",
         "<<<",

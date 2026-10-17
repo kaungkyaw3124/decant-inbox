@@ -19,7 +19,11 @@ def defaults() -> dict:
             "model": s.ai_model, "reasoning": s.ai_reasoning,
             # docs/SPEC-v4.7-graduation.md: SHADOW -> AUTO by itself when the numbers are good enough
             "auto_graduate": True, "min_days": 7, "min_decisions": 50, "min_accuracy": 0.95,
-            "shadow_since": None}  # ISO time SHADOW (re)started: the graduation window
+            "shadow_since": None,  # ISO time SHADOW (re)started: the graduation window
+            # docs/SPEC-v4.12-address-payment-ai.md privacy switches (owner, /ai): addresses go to the AI
+            # (phones stay masked, names never sent); payment screenshots go to the AI (off until the owner
+            # turns it on)
+            "ai_address": True, "ai_screenshot": False}
 
 
 def load(session: Session) -> dict:
@@ -47,6 +51,7 @@ def save(session: Session, values: dict, user: User | None) -> None:
     value["min_days"], value["min_decisions"] = int(value["min_days"]), int(value["min_decisions"])
     value["min_accuracy"] = round(float(value["min_accuracy"]), 3)
     value["auto_graduate"] = bool(value["auto_graduate"])
+    value["ai_address"], value["ai_screenshot"] = bool(value["ai_address"]), bool(value["ai_screenshot"])
     value["monthly_budget_usd"] = round(float(value["monthly_budget_usd"]), 2)
     value["threshold"] = round(float(value["threshold"]), 2)
     stmt = insert(AppSetting).values(key=SETTING, value=value, updated_by=user.id if user else None)

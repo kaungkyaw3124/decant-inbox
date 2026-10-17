@@ -27,6 +27,26 @@
       <form method="post" action="/orders/{{ o.id }}/address-checked" class="inline"><input type="hidden" name="csrf" value="{{ csrf }}">
         <button class="link">✅ {{ t("checked") }}</button></form></li>
   {% endfor %}
+  {% for m, c, chk, o in needs_you.address_checks %}
+    <li class="address-check" id="address-{{ m.id }}"><a href="/chats/{{ c.id }}?tab=cart"><b>📍 {{ c.display_name or c.username or customer }}</b>: {{ t("check address") }}</a>
+      <span class="small muted">“{{ m.raw_text | truncate(120) }}”</span>
+      <p class="small problem-text">⚠️ {{ tr(chk.why) }}{% if chk.source == "ai" %} · 🧠 AI {{ "%.0f" | format(chk.confidence * 100) }}%{% endif %}</p>
+      {% set parts = chk.parts.to_json() %}
+      <dl class="address-parts small">
+        {% for key, label in (("house_no", "House no."), ("street", "Street"), ("ward_or_quarter", "Ward"), ("township", "Township"), ("city", "City"), ("landmark", "Landmark")) %}
+          {% if parts.get(key) %}<dt>{{ t(label) }}</dt><dd>{% if key == "township" %}<b>{{ parts[key] }}</b>{% else %}{{ parts[key] }}{% endif %}</dd>{% endif %}
+        {% endfor %}
+      </dl>
+      <form method="post" action="/messages/{{ m.id }}/address" class="stack">
+        <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="back" value="/#needs-you">
+        <label class="small">{{ t("Address (fix it if needed: house no., street, township)") }}
+          <textarea name="full_text" rows="2" maxlength="500">{{ chk.parts.full_text }}</textarea></label>
+        <div class="buttons">
+          <button class="primary">✅ {{ t("Save address & continue") }}</button>
+          <button formaction="/messages/{{ m.id }}/address/ask" class="quiet">💬 {{ t("Ask for the full address") }}</button>
+        </div>
+      </form></li>
+  {% endfor %}
   {% for m, c, o in needs_you.change_sent %}
     <li><a href="/chats/{{ c.id }}"><b>📍 {{ c.display_name or c.username or customer }}</b>: {{ t("customer wants to change the address of an order already sent") }}{% if o.order_no %} (#{{ o.order_no }}){% endif %}</a>
       <span class="small muted">“{{ m.raw_text | truncate(60) }}”</span>

@@ -677,4 +677,23 @@ MY = {
     "No city.": "မြို့ မပါ။", "Township not in our list.": "မြို့နယ်စာရင်းထဲမှာ မရှိ။",
     "The AI is not sure about this address.": "AI က ဒီလိပ်စာကို မသေချာ။",
     "The address is not valid: fix it in the cart panel.": "လိပ်စာ မမှန်ပါ: ခြင်း ဘေးကွက်မှာ ပြင်ပါ။",
+    "check address": "လိပ်စာ စစ်ရန်", "House no.": "အိမ်နံပါတ်", "Street": "လမ်း", "Ward": "ရပ်ကွက်",
+    "Township": "မြို့နယ်", "City": "မြို့", "Landmark": "အမှတ်အသား",
+    "Address (fix it if needed: house no., street, township)": "လိပ်စာ (လိုရင် ပြင်ပါ: အိမ်နံပါတ်၊ လမ်း၊ မြို့နယ်)",
+    "Save address & continue": "လိပ်စာ သိမ်းပြီး ဆက်လုပ်မယ်", "Ask for the full address": "လိပ်စာ အပြည့်အစုံ တောင်းမယ်",
+    "Address saved. The reply goes out in 10 s (Undo in the chat).":
+        "လိပ်စာ သိမ်းပြီး။ ပြန်စာ ၁၀ စက္ကန့်အတွင်း ထွက်မယ် (chat ထဲမှာ ပြန်ဖျက်လို့ရ)။",
+    "Asked for the full address. It goes out in 10 s (Cancel in the chat).":
+        "လိပ်စာ အပြည့်အစုံ တောင်းပြီး။ ၁၀ စက္ကန့်အတွင်း ထွက်မယ် (chat ထဲမှာ ပယ်လို့ရ)။",
+    "Address without the township: ask it": "မြို့နယ် မပါတဲ့ လိပ်စာ: မြို့နယ် မေးမယ်",
+    "Address without the city: ask it": "မြို့ မပါတဲ့ လိပ်စာ: မြို့ မေးမယ်",
+    "The address is not clear: ask for the full address (button on the check-address card)":
+        "လိပ်စာ မရှင်း: လိပ်စာ အပြည့်အစုံ တောင်းမယ် (လိပ်စာစစ် ကတ်ပေါ်က ခလုတ်)",
+    "📍 Ask the township": "📍 မြို့နယ် မေးမယ်", "📍 Ask the city": "📍 မြို့ မေးမယ်",
+    "✅ 📍 Ask the township": "✅ 📍 မြို့နယ် မေးမယ်", "✅ 📍 Ask the city": "✅ 📍 မြို့ မေးမယ်",
+    "📞 Save phone & 📍 Ask the township": "📞 ဖုန်းသိမ်း & 📍 မြို့နယ် မေးမယ်",
+    "✅ 📞 Save phone & 📍 Ask the township": "✅ 📞 ဖုန်းသိမ်း & 📍 မြို့နယ် မေးမယ်",
+    "Address without the {what} ({address}): kept 24 h; the answer completes it.":
+        "{what} မပါတဲ့ လိပ်စာ ({address}): ၂၄ နာရီ သိမ်းထား၊ အဖြေနဲ့ ပြည့်စုံမယ်။",
+    "township": "မြို့နယ်", "city": "မြို့",
 }

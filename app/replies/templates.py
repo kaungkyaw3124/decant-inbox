@@ -62,6 +62,11 @@ TEMPLATES: tuple[TemplateDef, ...] = (
                 "{names} ကိုတော့ စစ်ပြီး ပြန်ပြောပေးပါမယ်နော်။", {"names": "hawas ice 10ml"}),
     TemplateDef("ask_phone", "Ask phone number", "ဆက်သွယ်ရန် ဖုန်းနံပါတ် ပို့ပေးပါနော်။", {}),
     TemplateDef("ask_address", "Ask address", "ပို့ပေးရမယ့် လိပ်စာ ပို့ပေးပါနော်။", {}),
+    # docs/SPEC-v4.12-address-payment-ai.md N1: an address without the township / city
+    TemplateDef("ask_township", "Address without the township: ask it", "ဘယ်မြို့နယ်လဲ ပြောပေးပါနော်။", {}),
+    TemplateDef("ask_city", "Address without the city: ask it", "ဘယ်မြို့လဲ ပြောပေးပါနော်။", {}),
+    TemplateDef("address_invalid_note", "The address is not clear: ask for the full address (button on the check-address card)",
+                "အိမ်နံပါတ်၊ လမ်း၊ မြို့နယ် ပါတဲ့ လိပ်စာ အပြည့်အစုံ ပို့ပေးပါနော်။", {}),
     TemplateDef("phone_saved_ask_address", "Phone received, ask address",
                 "ဖုန်းနံပါတ် {phones} ရပါပြီ။ ပို့ပေးရမယ့် လိပ်စာ ပို့ပေးပါနော်။", {"phones": "09 777 123 456"}),
     TemplateDef("phone_added", "Another phone number added",

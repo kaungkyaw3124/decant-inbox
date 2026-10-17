@@ -26,7 +26,7 @@ from sqlalchemy.orm import Session, aliased
 from app.learning import patterns
 from app.models import Customer, Message, Order, OrderEvent
 from app.models.orders import LOCKED_STATUSES, OPEN_STATUSES
-from app.orders import cart
+from app.orders import address, cart
 from app.parser.rules import ParsedItem, ParseOutcome
 from app.replies.templates import render
 
@@ -89,6 +89,8 @@ def resume_text(session: Session, s: Step, texts: dict[str, str]) -> str | None:
         return texts[ASK_NEW.get(s.order.change_wanted, "ask_new_contact")]
     if s.kind == "waiting_payment":
         return texts["resume_payment"]
+    if s.kind == "need_address" and (partial := address.pending_partial(s.order)):
+        return texts[partial.get("_ask") or "ask_township"]  # docs/SPEC-v4.12: the missing part only
     if s.kind in ("need_phone", "need_address", "need_confirm"):
         if s.order.status == "cart":
             return cart.closing_line(session, s.order, texts)

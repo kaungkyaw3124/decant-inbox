@@ -140,6 +140,7 @@ def test_f2_mask_unit():
 
 
 def test_f2_request_is_masked(ai, shop, db):
+    mode("shadow", ai_address=False)  # docs/SPEC-v4.12: addresses are masked only with the switch OFF
     add(990, "KPay 09000000001 · ငွေလွှဲ id 9988776655443322", direction="out", customer="91",
         when=START - timedelta(minutes=30))
     ai.answer = answer("buy", [(None, "10ml", 1, "hawas for him", None)], confidence=0.95)
@@ -440,11 +441,17 @@ def test_f9_rules_certain_never_calls_ai(ai, shop, db):
     mode("auto")
     auto_on(db)
     ai.answer = answer("other")
+    mode("auto", ai_address=False)
     for n, body in enumerate(("stw intensely 5ml ယူမယ်", "good girl 10ml ဘယ်လောက်လဲ", "မင်္ဂလာပါ", "ok",
                               "ရန်ကင်း ကိုပို့ပေးပါ 09777123456"), start=1):
         say(db, n, body)
         worker_step()
     assert ai.requests == [] and calls(db) == []
+    # docs/SPEC-v4.12-address-payment-ai.md N1: with ai_address ON (the default) the AI reads every address
+    mode("auto", ai_address=True)
+    say(db, 6, "ရန်ကင်း သုခလမ်း အမှတ် ၅ ကိုပို့ပေးပါ")
+    worker_step()
+    assert len(ai.requests) == 1 and "သုခလမ်း" in ai.requests[0][1]
 
 
 def test_f10_approved_pattern_no_ai_call(ai, shop, db):

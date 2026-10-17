@@ -223,3 +223,7 @@ details.teach-box > summary { cursor: pointer; display: inline-flex; }
 .teach details.card-edit[open] { display: grid; gap: 8px; }
 .ai-banner { background: var(--bg); }
 details.older > summary { cursor: pointer; font-weight: 600; }
+/* docs/SPEC-v4.12: the address split on the "check address" card */
+.address-parts { display: grid; grid-template-columns: max-content 1fr; gap: 2px 10px; margin: 4px 0; }
+.address-parts dt { color: var(--muted, #777); }
+.address-parts dd { margin: 0; overflow-wrap: anywhere; }

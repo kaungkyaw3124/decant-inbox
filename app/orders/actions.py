@@ -645,6 +645,8 @@ def _contact(session: Session, message: Message, customer: Customer, order: Orde
 
     docs/SPEC-v4.12-address-payment-ai.md: only a sure, valid reading is saved; anything else waits
     for a person (Needs you "📍 check address")."""
+    if read is not None and read.status == "partial" and read.source != "admin":
+        return _ask_missing(session, message, customer, order, phones, read, texts, before)
     if read is not None and not read.sure:
         if read.source == "admin":  # the admin's corrected address must pass the validator too
             raise Refused("Not saved: " + read.why)
@@ -652,7 +654,7 @@ def _contact(session: Session, message: Message, customer: Customer, order: Orde
     new_text = read.parts.full_text if read is not None else None
     text_norm = message.normalized_text or ""
     want = order.change_wanted
-    replace = replace or bool(want) or replace_words(text_norm) or (
+    replace = replace or bool(want) or replace_words(text_norm) or bool(read and read.is_change_request) or (
         order.status == "waiting_payment" and bool(new_text) and bool(order.address) and new_text != order.address)
     undo = {"order": before, "customer": {"address": customer.address, "address_parts": customer.address_parts,
                                           "address_invalid": customer.address_invalid},
@@ -724,6 +726,27 @@ def _contact(session: Session, message: Message, customer: Customer, order: Orde
     return Outcome("contact", label, text, reply_kind, note, order.id, undo, address=new_address)
 
 
+def _ask_missing(session: Session, message: Message, customer: Customer, order: Order, phones: list[str],
+                 read: address.Check, texts: dict[str, str], before: dict) -> Outcome:
+    """docs/SPEC-v4.12-address-payment-ai.md N1: a street / number without the township (or city): keep
+    it on the order for 24 h and ask "ဘယ်မြို့နယ်လဲ"; the answer is merged with it (address.read_message)."""
+    undo = {"order": before, "phones": [list(r) for r in cart.phone_rows(session, customer.id)]}
+    agreed = order.status == "cart"  # like an address: the customer agrees to the list
+    if agreed:
+        cart.confirm(session, order)
+    added = cart.add_phones(session, order, customer, phones, message.id) if phones else []
+    order.address_partial, order.address_partial_at = {**read.parts.to_json(), "_ask": read.ask}, datetime.now(UTC)
+    cart.touch(session, order)
+    what = "city" if read.ask == "ask_city" else "township"
+    text = "\n".join(([render(texts["phone_added"], phone=", ".join(added))] if added else []) + [texts[read.ask]])
+    session.add(AuditLog(user_id=None, action=f"address.{read.ask}", details={
+        "message_id": message.id, "order_id": order.id, "source": read.source}))
+    label = ("✅ " if agreed else "") + ("📞 Save phone & " if added else "") + f"📍 Ask the {what}"
+    return Outcome("contact", label, text, "ask_address",
+                   f"Address without the {what} ({read.parts.full_text}): kept 24 h; the answer completes it.",
+                   order.id, undo)
+
+
 # ---------- suggest / perform / undo ----------
 
 def _eligible(session: Session, message: Message, result: ParseResult | None, now: datetime) -> bool:
@@ -789,13 +812,14 @@ def describe(p: LearnedPattern, session: Session) -> str:
 
 
 def suggest(session: Session, message: Message, result: ParseResult | None, texts: dict[str, str],
-            now: datetime | None = None) -> Suggestion | None:
+            now: datetime | None = None, address_override: str | None = None) -> Suggestion | None:
+    """address_override: the admin's corrected address (Needs you "📍 check address")."""
     now = now or datetime.now(UTC)
     if not _eligible(session, message, result, now):
         return None
     savepoint = session.begin_nested()
     try:
-        outcome = _apply(session, message, result, texts)
+        outcome = _apply(session, message, result, texts, address_override)
         if outcome is not None:
             _with_greeting(session, outcome, message.customer_id, texts, now)
             outcome.text, _ = steps.with_resume(session, outcome.kind, outcome.text, message.customer_id, texts, now)

@@ -44,6 +44,7 @@ class AIResult:
     confidence: float
     reason: str
     draft_answer: str | None
+    address: dict | None = None  # docs/SPEC-v4.12-address-payment-ai.md N1 (only with ai_address ON)
 
     def to_json(self) -> dict:
         return asdict(self)
@@ -61,8 +62,12 @@ class AIResult:
         learn = tuple(AILearn(str(x["text"]), str(x["kind"]), _opt_int(x["product_id"]), _opt_str(x["intent"]))
                       for x in data["learn"])
         confidence = float(data["confidence"])
+        address = data.get("address")
+        if address is not None and (not isinstance(address, dict) or not isinstance(address.get("full_text", ""),
+                                                                                    (str, type(None)))):
+            raise ValueError("address is not an object")
         return cls(str(data["intent"]), items, learn, confidence, str(data["reason"] or "")[:300],
-                   _opt_str(data["draft_answer"]))
+                   _opt_str(data["draft_answer"]), address)
 
 
 def _opt_int(value) -> int | None:

@@ -61,8 +61,8 @@ class Understood:
 def understand(provider, catalog: prompt.Catalog, ctx: prompt.Context, model: str, reasoning: str) -> Understood:
     """Ask once and check the answer. Never raises for provider problems."""
     try:
-        reply = provider.understand(prompt.static_part(catalog), prompt.schema(catalog), prompt.dynamic_part(ctx),
-                                    model, reasoning)
+        reply = provider.understand(prompt.static_part(catalog, ctx.with_address),
+                                    prompt.schema(catalog, ctx.with_address), prompt.dynamic_part(ctx), model, reasoning)
     except AIError as exc:
         return Understood(None, [exc.kind], exc.kind)
     except Exception as exc:  # an SDK surprise must not stop the worker
@@ -77,7 +77,11 @@ def understand(provider, catalog: prompt.Catalog, ctx: prompt.Context, model: st
         out.problems = problems
         return out
     if result.intent != "question" and result.draft_answer:
-        result = AIResult(result.intent, result.items, result.learn, result.confidence, result.reason, None)
+        result = AIResult(result.intent, result.items, result.learn, result.confidence, result.reason, None,
+                          result.address)
+    if result.address is not None and not ctx.with_address:
+        result = AIResult(result.intent, result.items, result.learn, result.confidence, result.reason,
+                          result.draft_answer, None)  # not asked for: never used
     out.result = result
     return out
 
@@ -104,6 +108,10 @@ def rules_unsure(session: Session, message: Message, result: ParseResult) -> str
 
     if patterns.not_certain(session, list(result.learned_ids or [])):
         return "learned pattern waiting"  # docs/SPEC-v4.11-ai-first.md L4: the AI reads it (counts a use)
+    from app.orders import address  # late import
+
+    if address.wants_ai(session, message, result):
+        return "address"  # docs/SPEC-v4.12-address-payment-ai.md N1: the AI reads every address
     if faq.for_message(session, message, result) is not None:
         return None  # an FAQ answers it
     items = _items(session, result)
@@ -227,7 +235,7 @@ def process(message_id: int, now: datetime | None = None) -> str:
             limit = "budget"
         if limit is None:
             catalog = prompt.load_catalog(session)
-            ctx = prompt.build_context(session, message)
+            ctx = prompt.build_context(session, message, bool(cfg["ai_address"]))
             rules_result_id = result.id
     if limit is not None:
         with SessionLocal.begin() as session:

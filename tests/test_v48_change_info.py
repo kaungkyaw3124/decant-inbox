@@ -281,10 +281,14 @@ def test_h8_rules_certain_no_ai_call(returning, db):
     providers.use(fake)
     service._not_needed.clear()
     try:
-        for body in ("လိပ်စာ ပြောင်းချင်ပါတယ်", "ဖုန်းပြောင်းချင်တယ်", "change address", "ဗဟန်း ရွှေဂုံတိုင်လမ်း အမှတ် ၅"):
+        for body in ("လိပ်စာ ပြောင်းချင်ပါတယ်", "ဖုန်းပြောင်းချင်တယ်", "change address"):
             reply(db, body)
         service.run_once()
         assert fake.requests == []
+        # docs/SPEC-v4.12-address-payment-ai.md N1: an address itself is read by the AI (ai_address ON)
+        reply(db, "ဗဟန်း ရွှေဂုံတိုင်လမ်း အမှတ် ၅")
+        service.run_once()
+        assert len(fake.requests) == 1
     finally:
         providers.use(None)
 

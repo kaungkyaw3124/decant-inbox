@@ -148,3 +148,160 @@ def test_p4_keywords_never_an_address(shop, db, body):
     b = button(client, mid)
     assert b is None or "Save address" not in b[0]
     assert order_row(db)[2] is None
+
+
+# ---------- N1: the AI address assistant (fake provider, AUTO mode) ----------
+
+from app.ai import service  # noqa: E402
+from tests.test_cart import PAYMENT_FOOTER  # noqa: E402
+from tests.test_v411_ai_first import auto_ai, full, now_msg, ungreet  # noqa: E402, F401  (fixture)
+from tests.test_v46_ai import ai, calls, mode  # noqa: E402, F401  (fixture)
+from tests.test_v4_teaching import auto_on  # noqa: E402
+
+LIVE_P2 = "ဒီကိုပို့ပေးပါ ဗဟန်း ရွှေဂုံတိုင်လမ်း အမှတ် ၅ ဖုန်း 09777123456"
+ASK_TOWNSHIP = "ဘယ်မြို့နယ်လဲ ပြောပေးပါနော်။"
+
+
+def addr(full_text, township=None, street=None, house_no=None, city=None, missing=(), change=False,
+         confidence=0.95, ward=None) -> dict:
+    return {"full_text": full_text, "house_no": house_no, "street": street, "ward_or_quarter": ward,
+            "township": township, "city": city, "landmark": None, "missing": list(missing),
+            "is_change_request": change, "confidence": confidence}
+
+
+def answer_with(address_answer, intent="address", confidence=0.95) -> dict:
+    return {**full(intent, confidence=confidence), "address": address_answer}
+
+
+def open_order(db, customer="91") -> tuple:
+    with db.connect() as c:
+        return c.execute(text(
+            "SELECT o.status, o.address, o.phones, o.address_parts, o.address_partial FROM orders o JOIN customers c "
+            "ON c.id = o.customer_id WHERE c.external_user_id = :e ORDER BY o.id DESC LIMIT 1"), {"e": customer}).one()
+
+
+def cart_for(client, token, db, customer="91", phone=None) -> int:
+    """A cart from the chat (Stronger With You Intensely 5ml) made before auto mode answers anything."""
+    from tests.test_v411_ai_first import cart_with
+
+    cid = cart_with(client, token, db, customer, "Stronger With You Intensely", "5")
+    if phone:
+        client.post(f"/chats/{cid}/cart/confirm", data={"csrf": token})
+        client.post(f"/chats/{cid}/cart/phones", data={"csrf": token, "phone": phone})
+    return cid
+
+
+def test_p2_ai_address_without_phone_and_ask_words(auto_ai, shop, db):
+    client, token = shop
+    cart_for(client, token, db)
+    auto_ai.answer = lambda _: answer_with(addr("ဗဟန်း ရွှေဂုံတိုင်လမ်း အမှတ် ၅", "ဗဟန်း", "ရွှေဂုံတိုင်လမ်း", "အမှတ် ၅"))
+    now_msg(db, LIVE_P2)
+    sent = auto_ai.requests[-1]
+    assert "ရွှေဂုံတိုင်လမ်း အမှတ် ၅" in sent[1] and "[ADDRESS]" not in sent[1]  # ai_address ON: as written
+    assert "09777123456" not in sent[1] and "[PHONE]" in sent[1] and "## address" in sent[0]
+    status, saved, phones, parts, _ = open_order(db)
+    assert saved == "ဗဟန်း ရွှေဂုံတိုင်လမ်း အမှတ် ၅" and phones == ["09777123456"]
+    assert parts["township"] == "ဗဟန်း (Bahan)" and parts["house_no"] == "အမှတ် ၅"
+    assert status == "waiting_payment" and ungreet(deliver(db)[0]).endswith(PAYMENT_FOOTER)
+    page = client.get(f"/chats/{customer_id(db, '91')}?tab=cart").text
+    assert "<b>ဗဟန်း (Bahan)</b>" in page and "✅" in page
+
+
+def test_p2_the_ai_text_is_checked_too(auto_ai, shop, db):
+    """Even if the AI copies the phone and the ask words, the saved address has neither."""
+    client, token = shop
+    cart_for(client, token, db)
+    auto_ai.answer = lambda _: answer_with(addr("ဒီကိုပို့ပေးပါ ဗဟန်း ရွှေဂုံတိုင်လမ်း အမှတ် ၅ [PHONE]", "ဗဟန်း"))
+    now_msg(db, LIVE_P2)
+    assert open_order(db)[1] == "ဗဟန်း ရွှေဂုံတိုင်လမ်း အမှတ် ၅"
+
+
+@pytest.mark.parametrize("with_ai", [True, False])
+def test_p3_missing_township_asked_then_merged(request, shop, db, with_ai):
+    client, token = shop
+    if with_ai:
+        fake = request.getfixturevalue("auto_ai")
+        fake.answer = lambda body: answer_with(
+            addr("ရန်ကင်း", "ရန်ကင်း", missing=["street", "house_no"]) if "ရန်ကင်း" in body.split("CUSTOMER MESSAGE")[-1]
+            else addr("သုခလမ်း အမှတ် ၁၂", None, "သုခလမ်း", "အမှတ် ၁၂", missing=["township"]))
+    else:
+        auto_on(db)
+    cart_for(client, token, db, phone="09777123456")
+    now_msg(db, "သုခလမ်း အမှတ် ၁၂")
+    assert ungreet(deliver(db)[0]) == ASK_TOWNSHIP
+    status, saved, _, _, partial = open_order(db)
+    assert saved is None and partial["full_text"] in ("သုခလမ်း အမှတ် ၁၂", "သုခလမ်း အမှတ် 12")
+    if with_ai:
+        assert "WE ASKED: the township of this address: သုခလမ်း" in (now_msg(db, "ရန်ကင်း") and fake.requests[-1][1])
+    else:
+        now_msg(db, "ရန်ကင်း")
+    status, saved, _, parts, partial = open_order(db)
+    assert saved.startswith("သုခလမ်း အမှတ်") and saved.endswith(", ရန်ကင်း") and partial is None
+    assert parts["township"] == "ရန်ကင်း (Yankin)" and status == "waiting_payment"
+    assert deliver(db)[0].endswith(PAYMENT_FOOTER)
+
+
+def test_p3_resume_line_asks_only_the_township(shop, db):
+    client, token = shop
+    auto_on(db)
+    cart_for(client, token, db, phone="09777123456")
+    now_msg(db, "သုခလမ်း အမှတ် ၁၂")
+    deliver(db)
+    from app.orders import steps
+    from app.replies import templates as replies
+
+    with SessionLocal() as s:
+        step = steps.step(s, customer_id(db, "91"))
+        assert step.kind == "need_address" and steps.resume_text(s, step, replies.load(s)) == ASK_TOWNSHIP
+
+
+def test_p5_unknown_township_goes_to_a_person(auto_ai, shop, db):
+    client, token = shop
+    cart_for(client, token, db, phone="09777123456")
+    auto_ai.answer = lambda _: answer_with(addr("No 7 Shwe Taung Gyar Rd, Zigon", "Zigon", "Shwe Taung Gyar Rd", "No 7"))
+    mid = now_msg(db, "No 7 Shwe Taung Gyar Rd, Zigon")
+    assert deliver(db) == [] and open_order(db)[1] is None
+    page = client.get("/").text
+    assert f'id="address-{mid}"' in page and "Township not in our list." in page
+    assert "<b>Zigon</b>" in page and "No 7 Shwe Taung Gyar Rd, Zigon</textarea>" in page
+    r = client.post(f"/messages/{mid}/address", data={"csrf": token, "full_text": "Zigon", "back": "/"},
+                    follow_redirects=False)
+    assert r.status_code == 303 and open_order(db)[1] is None  # still not valid: nothing saved
+    client.post(f"/messages/{mid}/address", data={"csrf": token, "full_text": "No 7 Shwe Taung Gyar Rd, Bahan",
+                                                   "back": "/"})
+    status, saved, _, parts, _ = open_order(db)
+    assert saved == "No 7 Shwe Taung Gyar Rd, Bahan" and status == "waiting_payment"
+    assert ungreet(deliver(db)[0]).endswith(PAYMENT_FOOTER)
+    assert f'id="address-{mid}"' not in client.get("/").text
+
+
+def test_p5_unsure_ai_and_ask_for_full_address(auto_ai, shop, db):
+    client, token = shop
+    cart_for(client, token, db, phone="09777123456")
+    auto_ai.answer = lambda _: answer_with(addr("ဗဟန်း ရွှေဂုံတိုင်လမ်း အမှတ် ၅", "ဗဟန်း", confidence=0.6))
+    mid = now_msg(db, "ဗဟန်း ရွှေဂုံတိုင်လမ်း အမှတ် ၅ လားမသိဘူး")
+    assert deliver(db) == []
+    page = client.get("/").text
+    assert f'id="address-{mid}"' in page and "The AI is not sure about this address." in page
+    client.post(f"/messages/{mid}/address/ask", data={"csrf": token, "back": "/"})
+    assert ungreet(deliver(db)[0]) == "အိမ်နံပါတ်၊ လမ်း၊ မြို့နယ် ပါတဲ့ လိပ်စာ အပြည့်အစုံ ပို့ပေးပါနော်။"
+    assert f'id="address-{mid}"' not in client.get("/").text and open_order(db)[1] is None
+
+
+def test_p6_ai_address_off_rules_still_work_and_nothing_address_like_leaves(ai, shop, db):
+    client, token = shop
+    from app.ai import settings as ai_settings
+
+    mode("auto", ai_address=False)
+    auto_on(db)
+    cart_for(client, token, db)
+    ai.answer = lambda _: full("other", confidence=0.3)
+    now_msg(db, LIVE_P2)
+    assert all("ရွှေဂုံတိုင်" not in body for _, body in ai.requests)  # not even asked: the rules are sure
+    status, saved, phones, parts, _ = open_order(db)
+    assert saved == "ဗဟန်း ရွှေဂုံတိုင်လမ်း အမှတ် 5" and phones == ["09777123456"] and status == "waiting_payment"
+    now_msg(db, "mystery 10ml ယူမယ် ပြီးတော့ ရန်ကင်း သုခလမ်း အမှတ်၁၂ ကိုပို့ပေးပါ", customer="92")
+    instructions, body = ai.requests[-1]
+    assert "သုခလမ်း" not in body and "[ADDRESS]" in body and "## address" not in instructions
+    with SessionLocal() as s:
+        assert ai_settings.load(s)["ai_address"] is False

@@ -6,10 +6,12 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy import delete, exists, func, select, update
 from sqlalchemy.orm import Session
 
-from app.models import AuditLog, Customer, FaqEntry, Message, MessageReview, Outbox, Product, QuickAction, User
+from app.models import (
+    AuditLog, Customer, FaqEntry, Message, MessageReview, Outbox, ParseResult, Product, QuickAction, User,
+)
 from app.models.outbox import UNDO_SECONDS
 from app.learning import cards, patterns
-from app.orders import auto, followups, payments, unknown
+from app.orders import actions, address, auto, followups, payments, unknown
 from app.replies import compose, faq
 from app.replies import templates as replies
 from app.web.auth import current_user, owner_only, verify_csrf
@@ -135,6 +137,62 @@ def not_stocked(request: Request, message_id: int, position: int, back: str = Fo
     return _done(request, message, back, f"“{item.text}”: we don't have it (the reply will say so).")
 
 
+# ---------- docs/SPEC-v4.12-address-payment-ai.md N1: "📍 check address" ----------
+
+def _message(db: Session, message_id: int) -> Message:
+    message = db.get(Message, message_id)
+    if message is None or message.direction != "in":
+        raise HTTPException(404, "Message not found")
+    return message
+
+
+@router.post("/messages/{message_id}/address")
+def fix_address(request: Request, message_id: int, full_text: str = Form(""), back: str = Form("/"),
+                db: Session = Depends(get_db), user: User = Depends(current_user)):
+    """The admin's corrected address (same validator) -> the normal next step (payment info, ...)."""
+    message = _message(db, message_id)
+    back = safe_back(back, "/")
+    check = address.admin_check(full_text)
+    if not check.valid:
+        flash(request, "Not saved: " + check.why)
+        return RedirectResponse(back, status_code=303)
+    texts = replies.load(db)
+    result = db.scalar(select(ParseResult).where(ParseResult.message_id == message.id, ParseResult.is_current))
+    suggestion = actions.suggest(db, message, result, texts, address_override=full_text)
+    if suggestion is None:
+        flash(request, "Not possible any more (already handled, or a reply is waiting to go out).")
+        return RedirectResponse(back, status_code=303)
+    try:
+        actions.perform(db, message, suggestion.fingerprint, user, texts, address=full_text)
+    except actions.Refused as exc:
+        db.rollback()
+        flash(request, str(exc))
+        return RedirectResponse(back, status_code=303)
+    db.add(AuditLog(user_id=user.id, action="address.fixed", details={"message_id": message.id}))
+    db.commit()
+    flash(request, "Address saved. The reply goes out in 10 s (Undo in the chat).")
+    return RedirectResponse(back, status_code=303)
+
+
+@router.post("/messages/{message_id}/address/ask")
+def ask_full_address(request: Request, message_id: int, back: str = Form("/"), db: Session = Depends(get_db),
+                     user: User = Depends(current_user)):
+    """"Please send the full address" (template address_invalid_note); nothing is saved."""
+    message = _message(db, message_id)
+    now = datetime.now(UTC)
+    texts = replies.load(db)
+    body = compose.with_greeting(texts["address_invalid_note"], texts,
+                                 compose.needs_greeting(db, message.customer_id, now))
+    db.add(Outbox(customer_id=message.customer_id, text=body, reply_kind="ask_address", status="queued",
+                  idempotency_key=f"address-ask-{message.id}-{now.timestamp()}", created_by=user.id,
+                  send_after=now + timedelta(seconds=UNDO_SECONDS), source_message_id=message.id))
+    actions.upsert_review(db, message.id, "done", user)
+    db.add(AuditLog(user_id=user.id, action="address.ask_full", details={"message_id": message.id}))
+    db.commit()
+    flash(request, "Asked for the full address. It goes out in 10 s (Cancel in the chat).")
+    return RedirectResponse(safe_back(back, "/"), status_code=303)
+
+
 # ---------- monitoring ----------
 
 def needs_you(db: Session, now: datetime | None = None, owner: bool = True) -> dict:
@@ -164,7 +222,13 @@ def needs_you(db: Session, now: datetime | None = None, owner: bool = True) -> d
     to_check = payments.to_check(db)
     cancels = followups.cancel_requests(db, now)
     unpaid = [(d, why) for d in followups.due(db, now) if (why := followups.blocked(db, d.customer, now))]
+    address_checks = address.to_check(db, now)  # docs/SPEC-v4.12-address-payment-ai.md N1
+    checking = {m.id for m, *_ in address_checks}
     unanswered = followups.unanswered(db, now)
+    for row in unanswered:
+        row.message_ids = [mid for mid in row.message_ids if mid not in checking]
+    unanswered = [r for r in unanswered if r.message_ids]
+    teach = [(m, card) for m, card in teach if m.id not in checking]
     cards_by_id = dict(teach)
     for row in unanswered:  # the teaching card of an unanswered message goes on its row
         mid = next((mid for mid in reversed(row.message_ids) if mid in cards_by_id), None)
@@ -233,7 +297,8 @@ def needs_you(db: Session, now: datetime | None = None, owner: bool = True) -> d
             "price_needed": price_needed, "to_approve": to_approve, "conflicts": conflicts,
             "failed": failed, "paused": paused, "auto_cancelled": followups.auto_cancelled(db, now),
             "ai_notices": ai_notices, "changed_paid": changed_paid, "change_sent": change_sent, "requests": requests,
-            "count": len(ai_notices) + len(changed_paid) + len(change_sent) + len(requests) + len(to_check) + len(cancels) + len(unpaid) + len(unknown_msgs) + len(unanswered)
+            "address_checks": address_checks,
+            "count": len(address_checks) + len(ai_notices) + len(changed_paid) + len(change_sent) + len(requests) + len(to_check) + len(cancels) + len(unpaid) + len(unknown_msgs) + len(unanswered)
                      + len(hints) + len(failed) + len(paused) + len(teach) + len(price_needed)
                      + (1 if to_approve else 0) + len(conflicts)}
 

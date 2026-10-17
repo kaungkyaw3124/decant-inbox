@@ -13,10 +13,18 @@ Fixture columns: expect_intent "a/b" = either is right; expect_items "Name@5ml*2
 `allowed` = products that may appear when items are not checked).
 docs/SPEC-v4.11-ai-first.md: ">remove" / ">add" / ">ask_price" after an item = its action must be that;
 "?ysl@10ml{Y Eau de Parfum|Libre}" = unknown with candidates: the AI must offer 2-3 of those (never others).
+
+docs/SPEC-v4.12-address-payment-ai.md:
+  --addresses  tests/fixtures/ai_eval_address.csv through the AI + our validator (the same code as the
+               app). PASS: township correct >= 95%, full_text never contains a phone (the AI's text and the
+               saved text), 0 keyword-only messages accepted as an address.
+  --screens    tests/fixtures/payment_screens/ (synthetic receipts) through the screenshot reader. PASS:
+               amount exact >= 95%, transaction_no exact >= 90%, is_payment_receipt correct 100%.
 """
 import argparse
 import csv
 import json
+import re
 import sys
 from collections import Counter
 from dataclasses import dataclass
@@ -34,6 +42,9 @@ from app.core.db import SessionLocal
 from app.models import Product
 
 FIXTURE = BASE_DIR / "tests" / "fixtures" / "ai_eval.csv"
+ADDRESS_FIXTURE = BASE_DIR / "tests" / "fixtures" / "ai_eval_address.csv"
+PASS_TOWNSHIP = 0.95
+_PHONE = re.compile(r"\[PHONE\]|(?:\+?95|0)\s*9(?:[\s-]?\d){7,9}")
 EXPORTS = BASE_DIR / "data" / "exports"
 PASS_ACCURACY = 0.90
 
@@ -146,11 +157,83 @@ def score(row: dict, got: Understood, ids: dict[str, int]) -> Score:
                  bad_remove)
 
 
-def context(row: dict) -> prompt.Context:
-    history = tuple(f"{h[:1]}: {mask(h[2:].strip())}" for h in row["history"].split("|") if h.strip())
+def context(row: dict, with_address: bool = False) -> prompt.Context:
+    """with_address: as the app sends it with the owner's switch ai_address ON (docs/SPEC-v4.12)."""
+    history = tuple(f"{h[:1]}: {mask(h[2:].strip(), with_address)}" for h in row["history"].split("|") if h.strip())
     cart = tuple(x.strip() for x in row["cart"].split(";") if x.strip())
     paid = tuple(x.strip() for x in row["last_paid"].split(";") if x.strip())
-    return prompt.Context(mask(row["message"]), history, cart, paid)
+    return prompt.Context(mask(row["message"], with_address), history, cart, paid, with_address)
+
+
+def _save(name: str, summary: dict, cases: list[dict]) -> None:
+    EXPORTS.mkdir(parents=True, exist_ok=True)
+    stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+    report = EXPORTS / f"{name}_{stamp}.json"
+    report.write_text(json.dumps({"summary": summary, "cases": cases}, ensure_ascii=False, indent=1), encoding="utf-8")
+    report.chmod(0o600)
+    latest = EXPORTS / f"{name}_latest.json"
+    latest.write_text(report.read_text(encoding="utf-8"), encoding="utf-8")
+    latest.chmod(0o600)
+    print(f"report: {report.relative_to(BASE_DIR)}")
+
+
+def eval_addresses(provider, catalog: prompt.Catalog, model: str, reasoning: str, only: set[str] | None) -> int:
+    from app.orders import address
+
+    rows = [r for r in csv.DictReader(ADDRESS_FIXTURE.open(encoding="utf-8")) if not only or r["id"] in only]
+    print(f"Address evaluation: {len(rows)} cases, model {model}, reasoning {reasoning}\n")
+    cases, township_ok, township_n, phones, keyword_accepted, cost, errors = [], 0, 0, 0, 0, 0.0, 0
+    for row in rows:
+        ctx = prompt.Context(mask(row["message"], True), (), (), (), True, row["asked"] or None,
+                             mask(row["partial"], True) if row["partial"] else None)
+        got = understand(provider, catalog, ctx, model, reasoning)
+        cost += got.cost
+        notes = []
+        if got.result is None:
+            errors += 1
+            notes.append("no result: " + ", ".join(got.problems))
+        raw = (got.result.address or {}) if got.result else {}
+        partial = {"full_text": row["partial"]} if row["partial"] else None
+        check = address.combine({"address": got.result.address} if got.result else None,
+                                address.from_rules(row["message"]), partial)
+        accepted = check is not None and check.status in ("valid", "partial")
+        status = check.status if check else "none"
+        township = check.township.en if check is not None and check.township else ""
+        ok = True
+        if row["expect_status"] == "none":
+            if accepted:
+                keyword_accepted, ok = keyword_accepted + 1, False
+                notes.append(f"accepted as an address ({status}: {check.parts.full_text})")
+        else:
+            township_n += 1
+            if township == row["expect_township"]:
+                township_ok += 1
+            else:
+                ok = False
+                notes.append(f"township {township or '-'} (want {row['expect_township'] or '-'})")
+            if status != row["expect_status"]:
+                notes.append(f"status {status} (want {row['expect_status']})")  # shown, not part of the gate
+        phone = bool(_PHONE.search(raw.get("full_text") or "")) or bool(
+            check is not None and _PHONE.search(check.parts.full_text.translate(str.maketrans("၀၁၂၃၄၅၆၇၈၉", "0123456789"))))
+        if phone:
+            phones, ok = phones + 1, False
+            notes.append("phone in full_text")
+        print(f"{'✅' if ok else '❌'} {row['id']:4} {row['message'][:44]:44} {status:8} {township or '-':16}"
+              + ("" if ok else "  <- " + "; ".join(notes)) + (f"  ({'; '.join(notes)})" if ok and notes else ""))
+        cases.append({"id": row["id"], "ok": ok, "notes": notes, "status": status, "township": township,
+                      "ai_address": raw or None, "saved_text": check.parts.full_text if check else None,
+                      "cost_usd": got.cost})
+    acc = township_ok / (township_n or 1)
+    passed = acc >= PASS_TOWNSHIP and phones == 0 and keyword_accepted == 0 and errors < len(rows)
+    summary = {"at": datetime.now(UTC).isoformat(timespec="seconds"), "model": model, "reasoning": reasoning,
+               "cases": len(rows), "township_correct": round(acc, 3), "phone_in_full_text": phones,
+               "keyword_only_accepted": keyword_accepted, "errors": errors, "cost_usd": round(cost, 5),
+               "passed": passed}
+    print(f"\ntownship correct {acc:.0%} (need {PASS_TOWNSHIP:.0%}) · phone in full_text {phones} (need 0) · "
+          f"keyword-only accepted {keyword_accepted} (need 0) · errors {errors} · cost ${cost:.4f}")
+    print("PASS ✅" if passed else "FAIL ❌")
+    _save("ai_eval_address", summary, cases)
+    return 0 if passed else 1
 
 
 def main() -> int:
@@ -158,6 +241,8 @@ def main() -> int:
     parser.add_argument("--reasoning", choices=ai_settings.REASONING)
     parser.add_argument("--model")
     parser.add_argument("--only", help="comma-separated case ids")
+    parser.add_argument("--addresses", action="store_true", help="the 4.12 address set instead")
+    parser.add_argument("--screens", action="store_true", help="the 4.12 payment-screenshot set instead")
     args = parser.parse_args()
     provider = providers.get()
     if provider is None:
@@ -169,6 +254,13 @@ def main() -> int:
         ids = {name.lower(): pid for pid, name in session.execute(select(Product.id, Product.name)
                                                                   .where(Product.active))}
     model, reasoning = args.model or cfg["model"], args.reasoning or cfg["reasoning"]
+    only = set(args.only.split(",")) if args.only else None
+    if args.addresses:
+        return eval_addresses(provider, catalog, model, reasoning, only)
+    if args.screens:
+        from app.ai import screens
+
+        return screens.evaluate(provider, model, reasoning, only)
     rows = list(csv.DictReader(FIXTURE.open(encoding="utf-8")))
     if args.only:
         wanted = set(args.only.split(","))
@@ -177,7 +269,7 @@ def main() -> int:
     results = []
     raw_bad_removes = 0
     for row in rows:
-        got = understand(provider, catalog, context(row), model, reasoning)
+        got = understand(provider, catalog, context(row, bool(cfg["ai_address"])), model, reasoning)
         if got.result is not None:  # the same cart check as AUTO (service.auto_apply): removes only from the cart
             raw_bad_removes += score(row, got, ids).remove_not_in_cart
             got.result, dropped = checker.removes_in_cart(got.result, cart_ids(row, ids))
@@ -207,7 +299,7 @@ def main() -> int:
     passed = both >= PASS_ACCURACY and wrong == 0 and nil_mapped == 0 and bad_removes == 0
     summary = {
         "at": datetime.now(UTC).isoformat(timespec="seconds"), "model": model, "reasoning": reasoning,
-        "cases": len(results), "intent_and_products": round(both, 3),
+        "cases": len(results), "with_address": bool(cfg["ai_address"]), "intent_and_products": round(both, 3),
         "by_field": {k: round(v, 3) for k, v in field_acc.items()}, "wrong_product_cases": wrong,
         "not_in_list_mapped": nil_mapped, "remove_not_in_cart": bad_removes,
         "remove_not_in_cart_before_checker": raw_bad_removes, "cost_usd": round(cost, 5), "avg_latency_ms": round(latency),

@@ -15,6 +15,7 @@ full_text.
 import csv
 import re
 from dataclasses import asdict, dataclass, field
+from datetime import UTC, datetime, timedelta
 from functools import lru_cache
 
 from app.core.config import BASE_DIR
@@ -113,7 +114,7 @@ def _boundary(text: str, start: int, end: int, name: str) -> bool:
 
 def _find(text: str, names: list[tuple[str, object]]):
     """The longest name found in text (a street named after a township does not count)."""
-    lower = text.lower()
+    lower = _marks(text).lower()
     for name, value in sorted(names, key=lambda x: len(x[0]), reverse=True):
         start = lower.find(name)
         while start >= 0:
@@ -122,6 +123,11 @@ def _find(text: str, names: list[tuple[str, object]]):
                 return value
             start = lower.find(name, start + 1)
     return None
+
+
+def _marks(text: str) -> str:
+    """Zawgyi converts to "ု" before "ိ" (လှုိင်); Unicode order is "ိ" + "ု" (လှိုင်)."""
+    return text.replace("\u102f\u102d", "\u102d\u102f")
 
 
 def find_township(text: str) -> Township | None:
@@ -134,7 +140,7 @@ def find_city(text: str) -> tuple[str, str] | None:
 
 def lookup_township(name: str | None) -> Township | None:
     """A township the AI proposed ("Yankin", "ရန်ကင်း", "Yankin Township"): only names in our list."""
-    key = _SUFFIX.sub("", to_unicode(name or "").strip()).strip().lower()
+    key = _marks(_SUFFIX.sub("", to_unicode(name or "").strip()).strip().lower())
     if not key:
         return None
     return next((t for t in townships() if key in t.names), None)
@@ -158,7 +164,7 @@ def clean(text: str) -> str:
     """The address only: no phone numbers, no "ကိုပို့ပေးပါ" / "ဒီလိပ်စာကို…" / "new address:" words."""
     from app.orders import cart  # late import: cart imports this module
 
-    text = strip_phones(to_unicode(text or ""))
+    text = strip_phones(to_unicode(text or "")).replace("[PHONE]", " ").replace("[NUMBER]", " ")
     text = re.sub(r"(?i)(?:ဖုန်းနံပါတ်|ဖုန်း|(?<![a-z])(?:phone(?:\s*no)?|ph(?:\s*no)?|tel)(?![a-z])\.?)\s*[:：-]?\s*(?=[,၊။\s]|$)",
                   " ", text)
     text = re.sub(r"[ \t]+", " ", text)
@@ -315,7 +321,7 @@ def merge(partial: dict, check: Check) -> Check:
         combined = answer  # the customer sent the whole address again
     else:
         combined = f"{before}, {answer}" if answer else before
-    keep = {k: v for k, v in partial.items() if k in FIELDS and v}
+    keep = {k: v for k, v in partial.items() if k in FIELDS and v and k not in ("township", "city")}
     if check.township is not None:
         keep["township"] = check.township.my
     if check.parts.city:
@@ -324,6 +330,105 @@ def merge(partial: dict, check: Check) -> Check:
                     is_change_request=check.is_change_request)
 
 
+def pending_partial(order, at: datetime | None = None) -> dict | None:
+    """The partial address of this order that still waits for the township / city (24 h)."""
+    if order is None or not order.address_partial or order.address_partial_at is None:
+        return None
+    if (at or datetime.now(UTC)) - order.address_partial_at > timedelta(hours=PARTIAL_HOURS):
+        return None
+    return order.address_partial
+
+
+def asked_for(session, customer_id: int, order, at: datetime | None = None) -> tuple[str | None, str | None]:
+    """What we wait for from the customer: ("township" | "city", the partial address) after we asked for
+    the missing part, ("address", None) while the order needs an address, else (None, None)."""
+    from app.orders import steps  # late import: steps -> cart -> this module
+
+    partial = pending_partial(order, at)
+    if partial:
+        return ("city" if partial.get("_ask") == "ask_city" else "township"), partial.get("full_text")
+    step = steps.step(session, customer_id)
+    if step.kind == "need_address" or (step.kind == "waiting_new_info"
+                                       and step.order.change_wanted in ("address", "both", "unclear")):
+        return "address", None
+    return None, None
+
+
+def ai_allowed(session) -> bool:
+    from app.ai import settings as ai_settings  # late import: ai -> orders
+
+    cfg = ai_settings.load(session)
+    return bool(cfg["ai_address"]) and cfg["mode"] != "off"
+
+
+def wants_ai(session, message, result) -> bool:
+    """docs/SPEC-v4.12 N1: a message the rules read as an address (or a change request with one) is
+    read by the AI too, when the owner allows sending addresses (the rules are not trusted alone)."""
+    if result.intent not in ("address", "change_info") or not ai_allowed(session):
+        return False
+    return from_rules(message.raw_text or "") is not None
+
+
 def read_message(session, message) -> Check | None:
-    """The address in a customer message (None = none at all)."""
-    return from_rules(message.raw_text or "")
+    """The address in a customer message (None = none at all): the AI's reading when allowed and
+    available, else the rules; merged with a partial address that waits for its township / city."""
+    from sqlalchemy import select
+
+    from app.models import AICall, Order
+    from app.models.orders import OPEN_STATUSES
+
+    ai_answer = None
+    if ai_allowed(session):
+        call = session.scalar(select(AICall).where(AICall.message_id == message.id))
+        if call is not None and call.ok and call.result_json and "address" in call.result_json:
+            ai_answer = {"address": call.result_json["address"]}
+    order = session.scalar(select(Order).where(Order.customer_id == message.customer_id,
+                                               Order.status.in_(OPEN_STATUSES)))
+    return combine(ai_answer, from_rules(message.raw_text or ""), pending_partial(order, message.received_at))
+
+
+def combine(ai_answer: dict | None, rules: Check | None, partial: dict | None) -> Check | None:
+    """ai_answer: {"address": the AI's answer} when the AI read the message (None = it did not). The AI
+    wins; when it saw no address, a rules reading with a known township still counts. A partial
+    address waiting for its township / city is completed by the answer."""
+    check = rules if ai_answer is None else from_ai(ai_answer["address"])
+    if check is None and ai_answer is not None and rules is not None and rules.valid:
+        check = rules
+    if check is None or check.valid or not partial:
+        return check
+    merged = merge(partial, check)
+    return merged if merged.valid else check
+
+
+CHECK_WINDOW = timedelta(hours=24)
+
+
+def to_check(session, now: datetime | None = None) -> list[tuple]:
+    """Needs you "📍 check address": (message, customer, reading, order) for recent customer messages
+    whose address is not sure enough to save by itself (invalid, unknown township, the AI unsure) and
+    that nobody handled yet. A partial address that was asked about is not listed (the customer answers)."""
+    from sqlalchemy import exists, select
+
+    from app.models import Customer, Message, MessageReview, ParseResult, QuickAction
+    from app.orders import change  # late import: change -> cart -> this module
+
+    now = now or datetime.now(UTC)
+    handled = exists().where(QuickAction.message_id == Message.id, QuickAction.undone_at.is_(None),
+                             QuickAction.kind != "teach")
+    reviewed = exists().where(MessageReview.message_id == Message.id, MessageReview.status.in_(("done", "ignored")))
+    rows = session.execute(
+        select(Message, Customer).join(Customer, Customer.id == Message.customer_id)
+        .join(ParseResult, (ParseResult.message_id == Message.id) & ParseResult.is_current)
+        .where(Message.direction == "in", Message.kind == "text", Message.received_at >= now - CHECK_WINDOW,
+               Customer.ignored.is_(False), ParseResult.intent.in_(("address", "change_info")), ~handled, ~reviewed)
+        .order_by(Message.received_at.desc(), Message.id.desc())).all()
+    out = []
+    for message, customer in rows:
+        check = read_message(session, message)
+        if check is None or check.sure or check.status == "partial":
+            continue
+        order = change.target_order(session, customer.id)
+        if order is None or order.status in change.SENT:
+            continue
+        out.append((message, customer, check, order))
+    return out

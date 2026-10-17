@@ -1,0 +1,37 @@
+id,message,asked,partial,expect_status,expect_township,note
+a01,ဗဟန်း ရွှေဂုံတိုင်လမ်း အမှတ် ၅ ကိုပို့ပေးပါ,,,valid,Bahan,"Burmese, ask words"
+a02,"No. 12, Bo Aung Kyaw Street, Kyauktada Township, Yangon ph 09777123456",,,valid,Kyauktada,English + phone
+a03,အမှတ် ၄၅၊ ပြည်လမ်း၊ ကမာရွတ်မြို့နယ် ဖုန်း ၀၉၄၄၄၅၅၅၆၆၆,,,valid,Kamayut,Pyay Rd is a street; Burmese-digit phone
+a04,သုခလမ်း အမှတ် ၁၂,address,,partial,,no township
+a05,ရန်ကင်း,township,သုခလမ်း အမှတ် ၁၂,valid,Yankin,answer to which township
+a06,လိပ်စာ ပြောင်းချင်ပါတယ်,,,none,,keyword-only change request (live case)
+a07,လိပ်စာ,,,none,,keyword only
+a08,ဒီကိုပို့ပေးပါ,,,none,,keyword only
+a09,address ပို့ပေးမယ်နော်,,,none,,"keyword only, mixed"
+a10,"new address: No 3, Inya Road, Kamayut",,,valid,Kamayut,change request with address
+a11,35 လမ်း 80x81 ကြား မန္တလေး,,,valid,,Mandalay grid: city + street
+a12,"Hlaing Thar Yar, 12 ward, No 5 Shwe Pyi Thar St",,,valid,Hlaingthaya,street named after another township
+a13,ဗဟန္း ေ႐ႊဂုံတိုင္လမ္း အမွတ္ ၅ ကိုပို႔ေပးပါ,,,valid,Bahan,Zawgyi
+a14,အမွတ္ ၇၊ ၅ ရပ္ကြက္၊ သာေကတၿမိဳ႕နယ္,,,valid,Thaketa,"Zawgyi, ward"
+a15,"No.88, Pyay Road, 9 mile, Mayangone tsp",,,valid,Mayangon,"tsp, Pyay Road"
+a16,Sauvage 10ml ယူမယ် ပြီးရင် ဗဟန်း ၃၃ လမ်း အမှတ် ၂ ကိုပို့ပေးပါ,,,valid,Bahan,product + address
+a17,deli နဲ့ပို့ပေးပါ တောင်ဥက္ကလာပ ၉ ရပ်ကွက် အမှတ် ၁၂၃,,,valid,South Okkalapa,deli words
+a18,"Taunggyi, Merchant St, No 15",,,valid,Taunggyi,outside Yangon
+a19,ok,address,,none,,not an address while we wait for one
+a20,လိပ်စာက အရင်အတိုင်းပါ,,,none,,same as before: no new address
+a21,ဖုန်းနံပါတ် 09777123456,address,,none,,phone only
+a22,"North Dagon, 45 ward, No 1023 Thitsar Rd",,,valid,North Dagon,English
+a23,အင်းစိန် ရွာမ အမှတ် ၄,,,valid,Insein,short Burmese
+a24,Mandalay Chanayethazan 78 st 30x31,,,valid,Chanayethazan,Mandalay township
+a25,No 10 Myittar St,address,,partial,,English partial
+a26,လှိုင် ၁၀ ရပ်ကွက် အမှတ် ၅ ဖုန်း 09 444 555 666,,,valid,Hlaing,phone with spaces
+a27,ပဲခူး၊ ရွှေမော်ဓော ဘုရားလမ်း အမှတ် ၉,,,valid,Bago,town
+a28,Dagon,township,No 10 Myittar St,valid,Dagon,"answer, English"
+a29,"Myeik, Bogyoke road, No 22",,,valid,Myeik,town
+a30,change my address,,,none,,"keyword-only change, English"
+a31,ဒီလိပ်စာကို ပို့ပေးပါ - စမ်းချောင်း ဓမ္မစေတီလမ်း အမှတ် ၈,,,valid,Sanchaung,this address: replaces
+a32,ရွှေပြည်သာ ၃ ရပ်ကွက် လမ်း ၇ အမှတ် ၁၁၂,,,valid,Shwepyitha,ward + street number
+a33,ရန်ကုန်ထဲ ပို့ပေးလား,,,none,,"a question, not an address"
+a34,"Thanlyin, Kyaik Khauk Pagoda Rd, No 4",,,valid,Thanlyin,outside town
+a35,sanchaung,township,Bargayar Rd No 15,valid,Sanchaung,"answer, lower case"
+a36,လႈိင္သာယာ ၁၂ ရပ္ကြက္ အမွတ္ ၇ ဖုန္း ၀၉၇၇၇၁၂၃၄၅၆,,,valid,Hlaingthaya,Zawgyi + phone
