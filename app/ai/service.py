@@ -33,7 +33,7 @@ UNSURE_MATCHES = ("fuzzy", "multiple", "ambiguous", "partial", "context", "none"
 PRODUCT_INTENTS = ("buy", "ask_price", "ask_stock", "remove", "modify_cart")
 # AUTO may act on these (cancel_order only with an open cart; previous_item only when the history has it)
 AUTO_INTENTS = ("buy", "ask_price", "ask_stock", "remove", "cancel_order", "confirm", "address", "greeting",
-                "ask_delivery", "previous_item", "change_info", "payment_sent", "modify_cart")
+                "ask_delivery", "previous_item", "change_info", "payment_sent", "modify_cart", "order_start")
 NOT_IN_LIST_AUTO = 0.9
 MAX_CANDIDATES = 3  # docs/SPEC-v4.11-ai-first.md L3: more -> a person decides
 NOT_IN_LIST_HINT = 0.85

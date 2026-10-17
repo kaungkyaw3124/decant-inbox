@@ -2,7 +2,8 @@
 from dataclasses import asdict, dataclass
 
 INTENTS = ("buy", "ask_price", "ask_stock", "remove", "cancel_order", "confirm", "done", "address", "ask_delivery",
-           "greeting", "previous_item", "change_info", "payment_sent", "modify_cart", "question", "other")
+           "greeting", "previous_item", "change_info", "payment_sent", "modify_cart", "question", "other",
+           "order_start")
 LEARN_KINDS = ("nickname", "intent_phrase", "not_stocked")
 ACTIONS = ("add", "remove", "ask_price")  # docs/SPEC-v4.11-ai-first.md L2
 

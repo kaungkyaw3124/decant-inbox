@@ -54,7 +54,7 @@ from app.models import (
 from app.models.outbox import UNDO_SECONDS
 from app.orders import address, cart, change, delivery, previous, steps, unknown
 from app.parser.normalize import normalize
-from app.parser.rules import CHANGE_PHONE_RE, NEEDS_REVIEW_BELOW, change_kind, find_phones, replace_words
+from app.parser.rules import CHANGE_PHONE_RE, NEEDS_REVIEW_BELOW, change_kind, has_greeting, find_phones, replace_words
 from app.pricing.prices import size_label
 from app.replies import compose, faq
 from app.replies.templates import render
@@ -203,6 +203,12 @@ def _apply(session: Session, message: Message, result: ParseResult, texts: dict[
             return None  # switched off, or a greeting reply went out in the last 30 min (Needs you)
         return Outcome("greeting", "👋 Reply greeting", greeting.reply(session, message.customer_id, texts),
                        "greeting")
+    if result.intent == "order_start":  # docs/SPEC-v4.13-hotfix.md Q2: "I want to order" without a product
+        text = texts["ask_what_product"]
+        if has_greeting(message.normalized_text or "") and not compose.needs_greeting(
+                session, message.customer_id) and patterns.settings(session)["greeting"]:
+            text = f"{texts['greeting']}\n{text}"  # "hi …": greet back even inside the 6 h window
+        return Outcome("order_start", "💬 Ask which product", text, "custom")
     match = faq.for_message(session, message, result)
     if match is not None and result.intent in faq.FIRST_INTENTS:
         return _faq(match)

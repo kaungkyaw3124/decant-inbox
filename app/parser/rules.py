@@ -28,13 +28,15 @@ ambiguous name shared by 2-3 products keeps them as candidates (the customer is 
 rules-7 (docs/SPEC-v4.8-change-info.md): change_info ("လိပ်စာ ပြောင်းချင်ပါတယ်", "ဖုန်းအသစ်", "change address");
 an address needs real CONTENT (township, street, number, ward or a long text): keywords alone
 ("လိပ်စာ", "ပို့ပေးပါ", "address") are not an address and never an agreement.
+rules-10 (docs/SPEC-v4.13-hotfix.md Q2): order_start — "I want to order" (မှာချင်လို့ပါ, order တင်ချင်, want to order)
+with no product, size or unknown item; the shop asks which product.
 """
 import re
 from dataclasses import dataclass, field, replace
 
 from rapidfuzz import fuzz
 
-PARSER_VERSION = "rules-9"
+PARSER_VERSION = "rules-10"
 NEEDS_REVIEW_BELOW = 0.6  # dashboard shows results under this as "needs review"
 FUZZY_THRESHOLD = 88      # rapidfuzz partial_ratio, 0-100
 FUZZY_MIN_ALIAS_LEN = 5   # shorter aliases match too much by accident
@@ -82,6 +84,9 @@ DELI_WORD_RE = _rx(_w("deli"))
 DONE_RE = _rx("ဒါပဲ", "ဒါပါပဲ", "ဒီလောက်ပါပဲ", "ဒီလောက်ပဲ", "ဒါတွေပဲ", "ဒါတွေပါပဲ")
 CONFIRM_RE = _rx("အဆင်ပြေတယ်", "အဆင်ပြေပါတယ်", "ဟုတ်ကဲ့", "ရပါတယ်", _w("ok"), _w("okay"), _w("confirm"))
 PRODUCT_INTENTS = ("buy", "ask_price", "ask_stock", "remove")
+# "I want to order" without a product (docs/SPEC-v4.13-hotfix.md Q2)
+ORDER_START_RE = _rx("မှာချင်", "ဝယ်ချင်လို့", r"order\s*တင်(?:ချင်|မယ်)", r"အော်ဒါ\s*တင်(?:ချင်|မယ်)", "မှာလို့ရ",
+                     _w(r"(?:i\s+)?want\s+to\s+order"), _w(r"can\s+i\s+order"), _w(r"i(?:'d|\s+would)\s+like\s+to\s+order"))
 # Changing the delivery address / phone (docs/SPEC-v4.8-change-info.md). Checked before "address".
 CHANGE_ADDRESS_RE = _rx(r"လိပ်စာ\s*(?:ကို\s*)?ပြောင်း", r"လိပ်စာ\s*အသစ်", r"လိပ်စာ\s*မှား", r"တခြား\s*လိပ်စာ",
                         r"ဒီ\s*လိပ်စာ\s*(?:မ\s*)?(?:ဟုတ်ဘူး|မဟုတ်)", _w(r"(?:change|new|wrong|different)\s+(?:the\s+|my\s+)?address"),
@@ -457,6 +462,12 @@ def find_phrase(text: str, phrases: list[Phrase]) -> Phrase | None:
     return None
 
 
+def has_greeting(text: str) -> bool:
+    """A greeting word anywhere ("hi decant မှာချင်လို့ပါ")."""
+    return any(re.search(r"(?<![a-z])" + re.escape(w) + r"(?![a-z])", text) for w in GREETINGS_LATIN) or any(
+        w in text for w in GREETINGS_MY)
+
+
 def greeting_only(text: str, phrases: list[Phrase] = ()) -> tuple[bool, tuple[int, ...]]:
     """(True, learned ids) if the message is ONLY a greeting ("hi", "မင်္ဂလာပါ ရှင့်", a learned
     greeting phrase), with nothing else to answer."""
@@ -659,6 +670,9 @@ def parse(normalized_text: str, aliases: list[Alias], full_sizes: dict[int, int]
     if previous and not any(i.product_id or i.unknown_text for i in named) \
             and intent in (None, "buy", "unknown", "previous_item"):
         return ParseOutcome("previous_item", None, None, find_quantity(text), 0.8, (), phone, learned_ids)
+    if intent in (None, "buy", "unknown") and not phone and ORDER_START_RE.search(text) and not any(
+            i.product_id or i.unknown_text or i.size_ml or i.is_full_bottle for i in named):
+        return ParseOutcome("order_start", None, None, 1, 0.9, (), None, learned_ids)
     if intent is None and phone:
         intent = "address"  # contact details
     if intent == "address" and not phone and address_content(text) is None:

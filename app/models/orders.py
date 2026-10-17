@@ -20,7 +20,8 @@ SHIPPING_STATUSES = ("paid", "packed", "sent_out")  # paid, not delivered yet
 QUICK_KINDS = ("price", "cart_add", "cart_remove", "cart_list", "confirm", "address", "contact", "not_stocked",
                "delivery", "cancel_order", "faq", "greeting", "teach", "choose_previous", "change_info",
                "hold", "locked",  # docs/SPEC-v4.10-interruptions.md
-               "cart_change", "choose_product")  # docs/SPEC-v4.11-ai-first.md L2, L3
+               "cart_change", "choose_product",  # docs/SPEC-v4.11-ai-first.md L2, L3
+               "order_start")  # docs/SPEC-v4.13-hotfix.md Q2
 CHANGE_WANTED = ("address", "phone", "both", "unclear")  # docs/SPEC-v4.8-change-info.md
 EVENT_KINDS = ("status", "contact", "address_checked",
                # docs/SPEC-v4.10-interruptions.md: total changed while waiting for payment; a change the

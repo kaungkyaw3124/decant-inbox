@@ -110,3 +110,49 @@ def test_r3_auto_reply_off_means_no_watchdog(shop, db):
     cart_for(client, token, db)
     stuck(db, 1, "ဒီအနံ့က ဘယ်လိုမျိုးလဲ", seconds_ago=90)
     assert holding.run_once() == {}
+
+
+# ---------- R2 / Q2: "I want to order" without a product ----------
+
+from app.orders import address  # noqa: E402
+from app.parser.normalize import normalize  # noqa: E402
+from app.parser.rules import parse  # noqa: E402
+
+ASK_PRODUCT = "ဘယ်ပစ္စည်း မှာချင်လဲ ပြောပေးပါနော်။"
+
+
+@pytest.mark.parametrize("body", [LIVE_ORDER, "မှာချင်လို့ပါ", "ဝယ်ချင်လို့ပါ", "order တင်ချင်လို့", "အော်ဒါတင်ချင်ပါတယ်",
+                                  "hello, I want to order", "can I order?"])
+def test_r2_order_start_rules(body):
+    assert parse(normalize(body), []).intent == "order_start"
+
+
+def test_r2_order_start_with_a_product_is_a_buy():
+    assert parse(normalize("sauvage 10ml မှာချင်လို့ပါ"), []).intent != "order_start"
+
+
+def test_r2_live_hi_order_rules_path(shop, db):
+    """The live 01:59 message: greeting + "which product?" (not silence), and it is no address."""
+    client, token = shop
+    auto_on(db)
+    now_msg(db, LIVE_ORDER)
+    assert deliver(db) == ["မင်္ဂလာပါ။\n" + ASK_PRODUCT]
+
+
+def test_r2_live_hi_order_ai_path(auto_ai, shop, db):
+    """The AI answered live: buy without items (refused) -> now it may say order_start; either way a reply."""
+    client, token = shop
+    auto_ai.answer = lambda _: full("order_start", confidence=0.95)
+    now_msg(db, "hi decant ကနေ တစ်ခုခု ယူချင်လို့ပါ")  # the rules don't know these words: the AI does
+    assert deliver(db) == ["မင်္ဂလာပါ။\n" + ASK_PRODUCT]
+
+
+def test_r2_greeting_inside_the_6h_window(shop, db):
+    client, token = shop
+    auto_on(db)
+    now_msg(db, "မှာချင်လို့ပါ")
+    assert deliver(db) == ["မင်္ဂလာပါ။\n" + ASK_PRODUCT]  # first contact: the 6 h rule greets
+    now_msg(db, "မှာချင်လို့ပါ")
+    assert deliver(db) == [ASK_PRODUCT]  # no "hi": no second greeting
+    now_msg(db, "hi မှာချင်လို့ပါ")
+    assert deliver(db) == ["မင်္ဂလာပါ။\n" + ASK_PRODUCT]  # "hi" is greeted back

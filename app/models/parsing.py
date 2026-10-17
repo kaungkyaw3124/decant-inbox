@@ -8,7 +8,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.base import Base, created_at_column
 
-INTENTS = ("buy", "ask_stock", "ask_price", "other", "unknown", "remove", "confirm", "done", "address",
+INTENTS = ("buy", "ask_stock", "ask_price", "other", "unknown", "remove", "confirm", "done", "address", "order_start",
            "ask_delivery", "cancel_order", "greeting", "previous_item", "change_info", "payment_sent",
            "modify_cart")  # docs/SPEC-v4.11-ai-first.md L2: adds and removes in one message
 ITEM_ACTIONS = ("add", "remove", "ask_price")  # per item (L2); None = what the intent says

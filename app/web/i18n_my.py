@@ -12,6 +12,7 @@ CODES = {
     "remove": "ဖြုတ်မယ်", "confirm": "အတည်ပြု", "address": "လိပ်စာ", "ask_delivery": "ရောက်ပြီလားမေး",
     "cancel_order": "အော်ဒါပယ်", "greeting": "နှုတ်ဆက်", "previous_item": "အရင်ကဟာ", "question": "မေးခွန်း",
     "ignore": "ဘာမှမလုပ်", "change_info": "လိပ်စာ/ဖုန်း ပြောင်း", "payment_sent": "ငွေလွှဲပြီး (ပုံမပါ)", "modify_cart": "ဖြုတ်ပြီး ထည့်",
+    "order_start": "မှာချင် (ပစ္စည်းမပြော)",
     # message review
     "new": "အသစ်", "done": "ပြီးပြီ", "ignored": "လျစ်လျူရှုထား",
     # orders
@@ -737,4 +738,6 @@ MY = {
     "customer waiting": "ဖောက်သည် စောင့်နေ", "“please wait” sent at {time}": "{time} မှာ “ခဏစောင့်” ပို့ပြီး",
     "Nobody could answer within 60 s: please wait (at most every 10 min)":
         "၆၀ စက္ကန့်အတွင်း ဘယ်သူမှ မဖြေနိုင်: ခဏစောင့်ခိုင်း (၁၀ မိနစ်မှာ အများဆုံး တစ်ခါ)",
+    "💬 Ask which product": "💬 ဘယ်ပစ္စည်းလဲ မေးမယ်", "asked which product to order": "ဘယ်ပစ္စည်း မှာမလဲ မေးပြီး",
+    "Customer wants to order but names no product: ask which one": "မှာချင်ပေမယ့် ပစ္စည်း မပြော: ဘယ်ဟာလဲ မေးမယ်",
 }

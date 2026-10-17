@@ -100,6 +100,8 @@ context to understand it (e.g. "that one", "the previous one", "10ml too").
   change address), or answers "no" to "send to this phone / address?". If the new address / phone is
   in the same message, still change_info.
 - ask_delivery: asks when the parcel arrives / whether it was sent.
+- order_start: wants to order but names NO product and no size (မှာချင်လို့ပါ, ဝယ်ချင်လို့, order တင်ချင်,
+  အော်ဒါတင်ချင်, "want to order", "can I order"), with or without hi. items = [].
 - greeting: only a greeting (hi, မင်္ဂလာပါ) or a greeting with a very general "what do you have".
 - previous_item: wants the same item(s) as before (ဟိုနေ့ကဟာ, အရင်ကဟာ, same as last time). Fill items from
   the LAST PAID ORDER or the CART in the context (product_id and size from there; qty from the message).
