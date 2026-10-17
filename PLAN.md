@@ -4,9 +4,8 @@ Read CLAUDE.md first. This file tracks where we are.
 
 ## RESUME HERE (updated 2026-10-18 by planning chat)
 - v1-v4.12 DONE. AI AUTO, brake ON, ai_address ON, ai_screenshot OFF.
-- NOW: HOTFIX epic 4.13 docs/SPEC-v4.13-hotfix.md — silent replies in live test (Q0 root cause first),
-  "never leave a customer in silence" holding reply + watchdog, order_start intent, address cleaning,
-  validator, Mandalay grid addresses. Tests R1-R6 + eval additions. Commit per part, deploy, report.
+- v4.13 hotfix (docs/SPEC-v4.13-hotfix.md) DONE + deployed 2026-10-17: Q0-Q5, R1-R6, evals PASS. Owner test 4.13
+  pending (REPORT.md "OWNER TEST SCRIPT 4.13").
 - Owner checks: `bash scripts/status.sh`; AI numbers at /ai.
 
 ## Status
@@ -29,6 +28,7 @@ Read CLAUDE.md first. This file tracks where we are.
 | 13 | v4.10 (docs/SPEC-v4.10-interruptions.md): interruptions, resume line, locked paid orders | ✅ Done, live (owner test pending) |
 | 14 | v4.11 (docs/SPEC-v4.11-ai-first.md): AI-first (AUTO, multi-action, customer chooses, auto-learning, simple card) | ✅ Done, live in AUTO (owner test pending) |
 | 15 | v4.12 (docs/SPEC-v4.12-address-payment-ai.md): AI address assistant, address gates, AI screenshot reader | ✅ Done, live (ai_address ON, ai_screenshot OFF; owner test pending) |
+| 16 | v4.13 (docs/SPEC-v4.13-hotfix.md): hotfix from live test: never silent (holding reply + watchdog), order_start, address cleaning, no-place = invalid, Mandalay grid | ✅ Done, live (owner test pending) |
 
 ## Phase 0 checklist
 - [x] Step 0: rollback safety net scripts in ~/hardening/

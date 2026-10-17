@@ -1680,3 +1680,57 @@ this text "partial: missing township" — harmless here, but wrong.)
 independently (same township / city, valid), the two readers agree → saved; the prompt now explains Mandalay grid
 addresses (city + grid street is complete). Q1 holding reply + watchdog (never silence), Q2 order_start, Q3 cleaning,
 Q4 "no place words = not an address", Q5 Mandalay grid formats.
+
+### What was built (commits)
+- **Q0** (`47bd06c`, `afef46a`). Root cause above. The AI's address at >= 0.75 is saved when the rules independently
+  read the same valid place; under 0.75 a person still checks. Prompt explains Mandalay grid addresses.
+- **Q1** (`b8e13c5`). Never silence: the worker's watchdog sends the holding reply
+  `ခဏစောင့်ပေးပါနော်၊ စစ်ပြီး ပြန်ပြောပေးပါမယ်။` (template holding_reply) to a waiting customer's text message that has no
+  reply / action after 60 s (open or undelivered order, or a buy / price message); at most once per 10 min per customer,
+  not after a hand reply in the last 10 min, not for ignored / never-auto customers, only while Auto-reply is ON. Logged
+  "silent message caught". Needs you: "⏰ customer waiting" at the top until someone answers.
+- **Q2** (`eff375c`). Intent order_start (rules-10 + AI): "I want to order" without a product →
+  `ဘယ်ပစ္စည်း မှာချင်လဲ ပြောပေးပါနော်။` (template ask_what_product), with the greeting by the 6 h rule / when it says hi.
+- **Q3** (`cf9c575`). clean(): request words with or without spaces (ကို ပို့ပေးပါ, ဒီကိုပို့ပေးပါ, ပို့ပါ, ကိုပို့ …), glued
+  particles (ဗျ, ဗျာ, နော်, ရှင့်, ရှင်, ခင်ဗျာ, ပါ, က), phone lead-ins (ဖုန်းနံပါတ်က, ဖုန်းက, ph:, phone -, tel), tidy commas.
+  Live sentence → `no(121), 73, 45 လမ်း mandalay`, city Mandalay, phone 09945827742 separate.
+- **Q4** (`119f0c2`). "partial" needs a place element (house no., street, ward, township, city, landmark word such as
+  ဈေး / ဘုရား / ဆေးရုံ / နား / near / market). Greetings, order wishes and product requests are now "invalid: no place"
+  (reason shown in the dashboard), never "which township?", and the rules do not treat them as an address at all.
+- **Q5** (`8348589`). Mandalay grid streets: `73 x 45`, `73x45`, `၇၃ လမ်း x ၄၅ လမ်း`, `73, 45 လမ်း` (Mandalay only),
+  `between 73 & 74`, `၇၃ နဲ့ ၇၄ ကြား`, `၇၃ လမ်း (၄၅ x ၄၆ ကြား)`, `၂၆ လမ်း ၈၃ x ၈၄ ကြား`; city Mandalay + grid street = valid.
+  The 7 Mandalay townships were already in data/townships.csv. Found by the eval: `ချမ်းမြသာစည်` contains the town
+  `သာစည်` (Thazi), so the city came out as Thazi → a known township's own city now always wins.
+
+**Decisions to check**
+- Spec Q3 shows `…45 လမ်း, mandalay` (comma before the city); we save `…45 လမ်း mandalay` (spec: spacing may differ).
+- Rules path: Burmese digits are saved as 0-9 (4.12 decision), e.g. `73 လမ်း (45 x 46 ကြား) မန္တလေး`.
+- A trailing `ပါ` / `က` is removed from the end of an address (Q3); a place name ending in those letters would lose them.
+
+**Tests:** 703 passed, 1 skipped (was 676 + 1). tests/test_v413_hotfix.py (67): R1 live 02:04 message (rules path; AI
+unsure → holding reply within 60 s, Needs you), R2 order_start (rules, AI, 6 h greeting) + 5 no-place texts invalid +
+4 one-place-word texts still partial, R3 watchdog once / not twice in 10 min / not when answered, handled or Auto off,
+R4 12 cleaning variants + live sentence, R5 8 grid formats, 7 Mandalay townships, comma grid only in Mandalay, Thazi case,
+grid address in the chat → payment info; R6 the whole suite (4.10 matrix, fixtures).
+
+**Real-API evaluation:** address set now 49 cases (+ the 2 live sentences, 10 Mandalay / grid addresses, 1 product
+request; new column expect_city checks the city where there is no township): township/city 100% after the Thazi fix
+(97% before it), 0 phones in full_text, 0 keyword-only / greeting accepted → PASS ($0.006). Product set: 100%, 0 wrong
+product ids → PASS ($0.007).
+
+**Deployed:** backup product_requests_2026-10-17T2108Z.dump, migrations 3c71d0a9e214 + 7d2a5e8f1b36 (round trip done),
+reparse_all (rules-10: 34 changed, 2 AI kept), parser + web + listener restarted, health ok. Nothing was sent by the
+deploy (outbox 0, holding replies 0).
+
+### OWNER TEST SCRIPT 4.13 (second Telegram account, Auto-reply ON; AI replies take ~3-8 s)
+1. **The 01:59 message.** Send `hi decant မှာချင်လို့ပါ` → `မင်္ဂလာပါ။` + `ဘယ်ပစ္စည်း မှာချင်လဲ ပြောပေးပါနော်။`.
+   Inbox shows no "📍 check address" for it.
+2. **The 02:04 message.** Send `swy intensely 10ml ထပ်ယူပါမယ်ဗျ` (or any product) → list + ask for the address.
+   Send `no(121) ,73, 45 လမ်း mandalay ကို ပို့ပေးပါဗျဖုန်းနံပါတ်က 09945827742` → payment info within a few seconds.
+   Cart panel: address `no(121), 73, 45 လမ်း mandalay`, city **မန္တလေး (Mandalay)** ✅, phone 09945827742 (no ပို့ပေးပါ, no ဗျ,
+   no phone in the address).
+3. **Never silence.** In a new cart send an address the AI cannot be sure of, e.g. `No 7 Shwe Taung Gyar Rd, Zigon` →
+   within ~60 s `ခဏစောင့်ပေးပါနော်၊ စစ်ပြီး ပြန်ပြောပေးပါမယ်။`; Inbox → Needs you shows "⏰ customer waiting" at the top.
+   Send another unclear message within 10 min → no second "please wait". Fix the address in the card → payment info goes.
+4. **Mandalay grid.** In a new cart send `၇၃ လမ်း (၄၅ x ၄၆ ကြား) မန္တလေး` → payment info, city Mandalay.
+Cancel the test carts afterwards (Orders → cancel), so they do not count in /sales.
