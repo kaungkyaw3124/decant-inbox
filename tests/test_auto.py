@@ -62,10 +62,15 @@ def test_auto_reply_after_quiet_once_per_message(shop, db):
     add(3001, "stw intensely 5ml ဘယ်လောက်လဲ", customer="91", when=now)
     run_batch()
     assert auto.run_once(now + timedelta(seconds=0.5)) == {}  # customer may still be typing (quiet 1 s)
+    before = datetime.now(UTC)
     assert auto.run_once(now + timedelta(seconds=1.5)) == {"replied": 1}
-    (body, status, created_by, delay), = outbox(db)
+    after = datetime.now(UTC)
+    (body, status, created_by, _), = outbox(db)
     assert body.startswith("မင်္ဂလာပါ။\nStronger With You Intensely 5ml က 18,000 ကျပ်ပါ။")
-    assert status == "queued" and created_by is None and timedelta(seconds=2) <= delay <= timedelta(seconds=3)
+    # send_after = real time of the send decision + 2-3 s (created_at is the transaction start: not exact under load)
+    send_after = scalar(db, "SELECT send_after FROM outbox")
+    assert status == "queued" and created_by is None
+    assert before + timedelta(seconds=2) <= send_after <= after + timedelta(seconds=3)
     assert auto.run_once(now + timedelta(seconds=60)) == {} and len(outbox(db)) == 1  # one reply per message
     with db.connect() as c:
         assert c.execute(text("SELECT user_id, details->>'actor' FROM audit_log WHERE action = 'auto.price'")).one() \

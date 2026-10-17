@@ -1522,6 +1522,11 @@ the cart → PASS. Cost $0.006.
 **Deployed:** backup product_requests_2026-10-17T0502Z.dump, migration f6f4f1cb85a7 (round trip done), AI mode AUTO
 (auto-graduate OFF, brake ON), parser (rules-9) + web restarted, health ok.
 
+**Follow-up check (2026-10-17):** a re-run of the full suite had 1 flaky failure in
+tests/test_auto.py::test_auto_reply_after_quiet_once_per_message: it compared `send_after` (real time of the send
+decision + 2-3 s) with `created_at` (the DB transaction start), so a slow run went over 3 s. App code is fine; the test now
+brackets the real clock around the run. Full suite: 603 passed, 1 skipped. Live services unchanged and healthy.
+
 ### OWNER TEST SCRIPT 4.11 (second Telegram account, Auto-reply ON; AI replies take ~3-8 s)
 1. Dashboard → 🧠 AI: the banner says "AUTO since … (owner skipped shadow); safety brake ON".
 2. **The live sentence.** Send `ysl y edp 10ml ယူမယ်` → the list. Then send
