@@ -51,6 +51,29 @@
   </table>
 </section>
 
+<section class="card" id="privacy">
+  <h2>🔒 {{ t("What the AI may see") }} {{ ui.help("Phone numbers are always masked and customer names are never sent. Both readers use the same daily limit and monthly budget; if the AI fails, the normal manual flow continues.") }}</h2>
+  <form method="post" action="/ai/privacy" class="stack">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <label class="check"><input type="checkbox" name="ai_address" value="1" {% if cfg.ai_address %}checked{% endif %}>
+      📍 <b>{{ t("Addresses") }}</b> — {{ t("delivery addresses are sent to OpenAI to understand them (house no., street, township). Phones stay masked.") }}</label>
+    <label class="check"><input type="checkbox" name="ai_screenshot" value="1" {% if cfg.ai_screenshot %}checked{% endif %} {% if not screens_ok %}disabled{% endif %}>
+      💳 <b>{{ t("Payment screenshots") }}</b> — {{ t("screenshots contain names and account numbers. They are sent to OpenAI only after you open the payment card, to read amount, transaction no., receiver and time.") }}</label>
+    {% if screens_ok %}<p class="small muted">✅ {{ t("Model {model} reads screenshots (checked {date}).", model=cfg.model, date=cfg.screenshot_check.at[:10]) }}</p>
+    {% else %}<p class="small problem-text">{{ t("Screenshot reading is not available with model {model}.", model=cfg.model) }}{% if cfg.screenshot_check %} ({{ cfg.screenshot_check.detail }}){% endif %}</p>{% endif %}
+    <button>{{ t("Save") }}</button>
+  </form>
+  <h3>{{ t("This month") }}</h3>
+  <ul class="small">
+    <li>📍 {{ t("Addresses read: {n}", n=privacy.addresses_read) }} · {{ t("township / city asked: {n}", n=privacy.asked_township) }} · {{ t("not sure → a person checked: {n}", n=privacy.invalid_caught) }}</li>
+    <li>💳 {{ t("Screenshots read: {n}", n=privacy.screenshots_read) }}{% if privacy.screenshot_errors %} · {{ t("errors: {n}", n=privacy.screenshot_errors) }}{% endif %} · ${{ "%.4f" | format(privacy.screenshot_cost) }}
+      {% set labels = {"paid_more": "paid more", "paid_less": "paid less", "receiver": "other receiver",
+                       "duplicate": "transaction no. used before", "before_payment_info": "before the payment info",
+                       "old": "older than 3 days", "status": "not successful", "not_receipt": "not a receipt"} %}
+      {% for kind, n in privacy.warnings.items() %} · ⚠️ {{ tr(labels.get(kind, kind)) }}: {{ n }}{% endfor %}</li>
+  </ul>
+</section>
+
 <section class="card">
   <h2>{{ t("Settings") }}</h2>
   <form method="post" action="/ai/settings" class="grid">

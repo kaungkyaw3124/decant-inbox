@@ -9,7 +9,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.ai import graduation, report
+from app.ai import graduation, report, screens  # noqa: F401  (screens: the reader's settings)
 from app.ai import settings as ai_settings
 from app.ai.types import AIResult
 from app.core.config import BASE_DIR
@@ -51,7 +51,34 @@ def ai_page(request: Request, db: Session = Depends(get_db)):
         "today": report.period(db, report.today_start(now)), "month": report.period(db, report.month_start(now)),
         "notices": report.notices(db, now), "calls": _call_rows(db), "evaluation": report.latest_eval(),
         "eval_running": report.eval_running(now), "progress": graduation.progress(db, now),
-        "auto_since": _since(ai_settings.load(db).get("auto_since"))})
+        "auto_since": _since(ai_settings.load(db).get("auto_since")),
+        # docs/SPEC-v4.12-address-payment-ai.md N4: privacy switches + what they did this month
+        "privacy": report.privacy_stats(db, report.month_start(now)), "screens_ok": screens_available(db)})
+
+
+def screens_available(db: Session) -> bool:
+    """S0: the capability check passed with the model that is configured now."""
+    cfg = ai_settings.load(db)
+    found = cfg.get("screenshot_check") or {}
+    return bool(found.get("ok")) and found.get("model") == cfg["model"]
+
+
+@router.post("/privacy")
+def set_privacy(request: Request, ai_address: str = Form(""), ai_screenshot: str = Form(""),
+                db: Session = Depends(get_db), user: User = Depends(current_user)):
+    """docs/SPEC-v4.12-address-payment-ai.md: what may be sent to the AI (owner only)."""
+    values = {"ai_address": ai_address == "1", "ai_screenshot": ai_screenshot == "1"}
+    if values["ai_screenshot"] and not screens_available(db):
+        model = ai_settings.load(db)["model"]
+        flash(request, f"Screenshot reading is not available with model {model}.")
+        values["ai_screenshot"] = False
+        before = ai_settings.load(db)
+        ai_settings.save(db, values, user)
+        db.add(AuditLog(user_id=user.id, action="ai.privacy", details={
+            "before": {k: before[k] for k in values}, "after": values}))
+        db.commit()
+        return RedirectResponse("/ai#privacy", status_code=303)
+    return _save(request, db, user, values, "privacy")
 
 
 def _since(value: str | None) -> datetime | None:

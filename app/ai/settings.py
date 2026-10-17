@@ -23,7 +23,8 @@ def defaults() -> dict:
             # docs/SPEC-v4.12-address-payment-ai.md privacy switches (owner, /ai): addresses go to the AI
             # (phones stay masked, names never sent); payment screenshots go to the AI (off until the owner
             # turns it on)
-            "ai_address": True, "ai_screenshot": False}
+            "ai_address": True, "ai_screenshot": False,
+            "screenshot_check": None}  # scripts/ai_screens_check.py: {model, ok, at, detail}
 
 
 def load(session: Session) -> dict:

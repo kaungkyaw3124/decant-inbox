@@ -9,6 +9,6 @@
 {%- else -%}
 {%- set tsp = (parts or {}).get("township") -%}
 <span class="address{% if invalid %} problem-text{% endif %}">{% if tsp and not invalid %}<b>{{ tsp }}</b> · {% endif %}{{ text }}</span>
-{%- if invalid %} <span class="badge bad">⚠️ {{ t("invalid address") }}</span>{% elif parts %} <span class="badge ok" title="{{ t('valid address') }}">✅</span>{% endif -%}
+{%- if invalid %} <span class="badge bad">⚠️ {{ t("invalid address") }}</span> <span class="small problem-text">{{ tr(address_reason(text)) }}</span>{% elif parts %} <span class="badge ok" title="{{ t('valid address') }}">✅</span>{% endif -%}
 {%- endif -%}
 {%- endmacro %}

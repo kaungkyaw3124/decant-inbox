@@ -77,3 +77,13 @@ def age(context, value: datetime | None) -> str:
 templates.env.filters["local_time"] = local_time
 templates.env.filters["age"] = age
 templates.env.globals.update(format_mmk=format_mmk, size_label=size_label, now=lambda: datetime.now(UTC))
+
+
+def address_reason(text: str | None) -> str:
+    """docs/SPEC-v4.12: why a saved address is not valid (shown next to the ⚠️ badge)."""
+    from app.orders import address  # late import: orders -> web would be a cycle at start-up
+
+    return address.validate(text).why or address.REASONS["keywords"]
+
+
+templates.env.globals["address_reason"] = address_reason

@@ -109,3 +109,46 @@ def today_start(now: datetime) -> datetime:
 
 def month_start(now: datetime) -> datetime:
     return _day_start(now).replace(day=1)
+
+
+# ---------- docs/SPEC-v4.12-address-payment-ai.md N4: addresses and screenshots ----------
+
+@dataclass
+class PrivacyStats:
+    addresses_read: int = 0  # AI answers with an address
+    asked_township: int = 0  # "ဘယ်မြို့နယ်လဲ" / "ဘယ်မြို့လဲ" sent
+    invalid_caught: int = 0  # AI address readings not sure enough to save (a person checked them)
+    screenshots_read: int = 0
+    screenshot_errors: int = 0
+    warnings: dict | None = None  # warning kind -> count
+    screenshot_cost: float = 0.0
+
+
+def privacy_stats(session: Session, since: datetime) -> PrivacyStats:
+    from sqlalchemy import func, select
+
+    from app.ai import screens
+    from app.models import AuditLog, Order, PaymentCheck
+    from app.orders import address, cart
+
+    out = PrivacyStats(warnings={})
+    for result in session.scalars(select(AICall.result_json).where(AICall.created_at >= since,
+                                                                    AICall.result_json.is_not(None))):
+        if (result or {}).get("address"):
+            out.addresses_read += 1
+            check = address.from_ai(result["address"])
+            if check is not None and not check.sure and check.status != "partial":
+                out.invalid_caught += 1
+    out.asked_township = session.scalar(select(func.count()).select_from(AuditLog).where(
+        AuditLog.created_at >= since, AuditLog.action.in_(("address.ask_township", "address.ask_city")))) or 0
+    for check in session.scalars(select(PaymentCheck).where(PaymentCheck.ai_read_at >= since)):
+        out.screenshot_cost += float(check.ai_cost_usd or 0)
+        if check.ai_status == "error":
+            out.screenshot_errors += 1
+        if check.ai_status != "done":
+            continue
+        out.screenshots_read += 1
+        order = session.get(Order, check.order_id)
+        for w in screens.warnings(session, check, order, cart.view(session, order).total):
+            out.warnings[w.kind] = out.warnings.get(w.kind, 0) + 1
+    return out

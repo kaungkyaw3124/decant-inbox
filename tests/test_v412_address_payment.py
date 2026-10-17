@@ -94,6 +94,7 @@ def test_p1_repair_marks_invalid_and_blocks_payment_info(shop, db, monkeypatch, 
     assert flags(db) == (True, True)
     page = client.get(f"/chats/{cid}?tab=cart").text
     assert "⚠️ invalid address" in page and "Next: Send payment info" not in page
+    assert "Only words like “address” / “change”, no place." in page  # the reason next to the badge
     assert "The address is not valid: fix it in the cart panel." in page
     page = client.get(f"/chats/{cid}?compose=payment_info").text
     assert "The address is not valid: fix it in the cart panel." in page and 'name="key"' not in page
@@ -482,3 +483,58 @@ def test_p9_switch_off_no_image_ever_sent(reader, db):
                     follow_redirects=False)
     assert r.status_code == 303 and fake.images == []
 
+
+# ---------- N4: /ai switches and counts, Settings templates ----------
+
+def test_n4_ai_page_switches_and_counts(reader, db):
+    client, token, fake, check = reader
+    page = client.get("/ai").text
+    assert "What the AI may see" in page and "screenshots contain names and account numbers" in page
+    assert 'name="ai_address" value="1" checked' in page
+    assert "Screenshot reading is not available with model" in page  # no capability check yet
+    client.post("/ai/privacy", data={"csrf": token, "ai_address": "1", "ai_screenshot": "1"})
+    with SessionLocal() as s:
+        assert ai_settings.load(s)["ai_screenshot"] is False  # refused: not checked with this model
+    with SessionLocal.begin() as s:  # what scripts/ai_screens_check.py saves when the model reads images
+        model = ai_settings.load(s)["model"]
+        ai_settings.save(s, {"screenshot_check": {"model": model, "ok": True, "at": "2026-10-17T18:00:00+00:00",
+                                                  "detail": "read 70000"}}, None)
+    client.post("/ai/privacy", data={"csrf": token, "ai_screenshot": "1"})  # address box unticked
+    with SessionLocal() as s:
+        cfg = ai_settings.load(s)
+        assert cfg["ai_screenshot"] is True and cfg["ai_address"] is False
+    assert scalar(db, "SELECT count(*) FROM audit_log WHERE action = 'ai.privacy'") == 2
+    fake.image_answer = reading(amount=70000, receiver_name="Soe Htike Lwin", receiver_account_last4="7788")
+    screens.run_once()
+    page = client.get("/ai").text
+    assert f"Model {model} reads screenshots (checked 2026-10-17)." in page
+    assert "Screenshots read: 1" in page and "⚠️ paid more: 1" in page and "⚠️ other receiver: 1" in page
+
+
+def test_n4_settings_has_the_new_templates(shop):
+    client, _ = shop
+    page = client.get("/settings").text
+    for label in ("Address without the township: ask it", "Address without the city: ask it",
+                  "The address is not clear: ask for the full address"):
+        assert label in page
+    assert "ဘယ်မြို့နယ်လဲ ပြောပေးပါနော်။" in page
+
+
+def test_n4_screenshot_reads_count_in_cap_and_budget(reader, db):
+    client, token, fake, check = reader
+    with SessionLocal.begin() as s:
+        model = ai_settings.load(s)["model"]
+        ai_settings.save(s, {"daily_cap": 0, "ai_screenshot": True,
+                             "screenshot_check": {"model": model, "ok": True, "at": "x", "detail": ""}}, None)
+    fake.image_answer = reading()
+    assert screens.run_once() == {"cap": 1} and fake.images == []
+    assert "Could not read the screenshot; check it yourself." in client.get(f"/payments/{check}").text
+    with db.begin() as c:
+        c.execute(text("UPDATE payment_checks SET ai_status = NULL"))
+    with SessionLocal.begin() as s:
+        ai_settings.save(s, {"daily_cap": 300}, None)
+    assert screens.run_once() == {"done": 1}
+    from app.ai import service
+
+    with SessionLocal() as s:
+        assert service.calls_today(s, datetime.now(UTC)) == 1 and service.cost_this_month(s, datetime.now(UTC)) > 0
