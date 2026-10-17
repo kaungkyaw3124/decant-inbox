@@ -2,6 +2,7 @@
 `fake` (tests, no network). The API key is read from settings (SecretStr) and only handed to
 the SDK; it is never printed or logged. Errors become AIError(kind) with a short, safe kind:
 auth | quota | country | rate_limit | timeout | network | bad_request | server | bad_output | other."""
+import base64
 import json
 import time
 from collections.abc import Callable
@@ -36,6 +37,10 @@ class Provider(Protocol):
     def understand(self, instructions: str, schema: dict, user_input: str, model: str, reasoning: str) -> Reply:
         ...
 
+    def read_image(self, instructions: str, schema: dict, user_input: str, image: bytes, mime: str, model: str,
+                   reasoning: str) -> Reply:
+        ...
+
 
 def _code(exc) -> str:
     body = getattr(exc, "body", None)
@@ -52,19 +57,33 @@ class OpenAIProvider:
         import openai  # only the parser worker / eval script need the SDK
 
         self._openai = openai
+        self._timeout = timeout
         self._client = openai.OpenAI(api_key=api_key, timeout=timeout, max_retries=0)
 
     def understand(self, instructions: str, schema: dict, user_input: str, model: str, reasoning: str) -> Reply:
+        return self._call(instructions, schema, user_input, model, reasoning, "message_understanding")
+
+    def read_image(self, instructions: str, schema: dict, user_input: str, image: bytes, mime: str, model: str,
+                   reasoning: str) -> Reply:
+        """docs/SPEC-v4.12-address-payment-ai.md N3: one payment screenshot (only when the owner turned
+        screenshot reading on). The image goes inline as a data URL; nothing is stored (store=false)."""
+        url = f"data:{mime};base64,{base64.b64encode(image).decode()}"
+        content = [{"role": "user", "content": [{"type": "input_text", "text": user_input},
+                                                {"type": "input_image", "image_url": url, "detail": "high"}]}]
+        return self._call(instructions, schema, content, model, reasoning, "payment_screenshot", timeout_x=3)
+
+    def _call(self, instructions: str, schema: dict, user_input, model: str, reasoning: str, name: str,
+              timeout_x: float = 1) -> Reply:
         openai = self._openai
         start = time.monotonic()
+        client = self._client if timeout_x == 1 else self._client.with_options(timeout=self._timeout * timeout_x)
         for attempt in (1, 2):  # 1 retry, on network errors only (not on timeouts, not on HTTP errors)
             try:
-                response = self._client.responses.create(
+                response = client.responses.create(
                     model=model, instructions=instructions, input=user_input, store=False,
                     reasoning={"effort": reasoning}, max_output_tokens=MAX_OUTPUT_TOKENS,
                     prompt_cache_key=CACHE_KEY,
-                    text={"format": {"type": "json_schema", "name": "message_understanding", "schema": schema,
-                                     "strict": True}})
+                    text={"format": {"type": "json_schema", "name": name, "schema": schema, "strict": True}})
                 break
             except openai.APITimeoutError as exc:
                 raise AIError("timeout") from exc
@@ -109,10 +128,20 @@ class FakeProvider:
     output_tokens: int = 120
     requests: list[tuple[str, str]] = field(default_factory=list)  # (instructions, user input)
     name: str = "fake"
+    image_answer: dict | Exception | Callable[[str, bytes], dict | Exception] = field(default_factory=dict)
+    images: list[tuple[str, bytes]] = field(default_factory=list)  # (text, image bytes) sent with read_image
 
     def understand(self, instructions: str, schema: dict, user_input: str, model: str, reasoning: str) -> Reply:
         self.requests.append((instructions, user_input))
-        answer = self.answer(user_input) if callable(self.answer) else self.answer
+        return self._reply(self.answer(user_input) if callable(self.answer) else self.answer)
+
+    def read_image(self, instructions: str, schema: dict, user_input: str, image: bytes, mime: str, model: str,
+                   reasoning: str) -> Reply:
+        self.images.append((user_input, image))
+        answer = self.image_answer
+        return self._reply(answer(user_input, image) if callable(answer) else answer)
+
+    def _reply(self, answer) -> Reply:
         if isinstance(answer, Exception):
             raise answer
         if isinstance(answer, str):  # invalid JSON on purpose

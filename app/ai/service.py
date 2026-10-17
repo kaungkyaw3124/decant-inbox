@@ -137,14 +137,23 @@ def _day_start(now: datetime) -> datetime:
 
 
 def calls_today(session: Session, now: datetime) -> int:
-    return session.scalar(select(func.count()).select_from(AICall).where(
-        AICall.created_at >= _day_start(now), AICall.decision.in_(CALL_KINDS))) or 0
+    """Message calls + screenshot reads (docs/SPEC-v4.12: same daily cap)."""
+    from app.models import PaymentCheck  # the screenshot reader's calls
+
+    return (session.scalar(select(func.count()).select_from(AICall).where(
+        AICall.created_at >= _day_start(now), AICall.decision.in_(CALL_KINDS))) or 0) + (session.scalar(
+        select(func.count()).select_from(PaymentCheck).where(PaymentCheck.ai_read_at >= _day_start(now),
+                                                             PaymentCheck.ai_status.in_(("done", "error")))) or 0)
 
 
 def cost_this_month(session: Session, now: datetime) -> float:
+    """Messages + screenshots (docs/SPEC-v4.12: same monthly budget)."""
+    from app.models import PaymentCheck
+
     start = _day_start(now).replace(day=1)
     return float(session.scalar(select(func.coalesce(func.sum(AICall.cost_usd), 0)).where(
-        AICall.created_at >= start)) or 0)
+        AICall.created_at >= start)) or 0) + float(session.scalar(select(func.coalesce(
+            func.sum(PaymentCheck.ai_cost_usd), 0)).where(PaymentCheck.ai_read_at >= start)) or 0)
 
 
 _not_needed: dict[int, int] = {}  # message id -> parse result id the rules were sure about (this process)

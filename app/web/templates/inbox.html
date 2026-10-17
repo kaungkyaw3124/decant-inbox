@@ -56,6 +56,7 @@
   {% for check, order, c in needs_you.payments %}
     <li><a href="/payments/{{ check.id }}"><b>💳 {{ c.display_name or c.username or customer }}</b>:
       {{ t("several photos — ask for one") if check.decision == "several" else t("payment screenshot to check") }}</a>
+      {% if needs_you.payment_warnings.get(check.id) %}<span class="badge bad">⚠️ {{ t("{n} warnings from the screenshot", n=needs_you.payment_warnings[check.id]) }}</span>{% endif %}
       <span class="small muted">{{ format_mmk(order.total_mmk) }} ကျပ်</span></li>
   {% endfor %}
   {% for m, c, o in needs_you.cancels %}

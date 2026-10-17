@@ -698,4 +698,39 @@ MY = {
     "township": "မြို့နယ်", "city": "မြို့",
     "Approving is blocked until the address is valid.": "လိပ်စာ မှန်မှ အတည်ပြုလို့ ရမယ်။",
     "The address is not valid: fix it on this card.": "လိပ်စာ မမှန်ပါ: ဒီကတ်ပေါ်မှာ ပြင်ပါ။",
+    "From the screenshot": "screenshot ထဲက", "to": "သို့", "not a payment receipt": "ငွေလွှဲ ပြေစာ မဟုတ်",
+    "Amount, receiver and time match.": "ပမာဏ၊ လက်ခံသူ၊ အချိန် ကိုက်ညီတယ်။",
+    "The AI only reads the picture. Check the money in your KPay / AYA app before approving.":
+        "AI က ပုံကိုပဲ ဖတ်တာပါ။ အတည်မပြုခင် KPay / AYA app ထဲမှာ ငွေဝင်မဝင် စစ်ပါ။",
+    "Reading the screenshot…": "screenshot ကို ဖတ်နေတယ်…",
+    "Could not read the screenshot; check it yourself.": "screenshot ကို မဖတ်နိုင်ပါ၊ ကိုယ်တိုင် စစ်ပါ။",
+    "from the screenshot: compare it with your KPay / AYA history": "screenshot ထဲက: KPay / AYA မှတ်တမ်းနဲ့ တိုက်စစ်ပါ",
+    "{n} warnings from the screenshot": "screenshot က သတိပေးချက် {n} ခု",
+    "The screenshot does not look like a payment receipt (or it is unreadable).":
+        "screenshot က ငွေလွှဲ ပြေစာ မဟုတ်ပုံရတယ် (ဒါမှမဟုတ် ဖတ်မရ)။",
+    "Screenshot amount {amount} ≠ order total {total} ကျပ်: paid more ({diff} ကျပ် too much).":
+        "screenshot ပမာဏ {amount} ≠ အော်ဒါ စုစုပေါင်း {total} ကျပ်: ပိုလွှဲထား ({diff} ကျပ် ပို)။",
+    "Screenshot amount {amount} ≠ order total {total} ကျပ်: paid less ({diff} ကျပ် missing).":
+        "screenshot ပမာဏ {amount} ≠ အော်ဒါ စုစုပေါင်း {total} ကျပ်: လျော့လွှဲထား ({diff} ကျပ် လို)။",
+    "Paid to {who}: not one of our payment accounts.": "{who} ကို လွှဲထား: ဆိုင်ရဲ့ ငွေလက်ခံ အကောင့် မဟုတ်။",
+    "Transaction no. {no} from the screenshot was already used for order #{order}.":
+        "screenshot ထဲက transaction {no} ကို အော်ဒါ #{order} မှာ သုံးပြီးသား။",
+    "Receipt time {time} is before we sent the payment info ({sent}).":
+        "ပြေစာ အချိန် {time} က ငွေလွှဲအချက်အလက် ပို့ခဲ့တဲ့ အချိန် ({sent}) မတိုင်ခင်။",
+    "Receipt time {time} is more than 3 days old.": "ပြေစာ အချိန် {time} က ၃ ရက်ထက် ကြာပြီ။",
+    "Status on the screenshot: “{status}” (not successful).": "screenshot ပေါ်က အခြေအနေ: “{status}” (မအောင်မြင်)။",
+    "What the AI may see": "AI ကို ဘာတွေ ပြမလဲ", "Addresses": "လိပ်စာများ", "Payment screenshots": "ငွေလွှဲ screenshot များ",
+    "Phone numbers are always masked and customer names are never sent. Both readers use the same daily limit and monthly budget; if the AI fails, the normal manual flow continues.":
+        "ဖုန်းနံပါတ်တွေကို အမြဲ ဖုံးထားပြီး ဖောက်သည် နာမည် ဘယ်တော့မှ မပို့ပါ။ နှစ်ခုလုံး နေ့စဉ် ကန့်သတ်ချက်နဲ့ လစဉ် ဘတ်ဂျက် တူတူ သုံးတယ်၊ AI မအောင်မြင်ရင် ပုံမှန် လက်နဲ့လုပ်တဲ့ အဆင့် ဆက်သွားမယ်။",
+    "delivery addresses are sent to OpenAI to understand them (house no., street, township). Phones stay masked.":
+        "ပို့ရမယ့် လိပ်စာတွေကို နားလည်ဖို့ OpenAI ဆီ ပို့မယ် (အိမ်နံပါတ်၊ လမ်း၊ မြို့နယ်)။ ဖုန်းကို ဖုံးထားမယ်။",
+    "screenshots contain names and account numbers. They are sent to OpenAI only after you open the payment card, to read amount, transaction no., receiver and time.":
+        "screenshot တွေမှာ နာမည်နဲ့ အကောင့်နံပါတ် ပါတယ်။ ငွေစစ်ကတ် ဖွင့်ပြီးမှသာ ပမာဏ၊ transaction၊ လက်ခံသူ၊ အချိန် ဖတ်ဖို့ OpenAI ဆီ ပို့မယ်။",
+    "Model {model} reads screenshots (checked {date}).": "{model} မော်ဒယ်က screenshot ဖတ်နိုင်တယ် ({date} မှာ စစ်ပြီး)။",
+    "Screenshot reading is not available with model {model}.": "{model} မော်ဒယ်နဲ့ screenshot ဖတ်လို့ မရပါ။",
+    "This month": "ဒီလ", "Addresses read: {n}": "ဖတ်ပြီး လိပ်စာ: {n}", "township / city asked: {n}": "မြို့နယ် / မြို့ မေးပြီး: {n}",
+    "not sure → a person checked: {n}": "မသေချာ → လူ စစ်ပြီး: {n}", "Screenshots read: {n}": "ဖတ်ပြီး screenshot: {n}",
+    "errors: {n}": "အမှား: {n}", "paid more": "ပိုလွှဲ", "paid less": "လျော့လွှဲ", "other receiver": "လက်ခံသူ မှား",
+    "transaction no. used before": "transaction ထပ်", "before the payment info": "အချိန် စောနေ",
+    "older than 3 days": "၃ ရက်ကျော်", "not successful": "မအောင်မြင်", "not a receipt": "ပြေစာ မဟုတ်",
 }

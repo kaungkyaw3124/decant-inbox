@@ -11,7 +11,7 @@ from app.models import (
 )
 from app.models.outbox import UNDO_SECONDS
 from app.learning import cards, patterns
-from app.orders import actions, address, auto, followups, payments, unknown
+from app.orders import actions, address, auto, cart, followups, payments, unknown
 from app.replies import compose, faq
 from app.replies import templates as replies
 from app.web.auth import current_user, owner_only, verify_csrf
@@ -220,6 +220,10 @@ def needs_you(db: Session, now: datetime | None = None, owner: bool = True) -> d
     customers = {c.id: c for c in db.scalars(select(Customer).where(
         Customer.id.in_([m.customer_id for m in unknown_msgs] + [m.customer_id for m, _ in teach])))}
     to_check = payments.to_check(db)
+    from app.ai import screens  # docs/SPEC-v4.12 N3: "⚠️ n" from the screenshot reader on the payment line
+
+    payment_warnings = {check.id: len(screens.warnings(db, check, order, cart.view(db, order).total))
+                        for check, order, _ in to_check if check.ai_read}
     cancels = followups.cancel_requests(db, now)
     unpaid = [(d, why) for d in followups.due(db, now) if (why := followups.blocked(db, d.customer, now))]
     address_checks = address.to_check(db, now)  # docs/SPEC-v4.12-address-payment-ai.md N1
@@ -297,7 +301,7 @@ def needs_you(db: Session, now: datetime | None = None, owner: bool = True) -> d
             "price_needed": price_needed, "to_approve": to_approve, "conflicts": conflicts,
             "failed": failed, "paused": paused, "auto_cancelled": followups.auto_cancelled(db, now),
             "ai_notices": ai_notices, "changed_paid": changed_paid, "change_sent": change_sent, "requests": requests,
-            "address_checks": address_checks,
+            "address_checks": address_checks, "payment_warnings": payment_warnings,
             "count": len(address_checks) + len(ai_notices) + len(changed_paid) + len(change_sent) + len(requests) + len(to_check) + len(cancels) + len(unpaid) + len(unknown_msgs) + len(unanswered)
                      + len(hints) + len(failed) + len(paused) + len(teach) + len(price_needed)
                      + (1 if to_approve else 0) + len(conflicts)}

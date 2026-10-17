@@ -1,9 +1,26 @@
-<div id="shot" {% if not shot or shot.status == "queued" %}hx-get="/payments/{{ check.id }}/shot" hx-trigger="every 2s" hx-swap="outerHTML"{% endif %}>
+<div id="shot" {% if not shot or shot.status == "queued" or ai_waiting %}hx-get="/payments/{{ check.id }}/shot" hx-trigger="every 2s" hx-swap="outerHTML"{% endif %}>
   {% if shot and shot.status == "done" %}
     <a href="/media/{{ check.message_id }}" target="_blank" rel="noopener" title="{{ t('Tap to zoom') }}"><img src="/media/{{ check.message_id }}" alt="{{ t('Payment screenshot') }}" class="shot"></a>
   {% elif shot and shot.status == "failed" %}
     <p class="error">{{ t("Could not load the screenshot") }}: {{ tr(shot.error) }}</p>
   {% else %}
     <p class="muted">{{ t("Loading the screenshot…") }}</p>
+  {% endif %}
+  {# docs/SPEC-v4.12-address-payment-ai.md N3: what the AI read (only with screenshot reading ON) #}
+  {% if reading %}
+  <div class="ai-reading small" id="ai-reading">
+    <p><b>🧠 {{ t("From the screenshot") }}:</b>
+      {% if reading.is_payment_receipt %}{{ reading.app or "?" }} · <b>{{ format_mmk(reading.amount) if reading.amount else "?" }}</b> {{ reading.currency or "" }}
+      · {{ t("transaction") }} <code>{{ reading.transaction_no or "?" }}</code> · {{ reading.time or "?" }}
+      · {{ t("to") }} {{ reading.receiver_name or "?" }}{% if reading.receiver_account_last4 %} (…{{ reading.receiver_account_last4 }}){% endif %}
+      · “{{ reading.status_text or "?" }}”{% else %}{{ t("not a payment receipt") }}{% endif %}</p>
+    {% if ai_warnings %}<ul class="problem-text">{% for w in ai_warnings %}<li>⚠️ {{ tr(w.text) }}</li>{% endfor %}</ul>
+    {% else %}<p class="ok-text">✅ {{ t("Amount, receiver and time match.") }}</p>{% endif %}
+    <p class="muted">{{ t("The AI only reads the picture. Check the money in your KPay / AYA app before approving.") }}</p>
+  </div>
+  {% elif ai_waiting and shot and shot.status == "done" %}
+    <p class="muted small">🧠 {{ t("Reading the screenshot…") }}</p>
+  {% elif ai_failed %}
+    <p class="muted small">🧠 {{ t("Could not read the screenshot; check it yourself.") }}</p>
   {% endif %}
 </div>

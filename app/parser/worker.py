@@ -12,7 +12,7 @@ import time
 
 from sqlalchemy.exc import IntegrityError
 
-from app.ai import graduation, service as ai
+from app.ai import graduation, screens, service as ai
 from app.core.db import SessionLocal
 from app.core.heartbeat import beat
 from app.models import Message
@@ -104,6 +104,17 @@ def follow_up() -> None:
         log.exception("payment follow-ups failed")
 
 
+def read_screenshots() -> None:
+    """docs/SPEC-v4.12-address-payment-ai.md N3: payment screenshots an admin opened, when the owner turned
+    screenshot reading on."""
+    try:
+        stats = screens.run_once()
+        if stats:
+            log.info("screenshots: %s", stats)
+    except Exception:
+        log.exception("screenshot reading failed")
+
+
 def understand_with_ai() -> None:
     """docs/SPEC-v4.6-ai.md: messages the rules are not sure about (before auto mode looks at them).
     docs/SPEC-v4.7-graduation.md: daily graduation / brake check and the weekly summary."""
@@ -146,6 +157,7 @@ def main() -> None:
             log.info("parsed %d messages", parsed)
             continue  # there may be more
         scan_payments()
+        read_screenshots()
         understand_with_ai()
         auto.run_once()  # auto mode (does nothing while it is switched off)
         if args.once:

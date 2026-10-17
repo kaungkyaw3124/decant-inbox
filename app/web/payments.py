@@ -4,6 +4,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.ai import screens
 from app.models import AuditLog, Customer, Order, PaymentCheck, PaymentMethod, User
 from app.orders import address as address_rules
 from app.orders import cart, payments
@@ -36,16 +37,29 @@ def _card(request: Request, db: Session, check: PaymentCheck, form: payments.For
           found: list[str] | None = None, error: str | None = None, status_code: int = 200):
     order = db.get(Order, check.order_id)
     view = cart.view(db, order)
+    methods = db.scalars(select(PaymentMethod).where(PaymentMethod.active).order_by(PaymentMethod.sort_order)).all()
+    reading = screens.reading_of(check)  # docs/SPEC-v4.12 N3: pre-fill from the screenshot
+    if form is None and reading is not None and reading.is_payment_receipt and check.transaction_id is None:
+        form = payments.Form(reading.transaction_no or "", reading.amount or view.total,
+                             screens.method_for(reading, methods))
     return templates.TemplateResponse(request, "payment.html", {
         "check": check, "order": order, "c": db.get(Customer, order.customer_id), "cart": view,
-        "shot": payments.screenshot(db, check), "item_size": cart.item_size,
-        "methods": db.scalars(select(PaymentMethod).where(PaymentMethod.active).order_by(PaymentMethod.sort_order)).all(),
+        "shot": payments.screenshot(db, check), "item_size": cart.item_size, "methods": methods,
+        **reading_context(db, check, order, view.total),
         "form": form or payments.Form(check.transaction_id or "", check.amount_mmk or view.total, check.method),
         "warnings": found or [], "error": error, "reasons": payments.REASON_LABELS,
         "total_changes": payments.total_change_lines(db, order),  # docs/SPEC-v4.10-interruptions.md
         "address_problem": cart.address_problem(order),  # docs/SPEC-v4.12 N2
         "may_decide": staff.may_decide_payments(db, db.get(User, request.session["user_id"])),
     }, status_code=status_code)
+
+
+def reading_context(db: Session, check: PaymentCheck, order: Order, total: int) -> dict:
+    """The screenshot reader on the card: its reading, its warnings, and whether it is still working."""
+    reading = screens.reading_of(check)
+    waiting = check.ai_status is None and check.decision == "pending" and screens.enabled(db)
+    return {"reading": reading, "ai_warnings": screens.warnings(db, check, order, total), "ai_waiting": waiting,
+            "ai_failed": check.ai_status in ("error", "skipped")}
 
 
 @router.get("", response_class=HTMLResponse)
@@ -64,8 +78,10 @@ def card(request: Request, check_id: int, db: Session = Depends(get_db), user: U
 @router.get("/{check_id}/shot", response_class=HTMLResponse)
 def shot(request: Request, check_id: int, db: Session = Depends(get_db)):
     check = _check(db, check_id)
-    return templates.TemplateResponse(request, "_payment_shot.html", {"check": check,
-                                                                      "shot": payments.screenshot(db, check)})
+    order = db.get(Order, check.order_id)
+    return templates.TemplateResponse(request, "_payment_shot.html", {
+        "check": check, "shot": payments.screenshot(db, check),
+        **reading_context(db, check, order, cart.view(db, order).total)})
 
 
 @router.post("/{check_id}/approve", dependencies=[Depends(staff.payment_decider)])

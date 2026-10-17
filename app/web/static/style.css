@@ -227,3 +227,5 @@ details.older > summary { cursor: pointer; font-weight: 600; }
 .address-parts { display: grid; grid-template-columns: max-content 1fr; gap: 2px 10px; margin: 4px 0; }
 .address-parts dt { color: var(--muted, #777); }
 .address-parts dd { margin: 0; overflow-wrap: anywhere; }
+.ok-text { color: var(--done); }
+.ai-reading { border-top: 1px solid var(--line); margin-top: 8px; padding-top: 6px; overflow-wrap: anywhere; }

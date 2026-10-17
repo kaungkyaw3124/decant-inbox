@@ -2,8 +2,8 @@ from datetime import datetime
 from typing import Any
 
 from sqlalchemy import (
-    Boolean, CheckConstraint, DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint, false, func,
-    text,
+    Boolean, CheckConstraint, DateTime, ForeignKey, Index, Integer, Numeric, String, Text, UniqueConstraint, false,
+    func, text,
 )
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.orm import Mapped, mapped_column
@@ -193,6 +193,13 @@ class PaymentCheck(Base):
     decided_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
     decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = created_at_column()
+    # docs/SPEC-v4.12-address-payment-ai.md N3: the AI's reading of the screenshot (only with ai_screenshot
+    # ON): status done | error | skipped (cap / budget / no file), the reading (app/ai/screens.Reading), cost
+    ai_status: Mapped[str | None] = mapped_column(String(12))
+    ai_error: Mapped[str | None] = mapped_column(String(64))
+    ai_read: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    ai_read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    ai_cost_usd: Mapped[float] = mapped_column(Numeric(12, 8), server_default="0", default=0)
 
 
 class AutoRun(Base):

@@ -350,3 +350,135 @@ def test_p1_no_payment_info_again_while_the_address_is_invalid(shop, db):
     b = button(client, mid)
     assert b is None or "payment info" not in b[0]
     assert scalar(db, "SELECT count(*) FROM outbox WHERE reply_kind = 'payment_info' AND status = 'queued'") == 0
+
+
+# ---------- N3: the payment-screenshot reader (fake provider) ----------
+
+from app.ai import providers, screens  # noqa: E402
+from app.ai.providers import FakeProvider  # noqa: E402
+from app.ai import settings as ai_settings  # noqa: E402
+from app.core.config import get_settings  # noqa: E402
+from zoneinfo import ZoneInfo  # noqa: E402
+
+
+def reading(**over) -> dict:
+    base = {"is_payment_receipt": True, "app": "KBZPay", "amount": 18000, "currency": "Ks",
+            "transaction_no": "01003456789012345678", "time": "17/10/2026 23:21:05",
+            "time_iso": datetime.now(ZoneInfo(get_settings().timezone)).strftime("%Y-%m-%dT%H:%M"),
+            "receiver_name": "Test Shop",
+            "receiver_account_last4": "0001", "status_text": "Payment Successful", "confidence": 0.97}
+    return {**base, **over}
+
+
+@pytest.fixture
+def reader(shop, db, tmp_path, monkeypatch):
+    """Payment info sent (18,000 ကျပ်, KPay Test Shop 09000000001), one screenshot opened + downloaded,
+    a fake AI provider; returns (client, token, fake, check id)."""
+    client, token = shop
+    fake = FakeProvider()
+    providers.use(fake)
+    monkeypatch.setattr(screens, "MEDIA_DIR", tmp_path)
+    waiting_for_payment(client, token, db)
+    photo(1)
+    check = scalar(db, "SELECT id FROM payment_checks")
+    client.get(f"/payments/{check}")  # the admin opens the card: only now the photo is downloaded
+    downloaded(db, tmp_path, monkeypatch, check, content=b"\x89PNG fake receipt")
+    yield client, token, fake, check
+    providers.use(None)
+
+
+def switch_screens(on: bool) -> None:
+    with SessionLocal.begin() as s:
+        ai_settings.save(s, {"ai_screenshot": on}, None)
+
+
+def test_p7_paid_more_to_another_receiver_needs_second_confirm(reader, db):
+    client, token, fake, check = reader
+    switch_screens(True)
+    fake.image_answer = reading(amount=70000, receiver_name="Soe Htike Lwin", receiver_account_last4="7788")
+    assert screens.run_once() == {"done": 1}
+    [(sent_text, image)] = fake.images
+    assert image == b"\x89PNG fake receipt" and "EXPECTED TOTAL: 18000 Ks" in sent_text
+    assert "Test Shop (…0001)" in sent_text and "09000000001" not in sent_text  # last 4 digits only
+    assert screens.run_once() == {} and len(fake.images) == 1  # once per check
+    assert scalar(db, "SELECT status FROM orders") == "photo_received"  # never approved by itself
+    assert scalar(db, "SELECT count(*) FROM outbox WHERE status = 'queued'") == 0  # nothing to the customer
+    page = client.get(f"/payments/{check}").text
+    assert "70,000 ≠ order total 18,000 ကျပ်: paid more (52,000 ကျပ် too much)." in page
+    assert "Paid to Soe Htike Lwin (…7788): not one of our payment accounts." in page
+    assert 'name="transaction_id" value="01003456789012345678"' in page and "from the screenshot" in page
+    assert 'name="amount" value="70000"' in page
+    assert "⚠️ 2 warnings from the screenshot" in client.get("/").text
+    form = {"csrf": token, "transaction_id": "01003456789012345678", "amount": "18000", "method": "KPay"}
+    r = client.post(f"/payments/{check}/approve", data=form)
+    assert "Approve anyway" in r.text and "paid more" in r.text and scalar(db, "SELECT order_no FROM orders") is None
+    r = client.post(f"/payments/{check}/approve", data={**form, "confirmed": "1"}, follow_redirects=False)
+    assert r.status_code == 303 and scalar(db, "SELECT order_no FROM orders") == 1001
+
+
+def test_p7_matching_receipt_has_no_warnings(reader, db):
+    client, token, fake, check = reader
+    switch_screens(True)
+    fake.image_answer = reading()
+    screens.run_once()
+    page = client.get(f"/payments/{check}").text
+    assert "Amount, receiver and time match." in page
+    r = client.post(f"/payments/{check}/approve", data={"csrf": token, "transaction_id": "01003456789012345678",
+                                                         "amount": "18000"}, follow_redirects=False)
+    assert r.status_code == 303  # no second confirm needed
+
+
+@pytest.mark.parametrize("over, expected", [
+    ({"transaction_no": "TX-DUP"}, "Transaction no. TX-DUP from the screenshot was already used for order #1001."),
+    ({"time_iso": "2026-10-09T07:30"}, "is before we sent the payment info"),
+    ({"is_payment_receipt": False, "amount": None, "transaction_no": None, "receiver_name": None,
+      "receiver_account_last4": None, "status_text": None, "app": None},
+     "The screenshot does not look like a payment receipt (or it is unreadable)."),
+    ({"status_text": "Transaction Failed"}, "Status on the screenshot: “Transaction Failed” (not successful)."),
+    ({"amount": 15000}, "paid less (3,000 ကျပ် missing)."),
+])
+def test_p8_more_warnings(reader, db, over, expected):
+    client, token, fake, check = reader
+    switch_screens(True)
+    if over.get("transaction_no") == "TX-DUP":  # an earlier approved payment used the same transaction no.
+        from tests.test_messaging import add
+
+        add(900, "", customer="77", kind="photo", when=datetime.now(UTC) - timedelta(days=1))
+        with db.begin() as c:
+            c.execute(text("INSERT INTO orders (customer_id, status, order_no, paid_at) SELECT customer_id, 'paid', "
+                           "1001, now() FROM messages WHERE external_message_id = '900'"))
+            c.execute(text("INSERT INTO payment_checks (order_id, message_id, decision, transaction_id) SELECT "
+                           "o.id, m.id, 'approved', 'TX-DUP' FROM orders o, messages m WHERE o.order_no = 1001 AND "
+                           "m.external_message_id = '900'"))
+    fake.image_answer = reading(**over)
+    screens.run_once()
+    page = client.get(f"/payments/{check}").text
+    assert expected in page
+    r = client.post(f"/payments/{check}/approve", data={"csrf": token, "transaction_id": "TX-NEW", "amount": "18000"})
+    assert "Approve anyway" in r.text  # every warning needs the second confirm
+
+
+def test_p8_errors_never_block(reader, db):
+    client, token, fake, check = reader
+    switch_screens(True)
+    fake.image_answer = providers.AIError("timeout")
+    assert screens.run_once() == {"error": 1}
+    assert "Could not read the screenshot; check it yourself." in client.get(f"/payments/{check}").text
+    r = client.post(f"/payments/{check}/approve", data={"csrf": token, "transaction_id": "TX1", "amount": "18000"},
+                    follow_redirects=False)
+    assert r.status_code == 303
+
+
+def test_p9_switch_off_no_image_ever_sent(reader, db):
+    client, token, fake, check = reader
+    with SessionLocal() as s:
+        assert ai_settings.load(s)["ai_screenshot"] is False  # the default
+    fake.image_answer = reading(amount=70000)
+    assert screens.run_once() == {} and fake.images == []
+    page = client.get(f"/payments/{check}").text
+    assert "From the screenshot" not in page and "Reading the screenshot" not in page
+    assert 'name="transaction_id" value=""' in page  # the card works as before
+    r = client.post(f"/payments/{check}/approve", data={"csrf": token, "transaction_id": "TX1", "amount": "18000"},
+                    follow_redirects=False)
+    assert r.status_code == 303 and fake.images == []
+

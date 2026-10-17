@@ -17,6 +17,7 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
 
+from app.ai import screens
 from app.models import AuditLog, Customer, MediaDownload, Message, Order, Outbox, PaymentCheck, User
 from app.models.outbox import UNDO_SECONDS
 from app.orders import cart
@@ -123,6 +124,8 @@ def warnings(session: Session, check: PaymentCheck, order: Order, form: Form) ->
     if form.amount_mmk is not None and form.amount_mmk != total:
         found.append(f"Amount {format_mmk(form.amount_mmk)} ≠ order total {format_mmk(total)} ကျပ်.")
         found += total_change_lines(session, order)  # docs/SPEC-v4.10-interruptions.md
+    # docs/SPEC-v4.12-address-payment-ai.md N3: what the screenshot reader found (only with ai_screenshot ON)
+    found += [w.text for w in screens.warnings(session, check, order, total) if w.text not in found]
     return found
 
 

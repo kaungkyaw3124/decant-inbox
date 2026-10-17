@@ -50,7 +50,8 @@
   {% endif %}
   {{ ui.help("Open your KPay / AYA app, find this payment, copy its transaction ID and the amount here. Approve only if the money really arrived.") }}
   <div class="grid">
-    <label>{{ t("Transaction ID (from your KPay / AYA history)") }} <input name="transaction_id" value="{{ form.transaction_id }}" required maxlength="64" autocomplete="off"></label>
+    <label>{{ t("Transaction ID (from your KPay / AYA history)") }} <input name="transaction_id" value="{{ form.transaction_id }}" required maxlength="64" autocomplete="off">
+      {% if reading and form.transaction_id and form.transaction_id == reading.transaction_no %}<span class="small notice-line">🧠 {{ t("from the screenshot: compare it with your KPay / AYA history") }}</span>{% endif %}</label>
     <label>{{ t("Amount received (ကျပ်)") }} <input name="amount" value="{{ form.amount_mmk or '' }}" inputmode="numeric"></label>
     <label>{{ t("Method") }}
       <select name="method">{% for m in methods %}<option {% if form.method == m.name %}selected{% endif %}>{{ m.name }}</option>{% endfor %}</select>

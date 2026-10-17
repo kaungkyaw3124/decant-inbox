@@ -1,0 +1,11 @@
+id,app,amount,transaction_no,time,receiver_name,receiver_last4,status_text,is_receipt,note
+s01,KBZPay,34000,01003456789012345678,17/10/2026 23:21:05,Test Shop,1234,Payment Successful,1,"right amount, right receiver"
+s02,KBZPay,70000,01003456789098765432,17/10/2026 23:25:41,Soe Htike Lwin,7788,Payment Successful,1,"live case: paid more, other receiver"
+s03,AYA Pay,18000,AYA2610171844002931,17-Oct-2026 18:44,Test Shop,1234,Transfer Successful,1,AYA right
+s04,Wave,25500,8811223344,2026-10-16 09:12,Test Shop,1234,Successful,1,Wave right
+s05,KBZPay,30000,01003456781111222233,17/10/2026 12:02:10,Test Shop,1234,Payment Successful,1,paid less
+s06,KBZPay,34000,01003456785555666677,17/10/2026 13:40:00,Test Shop,1234,Transaction Failed,1,failed transfer
+s07,AYA Pay,52000,AYA2610090730118842,09-Oct-2026 07:30,Mya Mya,5521,Transfer Successful,1,"old receipt, other receiver"
+s08,other,,,,,,,0,not a receipt: a perfume photo
+s09,other,,,,,,,0,not a receipt: a chat screenshot
+s10,Wave,125000,9900112233,2026-10-17 20:05,Test Shop,1234,Successful,1,Wave six digits
