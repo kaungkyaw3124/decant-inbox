@@ -326,6 +326,8 @@ def _apply_items(session: Session, message: Message, result: ParseResult, texts:
                            "cancel", f"Removes {len(removed)} item(s): nothing left, the order is cancelled.",
                            order.id, undo)
         if before["status"] == "waiting_payment":
+            if cart.address_problem(order):
+                return None  # docs/SPEC-v4.12 N2: no payment info while the address is missing / invalid
             _keep_waiting(session, order, before, old_total, undo)
             return Outcome("cart_remove", "➖ Remove + 💳 payment info with the new total",
                            cart.payment_text(session, order, texts, changed=True), "payment_info",
@@ -461,6 +463,8 @@ def _modify(session: Session, message: Message, customer: Customer, order: Order
         return Outcome("cart_change", "🔁 Change the cart + reply (nothing left)", "\n".join(lines), "cart",
                        note + " Nothing left: the order is cancelled.", order.id, undo)
     if waiting and order.total_mmk != old_total:
+        if cart.address_problem(order):
+            return None  # docs/SPEC-v4.12 N2: no payment info while the address is missing / invalid
         _keep_waiting(session, order, before, old_total, undo)
         lines.append(cart.payment_text(session, order, texts, changed=True))
         return Outcome("cart_change", "🔁 Change the cart + 💳 payment info with the new total", "\n".join(lines),
@@ -552,6 +556,8 @@ def _buy(session: Session, message: Message, customer: Customer, order: Order | 
     undo = {"added": [i for i in changed if i > 0], "removed": [-i for i in changed if i < 0],
             "order": before, "created_order": created}
     if waiting:  # docs/SPEC-v4.10-interruptions.md: same order, new total, payment info again
+        if cart.address_problem(order):
+            return None  # docs/SPEC-v4.12 N2: no payment info while the address is missing / invalid
         _keep_waiting(session, order, before, old_total, undo)
         view = cart.view(session, order)
         return Outcome("cart_add", "🛒 Add + 💳 payment info with the new total",

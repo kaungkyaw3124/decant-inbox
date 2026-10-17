@@ -149,6 +149,9 @@ def _queue(session: Session, check: PaymentCheck, order: Order, body: str, user:
 
 
 def confirmation_text(session: Session, order: Order, texts: dict[str, str]) -> str:
+    """docs/SPEC-v4.12: always the validated address (full_text); approve() refuses without one."""
+    if why := cart.address_problem(order):
+        raise PaymentError(why)
     return render(texts["order_confirmed"], id=str(order.order_no),
                   items="\n".join(cart.item_lines(session, order, texts)),
                   total=format_mmk(cart.view(session, order).total),
@@ -167,6 +170,8 @@ def approve(session: Session, check: PaymentCheck, form: Form, user: User, texts
     order = session.scalar(select(Order).where(Order.id == check.order_id).with_for_update())
     if check.decision != "pending" or order.status != "photo_received":
         raise PaymentError("This payment check is already decided.")
+    if why := cart.address_problem(order):  # docs/SPEC-v4.12 N2: never approve (= confirm) without a valid address
+        raise PaymentError(why.replace("in the cart panel", "on this card"))
     if not form.transaction_id:
         raise PaymentError("The transaction ID is required (copy it from your KPay / AYA history).")
     shot = screenshot(session, check)

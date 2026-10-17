@@ -696,4 +696,6 @@ MY = {
     "Address without the {what} ({address}): kept 24 h; the answer completes it.":
         "{what} မပါတဲ့ လိပ်စာ ({address}): ၂၄ နာရီ သိမ်းထား၊ အဖြေနဲ့ ပြည့်စုံမယ်။",
     "township": "မြို့နယ်", "city": "မြို့",
+    "Approving is blocked until the address is valid.": "လိပ်စာ မှန်မှ အတည်ပြုလို့ ရမယ်။",
+    "The address is not valid: fix it on this card.": "လိပ်စာ မမှန်ပါ: ဒီကတ်ပေါ်မှာ ပြင်ပါ။",
 }

@@ -12,6 +12,15 @@
   </table>
   <p class="small">📞 {{ order.phones | join(", ") or "—" }} · 📍 {{ ui.address(order.address, order.address_parts, order.address_invalid) }}</p>
   {% for line in total_changes %}<p class="small problem-text">⚠️ {{ tr(line) }}</p>{% endfor %}
+  {% if address_problem and check.decision == "pending" and not order.order_no %}
+  <form method="post" action="/payments/{{ check.id }}/address" class="stack card problem" id="fix-address">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <p class="problem-text"><b>⚠️ {{ tr(address_problem) }}</b> {{ t("Approving is blocked until the address is valid.") }}</p>
+    <label>{{ t("Address (fix it if needed: house no., street, township)") }}
+      <textarea name="address" rows="2" maxlength="500">{{ order.address or "" }}</textarea></label>
+    <button>{{ t("Save address") }}</button>
+  </form>
+  {% endif %}
 </section>
 
 {% if check.decision in ("several", "pending") and not may_decide %}

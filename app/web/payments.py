@@ -4,7 +4,8 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import Customer, Order, PaymentCheck, PaymentMethod, User
+from app.models import AuditLog, Customer, Order, PaymentCheck, PaymentMethod, User
+from app.orders import address as address_rules
 from app.orders import cart, payments
 from app.replies import templates as replies
 from app.web import staff
@@ -42,6 +43,7 @@ def _card(request: Request, db: Session, check: PaymentCheck, form: payments.For
         "form": form or payments.Form(check.transaction_id or "", check.amount_mmk or view.total, check.method),
         "warnings": found or [], "error": error, "reasons": payments.REASON_LABELS,
         "total_changes": payments.total_change_lines(db, order),  # docs/SPEC-v4.10-interruptions.md
+        "address_problem": cart.address_problem(order),  # docs/SPEC-v4.12 N2
         "may_decide": staff.may_decide_payments(db, db.get(User, request.session["user_id"])),
     }, status_code=status_code)
 
@@ -84,6 +86,25 @@ def approve(request: Request, check_id: int, transaction_id: str = Form(""), amo
     order = db.get(Order, check.order_id)
     flash(request, f"Approved: Order #{order.order_no}. The confirmation goes out in a few seconds (Cancel in the chat).")
     return RedirectResponse(f"/chats/{order.customer_id}#bottom", status_code=303)
+
+
+@router.post("/{check_id}/address")
+def fix_address(request: Request, check_id: int, address: str = Form(""), db: Session = Depends(get_db),
+                user: User = Depends(current_user)):
+    """docs/SPEC-v4.12-address-payment-ai.md N2: fix a missing / invalid address before approving (same
+    validator); saved on the order and the customer."""
+    check = _check(db, check_id)
+    order = db.get(Order, check.order_id)
+    if order.order_no is not None:
+        raise HTTPException(409, "A paid order is changed with “Edit locked order” (owner).")
+    found = address_rules.admin_check(address)
+    if not found.valid:
+        return _card(request, db, check, error="Not saved: " + found.why, status_code=400)
+    cart.set_address(db, order, db.get(Customer, order.customer_id), found)
+    db.add(AuditLog(user_id=user.id, action="payment.address", details={"check_id": check.id, "order_id": order.id}))
+    db.commit()
+    flash(request, "Address saved (also for next time).")
+    return RedirectResponse(f"/payments/{check.id}", status_code=303)
 
 
 @router.post("/{check_id}/reject", dependencies=[Depends(staff.payment_decider)])

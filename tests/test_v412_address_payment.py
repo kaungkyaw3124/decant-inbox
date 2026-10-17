@@ -305,3 +305,48 @@ def test_p6_ai_address_off_rules_still_work_and_nothing_address_like_leaves(ai, 
     assert "သုခလမ်း" not in body and "[ADDRESS]" in body and "## address" not in instructions
     with SessionLocal() as s:
         assert ai_settings.load(s)["ai_address"] is False
+
+
+# ---------- N2 / P1: approve and the confirmation are blocked too ----------
+
+from tests.test_payments import downloaded, photo, waiting_for_payment  # noqa: E402
+
+
+def test_p1_approve_and_confirmation_blocked_until_fixed(shop, db, tmp_path, monkeypatch, capsys):
+    client, token = shop
+    waiting_for_payment(client, token, db)
+    with db.begin() as c:  # the live case: the 4.8 bug saved the change request as the address
+        c.execute(text("UPDATE orders SET address = :a"), {"a": BAD})
+    repair(monkeypatch, capsys)
+    photo(1)
+    check = scalar(db, "SELECT id FROM payment_checks")
+    page = client.get(f"/payments/{check}").text
+    assert "⚠️ invalid address" in page and "Approving is blocked until the address is valid." in page
+    downloaded(db, tmp_path, monkeypatch, check)
+    form = {"csrf": token, "transaction_id": "TX1", "amount": "18000"}
+    r = client.post(f"/payments/{check}/approve", data=form)
+    assert r.status_code == 400 and "The address is not valid: fix it on this card." in r.text
+    r = client.post(f"/payments/{check}/approve", data={**form, "confirmed": "1"})  # no "approve anyway" either
+    assert r.status_code == 400 and scalar(db, "SELECT order_no FROM orders") is None
+    assert scalar(db, "SELECT count(*) FROM outbox WHERE reply_kind = 'payment'") == 0  # no confirmation
+    r = client.post(f"/payments/{check}/address", data={"csrf": token, "address": "ပို့ပေးပါ"})
+    assert r.status_code == 400 and flags(db)[0] is True
+    client.post(f"/payments/{check}/address", data={"csrf": token, "address": "ဗဟန်း ရွှေဂုံတိုင်လမ်း အမှတ် ၅"})
+    assert flags(db) == (False, False)
+    r = client.post(f"/payments/{check}/approve", data=form, follow_redirects=False)
+    assert r.status_code == 303 and scalar(db, "SELECT order_no FROM orders") == 1001
+    assert "လိပ်စာ: ဗဟန်း ရွှေဂုံတိုင်လမ်း အမှတ် ၅\n" in deliver(db)[-1]
+
+
+def test_p1_no_payment_info_again_while_the_address_is_invalid(shop, db):
+    """docs/SPEC-v4.10 resends payment info with a new total; not while the address is invalid."""
+    client, token = shop
+    waiting_for_payment(client, token, db)
+    with db.begin() as c:
+        c.execute(text("UPDATE orders SET address = :a, address_invalid = true"), {"a": BAD})
+    mid = say(db, 5, "sauvage edp 10ml ထပ်ယူမယ်")
+    from tests.test_cart import button
+
+    b = button(client, mid)
+    assert b is None or "payment info" not in b[0]
+    assert scalar(db, "SELECT count(*) FROM outbox WHERE reply_kind = 'payment_info' AND status = 'queued'") == 0
