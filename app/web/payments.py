@@ -41,6 +41,7 @@ def _card(request: Request, db: Session, check: PaymentCheck, form: payments.For
         "methods": db.scalars(select(PaymentMethod).where(PaymentMethod.active).order_by(PaymentMethod.sort_order)).all(),
         "form": form or payments.Form(check.transaction_id or "", check.amount_mmk or view.total, check.method),
         "warnings": found or [], "error": error, "reasons": payments.REASON_LABELS,
+        "total_changes": payments.total_change_lines(db, order),  # docs/SPEC-v4.10-interruptions.md
         "may_decide": staff.may_decide_payments(db, db.get(User, request.session["user_id"])),
     }, status_code=status_code)
 

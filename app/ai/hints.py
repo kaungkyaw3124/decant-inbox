@@ -125,6 +125,12 @@ def apply(session: Session, card) -> None:
             card.phrase = cards.propose_phrase(session, card.message.normalized_text, names)
     if ai.intent == "question":
         hint.draft = ai.draft_answer or ""
+        from app.orders import steps  # late import; docs/SPEC-v4.10-interruptions.md: suggested resume line
+        from app.replies import templates as replies
+
+        resume = steps.resume_text(session, steps.step(session, card.message.customer_id), replies.load(session))
+        if resume and hint.draft and resume not in hint.draft:
+            hint.draft = f"{hint.draft}\n{resume}"
     card.ai = hint
 
 

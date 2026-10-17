@@ -11,7 +11,7 @@ CODES = {
     "buy": "ဝယ်မယ်", "ask_stock": "ရှိလားမေး", "ask_price": "ဈေးမေး", "other": "အခြား", "unknown": "မသိ",
     "remove": "ဖြုတ်မယ်", "confirm": "အတည်ပြု", "address": "လိပ်စာ", "ask_delivery": "ရောက်ပြီလားမေး",
     "cancel_order": "အော်ဒါပယ်", "greeting": "နှုတ်ဆက်", "previous_item": "အရင်ကဟာ", "question": "မေးခွန်း",
-    "ignore": "ဘာမှမလုပ်", "change_info": "လိပ်စာ/ဖုန်း ပြောင်း",
+    "ignore": "ဘာမှမလုပ်", "change_info": "လိပ်စာ/ဖုန်း ပြောင်း", "payment_sent": "ငွေလွှဲပြီး (ပုံမပါ)",
     # message review
     "new": "အသစ်", "done": "ပြီးပြီ", "ignored": "လျစ်လျူရှုထား",
     # orders
@@ -621,4 +621,34 @@ MY = {
     "Greeting reply again only after this many minutes (a 2nd “hi” sooner waits for a person)":
         "နှုတ်ဆက်စာ ထပ်ဖြေမယ့် မိနစ် (ဒီထက်စောတဲ့ ဒုတိယ “hi” ကို လူက ဖြေမယ်)",
     "Greeting reply again after: 0-{n} minutes.": "နှုတ်ဆက်စာ ထပ်ဖြေမယ့်အချိန်: 0-{n} မိနစ်။",
+    # interruptions & locked paid orders (docs/SPEC-v4.10-interruptions.md)
+    "Edit locked order": "ပိတ်ထားတဲ့ အော်ဒါ ပြင်မယ်", "Order #{no} locked": "Order #{no} ပိတ်ထားပြီ",
+    "Paid orders are locked. Only for a real exception: the change and the reason are kept in Activity. Tell the customer yourself.":
+        "ငွေချေပြီး အော်ဒါတွေကို ပိတ်ထားပါတယ်။ တကယ့်ခြွင်းချက်အတွက်ပဲ ပြင်ပါ: ပြင်တာနဲ့ အကြောင်းရင်းကို မှတ်တမ်းမှာ သိမ်းထားမယ်။ ဖောက်သည်ကို ကိုယ်တိုင် ပြောပါ။",
+    "Reason (required)": "အကြောင်းရင်း (မဖြစ်မနေ)", "Save the change": "ပြင်တာ သိမ်းမယ်",
+    "Resume line (“send the screenshot”, “send your phone”…) after other answers at most every this many minutes":
+        "ပြန်ခေါ်စာကြောင်း (“screenshot ပို့ပါ”, “ဖုန်း ပို့ပါ”…) ကို တခြားအဖြေတွေနောက်မှာ ဒီမိနစ်တစ်ခါပဲ ထည့်မယ်",
+    "Resume line at most every: 0-{n} minutes.": "ပြန်ခေါ်စာကြောင်း: 0-{n} မိနစ်။",
+    "customer wants to change paid Order #{no}: {what}": "ငွေချေပြီး Order #{no} ကို ဖောက်သည်က ပြင်ချင်တယ်: {what}",
+    "{what} after the payment screenshot — check it": "ငွေလွှဲပုံ ပို့ပြီးမှ {what} — စစ်ပါ",
+    "add items": "ပစ္စည်း ထပ်ထည့်", "add earlier items": "အရင်ကဟာ ထပ်ထည့်", "remove items": "ပစ္စည်း ဖြုတ်",
+    "change address / phone": "လိပ်စာ / ဖုန်း ပြောင်း", "new address / phone": "လိပ်စာ / ဖုန်း အသစ်",
+    "total changed {time}": "{time} မှာ စုစုပေါင်း ပြောင်းထား",
+    "Total changed at {time}: {old} → {new} ကျပ်.": "{time} မှာ စုစုပေါင်း ပြောင်းထား: {old} → {new} ကျပ်။",
+    "⏳ waiting payment": "⏳ ငွေလွှဲ စောင့်နေ", "⏳ waiting: address": "⏳ စောင့်နေ: လိပ်စာ",
+    "⏳ waiting: new address / phone": "⏳ စောင့်နေ: လိပ်စာ / ဖုန်း အသစ်", "⏳ waiting: phone": "⏳ စောင့်နေ: ဖုန်း",
+    "⏳ waiting: same phone & address?": "⏳ စောင့်နေ: ဖုန်း၊ လိပ်စာ အရင်အတိုင်းလား",
+    "📷 payment screenshot to check": "📷 စစ်ရမယ့် ငွေလွှဲပုံ",
+    "Resume line while waiting for the payment (added after other answers)":
+        "ငွေလွှဲ စောင့်နေချိန် ပြန်ခေါ်စာကြောင်း (တခြားအဖြေတွေနောက်မှာ ထည့်)",
+    "Payment info again after the order changed: total line": "အော်ဒါ ပြောင်းပြီးနောက် ငွေလွှဲအချက်အလက် ထပ်ပို့: စုစုပေါင်း စာကြောင်း",
+    "After a price, while waiting for the payment: offer to add it": "ငွေလွှဲ စောင့်နေချိန် ဈေးပြောပြီး: ထည့်ပေးရမလား မေး",
+    "“I paid” without a screenshot": "screenshot မပါဘဲ “ငွေလွှဲပြီးပြီ”",
+    "We must check first (unknown item, or a change after the payment screenshot)":
+        "အရင် စစ်ရမယ် (မသိတဲ့ပစ္စည်း၊ ဒါမှမဟုတ် ငွေလွှဲပုံ ပို့ပြီးမှ ပြောင်းတာ)",
+    "Paid order is locked: the new items become a NEW order (first line)":
+        "ငွေချေပြီး အော်ဒါ ပိတ်ထား: ပစ္စည်းအသစ်တွေက အော်ဒါအသစ် (ပထမစာကြောင်း)",
+    "Paid order is locked: the customer asked to change it": "ငွေချေပြီး အော်ဒါ ပိတ်ထား: ဖောက်သည်က ပြင်ချင်တယ်",
+    "Order #{no} changed (owner). Tell the customer yourself if needed.": "Order #{no} ပြင်ပြီး (ပိုင်ရှင်)။ လိုရင် ဖောက်သည်ကို ကိုယ်တိုင် ပြောပါ။",
+    "Not saved: write the reason.": "မသိမ်းရသေး: အကြောင်းရင်း ရေးပါ။",
 }

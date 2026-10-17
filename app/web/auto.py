@@ -194,14 +194,17 @@ def needs_you(db: Session, now: datetime | None = None, owner: bool = True) -> d
     from app.orders import change  # docs/SPEC-v4.8-change-info.md
 
     changed_paid = change.changed_after_payment(db)
+    from app.orders import steps  # docs/SPEC-v4.10-interruptions.md
+
+    requests = steps.open_requests(db)
     change_sent = change.requests_for_sent_orders(db, now)
     return {"faq_hints": hints, "payments": to_check, "cancels": cancels, "unpaid": unpaid, "unanswered": unanswered,
             "unknown": [(m, customers[m.customer_id], unknown.open_unknowns(db, m)) for m in unknown_msgs],
             "teach": [(m, customers[m.customer_id], card) for m, card in teach],
             "price_needed": price_needed, "to_approve": to_approve, "conflicts": conflicts,
             "failed": failed, "paused": paused, "auto_cancelled": followups.auto_cancelled(db, now),
-            "ai_notices": ai_notices, "changed_paid": changed_paid, "change_sent": change_sent,
-            "count": len(ai_notices) + len(changed_paid) + len(change_sent) + len(to_check) + len(cancels) + len(unpaid) + len(unknown_msgs) + len(unanswered)
+            "ai_notices": ai_notices, "changed_paid": changed_paid, "change_sent": change_sent, "requests": requests,
+            "count": len(ai_notices) + len(changed_paid) + len(change_sent) + len(requests) + len(to_check) + len(cancels) + len(unpaid) + len(unknown_msgs) + len(unanswered)
                      + len(hints) + len(failed) + len(paused) + len(teach) + len(price_needed)
                      + (1 if to_approve else 0) + len(conflicts)}
 

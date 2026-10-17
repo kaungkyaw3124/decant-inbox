@@ -142,7 +142,8 @@ def test_whole_flow_phone_first_with_undo(shop, db):
     assert button(client, third)[0] == "📞 Save phone + reply"
     tap(client, token, third)
     assert phones(db) == ["09777123456", "09444555666", "09111222333"]
-    assert deliver(db) == ["ဖုန်းနံပါတ် 09111222333 ကိုလည်း ထည့်ထားပါပြီ။"]
+    # docs/SPEC-v4.10-interruptions.md: + the resume line (still waiting for the payment screenshot)
+    assert deliver(db) == ["ဖုန်းနံပါတ် 09111222333 ကိုလည်း ထည့်ထားပါပြီ။\nငွေလွှဲပြီးရင် transaction id ပါတဲ့ screenshot ပို့ပေးပါနော်။"]
     assert button(client, say(db, 7, "09 999 888 777")) is None  # max 3 numbers: use the cart panel
 
 

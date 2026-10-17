@@ -68,6 +68,8 @@
     <label class="check"><input type="checkbox" name="greeting" value="1" {% if settings.greeting %}checked{% endif %}> {{ t("Answer a message that is only a greeting (“hi”) with the greeting reply") }}</label>
     <label>{{ t("Greeting reply again only after this many minutes (a 2nd “hi” sooner waits for a person)") }}
       <input name="greeting_repeat_minutes" inputmode="numeric" value="{{ settings.greeting_repeat_minutes }}"></label>
+    <label>{{ t("Resume line (“send the screenshot”, “send your phone”…) after other answers at most every this many minutes") }}
+      <input name="resume_line_minutes" inputmode="numeric" value="{{ settings.resume_line_minutes }}"></label>
     <label class="check"><input type="checkbox" name="auto_not_stocked" value="1" {% if settings.auto_not_stocked %}checked{% endif %}> {{ t("Auto-reply “we don't have it” for approved “we don't sell” names") }}</label>
     <button class="primary">{{ t("Save") }}</button>
   </form>

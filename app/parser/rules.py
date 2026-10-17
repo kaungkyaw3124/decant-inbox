@@ -19,6 +19,8 @@ intent phrases (they win over the seed keywords; their words are not product nam
 greeting intent (a message that is ONLY a greeting). Items keep the customer's words (name_text).
 rules-6 (docs/SPEC-v4.md 4.3): previous_item ("ဟိုနေ့ကဟာ ထပ်ယူမယ်", "same as before") when no product is
 named and it is not a price / stock / remove question; parse_choice() reads "1", "1 နဲ့ 2", "အကုန်".
+rules-8 (docs/SPEC-v4.10-interruptions.md): payment_sent ("ငွေလွှဲပြီးပါပြီ", "paid", "transferred") —
+"I paid" in words; the screenshot is what counts.
 rules-7 (docs/SPEC-v4.8-change-info.md): change_info ("လိပ်စာ ပြောင်းချင်ပါတယ်", "ဖုန်းအသစ်", "change address");
 an address needs real CONTENT (township, street, number, ward or a long text): keywords alone
 ("လိပ်စာ", "ပို့ပေးပါ", "address") are not an address and never an agreement.
@@ -28,7 +30,7 @@ from dataclasses import dataclass, field
 
 from rapidfuzz import fuzz
 
-PARSER_VERSION = "rules-7"
+PARSER_VERSION = "rules-8"
 NEEDS_REVIEW_BELOW = 0.6  # dashboard shows results under this as "needs review"
 FUZZY_THRESHOLD = 88      # rapidfuzz partial_ratio, 0-100
 FUZZY_MIN_ALIAS_LEN = 5   # shorter aliases match too much by accident
@@ -48,7 +50,7 @@ REMOVE_RE = _rx("မယူတော့", "ဖြုတ်ပေး", "ဖြု�
 CANCEL_ORDER_RE = _rx("မယူတော့", "မမှာတော့", "မဝယ်တော့", _w("cancel"))
 # The polite particle ပါ may sit inside: ယူပါမယ်, ဝယ်ပါမယ်, မှာပါမယ်, ယူပါရစေ.
 BUY_RE = _rx("ဝယ်ချင်", "ဝယ်(?:ပါ)?မယ်", "ယူ(?:ပါ)?မယ်", "ယူချင်", "ယူ(?:ပါ)?ရစေ", "မှာ(?:ပါ)?မယ်",
-             "မှာချင်", _w("order"), _w("buy"))
+             "မှာချင်", _w(r"order(?!\s*(?:#|no\.?|number)?\s*\d)"), _w("buy"))
 ASK_PRICE_RE = _rx("ဘယ်လောက်", "ဈေး", "စျေး", _w("price"), _w("how much"))
 ASK_STOCK_RE = _rx("ရှိလား", "ရှိသေးလား", "ရလား", _w("instock"), _w("in stock"), _w("available"), _w("avai"))
 # "ပေးပါ(နော်)" = buy, but only when a product or size is named; "ပို့ပေးပါ" = address.
@@ -71,7 +73,7 @@ ADDRESS_RE = _rx("ပို့ပေး", "လိပ်စာ", "မြို့
                  _w("street"), _w("road"), *TOWNSHIPS, *(_w(t) for t in TOWNSHIPS_LATIN))
 # "When will it arrive?" Strong words win over address words; a bare "deli" only counts when
 # nothing else matched and there is no phone number (an address message may say "deli").
-ASK_DELIVERY_RE = _rx("ဘယ်တော့ရောက်", "ရောက်ပြီလား", "ရောက်ပြီလဲ", "ပို့ပြီးပြီလား", "ပို့ပြီးပြီလဲ", "ဘယ်တော့ပို့")
+ASK_DELIVERY_RE = _rx(r"ဘယ်\s*တော့\s*ရောက်", "ရောက်ပြီလား", "ရောက်ပြီလဲ", "ပို့ပြီးပြီလား", "ပို့ပြီးပြီလဲ", r"ဘယ်\s*တော့\s*ပို့")
 DELI_WORD_RE = _rx(_w("deli"))
 DONE_RE = _rx("ဒါပဲ", "ဒါပါပဲ", "ဒီလောက်ပါပဲ", "ဒီလောက်ပဲ", "ဒါတွေပဲ", "ဒါတွေပါပဲ")
 CONFIRM_RE = _rx("အဆင်ပြေတယ်", "အဆင်ပြေပါတယ်", "ဟုတ်ကဲ့", "ရပါတယ်", _w("ok"), _w("okay"), _w("confirm"))
@@ -85,6 +87,10 @@ CHANGE_PHONE_RE = _rx(r"ဖုန်း\s*(?:နံပါတ်\s*)?(?:ကို
 CHANGE_BOTH_RE = _rx(r"(?:လိပ်စာ|ဖုန်း(?:နံပါတ်)?)\s*(?:နဲ့|နှင့်|ရော|ကော)\s*(?:လိပ်စာ|ဖုန်း(?:နံပါတ်)?)\s*(?:ရော|ကော|ပါ)?\s*ပြောင်း",
                      _w(r"(?:change|new)\s+(?:address\s+and\s+phone|phone\s+and\s+address)"))
 CHANGE_ANY_RE = _rx(r"^\s*ပြောင်း(?:မယ်|ချင်)")  # "I'll change it" (what is not said: unclear)
+# "I paid" without a screenshot (docs/SPEC-v4.10-interruptions.md); "လွှဲပြီးရင်" (= when you have paid) is not
+PAYMENT_SENT_RE = _rx(r"လွှဲ(?:\s*လိုက်)?\s*(?:ပြီး\s*(?:ပါ\s*)?ပြီ|(?:ပါ\s*)?ပြီ(?!း))", r"ငွေ\s*ပို့(?:\s*လိုက်)?\s*ပြီ(?:\s*ပါ)?",
+                      r"ပေးချေ(?:\s*လိုက်)?\s*ပြီ", _w(r"(?:i\s+)?(?:have\s+)?(?:paid|transferred)"), _w(r"money\s+sent"),
+                      _w(r"sent\s+the\s+money"), _w(r"payment\s+done"))
 # "Send it to THIS address": a new address that replaces the saved one (not a "keep the old one")
 REPLACE_RE = _rx(r"ဒီ\s*လိပ်စာ\s*(?:ကို|ကိုပဲ)?\s*ပို့", r"ဒီ\s*ကို\s*(?:ပဲ\s*)?ပို့", _w("this address"),
                  _w(r"send (?:it )?here"))
@@ -170,6 +176,8 @@ def find_intent(text: str, has_product_or_size: bool = False) -> str | None:
         return "buy"
     if change_kind(text):
         return "change_info"
+    if PAYMENT_SENT_RE.search(text):
+        return "payment_sent"
     for intent, pattern in (("ask_delivery", ASK_DELIVERY_RE), ("address", ADDRESS_RE), ("done", DONE_RE),
                             ("confirm", CONFIRM_RE)):
         if pattern.search(text):
@@ -589,7 +597,7 @@ def parse(normalized_text: str, aliases: list[Alias], full_sizes: dict[int, int]
         intent = "unknown"
     if intent == "remove" and not items and CANCEL_ORDER_RE.search(text):
         intent = "cancel_order"  # no product named: the whole order
-    if intent in ("address", "confirm", "done", "ask_delivery", "cancel_order", "change_info") \
+    if intent in ("address", "confirm", "done", "ask_delivery", "cancel_order", "change_info", "payment_sent") \
             or (intent == "remove" and not items):
         return ParseOutcome(intent, product_id, size_ml, quantity, 0.8, items_t, phone, learned_ids)
 

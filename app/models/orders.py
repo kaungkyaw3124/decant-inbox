@@ -18,9 +18,15 @@ OPEN_STATUSES = ("cart", "confirmed", "waiting_payment", "photo_received")
 PAID_STATUSES = ("paid", "packed", "sent_out", "delivered")  # counted as sales
 SHIPPING_STATUSES = ("paid", "packed", "sent_out")  # paid, not delivered yet
 QUICK_KINDS = ("price", "cart_add", "cart_remove", "cart_list", "confirm", "address", "contact", "not_stocked",
-               "delivery", "cancel_order", "faq", "greeting", "teach", "choose_previous", "change_info")
+               "delivery", "cancel_order", "faq", "greeting", "teach", "choose_previous", "change_info",
+               "hold", "locked")  # docs/SPEC-v4.10-interruptions.md
 CHANGE_WANTED = ("address", "phone", "both", "unclear")  # docs/SPEC-v4.8-change-info.md
-EVENT_KINDS = ("status", "contact", "address_checked")
+EVENT_KINDS = ("status", "contact", "address_checked",
+               # docs/SPEC-v4.10-interruptions.md: total changed while waiting for payment; a change the
+               # customer asked for that a person must handle (payment photo sent / paid order locked);
+               # its "done"; the owner's edit of a locked order
+               "total", "request", "request_done", "locked_edit")
+LOCKED_STATUSES = ("paid", "packed", "sent_out", "delivered")  # Order ID given: the customer can't change it
 UNKNOWN_RESOLUTIONS = ("mapped", "new_product", "not_stocked")
 AUTO_STATUSES = ("replied", "skipped")
 # pending: one screenshot to check · several: more than one photo (ask for one) ·
@@ -67,6 +73,10 @@ class Order(Base):
     # new one. While set, payment info waits and the next address / phone REPLACES the old one.
     change_wanted: Mapped[str | None] = mapped_column(String(8))
     change_asked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # docs/SPEC-v4.10-interruptions.md: price question while waiting for payment -> "add it to this
+    # order?"; the items offered (product_id, size_ml, is_full_bottle, quantity) until the answer
+    offer: Mapped[list[dict[str, Any]] | None] = mapped_column(JSONB)
+    offer_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = created_at_column()
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(),
                                                  default=func.now())  # last change: idle carts expire

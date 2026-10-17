@@ -65,6 +65,12 @@ def deli_line(order: Order, texts: dict[str, str]) -> str:
     return "\n" + re.sub(r"[ \t]{2,}", " ", line).strip()
 
 
+def local_zone():
+    from zoneinfo import ZoneInfo
+
+    return ZoneInfo(get_settings().timezone)
+
+
 def local_date(value: datetime) -> str:
     from zoneinfo import ZoneInfo
 

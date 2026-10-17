@@ -13,7 +13,7 @@ c01,10ml ဘယ်လောက်လဲ,C: sauvage ရှိလား|S: ရှ�
 c02,10ml ပေးပါ,"C: good girl 5ml ဘယ်လောက်လဲ|S: Good Girl 5ml – 15,000 ကျပ်ပါ",,,buy,Good Girl@10ml,,"context product, polite buy"
 c03,အဲ့ဒါ ဘယ်လောက်လဲ,C: aventus 5ml ရှိလား|S: ရှိပါတယ်ရှင့်,,,ask_price,Aventus@any,,'that one' from the chat
 c04,same as before pls,,,Bleu de Chanel Eau de Parfum 10ml x1,previous_item/buy,Bleu de Chanel Eau de Parfum@10ml,,"previous item, English"
-c05,ငွေလွှဲပြီးပါပြီ,S: KPay – [NUMBER],,,other/confirm,,,payment sent (not a product)
+c05,ငွေလွှဲပြီးပါပြီ,S: KPay – [NUMBER],,,other/confirm/payment_sent,,,payment sent (not a product)
 c06,ဒီအနံ့က ဘယ်လောက်ကြာကြာ မွှေးလဲ,C: aventus 5ml ရှိလား|S: ရှိပါတယ်ရှင့်,,,question,*,Aventus,longevity question about the chat's product
 c07,original လား,"C: sauvage 10ml ဘယ်လောက်လဲ|S: Sauvage Eau de Parfum 10ml – 38,000 ကျပ်ပါ",,,question,*,Sauvage Eau de Parfum,authenticity question
 n01,sauvage noir 10ml ယူမယ်,,,,buy,!sauvage noir@10ml,,flanker not in list

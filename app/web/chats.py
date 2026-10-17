@@ -20,7 +20,7 @@ from app.models import (
 )
 from app.models.orders import MAX_PHONES, OPEN_STATUSES
 from app.models.outbox import MAX_TEXT, MEDIA_DIR
-from app.orders import actions, auto, cart, change, delivery
+from app.orders import actions, auto, cart, change, delivery, steps
 from app.parser.normalize import normalize
 from app.parser.rules import find_phones
 from app.pricing.prices import current_prices
@@ -149,6 +149,10 @@ def chat(request: Request, customer_id: int, db: Session = Depends(get_db)):
     else:
         mode = "custom"
         result.text = texts["greeting"] + "\n" if greet else ""
+        # docs/SPEC-v4.10-interruptions.md: the resume line as a suggestion the admin can delete
+        resume = steps.resume_text(db, steps.step(db, customer_id), texts)
+        if resume:
+            result.text += "\n" + resume
     products = db.scalars(select(Product).where(Product.active).order_by(Product.brand, Product.name)).all()
     sizes = sorted({p.size_ml for ps in current_prices(db).values() for p in ps if p.size_ml})
     return templates.TemplateResponse(request, "chat.html", {
@@ -206,7 +210,15 @@ def cart_context(db: Session, customer: Customer, texts: dict[str, str]) -> dict
             PaymentCheck.outbox_id.is_(None))) if order else None,
         "item_size": cart.item_size, "shipping": delivery.shipping_order(db, customer.id),
         "contact_changes": change.recent_changes(db, order.id) if order else [],  # docs/SPEC-v4.8-change-info.md
+        **step_context(db, customer.id),
     }
+
+
+def step_context(db: Session, customer_id: int) -> dict:
+    """docs/SPEC-v4.10-interruptions.md: the badge "⏳ waiting payment · total changed 02:41" / "🔒 locked"."""
+    step = steps.step(db, customer_id)
+    changes = steps.total_changes(db, step.order.id) if step.kind == "waiting_payment" else []
+    return {"step": step, "total_changed_at": changes[-1].created_at if changes else None}
 
 
 @router.get("/chats/{customer_id}/thread", response_class=HTMLResponse)

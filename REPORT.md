@@ -1406,3 +1406,64 @@ answered late.
 5. Send a payment screenshot, then `hi` → "ငွေလွှဲ screenshot ရပါပြီ…". Approve it, then `hi` → "Order #N ကို
    ပြင်ဆင်နေပါတယ်…". Mark it sent out, then `hi` → "Order #N ကို dd/mm/yyyy မှာ ပို့ပြီးပါပြီ…".
 6. Send `hi swy 5ml ဘယ်လောက်လဲ` → the price reply.
+
+## 2026-10-17 — v4.10: interruptions, resume line, locked paid orders (docs/SPEC-v4.10-interruptions.md)
+**What was built**
+- **Paid orders are LOCKED** (Order ID given: paid / packed / sent_out / delivered). The customer can't change
+  items, address or phone, automatically or by one-tap.
+  - New items after a paid order → a NEW cart. The reply starts with "Order #N ကတော့ အတည်ပြုပြီးသားပါ။ ဒါကို order
+    အသစ်အနေနဲ့ ယူပေးပါမယ်နော်။" (template locked_new_order). (Delivered orders: just a normal new cart, no extra line.)
+  - Remove / change address / phone / send a new address → "Order #N က ငွေလွှဲပြီး အတည်ပြုပြီးသား…" (template
+    order_locked) + Needs you "🔒 customer wants to change paid Order #N: <what>" with a ✅ done button. Nothing changes.
+  - Owner only: Orders page → "🔒 Edit locked order" (address, phones, remove items, reason required, audit_log).
+    Staff get 403 and don't see it.
+- **Payment screenshot sent, not approved yet**: add / remove / address / phone changes are NOT applied. Reply
+  "စစ်ပြီး ပြန်ပြောပေးပါမယ်နော်။" + Needs you "📷 … after the payment screenshot — check it".
+- **Waiting for payment** (payment info sent, no photo):
+  - add a known item / remove an item → same order, new list + "စုစုပေါင်း အသစ် … ကျပ်ပါ။" + payment info again.
+  - unknown item → "စစ်ပြီး ပြန်ပြောပေးပါမယ်နော်။" once + the teaching card.
+  - price question → price + "ဒီ order ထဲ ထည့်ပေးရမလား။" + resume line; a following "ok / ထည့်ပေး / ဟုတ်" adds it.
+  - "ငွေလွှဲပြီးပါပြီ" without a photo → "transaction id ပါတဲ့ screenshot လေး ပို့ပေးပါနော်။" (new intent payment_sent).
+  - new address → "လိပ်စာ ပြင်ပြီးပါပြီ – …" (payment info is not sent again).
+  - payment card: when the typed amount ≠ the CURRENT total it also shows "Total changed at hh:mm: old → new".
+- **Resume line**: after an automatic / one-tap answer to something else, the pending step's question is added
+  (phone, address, new address, "send the screenshot"). At most every 10 min per customer (Learning page setting,
+  0 = always), never when the reply already asks it. Admin replies: pre-filled in the chat editor (you can delete it).
+- Chat header + cart panel: step badge ("⏳ waiting payment · total changed 02:41", "🔒 Order #1004 locked").
+- Small parser fixes found by the matrix: "ဘယ်တော့ ရောက်မလဲ" (with a space) is a delivery question; "Order #1001 …"
+  is a reference, not "I want to order". "ငွေလွှဲပြီးပါပြီ" with nothing to pay now shows in Needs you.
+- Bug found and fixed: the auto engine's preview and send used two different clocks for the resume line window.
+
+**Tests:** 580 passed, 1 skipped (was 397 + 1). New tests/test_v410_interruptions.py:
+- J1: the full STATE × MESSAGE matrix — 11 states × 16 messages = 176 cells; the expected outcome of every cell is
+  in the table at the top of the test file (exact replies + order/Needs-you state).
+- J2: the owner's story end to end (add while waiting → address change → hi → wrong amount warning shows
+  18,000 → 33,000 → reject → approve → "swy 5ml" = new order → "လိပ်စာပြောင်းချင်တယ်" = locked, nothing changed).
+- J3 resume line window / not doubled / admin suggestion; J4 photo_received holds; J5 owner edit + staff 403;
+  J6 rules-certain → no AI call.
+
+**Deployed:** backup product_requests_2026-10-17T0359Z.dump, migration 8fd84aaf85d1 (round-trip down/up done),
+parser (rules-8) + web restarted, health ok.
+
+### OWNER TEST SCRIPT 4.9 + 4.10 (second Telegram account, Auto-reply ON)
+4.9 (greeting): see the 6 steps in the v4.9 entry above (hi with no order, hi twice, hi with a cart, hi while
+waiting for payment / after the screenshot / after approval / after sending, "hi swy 5ml ဘယ်လောက်လဲ").
+
+4.10:
+1. Send `stw intensely 5ml ယူမယ်`, then your phone and address → payment info (18,000).
+2. Send `sauvage edp 5ml ယူမယ်` → the list with both items + "စုစုပေါင်း အသစ် 38,000 ကျပ်ပါ။" + payment info.
+   Chats: the badge shows "⏳ waiting payment · total changed hh:mm".
+3. Send `sauvage edp 5ml ဘယ်လောက်လဲ` → price + "ဒီ order ထဲ ထည့်ပေးရမလား။" + "ငွေလွှဲပြီးရင် … screenshot ပို့ပေးပါနော်။".
+   Reply `ok` → it is added, new total + payment info.
+4. Send `authentic လား` → the FAQ answer + the screenshot line. Send it again at once → the FAQ answer only
+   (resume line at most every 10 min).
+5. Send `ငွေလွှဲပြီးပါပြီ` → "transaction id ပါတဲ့ screenshot လေး ပို့ပေးပါနော်။".
+6. Send a screenshot. Then `sauvage edp 10ml ယူမယ်` → "စစ်ပြီး ပြန်ပြောပေးပါမယ်နော်။" and Needs you shows
+   "📷 add items after the payment screenshot — check it". The order is unchanged. Tap ✅ done.
+7. Open the payment card, type the OLD amount 18,000 → the warning shows "Total changed at …: 18,000 → …".
+   Approve with the right amount → Order #N.
+8. Send `swy 5ml ယူမယ်` → "Order #N ကတော့ အတည်ပြုပြီးသားပါ။ …" + a NEW cart list.
+9. Send `လိပ်စာပြောင်းချင်တယ်` → "Order #N က ငွေလွှဲပြီး အတည်ပြုပြီးသားဖြစ်လို့ …"; Needs you "🔒 customer wants to
+   change paid Order #N"; the paid order is unchanged.
+10. Orders → All → "🔒 #N" → "Edit locked order": change the address with a reason → saved, in Activity.
+    Log in as staff: the button is not there.

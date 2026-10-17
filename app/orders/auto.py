@@ -29,9 +29,11 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
 from app.core.db import SessionLocal
-from app.models import AppSetting, AutoRun, Customer, Message, Outbox, ParseItem, ParseResult, QuickAction, User
+from app.models import (
+    AppSetting, AuditLog, AutoRun, Customer, Message, Outbox, ParseItem, ParseResult, QuickAction, User,
+)
 from app.learning import patterns
-from app.orders import actions
+from app.orders import actions, cart
 from app.replies import faq
 from app.replies import templates as replies
 
@@ -41,7 +43,7 @@ SPEED_SETTING = "auto_speed"
 DEFAULT_SPEED = {"quiet_s": 1, "delay_min_s": 2, "delay_max_s": 3}  # ~3 s from message to reply
 SPEED_LIMITS = {"quiet_s": (0, 30), "delay_min_s": (1, 60), "delay_max_s": (1, 60)}
 AUTO_INTENTS = ("ask_price", "ask_stock", "buy", "remove", "done", "confirm", "address", "ask_delivery",
-                "cancel_order", "greeting", "previous_item", "change_info")
+                "cancel_order", "greeting", "previous_item", "change_info", "payment_sent")
 # learned = an approved learned nickname (4.2); choice = picked by number from our list (4.3);
 # ai = written by the AI in AUTO mode after our checker and the threshold (docs/SPEC-v4.6-ai.md S4)
 CERTAIN_MATCHES = ("exact", "inherited", "human", "learned", "choice", "ai")
@@ -164,7 +166,10 @@ def decide(session: Session, message: Message, now: datetime, ai_mode: str | Non
         return _skip(session, message.id, "paused: owner is replying by hand")
     items = session.scalars(select(ParseItem).where(ParseItem.parse_result_id == result.id)).all()
     open_unknown = actions.unknown.open_unknowns(session, message)
-    if open_unknown:
+    order = cart.open_cart(session, customer.id) if open_unknown else None
+    if open_unknown and not (order is not None and order.status == "photo_received"):
+        if order is not None and order.status == "waiting_payment":
+            hold_reply(session, message, now)  # docs/SPEC-v4.10-interruptions.md: "we'll check" once
         return None  # "Needs you": decided again once the admin resolved the items
     if patterns.not_certain(session, actions.learned_used(session, message, result)):
         return _skip(session, message.id, "learned pattern waiting for approval")
@@ -187,11 +192,29 @@ def decide(session: Session, message: Message, now: datetime, ai_mode: str | Non
         return _skip(session, message.id, f"daily limit of {DAILY_CAP} auto replies")
     delay = timedelta(seconds=random.uniform(pace["delay_min_s"], pace["delay_max_s"]))
     try:
-        action = actions.perform(session, message, suggestion.fingerprint, None, texts, delay=delay)
+        action = actions.perform(session, message, suggestion.fingerprint, None, texts, delay=delay, decided_at=now)
     except actions.Refused as exc:
         return _skip(session, message.id, str(exc)[:120])
     session.add(AutoRun(message_id=message.id, status="replied", quick_action_id=action.id))
     return f"{suggestion.kind}"
+
+
+def hold_reply(session: Session, message: Message, now: datetime) -> None:
+    """An unknown item while waiting for payment: "စစ်ပြီး ပြန်ပြောပေးပါမယ်နော်။" once, so the customer
+    knows; the teaching card stays in Needs you (no quick action: the message is not "handled")."""
+    if session.scalar(select(exists().where(Outbox.source_message_id == message.id, Outbox.reply_kind == "hold"))):
+        return
+    if sent_today(session, now) >= DAILY_CAP:
+        return
+    pace = speed(session)
+    if now - message.received_at < timedelta(seconds=pace["quiet_s"]):
+        return
+    texts = replies.load(session)
+    delay = timedelta(seconds=random.uniform(pace["delay_min_s"], pace["delay_max_s"]))
+    session.add(Outbox(customer_id=message.customer_id, text=texts["hold_check"], reply_kind="hold", status="queued",
+                       idempotency_key=f"hold-{message.id}", created_by=None, send_after=now + delay,
+                       source_message_id=message.id))
+    session.add(AuditLog(user_id=None, action="auto.hold", details={"actor": "auto", "message_id": message.id}))
 
 
 def candidates(session: Session, now: datetime) -> list[int]:

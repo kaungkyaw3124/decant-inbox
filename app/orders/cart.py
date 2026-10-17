@@ -333,7 +333,11 @@ def cart_text(session: Session, order: Order, texts: dict[str, str], notes: list
 
 
 def closing_line(session: Session, order: Order, texts: dict[str, str]) -> str:
-    """The question that ends a cart list: phone, else address, else "same as last time?"."""
+    """The question that ends a cart list: phone, else address, else "same as last time?". While the
+    customer's new address / phone is awaited (4.8): ask for it, never offer the old one."""
+    if order.change_wanted:
+        return texts[{"address": "ask_new_address", "phone": "ask_new_phone"}.get(order.change_wanted,
+                                                                                 "ask_new_contact")]
     customer = session.get(Customer, order.customer_id)
     phones = order.phones or customer_phones(session, customer.id)
     address = order.address or customer.address
@@ -344,13 +348,15 @@ def closing_line(session: Session, order: Order, texts: dict[str, str]) -> str:
     return render(texts["cart_returning"], phones=", ".join(phones), address=address)
 
 
-def payment_text(session: Session, order: Order, texts: dict[str, str]) -> str:
+def payment_text(session: Session, order: Order, texts: dict[str, str], changed: bool = False) -> str:
+    """changed: the order changed after payment info was sent (docs/SPEC-v4.10-interruptions.md):
+    "စုစုပေါင်း အသစ် … ကျပ်ပါ။" instead of the normal total line."""
     cart = view(session, order)
     methods = session.scalars(select(PaymentMethod).where(PaymentMethod.active)
                               .order_by(PaymentMethod.sort_order, PaymentMethod.id)).all()
     return "\n".join(
         item_lines(session, order, texts)
-        + [render(texts["payment_total"], total=format_mmk(cart.total))]
+        + [render(texts["cart_total_changed" if changed else "payment_total"], total=format_mmk(cart.total))]
         + [render(texts["payment_method_line"], name=m.name, account_number=m.account_number,
                   account_name=m.account_name) for m in methods]
         + [texts["payment_info_footer"]])

@@ -1,19 +1,20 @@
 """Orders after payment (docs/SPEC-v3.md 6.1, 6.2, 6.4, 6.5): to pack / to send / sent /
 delivered, one-tap status buttons with 60 s Undo, cancel, payment reminder; the "wanted
 but not stocked" report; clearing "Needs you" rows."""
+import re
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from app.core import audit
-from app.models import Customer, Order, OrderEvent, User
-from app.models.orders import PAID_STATUSES
-from app.orders import cart, change, delivery, followups, reports
+from app.models import Customer, Order, OrderEvent, OrderItem, User
+from app.models.orders import LOCKED_STATUSES, MAX_PHONES, PAID_STATUSES
+from app.orders import cart, change, delivery, followups, reports, steps
 from app.replies import templates as replies
-from app.web.auth import current_user, verify_csrf
+from app.web.auth import current_user, owner_only, verify_csrf
 from app.web.deps import get_db, templates
 from app.web.inbox import flash, safe_back
 
@@ -53,7 +54,7 @@ def orders_page(request: Request, tab: str = "to_pack", db: Session = Depends(ge
         "tab": tab, "tabs": TABS, "counts": counts, "status_labels": STATUS_LABELS,
         "rows": [(o, c, cart.view(db, o)) for o, c in rows], "item_name": cart.item_name,
         "undo": delivery.undoable(db, [o.id for o, _ in rows]), "now": datetime.now(UTC),
-        "contact_history": change.history(db, [o.id for o, _ in rows])})
+        "contact_history": change.history(db, [o.id for o, _ in rows]), "locked_statuses": LOCKED_STATUSES})
 
 
 def _back(request: Request, back: str, order: Order) -> RedirectResponse:
@@ -138,6 +139,55 @@ def address_checked(request: Request, order_id: int, back: str = Form("/"), db: 
     audit.record(db, user, "order.address_checked", order_id=order.id)
     db.commit()
     flash(request, "Marked as checked.")
+    return RedirectResponse(safe_back(back, "/"), status_code=303)
+
+
+@router.post("/orders/{order_id}/edit-locked", dependencies=[Depends(owner_only)])
+async def edit_locked(request: Request, order_id: int, db: Session = Depends(get_db),
+                      user: User = Depends(current_user)):
+    """docs/SPEC-v4.10-interruptions.md: paid orders are locked; only the OWNER may change one, for a
+    real exception, with a reason (audit_log). Address, phones, items to remove."""
+    form = await request.form()
+    order = _order(db, order_id)
+    back = safe_back(str(form.get("back", "/orders?tab=all")), "/orders?tab=all")
+    reason = " ".join(str(form.get("reason", "")).split())[:300]
+    if order.status not in LOCKED_STATUSES:
+        raise HTTPException(409, "Not a locked order")
+    if len(reason) < 3:
+        flash(request, "Not saved: write the reason.")
+        return RedirectResponse(back + f"#order-{order.id}", status_code=303)
+    address = " ".join(str(form.get("address", "")).split())[:500] or None
+    phones = list(dict.fromkeys(p for p in re.split(r"[,\s]+", str(form.get("phones", ""))) if p))[:MAX_PHONES]
+    remove = [int(v) for v in form.getlist("remove_item") if str(v).isdigit()]
+    before = {"address": order.address, "phones": list(order.phones or []), "total": order.total_mmk}
+    removed = list(db.scalars(select(OrderItem.id).where(OrderItem.order_id == order.id, OrderItem.id.in_(remove),
+                                                         OrderItem.removed_at.is_(None))))
+    if removed:
+        db.execute(update(OrderItem).where(OrderItem.id.in_(removed)).values(removed_at=datetime.now(UTC)))
+        db.flush()
+        order.total_mmk = cart.view(db, order).total
+    order.address, order.phones = address, phones
+    after = {"address": order.address, "phones": order.phones, "total": order.total_mmk, "removed_items": removed}
+    db.add(OrderEvent(order_id=order.id, from_status=order.status, to_status=order.status, kind="locked_edit",
+                      previous={**before, "after": after, "reason": reason}, created_by=user.id))
+    audit.record(db, user, "order.edit_locked", order_id=order.id, order_no=order.order_no, reason=reason,
+                 before=before, after=after)
+    db.commit()
+    flash(request, f"Order #{order.order_no} changed (owner). Tell the customer yourself if needed.")
+    return RedirectResponse(back + f"#order-{order.id}", status_code=303)
+
+
+@router.post("/orders/requests/{event_id}/done")
+def request_done(request: Request, event_id: int, back: str = Form("/"), db: Session = Depends(get_db),
+                 user: User = Depends(current_user)):
+    """A change the customer asked for (payment photo sent / paid order) is handled by a person."""
+    event = db.get(OrderEvent, event_id)
+    if event is None or event.kind != "request":
+        raise HTTPException(404, "Not found")
+    steps.close_request(db, event, user, "done")
+    audit.record(db, user, "order.request_done", order_id=event.order_id, request_id=event.id)
+    db.commit()
+    flash(request, "Marked done.")
     return RedirectResponse(safe_back(back, "/"), status_code=303)
 
 

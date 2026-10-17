@@ -8,6 +8,7 @@
   <div>
     <h1>{{ c.display_name or ("@" ~ c.username if c.username else t("Customer")) }}</h1>
     <p class="muted small">{% if c.username %}@{{ c.username }} · {% endif %}{{ c.channel }} id {{ c.external_user_id }}{% if c.ignored %} · {{ t("ignored") }}{% endif %}</p>
+    <p>{% include "_step.html" %}</p>
   </div>
   <div class="buttons">
     <a class="button" href="{{ tg_link }}">{{ t("Open in Telegram") }}</a>

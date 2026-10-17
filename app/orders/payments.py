@@ -122,7 +122,18 @@ def warnings(session: Session, check: PaymentCheck, order: Order, form: Form) ->
     total = cart.view(session, order).total
     if form.amount_mmk is not None and form.amount_mmk != total:
         found.append(f"Amount {format_mmk(form.amount_mmk)} ≠ order total {format_mmk(total)} ကျပ်.")
+        found += total_change_lines(session, order)  # docs/SPEC-v4.10-interruptions.md
     return found
+
+
+def total_change_lines(session: Session, order: Order) -> list[str]:
+    """"Total changed at 02:41: 18,000 → 33,000 ကျပ်." for every change while waiting for payment."""
+    from app.orders import delivery, steps  # late import: delivery imports this package's neighbours
+
+    tz = delivery.local_zone()
+    return [f"Total changed at {e.created_at.astimezone(tz).strftime('%H:%M')}: "
+            f"{format_mmk(e.previous['total'])} → {format_mmk(e.previous['new_total'])} ကျပ်."
+            for e in steps.total_changes(session, order.id)]
 
 
 def _queue(session: Session, check: PaymentCheck, order: Order, body: str, user: User) -> None:

@@ -25,3 +25,5 @@ class Customer(Base):
     # by the admin after an owner pause (replying by hand pauses auto for 2 h).
     auto_reply_off: Mapped[bool] = mapped_column(Boolean, server_default=false(), default=False)
     auto_resumed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # docs/SPEC-v4.10-interruptions.md: when we last added a "resume line" (at most every 10 min)
+    resume_line_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

@@ -25,7 +25,8 @@ UNANSWERED_AFTER = timedelta(minutes=2)
 RECENT = timedelta(days=7)
 INFO_WINDOW = timedelta(hours=24)
 QUESTION_INTENTS = ("other", "unknown", "ask_delivery", "cancel_order",  # listed even without an order
-                    "greeting")  # a 2nd "hi" within 30 min gets no auto reply: maybe waiting for a person (4.9)
+                    "greeting",  # a 2nd "hi" within 30 min gets no auto reply: maybe waiting for a person (4.9)
+                    "payment_sent")  # "I paid" with nothing to pay for (4.10): a person checks
 PAID_CANCEL_STATUSES = ("photo_received",) + SHIPPING_STATUSES  # money involved: the admin decides
 
 

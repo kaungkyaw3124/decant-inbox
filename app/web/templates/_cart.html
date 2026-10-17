@@ -7,6 +7,7 @@
   <h2>{{ t("Cart") }} {% if order %}<span class="badge">{{ tr(status_label.get(order.status, order.status)) }}</span>{% endif %} {{ ui.help("What this customer is buying now. Follow the blue “Next” button: list → confirmed → phone → address → payment info.") }}</h2>
 
   {% if order and order.order_no %}<p><b>{{ t("Order #{no}", no=order.order_no) }}</b></p>{% endif %}
+  <p class="small">{% include "_step.html" %}</p>
   {% for ev in contact_changes %}
     {% set old = ev.previous.address if ev.previous.address != ev.previous.new_address else none %}
     <p class="small notice-line">📍 {% if old %}{{ t("address changed at {time} (old: {old})", time=ev.created_at | local_time("%H:%M"), old=old) }}{% else %}{{ t("phone changed at {time} (old: {old})", time=ev.created_at | local_time("%H:%M"), old=ev.previous.phones | join(", ")) }}{% endif %}</p>

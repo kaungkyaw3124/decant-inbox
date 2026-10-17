@@ -14,6 +14,12 @@
   {% for n in needs_you.ai_notices %}
     <li class="problem-text">{% if user_role == "owner" %}<a href="/ai">{{ tr(n) }}</a>{% else %}{{ tr(n) }}{% endif %}</li>
   {% endfor %}
+  {% for ev, o, c in needs_you.requests %}
+    <li><a href="/chats/{{ c.id }}"><b>{% if o.order_no %}🔒 {{ t("customer wants to change paid Order #{no}: {what}", no=o.order_no, what=t(ev.previous.what)) }}{% else %}📷 {{ t("{what} after the payment screenshot — check it", what=t(ev.previous.what)) }}{% endif %}</b></a>
+      <span class="small muted">{{ c.display_name or c.username or customer }}: “{{ ev.previous.text | truncate(80) }}”</span>
+      <form method="post" action="/orders/requests/{{ ev.id }}/done" class="inline"><input type="hidden" name="csrf" value="{{ csrf }}">
+        <button class="link">✅ {{ t("done") }}</button></form></li>
+  {% endfor %}
   {% for o, c, ev in needs_you.changed_paid %}
     <li><a href="/chats/{{ c.id }}"><b>📍 {% if o.order_no %}{{ t("Order #{no} address changed after payment — check before packing/sending", no=o.order_no) }}{% else %}{{ t("Address changed after the payment photo — check before packing/sending") }}{% endif %}</b></a>
       <span class="small muted">{{ c.display_name or c.username or customer }}: {{ ev.previous.address or "—" }} → {{ o.address or "—" }}{% if ev.previous.phones != ev.previous.new_phones %} · 📞 {{ o.phones | join(", ") }}{% endif %}</span>

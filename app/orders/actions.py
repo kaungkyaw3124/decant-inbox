@@ -52,7 +52,7 @@ from app.models import (
     ParseResult, Product, QuickAction, UnknownRequest, User,
 )
 from app.models.outbox import UNDO_SECONDS
-from app.orders import cart, change, delivery, previous, unknown
+from app.orders import cart, change, delivery, previous, steps, unknown
 from app.parser.normalize import normalize
 from app.parser.rules import CHANGE_PHONE_RE, NEEDS_REVIEW_BELOW, address_content, change_kind, find_phones, replace_words
 from app.pricing.prices import size_label
@@ -156,7 +156,8 @@ def _order_state(order: Order) -> dict[str, Any]:
     return {"status": order.status, "closed_at": _iso(order.closed_at), "confirmed_at": _iso(order.confirmed_at),
             "payment_info_sent_at": _iso(order.payment_info_sent_at), "list_sent_at": _iso(order.list_sent_at),
             "address": order.address, "phones": list(order.phones or []),
-            "change_wanted": order.change_wanted, "change_asked_at": _iso(order.change_asked_at)}
+            "change_wanted": order.change_wanted, "change_asked_at": _iso(order.change_asked_at),
+            "offer": order.offer, "offer_at": _iso(order.offer_at)}
 
 
 def _iso(value: datetime | None) -> str | None:
@@ -246,7 +247,17 @@ def _apply_items(session: Session, message: Message, result: ParseResult, texts:
         if made.problems or made.notes or not made.text:
             return None
         query = "".join(f"&p{n}={i.product_id}&s{n}={i.size}" for n, i in enumerate(price_items, 1))
-        return Outcome("price", "💬 Reply price", made.text, "price", edit_query=f"compose=price&make=1{query}")
+        text, note, undo, order_id = made.text, "", {}, None
+        waiting = cart.open_cart(session, customer.id)
+        if waiting is not None and waiting.status == "waiting_payment" and not waiting.change_wanted \
+                and all(i.size_ml or i.is_full_bottle for i in items):
+            # docs/SPEC-v4.10-interruptions.md: "add it to this order?"; "ok" next adds it
+            undo, order_id = {"order": _order_state(waiting)}, waiting.id
+            steps.make_offer(waiting, [{"product_id": i.product_id, "size_ml": None if i.is_full_bottle else i.size_ml,
+                                        "is_full_bottle": i.is_full_bottle, "quantity": i.quantity or 1} for i in items])
+            text, note = f"{text}\n{texts['offer_add']}", "Offers to add it to the order waiting for payment."
+        return Outcome("price", "💬 Reply price", text, "price", note, order_id, undo,
+                       edit_query=f"compose=price&make=1{query}")
 
     if intent == "ask_delivery":
         shipping = delivery.shipping_order(session, customer.id)
@@ -255,6 +266,21 @@ def _apply_items(session: Session, message: Message, result: ParseResult, texts:
         return Outcome("delivery", "💬 Reply delivery status", delivery.status_answer(shipping, texts), "delivery",
                        f"Order #{shipping.order_no} is {shipping.status.replace('_', ' ')}.")
     order = cart.open_cart(session, customer.id)
+    # docs/SPEC-v4.10-interruptions.md: "I paid" in words; changes after the screenshot; locked paid orders
+    if intent == "payment_sent":
+        return _payment_sent(order, texts)
+    phones, address = contact_in(message)
+    if address_override is not None and address is not None:
+        address = address_override.strip()[:500] or address
+    asks_change = intent in ("buy", "previous_item", "remove", "change_info") or (
+        intent == "address" and bool(phones or address))
+    if order is not None and order.status == "photo_received" and asks_change:
+        return _hold_request(session, message, order, intent, texts)
+    locked = steps.locked_order(session, customer.id)
+    if locked is not None and intent in ("remove", "change_info", "address") and asks_change and (
+            order is None or (intent == "change_info" and order.status == "cart" and not order.address
+                              and not order.phones and locked.status in steps.SHIPPING_LOCKED)):
+        return _locked(session, message, locked, intent, texts)  # nothing is changed; Needs you
     if intent == "previous_item":
         return _previous(session, message, customer, order, result, texts)
     if intent == "cancel_order":
@@ -271,32 +297,33 @@ def _apply_items(session: Session, message: Message, result: ParseResult, texts:
         return _change(session, message, customer, texts, address_override)
     if intent == "buy":
         return _buy(session, message, customer, order, items, texts, dropped)
-    if intent == "address" and (order is None or order.status not in ("cart", "confirmed", "waiting_payment")):
-        paid = change.waiting_after_payment(session, customer.id)  # asked "change the address" after paying
-        if paid is None and order is not None and order.status == "photo_received" \
-                and replace_words(message.normalized_text or ""):
-            paid = order
-        if paid is not None:
-            phones, address = contact_in(message)
-            if address_override is not None and address is not None:
-                address = address_override.strip()[:500] or address
-            if phones or address:
-                return _contact(session, message, customer, paid, phones, address, texts, _order_state(paid), True)
-        return None
     if order is None or order.status not in ("cart", "confirmed", "waiting_payment"):
         return None
     before = _order_state(order)
     if intent == "remove":
         if not _certain(items):
             return None
+        old_total = order.total_mmk
         removed = cart.remove_items(session, order, [_wanted(i) for i in items])
         if not removed:
             return None
         order.list_sent_at = datetime.now(UTC)
         view = cart.view(session, order)
+        undo = {"restore": removed, "order": before}
+        if view.empty:  # the last item: the order is cancelled
+            cart.cancel(session, order)
+            order.cancel_note = "customer removed every item"
+            return Outcome("cancel_order", "🚫 Remove the last item = cancel + reply", texts["order_cancelled"],
+                           "cancel", f"Removes {len(removed)} item(s): nothing left, the order is cancelled.",
+                           order.id, undo)
+        if before["status"] == "waiting_payment":
+            _keep_waiting(session, order, before, old_total, undo)
+            return Outcome("cart_remove", "➖ Remove + 💳 payment info with the new total",
+                           cart.payment_text(session, order, texts, changed=True), "payment_info",
+                           f"Removes {len(removed)} item(s); new total {view.total:,} ကျပ်. Still waiting for payment.",
+                           order.id, undo)
         return Outcome("cart_remove", "➖ Remove + send list", cart.cart_text(session, order, texts), "cart",
-                       f"Removes {len(removed)} item(s); new total {view.total:,} ကျပ်.", order.id,
-                       {"restore": removed, "order": before})
+                       f"Removes {len(removed)} item(s); new total {view.total:,} ကျပ်.", order.id, undo)
     if cart.view(session, order).empty:
         return None
     if intent == "done" and order.status == "cart":
@@ -309,12 +336,54 @@ def _apply_items(session: Session, message: Message, result: ParseResult, texts:
         text, reply_kind, suffix = _ask_next(session, order, texts)
         return Outcome("confirm", "✅ Confirm" + suffix, text, reply_kind, "Cart confirmed.", order.id,
                        {"order": before})
-    phones, address = contact_in(message)
-    if address_override is not None and address is not None:
-        address = address_override.strip()[:500] or address
     if phones or address:
         return _contact(session, message, customer, order, phones, address, texts, before)
     return None
+
+
+def _payment_sent(order: Order | None, texts: dict[str, str]) -> Outcome | None:
+    """"ငွေလွှဲပြီးပါပြီ" without a photo: ask for the screenshot (being checked: "we'll check")."""
+    if order is None or order.status not in ("waiting_payment", "photo_received"):
+        return None  # no payment info sent yet / already paid: a person answers
+    if order.status == "photo_received":
+        return Outcome("hold", "💬 Reply “we'll check”", texts["hold_check"], "hold",
+                       "The screenshot is waiting in Payments.", order.id)
+    return Outcome("hold", "📷 Ask for the screenshot", texts["ask_screenshot"], "hold",
+                   "Says they paid; the screenshot is what counts.", order.id)
+
+
+_WHAT = {"buy": "add items", "previous_item": "add earlier items", "remove": "remove items",
+         "change_info": "change address / phone", "address": "new address / phone"}
+
+
+def _hold_request(session: Session, message: Message, order: Order, intent: str,
+                  texts: dict[str, str]) -> Outcome:
+    """The payment screenshot is being checked: change nothing, "we'll check", Needs you (4.10)."""
+    event = steps.record_request(session, order, message, _WHAT.get(intent, intent))
+    return Outcome("hold", "⏸ Reply “we'll check” + Needs you", texts["hold_check"], "hold",
+                   f"Payment screenshot sent: nothing is changed. Needs you: {_WHAT.get(intent, intent)}.",
+                   order.id, {"events": [event.id]})
+
+
+def _locked(session: Session, message: Message, order: Order, intent: str, texts: dict[str, str]) -> Outcome:
+    """Paid orders are locked (owner rule, 4.10): the locked reply, nothing changed, Needs you."""
+    event = steps.record_request(session, order, message, _WHAT.get(intent, intent))
+    return Outcome("locked", f"🔒 Reply “Order #{order.order_no} can't be changed” + Needs you",
+                   steps.locked_line(texts, order), "hold",
+                   f"Order #{order.order_no} is paid: nothing is changed. Needs you: {_WHAT.get(intent, intent)}.",
+                   order.id, {"events": [event.id]})
+
+
+def _keep_waiting(session: Session, order: Order, before: dict, old_total: int, undo: dict) -> None:
+    """Items changed while waiting for payment: still waiting (payment info goes again with the new
+    total); the change is kept for the payment card."""
+    order.status = "waiting_payment"
+    order.confirmed_at = _dt(before["confirmed_at"])
+    order.payment_info_sent_at = datetime.now(UTC)
+    order.offer = order.offer_at = None
+    event = steps.record_total(session, order, old_total)
+    if event is not None:
+        undo.setdefault("events", []).append(event.id)
 
 
 def _buy(session: Session, message: Message, customer: Customer, order: Order | None,
@@ -323,6 +392,9 @@ def _buy(session: Session, message: Message, customer: Customer, order: Order | 
     out-of-stock items are not added (out-of-stock line instead)."""
     if not items or any(i.from_context or (not i.product_id and not i.unknown_text) for i in items):
         return None  # a guessed or unnamed product: use the chat
+    waiting = order is not None and order.status == "waiting_payment"
+    if waiting and any(not i.product_id for i in items):
+        return None  # unknown item while waiting for payment: "we'll check" + teaching card (auto mode)
     add, out_of_stock, sellable = [], [], 0
     for i in items:
         w = cart.normalize_wanted(session, _wanted(i))
@@ -335,20 +407,34 @@ def _buy(session: Session, message: Message, customer: Customer, order: Order | 
         add.append(w)
     if not sellable:
         return None  # nothing we can sell from this message: use the chat
+    if waiting and (out_of_stock or sellable < len(add)):
+        return None  # no price / out of stock while waiting for payment: a person answers
     created = order is None
+    locked = steps.locked_order(session, customer.id, steps.SHIPPING_LOCKED) if created else None
     order = order or cart.open_cart(session, customer.id, create=True)
     if order.status not in ("cart", "confirmed", "waiting_payment"):
         return None
     before = _order_state(order)
+    old_total = order.total_mmk
     more = bool(MORE_RE.search(message.normalized_text or ""))
     changed = cart.add_items(session, order, add, message.id, more=more)
     order.list_sent_at = datetime.now(UTC)
+    undo = {"added": [i for i in changed if i > 0], "removed": [-i for i in changed if i < 0],
+            "order": before, "created_order": created}
+    if waiting:  # docs/SPEC-v4.10-interruptions.md: same order, new total, payment info again
+        _keep_waiting(session, order, before, old_total, undo)
+        view = cart.view(session, order)
+        return Outcome("cart_add", "🛒 Add + 💳 payment info with the new total",
+                       "\n".join([cart.payment_text(session, order, texts, changed=True), *dropped]), "payment_info",
+                       f"Adds to the order waiting for payment; new total {view.total:,} ကျပ်.", order.id, undo)
     notes = []
     for w in out_of_stock:
         product = session.get(Product, w.product_id)
         notes.append(render(texts["out_of_stock"], product=product.name,
                             size=size_label(None if w.is_full_bottle else w.size_ml, product.full_size_ml)))
     lines = [cart.cart_text(session, order, texts, notes + dropped)]
+    if locked is not None:  # the paid order is locked: this is a NEW order
+        lines.insert(0, render(texts["locked_new_order"], order_no=str(locked.order_no)))
     view = cart.view(session, order)
     partial = sellable < len(items)
     label = (f"🛒 Add {sellable} known item{'s' if sellable > 1 else ''} + send list" if partial
@@ -356,9 +442,9 @@ def _buy(session: Session, message: Message, customer: Customer, order: Order | 
     note = f"Cart total {view.total:,} ကျပ်."
     if view.problems:
         note += " To check (red in the cart): " + ", ".join(view.problems) + "."
-    return Outcome("cart_add", label, "\n".join(lines), "cart", note, order.id,
-                   {"added": [i for i in changed if i > 0], "removed": [-i for i in changed if i < 0],
-                    "order": before, "created_order": created})
+    if locked is not None:
+        note = f"Order #{locked.order_no} is paid and locked: a NEW order. " + note
+    return Outcome("cart_add", label, "\n".join(lines), "cart", note, order.id, undo)
 
 
 def _previous(session: Session, message: Message, customer: Customer, order: Order | None, result: ParseResult,
@@ -429,7 +515,8 @@ def _contact(session: Session, message: Message, customer: Customer, order: Orde
     it was not sent yet (never sent twice)."""
     text_norm = message.normalized_text or ""
     want = order.change_wanted
-    replace = replace or bool(want) or replace_words(text_norm)
+    replace = replace or bool(want) or replace_words(text_norm) or (
+        order.status == "waiting_payment" and bool(address) and bool(order.address) and address != order.address)
     undo = {"order": before, "customer": {"address": customer.address},
             "phones": [list(r) for r in cart.phone_rows(session, customer.id)]}
     old_address = order.address or customer.address
@@ -572,6 +659,7 @@ def suggest(session: Session, message: Message, result: ParseResult | None, text
         outcome = _apply(session, message, result, texts)
         if outcome is not None:
             _with_greeting(session, outcome, message.customer_id, texts, now)
+            outcome.text, _ = steps.with_resume(session, outcome.kind, outcome.text, message.customer_id, texts, now)
     finally:
         savepoint.rollback()
     if outcome is None:
@@ -593,9 +681,11 @@ def _edit_url(message: Message, outcome: Outcome) -> str | None:
 
 
 def perform(session: Session, message: Message, expect: str, user: User | None, texts: dict[str, str],
-            address: str | None = None, delay: timedelta = timedelta(seconds=UNDO_SECONDS)) -> QuickAction:
+            address: str | None = None, delay: timedelta = timedelta(seconds=UNDO_SECONDS),
+            decided_at: datetime | None = None) -> QuickAction:
     """Do the action the button showed (address: the admin's edited address, if any).
     user None = auto mode (app/orders/auto.py), which passes its own random delay.
+    decided_at: the time suggest() used (greeting / resume line windows), so both see the same clock.
     Raises Refused if the reply changed meanwhile."""
     auto = user is None
     user_id = None if auto else user.id
@@ -605,12 +695,19 @@ def perform(session: Session, message: Message, expect: str, user: User | None, 
     if not _eligible(session, message, result, now):
         raise Refused("Not possible any more (already handled, or a reply is waiting to go out).")
     outcome = _apply(session, message, result, texts, address_override=address)
+    resumed = False
     if outcome is not None:
-        _with_greeting(session, outcome, message.customer_id, texts, now)
+        _with_greeting(session, outcome, message.customer_id, texts, decided_at or now)
+        outcome.text, resumed = steps.with_resume(session, outcome.kind, outcome.text, message.customer_id, texts,
+                                                  decided_at or now)
     if outcome is None or fingerprint(outcome.kind, outcome.text) != expect:
         raise Refused("Not sent: the reply changed (price, cart or parse). Check and try again.")
     review = session.scalar(select(MessageReview).where(MessageReview.message_id == message.id))
     outcome.undo["review"] = review.status if review else "new"
+    if resumed:  # the resume line went out: not again for 10 minutes (4.10)
+        customer = session.get(Customer, message.customer_id)
+        outcome.undo["resume_line_at"] = _iso(customer.resume_line_at)
+        customer.resume_line_at = decided_at or now
     used = learned_used(session, message, result)
     if used:
         outcome.undo["learned"] = used  # "handled by learned patterns" counter (Learning page)
@@ -697,10 +794,14 @@ def undo(session: Session, action: QuickAction, user: User) -> None:
                 _dt(o["confirmed_at"]), _dt(o["payment_info_sent_at"]), _dt(o["list_sent_at"]))
             if "change_wanted" in o:
                 order.change_wanted, order.change_asked_at = o["change_wanted"], _dt(o.get("change_asked_at"))
+            if "offer" in o:
+                order.offer, order.offer_at = o["offer"], _dt(o.get("offer_at"))
         if u.get("created_order") and cart.view(session, order).empty:
             cart.cancel(session, order)
         cart.touch(session, order)
-    for event_id in u.get("events") or []:  # the contact change never happened
+    if "resume_line_at" in u:
+        session.get(Customer, action.customer_id).resume_line_at = _dt(u["resume_line_at"])
+    for event_id in u.get("events") or []:  # the contact change / request / total change never happened
         event = session.get(OrderEvent, event_id)
         if event is not None:
             session.delete(event)

@@ -23,7 +23,8 @@ from app.parser.rules import Alias, Phrase, find_intent, greeting_only
 
 SETTING = "learning"
 DEFAULTS = {"auto_approve_after": 3, "greeting": True, "auto_not_stocked": True,
-            "greeting_repeat_minutes": 30}  # docs/SPEC-v4.9-greeting.md: no 2nd greeting reply within 30 min
+            "greeting_repeat_minutes": 30,  # docs/SPEC-v4.9-greeting.md: no 2nd greeting reply within 30 min
+            "resume_line_minutes": 10}  # docs/SPEC-v4.10-interruptions.md: resume line at most every 10 min
 MAX_GREETING_REPEAT = 24 * 60
 MAX_AUTO_APPROVE = 20
 LIVE = ("pending", "approved")
@@ -45,8 +46,12 @@ def set_settings(session: Session, values: dict, user: User | None) -> None:
     repeat = values.get("greeting_repeat_minutes", settings(session)["greeting_repeat_minutes"])
     if not isinstance(repeat, int) or not 0 <= repeat <= MAX_GREETING_REPEAT:
         raise ValueError(f"Greeting reply again after: 0-{MAX_GREETING_REPEAT} minutes.")
+    resume = values.get("resume_line_minutes", settings(session)["resume_line_minutes"])
+    if not isinstance(resume, int) or not 0 <= resume <= MAX_GREETING_REPEAT:
+        raise ValueError(f"Resume line at most every: 0-{MAX_GREETING_REPEAT} minutes.")
     value = {"auto_approve_after": n, "greeting": bool(values["greeting"]),
-             "auto_not_stocked": bool(values["auto_not_stocked"]), "greeting_repeat_minutes": repeat}
+             "auto_not_stocked": bool(values["auto_not_stocked"]), "greeting_repeat_minutes": repeat,
+             "resume_line_minutes": resume}
     stmt = insert(AppSetting).values(key=SETTING, value=value, updated_by=user.id if user else None)
     session.execute(stmt.on_conflict_do_update(index_elements=["key"], set_={
         "value": stmt.excluded.value, "updated_by": stmt.excluded.updated_by, "updated_at": func.now()}))

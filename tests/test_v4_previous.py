@@ -47,7 +47,8 @@ def test_c1_one_paid_item_added_automatically(shop, db, tmp_path, monkeypatch):
     mid = msg(db, "ဟိုနေ့ကဟာ ထပ်ယူမယ်")
     assert intent(db, mid) == "previous_item"
     assert run_auto()["replied"] == 1  # (the payment photo is "skipped")
-    assert deliver(db) == ["• Stronger With You Intensely 5ml – 18,000 ကျပ်\nစုစုပေါင်း 18,000 ကျပ်ပါ။\n"
+    # docs/SPEC-v4.10-interruptions.md: Order #1001 is paid and locked: this is a NEW order
+    assert deliver(db) == ["Order #1001 ကတော့ အတည်ပြုပြီးသားပါ။ ဒါကို order အသစ်အနေနဲ့ ယူပေးပါမယ်နော်။\n• Stronger With You Intensely 5ml – 18,000 ကျပ်\nစုစုပေါင်း 18,000 ကျပ်ပါ။\n"
                            f"{LINE}\n{RETURNING}"]
     assert items(db)[-1] == ("Stronger With You Intensely", 5, False, 1, 18000)
 
@@ -118,7 +119,7 @@ def test_c6_quantity(shop, db, tmp_path, monkeypatch):
     paid_order(client, token, db, tmp_path, monkeypatch, "91", 1)
     mid = msg(db, "ဟိုနေ့ကဟာ ၂ ခု ထပ်ယူမယ်")
     tap(client, token, mid)
-    assert deliver(db)[0].startswith("• Stronger With You Intensely 5ml × 2 – 36,000 ကျပ်\nစုစုပေါင်း 36,000 ကျပ်ပါ။")
+    assert deliver(db)[0].startswith("Order #1001 ကတော့ အတည်ပြုပြီးသားပါ။ ဒါကို order အသစ်အနေနဲ့ ယူပေးပါမယ်နော်။\n• Stronger With You Intensely 5ml × 2 – 36,000 ကျပ်\nစုစုပေါင်း 36,000 ကျပ်ပါ။")  # 4.10
     assert items(db)[-1] == ("Stronger With You Intensely", 5, False, 2, 18000)
 
 

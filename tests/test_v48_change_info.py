@@ -202,7 +202,8 @@ def test_h5_change_after_payment_info_no_resend(shop, db, tmp_path, monkeypatch)
     tap(client, token, reply(db, "လိပ်စာ ပြောင်းချင်ပါတယ်", customer="91"))
     assert deliver(db) == [ASK_ADDRESS]
     tap(client, token, reply(db, "ဒဂုံ ၃လမ်း အမှတ် ၉", customer="91"))
-    assert deliver(db) == ["လိပ်စာ ပြင်ပြီးပါပြီ – ဒဂုံ 3လမ်း အမှတ် 9"]  # the line only, payment info NOT again
+    # the line + the resume line (4.10), payment info NOT again
+    assert deliver(db) == ["လိပ်စာ ပြင်ပြီးပါပြီ – ဒဂုံ 3လမ်း အမှတ် 9\nငွေလွှဲပြီးရင် transaction id ပါတဲ့ screenshot ပို့ပေးပါနော်။"]
     assert order_row(db, "91")[:3] == ("waiting_payment", 18000, "ဒဂုံ 3လမ်း အမှတ် 9")
     assert scalar(db, "SELECT payment_info_sent_at FROM orders") == sent_at
     # the order confirmation (after the payment is approved) shows the NEW address
@@ -221,25 +222,26 @@ def test_h5_change_after_payment_info_no_resend(shop, db, tmp_path, monkeypatch)
 
 # ---------- H6 after payment / after sending ----------
 
-def test_h6_change_after_paid_saved_with_needs_you(shop, db, tmp_path, monkeypatch):
+LOCKED = ("Order #1001 က ငွေလွှဲပြီး အတည်ပြုပြီးသားဖြစ်လို့ ပြင်ဆင်လို့ မရတော့ပါဘူးနော်။ အကူအညီလိုရင် ခဏစောင့်ပေးပါ၊ "
+          "ပြန်ဆက်သွယ်ပေးပါမယ်။")
+
+
+def test_h6_change_after_paid_is_locked(shop, db, tmp_path, monkeypatch):
+    """docs/SPEC-v4.10-interruptions.md overrides 4.8 rule 6: a paid order is locked."""
     client, token = shop
     _n["next"] = 0
     order_id = paid_order(client, token, db, tmp_path, monkeypatch)
     tap(client, token, reply(db, "လိပ်စာ ပြောင်းချင်ပါတယ်", customer="91"))
-    assert deliver(db) == [ASK_ADDRESS]
-    tap(client, token, reply(db, "ဒဂုံ ၃လမ်း အမှတ် ၉", customer="91"))
-    assert deliver(db) == ["လိပ်စာ ပြင်ပြီးပါပြီ – ဒဂုံ 3လမ်း အမှတ် 9"]
-    assert scalar(db, "SELECT status || ' ' || address FROM orders WHERE id = :o", o=order_id) == \
-        "paid ဒဂုံ 3လမ်း အမှတ် 9"
+    assert deliver(db) == [LOCKED]
+    assert scalar(db, "SELECT status || ' ' || address FROM orders WHERE id = :o", o=order_id) == "paid No. 12, Bahan"
     page = client.get("/").text
-    assert "Order #1001 address changed after payment — check before packing/sending" in page
-    assert "No. 12, Bahan → ဒဂုံ 3လမ်း အမှတ် 9" in page
-    client.post(f"/orders/{order_id}/address-checked", data={"csrf": token})
-    assert "address changed after payment" not in client.get("/").text
-    assert "Address / phone changes (1)" in client.get("/orders?tab=all").text
+    assert "customer wants to change paid Order #1001: change address / phone" in page
+    request = scalar(db, "SELECT id FROM order_events WHERE kind = 'request'")
+    client.post(f"/orders/requests/{request}/done", data={"csrf": token})
+    assert "customer wants to change paid Order #1001" not in client.get("/").text
 
 
-def test_h6_change_after_sent_out_needs_you_only(shop, db, tmp_path, monkeypatch):
+def test_h6_change_after_sent_out_is_locked(shop, db, tmp_path, monkeypatch):
     client, token = shop
     _n["next"] = 0
     auto_on(db)
@@ -247,14 +249,11 @@ def test_h6_change_after_sent_out_needs_you_only(shop, db, tmp_path, monkeypatch
     status_tap(client, token, order_id, "packed")
     status_tap(client, token, order_id, "sent_out")
     deliver(db)
-    mid = reply(db, "လိပ်စာ ပြောင်းချင်ပါတယ်", customer="91")
-    assert button(client, mid) is None
+    reply(db, "လိပ်စာ ပြောင်းချင်ပါတယ်", customer="91")
     auto.run_once(datetime.now(UTC) + timedelta(seconds=5))
-    assert deliver(db) == []  # no automatic change or reply
+    assert deliver(db) == [LOCKED]  # the locked reply; nothing is changed
     assert scalar(db, "SELECT address FROM orders WHERE id = :o", o=order_id) == "No. 12, Bahan"
-    assert "customer wants to change the address of an order already sent" in client.get("/").text
-    client.post("/needs-you/clear", data={"csrf": token, "message_id": str(mid)})
-    assert "customer wants to change the address" not in client.get("/").text
+    assert "customer wants to change paid Order #1001: change address / phone" in client.get("/").text
 
 
 # ---------- H7 phone ----------
@@ -271,7 +270,7 @@ def test_h7_change_phone_replaces_then_plain_number_adds(returning, db):
     assert phones(db, "92") == ["09444555666", "09111222333"]  # new = phone 1, old kept as phone 2
     # a plain new number without change words is ADDED (as before)
     tap(client, token, reply(db, "09777888999"))
-    assert deliver(db) == ["ဖုန်းနံပါတ် 09777888999 ကိုလည်း ထည့်ထားပါပြီ။"]
+    assert deliver(db) == ["ဖုန်းနံပါတ် 09777888999 ကိုလည်း ထည့်ထားပါပြီ။\nငွေလွှဲပြီးရင် transaction id ပါတဲ့ screenshot ပို့ပေးပါနော်။"]  # + resume line (4.10)
     assert phones(db, "92") == ["09444555666", "09111222333", "09777888999"]
 
 

@@ -3,12 +3,8 @@
 Read CLAUDE.md first. This file tracks where we are.
 
 ## RESUME HERE (updated 2026-10-17 by planning chat)
-- v1-v4.8 DONE (AI SHADOW, auto-graduate ON).
-- NOW, in order: epic 4.9 docs/SPEC-v4.9-greeting.md (smart greeting), then epic 4.10
-  docs/SPEC-v4.10-interruptions.md (interruptions + LOCKED paid orders; overrides 4.8 rule 6).
-  Same loop: tests -> fix -> green -> self-review -> deploy -> report. At the end: OWNER TEST
-  SCRIPT 4.9 + 4.10 in REPORT.md.
-- THEN epic 4.11 docs/SPEC-v4.11-ai-first.md (AI-first: AUTO now, multi-action messages, ask the
+- v1-v4.10 DONE (AI SHADOW, auto-graduate ON). OWNER TEST SCRIPT 4.9 + 4.10 is in REPORT.md.
+- NOW epic 4.11 docs/SPEC-v4.11-ai-first.md (AI-first: AUTO now, multi-action messages, ask the
   customer to choose, automatic learning, simple admin card, form-expired fix, Older section).
 - Owner checks: `bash scripts/status.sh`; AI numbers at /ai.
 
@@ -29,6 +25,7 @@ Read CLAUDE.md first. This file tracks where we are.
 | 10 | v4.7 (docs/SPEC-v4.7-graduation.md): SHADOW -> AUTO graduation, brake, weekly summary | ✅ Done, live (auto-graduate ON) |
 | 11 | v4.8 (docs/SPEC-v4.8-change-info.md): change address / phone, live bug fix | ✅ Done, live (owner test pending) |
 | 12 | v4.9 (docs/SPEC-v4.9-greeting.md): smart greeting | ✅ Done, live (owner test pending) |
+| 13 | v4.10 (docs/SPEC-v4.10-interruptions.md): interruptions, resume line, locked paid orders | ✅ Done, live (owner test pending) |
 
 ## Phase 0 checklist
 - [x] Step 0: rollback safety net scripts in ~/hardening/

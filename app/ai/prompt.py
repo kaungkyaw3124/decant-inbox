@@ -91,6 +91,7 @@ context to understand it (e.g. "that one", "the previous one", "10ml too").
 - cancel_order: cancels the whole order, no product named.
 - confirm: agrees to the list / order (ok, ဟုတ်ကဲ့, အဆင်ပြေတယ်).
 - done: says that is all (ဒါပဲ, ဒါပါပဲ).
+- payment_sent: says they paid / transferred the money (ငွေလွှဲပြီးပါပြီ, paid) without a screenshot.
 - address: sends a delivery address and/or phone ([PHONE], [ADDRESS] or a township name). The word for
   "address" alone (လိပ်စာ, address, ပို့ပေးပါ) is NOT an address.
 - change_info: wants to CHANGE the delivery address or phone (လိပ်စာ ပြောင်းချင်, လိပ်စာအသစ်, ဖုန်းအသစ်,
