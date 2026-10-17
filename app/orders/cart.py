@@ -18,6 +18,7 @@ from sqlalchemy.orm import Session
 
 from app.models import Customer, CustomerPhone, Order, OrderItem, PaymentMethod, Product
 from app.models.orders import MAX_PHONES, OPEN_STATUSES
+from app.orders import address
 from app.pricing.prices import current_prices, format_mmk, size_label
 from app.replies.templates import render
 
@@ -240,30 +241,57 @@ def replace_phones(session: Session, order: Order, customer: Customer, phones: l
     return new
 
 
-def set_address(session: Session, order: Order, customer: Customer, address: str | None) -> None:
-    """Saved on the order and on the customer (offered again next time)."""
-    order.address = customer.address = address
+def set_address(session: Session, order: Order, customer: Customer, check: address.Check) -> None:
+    """Saved on the order and on the customer (offered again next time). Only a VALID address
+    (docs/SPEC-v4.12-address-payment-ai.md: the validator has the final say)."""
+    if not check.valid:
+        raise ValueError(check.why or "not a valid address")
+    order.address = customer.address = check.parts.full_text
+    order.address_parts = customer.address_parts = check.parts.to_json()
+    order.address_invalid = customer.address_invalid = False
+    order.address_partial = order.address_partial_at = None
     touch(session, order)
+
+
+def saved_address(customer: Customer) -> str | None:
+    """The customer's address from last time, unless it failed the validator (never offered again)."""
+    return customer.address if customer.address and not customer.address_invalid else None
+
+
+def order_address(order: Order) -> str | None:
+    """The order's address if it is usable (present and not marked invalid)."""
+    return order.address if order.address and not order.address_invalid else None
 
 
 def use_saved_contact(session: Session, order: Order, customer: Customer) -> None:
     """"Same phone & address as last time": fills what the order is missing."""
     if not order.phones:
         order.phones = customer_phones(session, customer.id)
-    if not order.address and customer.address:
-        order.address = customer.address
+    if not order_address(order) and saved_address(customer):
+        order.address, order.address_parts = customer.address, customer.address_parts
+        order.address_invalid = False
     touch(session, order)
 
 
 def has_saved_contact(session: Session, order: Order, customer: Customer) -> bool:
     """Saved info that would fill something the order is missing."""
     return bool((not order.phones and customer_phones(session, customer.id))
-                or (not order.address and customer.address))
+                or (not order_address(order) and saved_address(customer)))
 
 
 def missing_contact(order: Order) -> list[str]:
-    """What to ask next, phone first."""
-    return [what for what, ok in (("phone", order.phones), ("address", order.address)) if not ok]
+    """What to ask next, phone first (an invalid address counts as missing)."""
+    return [what for what, ok in (("phone", order.phones), ("address", order_address(order))) if not ok]
+
+
+def address_problem(order: Order) -> str | None:
+    """docs/SPEC-v4.12-address-payment-ai.md N2: why the address blocks payment info / approval /
+    the confirmation (None = fine)."""
+    if order.address_invalid and order.address:
+        return "The address is not valid: fix it in the cart panel."
+    if not order.address:
+        return "No address yet."
+    return None
 
 
 def payment_problems(session: Session, order: Order, customer: Customer | None = None) -> list[str]:
@@ -278,8 +306,10 @@ def payment_problems(session: Session, order: Order, customer: Customer | None =
         problems.append("Not in the product list: " + ", ".join(cart.unknown) + ".")
     if cart.unpriced:
         problems.append("No price for: " + ", ".join(cart.unpriced) + ".")
-    for what in missing_contact(order):
-        problems.append(f"No {what} yet.")
+    if not order.phones:
+        problems.append("No phone yet.")
+    if why := address_problem(order):
+        problems.append(why)
     if not session.scalar(select(PaymentMethod.id).where(PaymentMethod.active).limit(1)):
         problems.append("No active payment method (Settings).")
     return problems
@@ -340,12 +370,12 @@ def closing_line(session: Session, order: Order, texts: dict[str, str]) -> str:
                                                                                  "ask_new_contact")]
     customer = session.get(Customer, order.customer_id)
     phones = order.phones or customer_phones(session, customer.id)
-    address = order.address or customer.address
+    known = order_address(order) or saved_address(customer)
     if not phones:
         return texts["cart_ask_phone"]
-    if not address:
+    if not known:
         return texts["ask_address"]
-    return render(texts["cart_returning"], phones=", ".join(phones), address=address)
+    return render(texts["cart_returning"], phones=", ".join(phones), address=known)
 
 
 def payment_text(session: Session, order: Order, texts: dict[str, str], changed: bool = False) -> str:
@@ -363,9 +393,9 @@ def payment_text(session: Session, order: Order, texts: dict[str, str], changed:
 
 
 _PHONE_IN_TEXT = re.compile(r"(?:\+?95[\s-]?|0)9(?:[\s-]?\d){7,9}")
-_TRAILING_ASK = re.compile(r"\s*(?:ကို)?\s*ပို့ပေးပါ(?:နော်|ရှင့်|ရှင်|ခင်ဗျာ)?\s*[။.!]*\s*$")
+TRAILING_ASK = re.compile(r"\s*(?:ကို)?\s*ပို့ပေးပါ(?:နော်|ရှင့်|ရှင်|ခင်ဗျာ)?\s*[။.!]*\s*$")
 # "ဒီလိပ်စာကိုပို့ပေးပါ - …", "လိပ်စာအသစ်က …", "new address: …" (docs/SPEC-v4.8-change-info.md): not part of it
-_LEADING_ASK = re.compile(
+LEADING_ASK = re.compile(
     r"^\s*(?:(?:ဒီ\s*)?လိပ်စာ\s*(?:အသစ်)?\s*(?:ကိုပဲ|ကို|က)?\s*(?:ပြောင်း(?:ချင်|မယ်)?(?:ပါ)?(?:တယ်)?\s*)?"
     r"(?:ပို့\s*(?:ပေး)?\s*ပါ(?:နော်|ရှင့်)?)?|ဒီ\s*ကို\s*(?:ပဲ\s*)?ပို့\s*(?:ပေး)?\s*ပါ|"
     r"(?:(?:this|new|my|change)\s+)?address(?:\s+is)?)\s*[:：\-–,။]*\s*", re.IGNORECASE)
@@ -378,6 +408,6 @@ def address_from_message(raw_text: str) -> str:
     "ကိုပို့ပေးပါ" (Burmese digits become 0-9)."""
     text = raw_text.translate(str.maketrans("၀၁၂၃၄၅၆၇၈၉", "0123456789"))
     text = _PHONE_WORDS.sub(" ", _PHONE_IN_TEXT.sub(" ", text))
-    text = _TRAILING_ASK.sub("", re.sub(r"[ \t]+", " ", text).strip(" ,\n"))
-    text = _LEADING_ASK.sub("", text, count=1)
+    text = TRAILING_ASK.sub("", re.sub(r"[ \t]+", " ", text).strip(" ,\n"))
+    text = LEADING_ASK.sub("", text, count=1)
     return text.strip(" ,\n")[:500]

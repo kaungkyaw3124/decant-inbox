@@ -52,9 +52,9 @@ from app.models import (
     ParseResult, Product, QuickAction, UnknownRequest, User,
 )
 from app.models.outbox import UNDO_SECONDS
-from app.orders import cart, change, delivery, previous, steps, unknown
+from app.orders import address, cart, change, delivery, previous, steps, unknown
 from app.parser.normalize import normalize
-from app.parser.rules import CHANGE_PHONE_RE, NEEDS_REVIEW_BELOW, address_content, change_kind, find_phones, replace_words
+from app.parser.rules import CHANGE_PHONE_RE, NEEDS_REVIEW_BELOW, change_kind, find_phones, replace_words
 from app.pricing.prices import size_label
 from app.replies import compose, faq
 from app.replies.templates import render
@@ -139,15 +139,19 @@ def _wanted(i: ParseItem) -> cart.WantedItem:
                            None if i.product_id else i.unknown_text)
 
 
-def contact_in(message: Message) -> tuple[list[str], str | None]:
-    """(phones, address) found in a message. Address = the text without phones and without
-    "ကိုပို့ပေးပါ" / "ဒီလိပ်စာကို…" words, only if it really says WHERE (township, street, number,
-    ward or a long text): "လိပ်စာ" or "ပို့ပေးပါ" alone is no address (docs/SPEC-v4.8-change-info.md)."""
-    phones = find_phones(message.normalized_text or "")
-    address = cart.address_from_message(message.raw_text)
-    if not address or address_content(normalize(address)) is None:
-        address = None
-    return phones, address
+def contact_in(session: Session, message: Message) -> tuple[list[str], address.Check | None]:
+    """(phones, address reading) of a message. The reading went through the validator
+    (docs/SPEC-v4.12-address-payment-ai.md): None = no address at all ("လိပ်စာ" or "ပို့ပေးပါ" alone is
+    none, docs/SPEC-v4.8-change-info.md); otherwise valid / partial / invalid, and only a sure valid
+    one is saved without a person."""
+    return find_phones(message.normalized_text or ""), address.read_message(session, message)
+
+
+def _override(read: address.Check | None, override: str | None) -> address.Check | None:
+    """The admin's corrected address (cart panel / Needs you "check address") replaces the reading."""
+    if override is None or read is None:
+        return read
+    return address.admin_check(override) if override.strip() else read
 
 
 # ---------- the actions (run for preview in a savepoint, and for real) ----------
@@ -156,6 +160,8 @@ def _order_state(order: Order) -> dict[str, Any]:
     return {"status": order.status, "closed_at": _iso(order.closed_at), "confirmed_at": _iso(order.confirmed_at),
             "payment_info_sent_at": _iso(order.payment_info_sent_at), "list_sent_at": _iso(order.list_sent_at),
             "address": order.address, "phones": list(order.phones or []),
+            "address_parts": order.address_parts, "address_invalid": order.address_invalid,
+            "address_partial": order.address_partial, "address_partial_at": _iso(order.address_partial_at),
             "change_wanted": order.change_wanted, "change_asked_at": _iso(order.change_asked_at),
             "offer": order.offer, "offer_at": _iso(order.offer_at)}
 
@@ -271,11 +277,10 @@ def _apply_items(session: Session, message: Message, result: ParseResult, texts:
     # docs/SPEC-v4.10-interruptions.md: "I paid" in words; changes after the screenshot; locked paid orders
     if intent == "payment_sent":
         return _payment_sent(order, texts)
-    phones, address = contact_in(message)
-    if address_override is not None and address is not None:
-        address = address_override.strip()[:500] or address
+    phones, read = contact_in(session, message)
+    read = _override(read, address_override)
     asks_change = intent in ("buy", "previous_item", "remove", "change_info", "modify_cart") or (
-        intent == "address" and bool(phones or address))
+        intent == "address" and bool(phones or read))
     if order is not None and order.status == "photo_received" and asks_change:
         return _hold_request(session, message, order, intent, texts)
     locked = steps.locked_order(session, customer.id)
@@ -340,8 +345,8 @@ def _apply_items(session: Session, message: Message, result: ParseResult, texts:
         text, reply_kind, suffix = _ask_next(session, order, texts)
         return Outcome("confirm", "✅ Confirm" + suffix, text, reply_kind, "Cart confirmed.", order.id,
                        {"order": before})
-    if phones or address:
-        return _contact(session, message, customer, order, phones, address, texts, before)
+    if phones or read:
+        return _contact(session, message, customer, order, phones, read, texts, before)
     return None
 
 
@@ -611,12 +616,11 @@ def _change(session: Session, message: Message, customer: Customer, texts: dict[
         return None
     kind = change_kind(message.normalized_text or "") or "unclear"
     before = _order_state(order)
-    phones, address = contact_in(message)
-    if address_override is not None and address is not None:
-        address = address_override.strip()[:500] or address
-    if phones or address:
+    phones, read = contact_in(session, message)
+    read = _override(read, address_override)
+    if phones or read:
         order.change_wanted = kind
-        return _contact(session, message, customer, order, phones, address, texts, before, True)
+        return _contact(session, message, customer, order, phones, read, texts, before, True)
     order.change_wanted, order.change_asked_at = kind, datetime.now(UTC)
     cart.touch(session, order)
     key, what = {"address": ("ask_new_address", "address"), "phone": ("ask_new_phone", "phone")}.get(
@@ -629,7 +633,7 @@ def _change(session: Session, message: Message, customer: Customer, texts: dict[
 
 
 def _contact(session: Session, message: Message, customer: Customer, order: Order, phones: list[str],
-             address: str | None, texts: dict[str, str], before: dict, replace: bool = False) -> Outcome | None:
+             read: address.Check | None, texts: dict[str, str], before: dict, replace: bool = False) -> Outcome | None:
     """Save phone(s) and/or address, then ask for what is still missing (phone first) or
     send payment info when everything is ready.
 
@@ -637,12 +641,21 @@ def _contact(session: Session, message: Message, customer: Customer, order: Orde
     ပို့ပေးပါ …" / "this address": the new address replaces the order's and the customer's; a new
     phone becomes the order's only phone and the customer's phone 1. A phone without change words
     is added (as before). The reply starts with "လိပ်စာ ပြင်ပြီးပါပြီ – …"; payment info follows if
-    it was not sent yet (never sent twice)."""
+    it was not sent yet (never sent twice).
+
+    docs/SPEC-v4.12-address-payment-ai.md: only a sure, valid reading is saved; anything else waits
+    for a person (Needs you "📍 check address")."""
+    if read is not None and not read.sure:
+        if read.source == "admin":  # the admin's corrected address must pass the validator too
+            raise Refused("Not saved: " + read.why)
+        return None
+    new_text = read.parts.full_text if read is not None else None
     text_norm = message.normalized_text or ""
     want = order.change_wanted
     replace = replace or bool(want) or replace_words(text_norm) or (
-        order.status == "waiting_payment" and bool(address) and bool(order.address) and address != order.address)
-    undo = {"order": before, "customer": {"address": customer.address},
+        order.status == "waiting_payment" and bool(new_text) and bool(order.address) and new_text != order.address)
+    undo = {"order": before, "customer": {"address": customer.address, "address_parts": customer.address_parts,
+                                          "address_invalid": customer.address_invalid},
             "phones": [list(r) for r in cart.phone_rows(session, customer.id)]}
     old_address = order.address or customer.address
     old_phones = list(order.phones or []) or cart.customer_phones(session, customer.id)
@@ -656,9 +669,10 @@ def _contact(session: Session, message: Message, customer: Customer, order: Orde
     else:
         added = cart.add_phones(session, order, customer, phones, message.id) if phones else []
         phones_new_on_order = bool(set(order.phones or []) - set(before["phones"]))
-    new_address = address if address and (address != order.address or (replace and address != old_address)) else None
+    new_address = new_text if new_text and (new_text != order.address or order.address_invalid
+                                            or (replace and new_text != old_address)) else None
     if new_address:
-        cart.set_address(session, order, customer, new_address)
+        cart.set_address(session, order, customer, read)
     if want and (new_address or phones_new_on_order):
         order.change_wanted = order.change_asked_at = None  # the new info came
     if not phones_new_on_order and not new_address:
@@ -676,7 +690,7 @@ def _contact(session: Session, message: Message, customer: Customer, order: Orde
         [f"📍 {'Replace' if updated and replace else 'Save'} address"] if new_address else [])
     label, text, reply_kind = ("✅ " if agreed else "") + " & ".join(parts), None, None
     if order.status == "confirmed":
-        if phones_new_on_order and not new_address and not order.address:
+        if phones_new_on_order and not new_address and not cart.order_address(order):
             text = render(texts["phone_saved_ask_address"], phones=shown_phones)
             reply_kind, label = "contact", label + " + ask address"
         else:
@@ -908,9 +922,14 @@ def undo(session: Session, action: QuickAction, user: User) -> None:
             cart.set_customer_phones(session, customer, [tuple(r) for r in u["phones"]])
         if "customer" in u:
             customer.address = u["customer"]["address"]
+            customer.address_parts = u["customer"].get("address_parts")
+            customer.address_invalid = u["customer"].get("address_invalid", False)
         if "order" in u:
             o = u["order"]
             order.status, order.address, order.phones = o["status"], o["address"], o.get("phones", [])
+            if "address_parts" in o:
+                order.address_parts, order.address_invalid = o["address_parts"], o["address_invalid"]
+                order.address_partial, order.address_partial_at = o["address_partial"], _dt(o["address_partial_at"])
             if "closed_at" in o:
                 order.closed_at = _dt(o["closed_at"])
                 if order.status != "cancelled":

@@ -78,6 +78,13 @@ class Order(Base):
     # order?"; the items offered (product_id, size_ml, is_full_bottle, quantity) until the answer
     offer: Mapped[list[dict[str, Any]] | None] = mapped_column(JSONB)
     offer_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # docs/SPEC-v4.12-address-payment-ai.md: the address split (house_no, street, ward_or_quarter, township,
+    # city, landmark, full_text = address) and whether the saved address failed the validator (old data:
+    # scripts/repair_addresses.py); a partial address waiting for the township / city answer (24 h).
+    address_parts: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    address_invalid: Mapped[bool] = mapped_column(Boolean, server_default=false(), default=False)
+    address_partial: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    address_partial_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = created_at_column()
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(),
                                                  default=func.now())  # last change: idle carts expire

@@ -120,7 +120,8 @@
     {% endif %}
 
     <h3>{{ t("Address") }}</h3>
-    {% if not order.address and c.address %}<p class="small">{{ t("Last time") }}: <b>{{ c.address }}</b></p>{% endif %}
+    {% if order.address %}<p class="small">{{ ui.address(order.address, order.address_parts, order.address_invalid) }}</p>
+    {% elif c.address %}<p class="small">{{ t("Last time") }}: {{ ui.address(c.address, c.address_parts, c.address_invalid) }}</p>{% endif %}
     <form method="post" action="/chats/{{ c.id }}/cart/address" class="stack">
       <input type="hidden" name="csrf" value="{{ csrf }}">
       <textarea name="address" rows="2" maxlength="500" aria-label="{{ t('Address') }}">{{ order.address or "" }}</textarea>

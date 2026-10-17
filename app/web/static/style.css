@@ -61,6 +61,8 @@ form.inline { display: inline; }
 .badge.product { font-weight: 600; }
 .badge.warn { background: var(--warn-bg); color: var(--warn); border-color: transparent; }
 .badge.human { color: var(--done); border-color: var(--done); }
+.badge.bad { background: var(--bad-bg); color: var(--danger); border-color: var(--danger); font-weight: 600; }
+.badge.ok { color: var(--done); border-color: transparent; background: transparent; padding: 0 2px; }
 .muted { color: var(--muted); } .small { font-size: .85rem; }
 .flash { background: var(--flash); border-radius: 8px; padding: 10px 14px; }
 .error { color: var(--danger); margin: 0; }

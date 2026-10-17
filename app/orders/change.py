@@ -36,7 +36,7 @@ def returning_question_open(session: Session, message: Message) -> bool:
     if order is None:
         return False
     customer = session.get(Customer, message.customer_id)
-    return bool((order.phones or cart.customer_phones(session, customer.id)) and (order.address or customer.address))
+    return bool((order.phones or cart.customer_phones(session, customer.id)) and (cart.order_address(order) or cart.saved_address(customer)))
 
 
 def negative_answer(session: Session, message: Message, normalized: str) -> ParseOutcome | None:

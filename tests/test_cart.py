@@ -132,8 +132,8 @@ def test_whole_flow_phone_first_with_undo(shop, db):
     cid = customer_id(db, "91")
     page = client.get(f"/chats/{cid}?tab=cart").text
     assert "Address to save (you can fix it first)" in page and "အမှတ် 12, ဗဟန်း</textarea>" in page
-    tap(client, token, address, address="No. 12, Bahan Road", back=f"/chats/{cid}?tab=cart")
-    assert order_row(db)[:3] == ("waiting_payment", 18000, "No. 12, Bahan Road")
+    tap(client, token, address, address="No. 12, Bahan Road, Bahan", back=f"/chats/{cid}?tab=cart")
+    assert order_row(db)[:3] == ("waiting_payment", 18000, "No. 12, Bahan Road, Bahan")
     assert deliver(db) == ["• Stronger With You Intensely 5ml – 18,000 ကျပ်\nစုစုပေါင်း 18,000 ကျပ်ပါ။\n"
                            + PAYMENT_FOOTER]
 
@@ -166,7 +166,7 @@ def test_partial_cart(shop, db):
     # confirm + phone + address: everything saved, but payment info stays blocked
     tap(client, token, say(db, 2, "ok", customer="95"))
     deliver(db)
-    contact = say(db, 3, "09 777 123 456 ဗဟန်း ကိုပို့ပေးပါ", customer="95")
+    contact = say(db, 3, "09 777 123 456 အမှတ် ၁၂, ဗဟန်း ကိုပို့ပေးပါ", customer="95")
     label, tooltip, _ = button(client, contact)
     assert label == "📞 Save phone & 📍 Save address"  # no payment info: red items first
     assert "Still to check before payment: hawas ice 10ml, Sauvage Eau de Parfum 3ml" in tooltip
@@ -240,7 +240,9 @@ def test_cart_panel_phones_and_blockers(shop, db):
     assert phones(db, "93") == order_row(db, "93")[3] == ["0944443333", "0977778888"]
     assert scalar(db, "SELECT phone FROM customers WHERE external_user_id = '93'") == "0944443333"
     assert "Next: Ask for address" in client.get(f"/chats/{cid}?tab=cart").text
-    client.post(f"/chats/{cid}/cart/address", data={"csrf": token, "address": "Yankin"})
+    client.post(f"/chats/{cid}/cart/address", data={"csrf": token, "address": "Yankin"})  # 4.12: too short
+    assert "Next: Ask for address" in client.get(f"/chats/{cid}?tab=cart").text
+    client.post(f"/chats/{cid}/cart/address", data={"csrf": token, "address": "No. 3, Kaba Aye Rd, Yankin"})
     assert "Next: Send payment info" in client.get(f"/chats/{cid}?tab=cart").text
     client.post(f"/chats/{cid}/cart/cancel", data={"csrf": token})
     assert order_row(db, "93")[0] == "cancelled"

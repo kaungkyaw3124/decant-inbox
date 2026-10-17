@@ -10,7 +10,7 @@
     <tbody>{% for i, p in cart.lines %}<tr><td>{{ p.name if p else i.unknown_text }} <span class="muted small">{{ item_size(i, p) }}</span></td><td class="num">{{ format_mmk((i.unit_price_mmk or 0) * i.quantity) }}</td></tr>{% endfor %}</tbody>
     <tfoot><tr><th>{{ t("Expected total") }}</th><th class="num">{{ format_mmk(cart.total) }} ကျပ်</th></tr></tfoot>
   </table>
-  <p class="small">📞 {{ order.phones | join(", ") or "—" }} · 📍 {{ order.address or "—" }}</p>
+  <p class="small">📞 {{ order.phones | join(", ") or "—" }} · 📍 {{ ui.address(order.address, order.address_parts, order.address_invalid) }}</p>
   {% for line in total_changes %}<p class="small problem-text">⚠️ {{ tr(line) }}</p>{% endfor %}
 </section>
 

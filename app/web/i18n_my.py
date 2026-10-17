@@ -668,4 +668,13 @@ MY = {
     "Auto-learned": "အလိုအလျောက် သင်ယူပြီး", "{n} this week": "ဒီအပတ် {n} ခု",
     "The AI read the same words the same way {n} times with no correction, so the app now understands them by itself. Remove one if it is wrong.":
         "AI က ဒီစာလုံးတွေကို အမှားမပြင်ရဘဲ {n} ကြိမ် တူတူ နားလည်ခဲ့လို့ app က ကိုယ်တိုင် နားလည်ပါပြီ။ မှားရင် ဖယ်ပါ။",
+    # AI address assistant + address gates + screenshot reader (docs/SPEC-v4.12-address-payment-ai.md)
+    "invalid address": "လိပ်စာ မမှန်", "valid address": "လိပ်စာ မှန်",
+    "No address in the message.": "စာထဲမှာ လိပ်စာ မပါ။",
+    "Only words like “address” / “change”, no place.": "“လိပ်စာ” / “ပြောင်း” လို စာလုံးပဲ ပါ၊ နေရာ မပါ။",
+    "Too short to be an address.": "လိပ်စာ ဖြစ်ဖို့ တိုလွန်းတယ်။",
+    "No township (or city + street).": "မြို့နယ် မပါ (ဒါမှမဟုတ် မြို့ + လမ်း မပါ)။",
+    "No city.": "မြို့ မပါ။", "Township not in our list.": "မြို့နယ်စာရင်းထဲမှာ မရှိ။",
+    "The AI is not sure about this address.": "AI က ဒီလိပ်စာကို မသေချာ။",
+    "The address is not valid: fix it in the cart panel.": "လိပ်စာ မမှန်ပါ: ခြင်း ဘေးကွက်မှာ ပြင်ပါ။",
 }

@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from app.core import audit
 from app.models import Customer, Order, OrderEvent, OrderItem, User
 from app.models.orders import LOCKED_STATUSES, MAX_PHONES, PAID_STATUSES
+from app.orders import address as address_rules
 from app.orders import cart, change, delivery, followups, reports, steps
 from app.replies import templates as replies
 from app.web.auth import current_user, owner_only, verify_csrf
@@ -156,7 +157,10 @@ async def edit_locked(request: Request, order_id: int, db: Session = Depends(get
     if len(reason) < 3:
         flash(request, "Not saved: write the reason.")
         return RedirectResponse(back + f"#order-{order.id}", status_code=303)
-    address = " ".join(str(form.get("address", "")).split())[:500] or None
+    check = address_rules.admin_check(str(form.get("address", "")))  # docs/SPEC-v4.12: the same validator
+    if not check.valid:
+        flash(request, "Not saved: " + check.why)
+        return RedirectResponse(back + f"#order-{order.id}", status_code=303)
     phones = list(dict.fromkeys(p for p in re.split(r"[,\s]+", str(form.get("phones", ""))) if p))[:MAX_PHONES]
     remove = [int(v) for v in form.getlist("remove_item") if str(v).isdigit()]
     before = {"address": order.address, "phones": list(order.phones or []), "total": order.total_mmk}
@@ -166,7 +170,11 @@ async def edit_locked(request: Request, order_id: int, db: Session = Depends(get
         db.execute(update(OrderItem).where(OrderItem.id.in_(removed)).values(removed_at=datetime.now(UTC)))
         db.flush()
         order.total_mmk = cart.view(db, order).total
-    order.address, order.phones = address, phones
+    order.address, order.address_parts, order.address_invalid = check.parts.full_text, check.parts.to_json(), False
+    order.phones = phones
+    customer = db.get(Customer, order.customer_id)
+    if customer.address_invalid or customer.address == before["address"]:  # the same (bad) address saved there
+        customer.address, customer.address_parts, customer.address_invalid = order.address, order.address_parts, False
     after = {"address": order.address, "phones": order.phones, "total": order.total_mmk, "removed_items": removed}
     db.add(OrderEvent(order_id=order.id, from_status=order.status, to_status=order.status, kind="locked_edit",
                       previous={**before, "after": after, "reason": reason}, created_by=user.id))

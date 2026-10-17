@@ -21,6 +21,7 @@ from app.models import (
 from app.models.orders import MAX_PHONES, OPEN_STATUSES
 from app.models.outbox import MAX_TEXT, MEDIA_DIR
 from app.orders import actions, auto, cart, change, delivery, steps
+from app.orders import address as address_rules
 from app.parser.normalize import normalize
 from app.parser.rules import find_phones
 from app.pricing.prices import current_prices
@@ -403,7 +404,11 @@ def cart_address(request: Request, customer_id: int, address: str = Form(""),
                  db: Session = Depends(get_db), user: User = Depends(current_user)):
     customer = get_customer(db, customer_id)
     order = _open_order(db, customer_id)
-    cart.set_address(db, order, customer, address.replace("\r\n", "\n").strip()[:500] or None)
+    check = address_rules.admin_check(address)  # docs/SPEC-v4.12-address-payment-ai.md: the same validator
+    if not check.valid:
+        flash(request, "Not saved: " + check.why)
+        return _cart_redirect(customer_id)
+    cart.set_address(db, order, customer, check)
     _log(db, user, "cart.address", order_id=order.id)
     db.commit()
     flash(request, "Address saved (also for next time).")

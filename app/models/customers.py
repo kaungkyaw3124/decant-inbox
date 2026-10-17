@@ -1,6 +1,8 @@
 from datetime import datetime
+from typing import Any
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, String, Text, UniqueConstraint, false
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.base import Base, created_at_column
@@ -21,6 +23,9 @@ class Customer(Base):
     phone: Mapped[str | None] = mapped_column(String(20))
     phone_message_id: Mapped[int | None] = mapped_column(ForeignKey("messages.id", use_alter=True))
     address: Mapped[str | None] = mapped_column(Text)  # set by an admin (Step 4)
+    # docs/SPEC-v4.12-address-payment-ai.md: the split of the saved address; True = it failed the validator
+    address_parts: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    address_invalid: Mapped[bool] = mapped_column(Boolean, server_default=false(), default=False)
     # Auto mode (Step 4c): never auto-reply to this customer (friends, family) / resumed
     # by the admin after an owner pause (replying by hand pauses auto for 2 h).
     auto_reply_off: Mapped[bool] = mapped_column(Boolean, server_default=false(), default=False)

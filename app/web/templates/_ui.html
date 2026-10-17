@@ -2,3 +2,13 @@
 {% macro help(text) -%}
 <details class="help"><summary aria-label="{{ t('Help') }}">?</summary><p>{{ t(text) }}</p></details>
 {%- endmacro %}
+
+{# docs/SPEC-v4.12-address-payment-ai.md: an address with its township in bold, ✅ valid or a red ⚠️ badge #}
+{% macro address(text, parts, invalid) -%}
+{%- if not text -%}<span class="problem-text">{{ t("No address yet.") }}</span>
+{%- else -%}
+{%- set tsp = (parts or {}).get("township") -%}
+<span class="address{% if invalid %} problem-text{% endif %}">{% if tsp and not invalid %}<b>{{ tsp }}</b> · {% endif %}{{ text }}</span>
+{%- if invalid %} <span class="badge bad">⚠️ {{ t("invalid address") }}</span>{% elif parts %} <span class="badge ok" title="{{ t('valid address') }}">✅</span>{% endif -%}
+{%- endif -%}
+{%- endmacro %}
