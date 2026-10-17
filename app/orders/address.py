@@ -161,18 +161,32 @@ def strip_phones(text: str) -> str:
     return text
 
 
+_PARTICLES = r"(?:ခင်ဗျာ|ခင်ဗျ|ဗျာ|ဗျ|နော်|ရှင့်|ရှင်|ပါ)"
+# "ကို ပို့ပေးပါ", "ဒီကိုပို့ပေးပါ", "ကိုပို့ပေးပါဗျ", "ပို့ပေးပါနော်", "ပို့ပါ", "ကိုပို့" (docs/SPEC-v4.13-hotfix.md Q3), with the particles after it
+_ASK_WORDS = re.compile(r"(?:(?:ဒီ\s*)?ကို\s*)?ပို့\s*(?:ပေး\s*)?ပါ(?:\s*" + _PARTICLES + r")*|(?:ဒီ\s*)?ကို\s*ပို့(?:\s*ပေး)?(?:\s*" + _PARTICLES
+                        + r")*")
+# "ဖုန်းနံပါတ်က", "ဖုန်း:", "ph:", "phone -", "tel" (the number itself is removed before)
+_PHONE_LEAD = re.compile(r"(?:ဖုန်းနံပါတ်|ဖုန်း)\s*(?:ကတော့|က)?\s*[:：\-–]?|(?<![a-z])(?:phone|ph|tel)(?:\s*no)?\.?\s*"
+                         r"[:：\-–]?(?![a-z])", re.IGNORECASE)
+_TRAILING_PARTICLES = re.compile(r"(?:\s*" + _PARTICLES + r"|\s+က)\s*[။.!]*\s*$")
+
+
 def clean(text: str) -> str:
-    """The address only: no phone numbers, no "ကိုပို့ပေးပါ" / "ဒီလိပ်စာကို…" / "new address:" words."""
+    """The address only: no phone numbers or "ဖုန်းနံပါတ်က" / "ph:" words, no "ကို ပို့ပေးပါဗျ" / "ဒီလိပ်စာကို…" /
+    "new address:" words, no particles at the end (ဗျ, နော်, ရှင့်, ပါ, က)."""
     from app.orders import cart  # late import: cart imports this module
 
     text = strip_phones(to_unicode(text or "")).replace("[PHONE]", " ").replace("[NUMBER]", " ")
-    text = re.sub(r"(?i)(?:ဖုန်းနံပါတ်|ဖုန်း|(?<![a-z])(?:phone(?:\s*no)?|ph(?:\s*no)?|tel)(?![a-z])\.?)\s*[:：-]?\s*(?=[,၊။\s]|$)",
-                  " ", text)
+    text = _ASK_WORDS.sub(" ", _PHONE_LEAD.sub(" ", text))
     text = re.sub(r"[ \t]+", " ", text)
     text = re.sub(r"\s*\n\s*", ", ", text)
-    text = re.sub(r"(?:\s*[,၊]\s*){2,}", ", ", text).strip(" ,၊-–\n")
+    text = re.sub(r"\s*([,၊])\s*", r"\1 ", text)  # "no(121) ,73" -> "no(121), 73"
+    text = re.sub(r"(?:[,၊]\s*){2,}", ", ", text).strip(" ,၊-–\n")
     text = cart.LEADING_ASK.sub("", cart.TRAILING_ASK.sub("", text), count=1)
-    return text.strip(" ,၊-–\n")[:500]
+    previous = None
+    while previous != text:
+        previous, text = text, _TRAILING_PARTICLES.sub("", text).strip(" ,၊-–\n")
+    return text[:500]
 
 
 @dataclass

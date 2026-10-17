@@ -27,7 +27,7 @@ def test_q0_live_address_just_under_the_threshold_is_saved_when_the_rules_agree(
     auto_ai.answer = lambda _: LIVE_AI
     now_msg(db, LIVE_ADDRESS)
     status, saved, phones, parts, _ = open_order(db)
-    assert saved == "no(121) ,73, 45 လမ်း mandalay" and phones == ["09945827742"]
+    assert saved == "no(121), 73, 45 လမ်း mandalay" and phones == ["09945827742"]  # Q3: tidy, no request words
     assert parts["city"] == "မန္တလေး (Mandalay)" and status == "waiting_payment"
     assert ungreet(deliver(db)[0]).endswith(PAYMENT_FOOTER)
 
@@ -156,3 +156,50 @@ def test_r2_greeting_inside_the_6h_window(shop, db):
     assert deliver(db) == [ASK_PRODUCT]  # no "hi": no second greeting
     now_msg(db, "hi မှာချင်လို့ပါ")
     assert deliver(db) == ["မင်္ဂလာပါ။\n" + ASK_PRODUCT]  # "hi" is greeted back
+
+
+# ---------- R4 / Q3: cleaning ----------
+
+ADDRESS = "ဗဟန်း သုခလမ်း အမှတ် ၅"
+
+
+@pytest.mark.parametrize("raw", [
+    f"{ADDRESS} ကိုပို့ပေးပါ", f"{ADDRESS} ကို ပို့ပေးပါနော်", f"{ADDRESS} ပို့ပေးပါရှင့်", f"{ADDRESS} ပို့ပါ",
+    f"{ADDRESS} ကိုပို့ ဖုန်း 09777123456", f"{ADDRESS} ဖုန်းက ၀၉၇၇၇၁၂၃၄၅၆ ပါ", f"{ADDRESS} ph:09777123456",
+    f"{ADDRESS} phone - 09 777 123 456 ခင်ဗျာ", f"{ADDRESS} tel 09777123456", f"{ADDRESS} ကိုပို့ပေးပါဗျာ",
+    f"ပို့ပေးပါ {ADDRESS}", f"{ADDRESS} ကို ပို့ပေးပါဗျဖုန်းနံပါတ်က 09777123456",
+])
+def test_r4_cleaning(raw):
+    assert address.validate(raw).parts.full_text == ADDRESS
+
+
+def test_r4_live_sentence_cleaned():
+    check = address.validate(LIVE_ADDRESS)
+    assert check.parts.full_text == "no(121), 73, 45 လမ်း mandalay" and check.valid
+    assert check.parts.city == "မန္တလေး (Mandalay)"
+
+
+# ---------- R1: the live 02:04 message, rules path + unsure AI ----------
+
+def test_r1_live_address_rules_path(shop, db):
+    client, token = shop
+    auto_on(db)
+    cart_for(client, token, db)
+    now_msg(db, LIVE_ADDRESS)
+    status, saved, phones, parts, _ = open_order(db)
+    assert saved == "no(121), 73, 45 လမ်း mandalay" and phones == ["09945827742"]  # added (no change words)
+    assert status == "waiting_payment" and ungreet(deliver(db)[0]).endswith(PAYMENT_FOOTER)
+
+
+def test_r1_unsure_ai_gets_the_holding_reply_not_silence(auto_ai, shop, db):
+    client, token = shop
+    cart_for(client, token, db)
+    auto_ai.answer = lambda _: {**LIVE_AI, "address": {**LIVE_AI["address"], "confidence": 0.5}}
+    mid = now_msg(db, LIVE_ADDRESS)
+    assert deliver(db) == [] and open_order(db)[1] is None  # a person checks the address...
+    with db.begin() as c:
+        c.execute(text("UPDATE messages SET received_at = now() - interval '61 seconds' WHERE id = :m"), {"m": mid})
+    assert holding.run_once() == {"held": 1}
+    assert ungreet(deliver(db)[0]) == HOLDING  # ...and the customer hears from us within 60 s
+    page = client.get("/").text
+    assert f'id="waiting-{mid}"' in page and f'id="address-{mid}"' in page
