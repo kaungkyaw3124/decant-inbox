@@ -8,6 +8,8 @@ Read CLAUDE.md first. This file tracks where we are.
   docs/SPEC-v4.10-interruptions.md (interruptions + LOCKED paid orders; overrides 4.8 rule 6).
   Same loop: tests -> fix -> green -> self-review -> deploy -> report. At the end: OWNER TEST
   SCRIPT 4.9 + 4.10 in REPORT.md.
+- THEN epic 4.11 docs/SPEC-v4.11-live-fixes.md (form-expired, remove+add in one message,
+  learn-box phrases, stale Needs-you items).
 - Owner checks: `bash scripts/status.sh`; AI numbers at /ai.
 
 ## Status
