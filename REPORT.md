@@ -1549,3 +1549,103 @@ brackets the real clock around the run. Full suite: 603 passed, 1 skipped. Live 
    them; "↩️ Undo dismiss" (60 s) brings them back. Payments never go there.
 9. **Brake (optional).** If the AI ever picks a wrong product: open the message → 🧠 AI was wrong → choose the right
    product → the AI goes back to SHADOW with a notice. Switch AUTO on again at /ai when you want.
+
+## 2026-10-17 — v4.12: AI address assistant, address gates, AI payment-screenshot reader (docs/SPEC-v4.12-address-payment-ai.md)
+**Owner goal:** "the address should be supervised by AI" — after Order #1001 was confirmed with the address
+"လိပ်စာ ပြောင်းချင်ပါတယ်" and a 70,000 Ks screenshot to another person passed for a 34,000 order without a warning.
+
+**What was built** (one commit per part)
+- **N0 repair + guard** (`0f9cb55`). `app/orders/address.py`: the validator (our final say) and `data/townships.csv`
+  (114 townships / towns, Burmese + English spellings, Yangon / Mandalay / Naypyitaw first). Valid = a township from the
+  list, or city + street, and real place words; invalid = only keywords, < 8 characters, or a township not in the list;
+  partial = street / number / ward without the township. Addresses are saved ONLY through it (customer messages, the
+  cart panel, "Edit locked order", the payment card); the split is kept in `address_parts`. `scripts/repair_addresses.py`
+  marks old bad addresses `address_invalid` (ids only, never rewrites): a red "⚠️ invalid address" badge + the reason
+  (cart panel, Orders, payment card); never offered again as "same as last time".
+- **N1 AI address assistant** (`7c7a9da`). With the switch **ai_address** (default ON) every message the rules read as an
+  address / change request is also read by the AI in the same call (no 2nd call): addresses go as written (Zawgyi
+  converted, Burmese digits kept), phones stay [PHONE], names never. The AI returns {house_no, street, ward_or_quarter,
+  township, city, landmark, full_text, missing, is_change_request, confidence}; the validator decides. Sure + valid →
+  saved on order and customer, flow continues. No township → "ဘယ်မြို့နယ်လဲ ပြောပေးပါနော်။" (ask_city:
+  "ဘယ်မြို့လဲ …"), the partial is kept 24 h and merged with the answer (the AI is told "WE ASKED: the township of …").
+  Keyword-only / change request → 4.8 as before. Unsure (< 0.85) / invalid / unknown township → Needs you
+  **"📍 check address"** card: the split, the reason, an editable address → "✅ Save address & continue" (same
+  validator, then the normal next step) or "💬 Ask for the full address" (template address_invalid_note).
+- **N2 gates** (`bd2de13`). A missing / invalid address blocks payment info (manual, auto, and the 4.10 "new total"
+  resend), approving a payment (no "approve anyway") and so the confirmation. The payment card shows the reason and a
+  fix form; the confirmation always carries the validated full_text.
+- **N3 screenshot reader** (`43cab88`). S0: `gpt-6-luna` reads images (`scripts/ai_screens_check.py`, synthetic receipt,
+  saved on /ai). With the switch **ai_screenshot** (default OFF) the worker reads a screenshot once, after an admin
+  opened the card (photos are still downloaded only then), with the expected total and our accounts (name + last 4).
+  Our checks: not a receipt, paid more / less (both amounts), receiver not ours (fuzzy name or last 4), transaction no.
+  already approved, receipt before the payment info (10 min clock slack) or > 3 days old, status not successful. The
+  card shows the reading + warnings and is pre-filled (transaction no. marked "from the screenshot: compare it with your
+  KPay / AYA history"); Needs you shows "⚠️ n warnings". Any warning needs the existing second confirm. Never approves,
+  never messages the customer. Same daily cap and monthly budget; errors → "check it yourself", card as before.
+- **N4** (`40c1012`). /ai "🔒 What the AI may see": both switches with privacy notes (screenshots can only be ticked
+  when the S0 check passed for the configured model) + this month's counts (addresses read, township/city asked, not-sure
+  addresses checked by a person, screenshots read, warnings by type, screenshot cost). Settings: templates ask_township,
+  ask_city, address_invalid_note.
+
+**Decisions to check**
+- A township alone ("ဗဟန်း", "Yankin") is not an address (spec: < 8 characters) → check-address card. Two old tests used
+  such addresses and now use a full one; "No. 12, Bahan Road" now needs ", Bahan": a name right before လမ်း / Road is a
+  street ("ပြည်လမ်း" is Pyay Road, not the town Pyay).
+- Burmese digits: the AI path keeps them as written ("အမှတ် ၅"); the rules path still saves 0-9 ("အမှတ် 5") as before.
+- If the AI sees no address but the rules found a known township with a street / number, the rules reading counts.
+- The screenshot is read when the card is opened (CLAUDE.md: photos only when an admin opens them), so the card shows
+  "Reading the screenshot…" for a few seconds, then the reading.
+- In SHADOW mode the rules still act at once on address messages; only AUTO waits for the AI (as for products).
+- "Edit locked order" also fixes the customer's saved address when it was invalid (or the same text).
+- 4.6 masking test now runs with ai_address OFF; "rules certain → no AI call" no longer applies to addresses (4.6 F9, 4.8 H8
+  extended with the 4.12 case).
+
+**Tests:** 645 passed, 1 skipped (was 603 + 1). New tests/test_v412_address_payment.py (42): validator cases; P1 repair
+(ids only), badge + reason, payment info / approve / confirmation blocked, fixing in panel / card / Edit locked order
+unblocks; P2 live sentence (AI): saved without phone and ask words, phone separate, payment info, request has the
+address as written and [PHONE]; P3 ask township → merge (AI and rules); resume line asks only the township; P4 7
+keyword-only messages; P5 unknown township + unsure AI → card, fix / ask for the full address; P6 switch OFF: rules work,
+nothing address-like in the payload; P7 70,000 vs 18,000 + other receiver → 2 warnings, pre-fill, second confirm,
+nothing auto, nothing sent; P8 duplicate no., old receipt, not a receipt, failed status, paid less, errors never block;
+P9 switch OFF: no image sent; N4 switches / counts / cap + budget. Also fixed on the way: a flaky 4.x test (REPORT above).
+
+**Real-API evaluation:** address set (36 cases: Burmese / English / mixed, 3 Zawgyi, Burmese digits, phones, partials,
+answers to "which township?", change requests, 9 keyword-only / non-addresses): township 100%, 0 phones in full_text,
+0 keyword-only accepted → PASS ($0.004). Screenshot set (10 synthetic: KBZPay / AYA / Wave-like, right / more / less /
+other receiver / failed / old, 2 not receipts): amount 100%, transaction no. 100%, is_payment_receipt 100% → PASS
+($0.0025). Product set re-run with addresses unmasked: 98% (61/62; the miss was "armani 10ml" without candidates, safe:
+a person decides; 3 re-runs passed), 0 wrong product ids → PASS.
+Commands: `.venv/bin/python -m scripts.ai_eval --addresses` / `--screens` / (no flag = products).
+
+**Deployed:** backup product_requests_2026-10-17T1926Z.dump, migrations 5652173130df + 9b3e2c41d7a5 (round trip done),
+`repair_addresses`: order id=28 (#1001, paid) and customer id=11 marked invalid (keywords); S0 check ✅; ai_address ON,
+ai_screenshot OFF; parser + web + listener restarted, health ok.
+
+### OWNER TEST SCRIPT 4.12 (second Telegram account, Auto-reply ON; AI replies take ~3-8 s)
+1. **/ai → 🔒 What the AI may see**: "Addresses" ticked, "Payment screenshots" not ticked,
+   "Model gpt-6-luna reads screenshots (checked 2026-10-17)".
+2. **Fix Order #1001.** Orders → All: #1001 shows "📍 … ⚠️ invalid address — Only words like “address” / “change”, no
+   place." Open "Edit locked order", type the customer's real address (with the township), reason "4.8 bug", Save → the
+   badge is gone (the customer's saved address is fixed too). Typing "ပို့ပေးပါ" instead is refused ("Not saved: …").
+3. **The live sentence.** New order: `stw intensely 5ml ယူမယ်` → the list asks for the phone. Send
+   `ဒီကိုပို့ပေးပါ ဗဟန်း ရွှေဂုံတိုင်လမ်း အမှတ် ၅ ဖုန်း 09777123456` → payment info comes. Cart panel: phone 09777123456,
+   address "**ဗဟန်း (Bahan)** · ဗဟန်း ရွှေဂုံတိုင်လမ်း အမှတ် ၅ ✅" (no phone, no ကိုပို့ပေးပါ).
+4. **Missing township.** Cancel that cart (or use a third account): `stw intensely 5ml ယူမယ်` → send a phone → asked for the
+   address → `သုခလမ်း အမှတ် ၁၂` → "ဘယ်မြို့နယ်လဲ ပြောပေးပါနော်။" → `ရန်ကင်း` → payment info; address
+   "သုခလမ်း အမှတ် ၁၂, ရန်ကင်း" (or the AI's merged spelling) with **ရန်ကင်း (Yankin)**.
+5. **Keywords only.** While waiting for payment send `လိပ်စာ ပြောင်းချင်ပါတယ်` → "ပို့ပေးရမယ့် လိပ်စာအသစ် ပို့ပေးပါနော်။";
+   the saved address does NOT change. Then send a full new address → "လိပ်စာ ပြင်ပြီးပါပြီ – …".
+6. **Check address card.** In a new order (after the phone) send `No 7 Shwe Taung Gyar Rd, Zigon` → no reply. Inbox → 🟡
+   Needs you: "📍 … check address", "Township not in our list.", the split (Zigon in bold), the address in a box. Change
+   it to `No 7 Shwe Taung Gyar Rd, Bahan` → ✅ Save address & continue → payment info goes out in 10 s. (Or try
+   "💬 Ask for the full address" → "အိမ်နံပါတ်၊ လမ်း၊ မြို့နယ် ပါတဲ့ လိပ်စာ အပြည့်အစုံ ပို့ပေးပါနော်။".)
+7. **Gates.** In a chat whose cart has no valid address, the cart panel says "Payment info not possible yet: No address
+   yet." and the Next button never offers payment info.
+8. **Screenshot reading.** /ai → tick "Payment screenshots" → Save. With an order waiting for payment (e.g. 18,000), send
+   your KBZPay test screenshot (70,000 Ks to Soe Htike Lwin) from the second account. Payments → open the card → after
+   a few seconds: "🧠 From the screenshot: KBZPay · 70,000 Ks · transaction … · to Soe Htike Lwin …" and in red
+   "Screenshot amount 70,000 ≠ order total … paid more …" + "Paid to Soe Htike Lwin …: not one of our payment accounts."
+   The transaction ID and amount are pre-filled ("from the screenshot: compare it with your KPay / AYA history"). Needs
+   you shows "⚠️ 2 warnings from the screenshot". Press Approve → "Please check" (needs "Approve anyway"). Do NOT approve
+   the test: use "🚫 Not a payment (nothing sent)" or Reject. Nothing was sent to the customer by itself. /ai → "Screenshots
+   read: 1 · ⚠️ paid more: 1 · ⚠️ other receiver: 1". Untick the switch again if you prefer it off.

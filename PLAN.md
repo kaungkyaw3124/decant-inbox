@@ -2,13 +2,12 @@
 
 Read CLAUDE.md first. This file tracks where we are.
 
-## RESUME HERE (updated 2026-10-17 by planning chat)
-- v1-v4.11 DONE. AI mode AUTO, brake ON.
-- NOW: epic 4.12 docs/SPEC-v4.12-address-payment-ai.md — N0 repair invalid addresses + gate,
-  N1 AI address assistant, N2 address gates before payment info / approve / confirmation,
-  N3 AI payment-screenshot reader (switch default OFF), N4 /ai switches. Commit + push after
-  each part. Tests P1-P10 + real-API eval gates. Loop until green, deploy, OWNER TEST SCRIPT 4.12.
-- Owner checks: `bash scripts/status.sh`; AI numbers at /ai.
+## RESUME HERE (updated 2026-10-17 by Claude Code after epic 4.12)
+- v1-v4.12 DONE (2026-10-17). AI mode AUTO, brake ON; ai_address ON, ai_screenshot OFF (S0 check passed:
+  gpt-6-luna reads screenshots; the owner may tick it on /ai).
+- OWNER TEST SCRIPT 4.12 is in REPORT.md (incl. fixing Order #1001's address with "Edit locked order").
+- NEXT: wait for the owner's test results / the next spec from the planning chat.
+- Owner checks: `bash scripts/status.sh`; AI numbers at /ai; evals: `scripts.ai_eval [--addresses|--screens]`.
 
 ## Status
 | Phase | What | Status |
@@ -29,6 +28,7 @@ Read CLAUDE.md first. This file tracks where we are.
 | 12 | v4.9 (docs/SPEC-v4.9-greeting.md): smart greeting | ✅ Done, live (owner test pending) |
 | 13 | v4.10 (docs/SPEC-v4.10-interruptions.md): interruptions, resume line, locked paid orders | ✅ Done, live (owner test pending) |
 | 14 | v4.11 (docs/SPEC-v4.11-ai-first.md): AI-first (AUTO, multi-action, customer chooses, auto-learning, simple card) | ✅ Done, live in AUTO (owner test pending) |
+| 15 | v4.12 (docs/SPEC-v4.12-address-payment-ai.md): AI address assistant, address gates, AI screenshot reader | ✅ Done, live (ai_address ON, ai_screenshot OFF; owner test pending) |
 
 ## Phase 0 checklist
 - [x] Step 0: rollback safety net scripts in ~/hardening/
