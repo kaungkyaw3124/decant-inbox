@@ -16,8 +16,9 @@ docs/SPEC-v4.11-ai-first.md: ">remove" / ">add" / ">ask_price" after an item = i
 
 docs/SPEC-v4.12-address-payment-ai.md:
   --addresses  tests/fixtures/ai_eval_address.csv through the AI + our validator (the same code as the
-               app). PASS: township correct >= 95%, full_text never contains a phone (the AI's text and the
-               saved text), 0 keyword-only messages accepted as an address.
+               app). PASS: township correct >= 95% (and the city, where expect_city is set: Mandalay grid
+               addresses have no township, docs/SPEC-v4.13-hotfix.md), full_text never contains a phone (the
+               AI's text and the saved text), 0 keyword-only / greeting messages accepted as an address.
   --screens    tests/fixtures/payment_screens/ (synthetic receipts) through the screenshot reader. PASS:
                amount exact >= 95%, transaction_no exact >= 90%, is_payment_receipt correct 100%.
 """
@@ -206,11 +207,13 @@ def eval_addresses(provider, catalog: prompt.Catalog, model: str, reasoning: str
                 notes.append(f"accepted as an address ({status}: {check.parts.full_text})")
         else:
             township_n += 1
-            if township == row["expect_township"]:
+            city = check.parts.city.split(" (")[-1].rstrip(")") if check is not None and check.parts.city else ""
+            if township == row["expect_township"] and (not row.get("expect_city") or city == row["expect_city"]):
                 township_ok += 1
             else:
                 ok = False
-                notes.append(f"township {township or '-'} (want {row['expect_township'] or '-'})")
+                notes.append(f"township {township or '-'} (want {row['expect_township'] or '-'})"
+                             + (f", city {city or '-'} (want {row['expect_city']})" if row.get("expect_city") else ""))
             if status != row["expect_status"]:
                 notes.append(f"status {status} (want {row['expect_status']})")  # shown, not part of the gate
         phone = bool(_PHONE.search(raw.get("full_text") or "")) or bool(

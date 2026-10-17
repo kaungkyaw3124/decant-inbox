@@ -219,3 +219,45 @@ def test_r2_no_place_words_is_invalid_not_partial(body):
                                   "ရွှေဂုံတိုင် ဘုရားရှေ့ အိမ်"])
 def test_r2_one_place_word_is_still_partial(body):
     assert address.validate(body).status == "partial"
+
+
+# ---------- R5 / Q5: Mandalay grid addresses ----------
+
+@pytest.mark.parametrize("body", [
+    "73 x 45, mandalay", "73x45 mandalay", "၇၃ လမ်း x ၄၅ လမ်း မန္တလေး", "73, 45 လမ်း mandalay", "between 73 & 74, mandalay",
+    "၇၃ နဲ့ ၇၄ ကြား မန္တလေး", "၇၃ လမ်း (၄၅ x ၄၆ ကြား) မန္တလေး", "၂၆ လမ်း ၈၃ x ၈၄ ကြား mdy",
+])
+def test_r5_mandalay_grid_is_valid(body):
+    check = address.validate(body)
+    assert check.valid and check.parts.city == "မန္တလေး (Mandalay)" and check.parts.street
+
+
+@pytest.mark.parametrize("name,en", [
+    ("ချမ်းအေးသာစံ", "Chanayethazan"), ("မဟာအောင်မြေ", "Mahaaungmye"), ("အောင်မြေသာစံ", "Aungmyethazan"),
+    ("ချမ်းမြသာစည်", "Chanmyathazi"), ("pyigyitagon", "Pyigyidagun"), ("အမရပူရ", "Amarapura"), ("ပုသိမ်ကြီး", "Patheingyi"),
+])
+def test_r5_mandalay_townships(name, en):
+    check = address.validate(f"၂၆ လမ်း၊ အမှတ် ၅ {name}")
+    assert check.valid and check.township.en == en and check.township.city_en == "Mandalay"
+
+
+def test_r5_comma_grid_only_in_mandalay():
+    assert address.validate("အမှတ် 12, 45 လမ်း ဗဟန်း").parts.street == "45 လမ်း"  # Yangon: house no. + street
+
+
+def test_r5_grid_address_in_the_chat(shop, db):
+    """The rules path saves 0-9 digits (4.12 decision)."""
+    client, token = shop
+    auto_on(db)
+    cart_for(client, token, db)
+    now_msg(db, "၇၃ လမ်း (၄၅ x ၄၆ ကြား) မန္တလေး ဖုန်း 09777123456")
+    status, saved, phones, parts, _ = open_order(db)
+    assert saved == "73 လမ်း (45 x 46 ကြား) မန္တလေး" and phones == ["09777123456"]
+    assert parts["city"] == "မန္တလေး (Mandalay)" and status == "waiting_payment"
+    assert ungreet(deliver(db)[0]).endswith(PAYMENT_FOOTER)
+
+
+def test_r5_township_city_wins_over_a_town_inside_its_name():
+    """Eval a47: "ချမ်းမြသာစည်" contains the town "သာစည်" (Thazi)."""
+    check = address.validate("အမှတ် ၈၊ ၃၀ လမ်း၊ ချမ်းမြသာစည်")
+    assert check.township.en == "Chanmyathazi" and check.parts.city == "မန္တလေး (Mandalay)"

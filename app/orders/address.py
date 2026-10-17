@@ -57,6 +57,16 @@ _HOUSE = re.compile(r"အမှတ်\s*[\(\[]?\s*[\d၀-၉][\w/\-]*\s*[\)\]]?|
                     r"[\d၀-၉][\w/\-]*|#\s*[\d၀-၉][\w/\-]*", re.IGNORECASE)
 _STREET = re.compile(r"[\d၀-၉]+\s*လမ်း(?:မ)?(?:ကြီး)?|[^\s,၊။]*လမ်း(?:မ)?(?:ကြီး)?|(?<![a-z])(?:[\w.'-]+\s+){1,3}(?:street|st|road|rd|lane|avenue|ave)"
                      r"\.?(?![a-z])|[\d၀-၉]+\s*[x×]\s*[\d၀-၉]+", re.IGNORECASE)
+# Mandalay grid streets (docs/SPEC-v4.13-hotfix.md Q5): "73 x 45", "၇၃ လမ်း x ၄၅ လမ်း", "၇၃ လမ်း (၄၅ x ၄၆ ကြား)",
+# "၂၆ လမ်း ၈၃ x ၈၄ ကြား",
+# "between 73 & 74", "၇၃ နဲ့ ၇၄ ကြား"
+_GRID = re.compile(r"[\d၀-၉]+\s*လမ်း\s*[,၊]?\s*\(?\s*[\d၀-၉]+\s*(?:လမ်း)?\s*(?:[x×]|နဲ့|နှင့်|&|and)\s*[\d၀-၉]+\s*(?:လမ်း)?\s*"
+                   r"ကြား\s*\)?"
+                   r"|[\d၀-၉]+\s*(?:လမ်း)?\s*[x×]\s*[\d၀-၉]+(?:\s*လမ်း)?(?:\s*ကြား)?"
+                   r"|(?<![a-z])between\s+[\d၀-၉]+\s*(?:st|street|လမ်း)?\s*(?:&|and|-)\s*[\d၀-၉]+(?:\s*(?:st|street|လမ်း)(?![a-z]))?"
+                   r"|[\d၀-၉]+\s*(?:လမ်း)?\s*(?:နဲ့|နှင့်|&|-)\s*[\d၀-၉]+\s*(?:လမ်း)?\s*ကြား", re.IGNORECASE)
+# "73, 45 လမ်း": a grid only in Mandalay (elsewhere "12, 45 လမ်း" is a house no. + street)
+_GRID_COMMA = re.compile(r"(?<![\d၀-၉])[\d၀-၉]+\s*[,၊]\s*[\d၀-၉]+\s*လမ်း")
 # a place to find the house by: enough for "partial" without a street / ward
 _LANDMARK = re.compile(r"ဈေး|ဘုရား|ကျောင်း|ဆေးရုံ|ဆေးခန်း|ဘဏ်|ရုံး|ဟိုတယ်|မှတ်တိုင်|ဂိတ်|ကွက်|အိမ်ရာ|တိုက်|ရွာ|ကုန်တိုက်|နား(?!လည်|ထောင်)|အနီး|"
                        r"(?:ရှေ့|ဘေး|နောက်|မျက်နှာချင်းဆိုင်)(?:မှာ|က)?(?![ါ-ှ])|(?<![a-z])(?:near|opposite|beside|behind|next to|market|pagoda|"
@@ -282,11 +292,12 @@ def validate(full_text: str | None, parts: dict | None = None, *, source: str = 
     city = lookup_city(parts.get("city")) or find_city(text)
     if township is not None:
         p.township, out.township = township.label, township
-        city = city or (township.city_my, township.city_en)
+        city = (township.city_my, township.city_en)  # "ချမ်းမြသာစည်" holds the town "သာစည်" (Thazi)
     if city:
         p.city = f"{city[0]} ({city[1]})"
     p.house_no = p.house_no or _first(_HOUSE, text)
-    p.street = p.street or _first(_STREET, text)
+    mandalay = city is not None and city[1] == "Mandalay"
+    p.street = p.street or _first(_GRID, text) or (mandalay and _first(_GRID_COMMA, text)) or _first(_STREET, text)
     p.ward_or_quarter = p.ward_or_quarter or _first(_WARD, text)
     if len(text) < MIN_CHARS:
         out.status, out.reason = "invalid", "short"
