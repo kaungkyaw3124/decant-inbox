@@ -175,6 +175,9 @@ ADDRESS_INSTRUCTIONS = """
 - missing: what a delivery still needs: "township" when there is no township, "city" when there is
   neither a township nor a city (outside Yangon a town name is the city), "street" / "house_no" when not
   given. [] when complete.
+- Mandalay (and other towns) use NUMBERED streets instead of a township: "73 x 45", "73x45", "၇၃ လမ်း x ၄၅ လမ်း",
+  "73, 45 လမ်း", "၇၃ လမ်း (၄၅ x ၄၆ ကြား)", "between 73 & 74", "၇၃ နဲ့ ၇၄ ကြား". street = those numbers as written;
+  city = Mandalay (or the town). City + such a street is a complete address: missing = [] (no township needed).
 - is_change_request: true when the customer says this REPLACES the address we have (new / changed /
   "send it here instead").
 - confidence 0-1: how sure you are that full_text is exactly the address and the parts are right.

@@ -1649,3 +1649,34 @@ ai_screenshot OFF; parser + web + listener restarted, health ok.
    you shows "⚠️ 2 warnings from the screenshot". Press Approve → "Please check" (needs "Approve anyway"). Do NOT approve
    the test: use "🚫 Not a payment (nothing sent)" or Reject. Nothing was sent to the customer by itself. /ai → "Screenshots
    read: 1 · ⚠️ paid more: 1 · ⚠️ other receiver: 1". Untick the switch again if you prefer it off.
+
+## 2026-10-18 — v4.13 hotfix (docs/SPEC-v4.13-hotfix.md)
+
+### Q0 — why the live messages got no reply (from the database, ids only)
+Test account = customer id 11 (Order #1001 paid). Times UTC (+6:30 = Myanmar).
+
+**02:04 MMT, message 78 `no(121) ,73, 45 လမ်း mandalay ကို ပို့ပေးပါဗျဖုန်းနံပါတ်က …`**
+1. Rules: intent `address` (0.8), phone found. Open order: id 30 `cart` (the new STW Intensely 10ml order).
+2. Because it is an address and ai_address is ON, the AI read it (ai_calls id 4, AUTO, 3.6 s, no error): intent
+   `address` 0.88 → applied (parse result method=ai). Its address answer: full_text `no(121) ,73, 45 လမ်း mandalay`,
+   city mandalay, street `73, 45 လမ်း`, missing ["township"], **address confidence 0.84**.
+3. Our validator: **valid** (city Mandalay + street). But 0.84 < 0.85 (SURE) → "valid but not sure" → the contact action
+   returned nothing → `auto_runs`: **skipped "no certain reply"** (19:34:18 UTC).
+4. The only trace was the Needs you "📍 check address" card (still listed now). Nothing told the customer anything,
+   and nobody looked for 6+ minutes → silence.
+**Cause:** an address the validator accepts was held back only because the AI was 1 point under its threshold; the AI
+was unsure because the prompt did not explain Mandalay grid addresses (no township is normal there: it reported
+"missing township"). And the design allowed a message to end in a card with no word to the customer.
+Also found: had the AI not answered, the rules fallback would have saved `… mandalay ကို ပို့ပေးပါဗျ က` (clean() kept
+request words with a space / glued particles and the phone lead-in `ဖုန်းနံပါတ်က`).
+
+**01:59 MMT, message 73 `hi decant မှာချင်လို့ပါ`**
+Rules: intent `buy` without a product (0.3) → the AI was asked: intent buy, no items, 0.99 → AUTO refused ("a buy without
+items"), so the rules result stayed → `auto_runs` skipped "no certain reply" → only the 2-minute "unanswered" row.
+**Cause:** no intent for "I want to order" without a product, so no automatic reply exists for it. (validate() also called
+this text "partial: missing township" — harmless here, but wrong.)
+
+**Fixes:** (Q0) when the AI's address is valid but just under the threshold and the rules read the same place
+independently (same township / city, valid), the two readers agree → saved; the prompt now explains Mandalay grid
+addresses (city + grid street is complete). Q1 holding reply + watchdog (never silence), Q2 order_start, Q3 cleaning,
+Q4 "no place words = not an address", Q5 Mandalay grid formats.

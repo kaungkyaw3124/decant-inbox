@@ -26,6 +26,7 @@ TOWNSHIPS_CSV = BASE_DIR / "data" / "townships.csv"
 FIELDS = ("house_no", "street", "ward_or_quarter", "township", "city", "landmark")
 MIN_CHARS = 8
 SURE = 0.85  # the AI's address confidence needed to save without a person
+AGREE = 0.6  # ... or this much when the rules read the same township / city on their own (docs/SPEC-v4.13 Q0)
 PARTIAL_HOURS = 24  # a partial address waits this long for the township / city answer
 # Shown to the admin (English; i18n_my.py has the Burmese)
 REASONS = {
@@ -278,6 +279,13 @@ def validate(full_text: str | None, parts: dict | None = None, *, source: str = 
     return out
 
 
+def same_place(a: Check, b: Check) -> bool:
+    """The same township (both found one), or no township and the same city."""
+    if a.township is not None or b.township is not None:
+        return a.township is not None and b.township is not None and a.township.my == b.township.my
+    return bool(a.parts.city) and a.parts.city == b.parts.city
+
+
 def admin_check(text: str | None) -> Check:
     """An address a person typed in the dashboard (same validator)."""
     return validate(text, source="admin")
@@ -394,6 +402,9 @@ def combine(ai_answer: dict | None, rules: Check | None, partial: dict | None) -
     check = rules if ai_answer is None else from_ai(ai_answer["address"])
     if check is None and ai_answer is not None and rules is not None and rules.valid:
         check = rules
+    elif (ai_answer is not None and check is not None and check.valid and not check.sure
+          and check.confidence >= AGREE and rules is not None and rules.valid and same_place(check, rules)):
+        check.confidence = SURE  # docs/SPEC-v4.13 Q0: two independent readers found the same place
     if check is None or check.valid or not partial:
         return check
     merged = merge(partial, check)
