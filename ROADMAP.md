@@ -23,7 +23,7 @@ Detailed specs live in docs/; status and "resume here" in PLAN.md; build log in 
 - 4.3 Reorder "the previous one" from history + numbered choice
 - 4.4 Roles (owner/staff), permissions, owner approval of learning
 - 4.5 Burmese dashboard, help, practice mode, staff guide
-- 4.11 Live fixes: form expired, multi-action messages, learn phrases, stale Needs you — docs/SPEC-v4.11-live-fixes.md
+- 4.11 AI-first inbox: AUTO, multi-action, customer choice, auto-learning, simple card — docs/SPEC-v4.11-ai-first.md
 - 4.10 Interruptions + locked paid orders — docs/SPEC-v4.10-interruptions.md
 - 4.9 Smart greeting by order state — docs/SPEC-v4.9-greeting.md
 - 4.8 Change address / phone (live bug fix) — docs/SPEC-v4.8-change-info.md
