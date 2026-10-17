@@ -5,7 +5,8 @@ rules, the AI or a person typing it in the dashboard).
 
   valid     township (from data/townships.csv) OR city + street, and real place words
   partial   says where in a street / ward / house, but no township (or city): ask for it
-  invalid   too short, only keywords ("လိပ်စာ ပြောင်းချင်ပါတယ်"), or a township we don't know
+  invalid   too short, only keywords ("လိပ်စာ ပြောင်းချင်ပါတယ်"), no place word at all ("hi decant
+            မှာချင်လို့ပါ", docs/SPEC-v4.13-hotfix.md Q4), or a township we don't know
   none      no address at all in the text
 
 read_message() reads a customer message: the AI's split when the owner allows sending addresses
@@ -33,6 +34,7 @@ REASONS = {
     "none": "No address in the message.",
     "keywords": "Only words like “address” / “change”, no place.",
     "short": "Too short to be an address.",
+    "no_place": "No house no., street, ward, township, city or landmark.",
     "missing_township": "No township (or city + street).",
     "missing_city": "No city.",
     "unknown_township": "Township not in our list.",
@@ -55,6 +57,11 @@ _HOUSE = re.compile(r"အမှတ်\s*[\(\[]?\s*[\d၀-၉][\w/\-]*\s*[\)\]]?|
                     r"[\d၀-၉][\w/\-]*|#\s*[\d၀-၉][\w/\-]*", re.IGNORECASE)
 _STREET = re.compile(r"[\d၀-၉]+\s*လမ်း(?:မ)?(?:ကြီး)?|[^\s,၊။]*လမ်း(?:မ)?(?:ကြီး)?|(?<![a-z])(?:[\w.'-]+\s+){1,3}(?:street|st|road|rd|lane|avenue|ave)"
                      r"\.?(?![a-z])|[\d၀-၉]+\s*[x×]\s*[\d၀-၉]+", re.IGNORECASE)
+# a place to find the house by: enough for "partial" without a street / ward
+_LANDMARK = re.compile(r"ဈေး|ဘုရား|ကျောင်း|ဆေးရုံ|ဆေးခန်း|ဘဏ်|ရုံး|ဟိုတယ်|မှတ်တိုင်|ဂိတ်|ကွက်|အိမ်ရာ|တိုက်|ရွာ|ကုန်တိုက်|နား(?!လည်|ထောင်)|အနီး|"
+                       r"(?:ရှေ့|ဘေး|နောက်|မျက်နှာချင်းဆိုင်)(?:မှာ|က)?(?![ါ-ှ])|(?<![a-z])(?:near|opposite|beside|behind|next to|market|pagoda|"
+                       r"school|hospital|clinic|bank|hotel|condo|tower|plaza|mall|junction|bus stop|village|bldg|building|"
+                       r"apartment|housing)(?![a-z])", re.IGNORECASE)
 _WARD = re.compile(r"[^\s,၊။]*ရပ်ကွက်(?:\s*\(?[\d၀-၉]+\)?)?|[\d၀-၉]+\s*(?:ward|qtr|quarter)(?![a-z])|"
                    r"(?<![a-z])(?:ward|qtr|quarter)\s*\(?[\d၀-၉]+\)?", re.IGNORECASE)
 _PHONE_IN_TEXT = re.compile(r"(?:\+?95[\s-]?|0)9(?:[\s-]?\d){7,9}")
@@ -287,6 +294,9 @@ def validate(full_text: str | None, parts: dict | None = None, *, source: str = 
     if township is not None or (city and p.street):
         out.status, out.reason = "valid", None
         return out
+    if not (p.house_no or p.street or p.ward_or_quarter or p.city or p.landmark or _LANDMARK.search(text)):
+        out.status, out.reason = "invalid", "no_place"  # a greeting / order wish / product request
+        return out
     out.status = "partial"
     out.missing = ("city",) if missing_hint == ("city",) and not city else ("township",)
     out.reason = "missing_city" if out.missing == ("city",) else "missing_township"
@@ -328,7 +338,7 @@ def from_rules(raw_text: str) -> Check | None:
     if not candidate:
         return None
     check = validate(candidate)
-    return None if check.status == "none" or check.reason == "keywords" else check
+    return None if check.status == "none" or check.reason in ("keywords", "no_place") else check
 
 
 def merge(partial: dict, check: Check) -> Check:

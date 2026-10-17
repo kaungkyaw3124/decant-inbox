@@ -203,3 +203,19 @@ def test_r1_unsure_ai_gets_the_holding_reply_not_silence(auto_ai, shop, db):
     assert ungreet(deliver(db)[0]) == HOLDING  # ...and the customer hears from us within 60 s
     page = client.get("/").text
     assert f'id="waiting-{mid}"' in page and f'id="address-{mid}"' in page
+
+
+# ---------- R2 / Q4: no place word = not an address ----------
+
+@pytest.mark.parametrize("body", [LIVE_ORDER, "stw intensely 10ml ယူမယ်", "can I order 2 bottles",
+                                  "hello how are you today friend", "sauvage 10ml ဘယ်လောက်လဲ"])
+def test_r2_no_place_words_is_invalid_not_partial(body):
+    check = address.validate(body)
+    assert check.status == "invalid" and check.reason == "no_place" and check.ask is None  # never "which township?"
+    assert address.from_rules(body) is None
+
+
+@pytest.mark.parametrize("body", ["သုခလမ်း အမှတ် ၁၂", "ဆေးရုံနား ကျောက်မြောင်း", "No 12, 3rd Ward, near the market",
+                                  "ရွှေဂုံတိုင် ဘုရားရှေ့ အိမ်"])
+def test_r2_one_place_word_is_still_partial(body):
+    assert address.validate(body).status == "partial"

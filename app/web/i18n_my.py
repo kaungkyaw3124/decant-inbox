@@ -674,6 +674,7 @@ MY = {
     "No address in the message.": "စာထဲမှာ လိပ်စာ မပါ။",
     "Only words like “address” / “change”, no place.": "“လိပ်စာ” / “ပြောင်း” လို စာလုံးပဲ ပါ၊ နေရာ မပါ။",
     "Too short to be an address.": "လိပ်စာ ဖြစ်ဖို့ တိုလွန်းတယ်။",
+    "No house no., street, ward, township, city or landmark.": "အိမ်နံပါတ်၊ လမ်း၊ ရပ်ကွက်၊ မြို့နယ်၊ မြို့ (သို့) အမှတ်အသား မပါ။",
     "No township (or city + street).": "မြို့နယ် မပါ (ဒါမှမဟုတ် မြို့ + လမ်း မပါ)။",
     "No city.": "မြို့ မပါ။", "Township not in our list.": "မြို့နယ်စာရင်းထဲမှာ မရှိ။",
     "The AI is not sure about this address.": "AI က ဒီလိပ်စာကို မသေချာ။",
