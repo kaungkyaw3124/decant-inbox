@@ -2,12 +2,12 @@
 
 Read CLAUDE.md first. This file tracks where we are.
 
-## RESUME HERE (updated 2026-10-17 by Claude Code after epic 4.12)
-- v1-v4.12 DONE (2026-10-17). AI mode AUTO, brake ON; ai_address ON, ai_screenshot OFF (S0 check passed:
-  gpt-6-luna reads screenshots; the owner may tick it on /ai).
-- OWNER TEST SCRIPT 4.12 is in REPORT.md (incl. fixing Order #1001's address with "Edit locked order").
-- NEXT: wait for the owner's test results / the next spec from the planning chat.
-- Owner checks: `bash scripts/status.sh`; AI numbers at /ai; evals: `scripts.ai_eval [--addresses|--screens]`.
+## RESUME HERE (updated 2026-10-18 by planning chat)
+- v1-v4.12 DONE. AI AUTO, brake ON, ai_address ON, ai_screenshot OFF.
+- NOW: HOTFIX epic 4.13 docs/SPEC-v4.13-hotfix.md — silent replies in live test (Q0 root cause first),
+  "never leave a customer in silence" holding reply + watchdog, order_start intent, address cleaning,
+  validator, Mandalay grid addresses. Tests R1-R6 + eval additions. Commit per part, deploy, report.
+- Owner checks: `bash scripts/status.sh`; AI numbers at /ai.
 
 ## Status
 | Phase | What | Status |

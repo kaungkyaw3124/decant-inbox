@@ -23,6 +23,7 @@ Detailed specs live in docs/; status and "resume here" in PLAN.md; build log in 
 - 4.3 Reorder "the previous one" from history + numbered choice
 - 4.4 Roles (owner/staff), permissions, owner approval of learning
 - 4.5 Burmese dashboard, help, practice mode, staff guide
+- 4.13 Hotfix: never silent, order_start, address cleaning, Mandalay addresses — docs/SPEC-v4.13-hotfix.md
 - 4.12 AI address assistant + address gates + AI payment-screenshot reader — docs/SPEC-v4.12-address-payment-ai.md
 - 4.11 AI-first inbox: AUTO, multi-action, customer choice, auto-learning, simple card — docs/SPEC-v4.11-ai-first.md
 - 4.10 Interruptions + locked paid orders — docs/SPEC-v4.10-interruptions.md
