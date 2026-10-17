@@ -1,34 +1,64 @@
-{# Teaching card (docs/SPEC-v4.md 4.2). Needs: card, m (message), back.
-   card.ai (docs/SPEC-v4.6-ai.md): the AI's answers are pre-selected; a person checks them. #}
+{# The card in "Needs you" (docs/SPEC-v4.11-ai-first.md L5; teaching cards docs/SPEC-v4.md 4.2).
+   Needs: card, m (message), back; previews (message id -> cards.Preview) from card_context.
+   The AI's answer (or the most likely one) is pre-selected and the exact reply is shown:
+   ✅ ပို့မယ် sends it, ✏️ ပြင်မယ် opens the choices (a changed answer shows the new reply first),
+   🙅 ဘာမှမလုပ်နဲ့ sends nothing. No teaching: learning is automatic (L4).
+   After "form expired" (L6) the page URL carries restore=<message id> + the answers to put back. #}
 {% set ai = card.ai %}
-<form method="post" action="{{ card_action or "/messages/" ~ m.id ~ "/teach/preview" }}" class="teach stack" id="card-{{ m.id }}">
+{% set pv = previews.get(m.id) if previews is defined and previews else none %}
+{% set rq = request.query_params if request.query_params.get("restore") == m.id | string else {} %}
+{% macro on(rq, name, value, pre, first) %}{% if rq.get(name) is not none %}{% if rq.get(name) == value %}checked{% endif %}{% elif pre %}{% if pre == value %}checked{% endif %}{% elif first %}checked{% endif %}{% endmacro %}
+<form method="post" action="{{ card_action or "/messages/" ~ m.id ~ "/teach" }}" class="teach stack" id="card-{{ m.id }}">
   <input type="hidden" name="csrf" value="{{ csrf }}">
   <input type="hidden" name="back" value="{{ back }}">
   {% if ai %}
   <input type="hidden" name="ai_call" value="{{ ai.call_id }}">
   <input type="hidden" name="ai_hint" value="{{ ai.preset_json }}">
-  <p class="ai-hint">🧠 <b>AI suggests</b> · {{ ai.reason }} <small class="muted">({{ ai.percent }}%)</small><br>
-    <small class="muted">AI ရွေးထားတာကို စစ်ပြီး မှန်ရင် ဆက်လုပ်ပါ၊ မှားရင် ပြောင်းပါ။</small></p>
+  <p class="ai-hint">🧠 <b>AI suggests</b> · {{ ai.reason }} <small class="muted">({{ ai.percent }}%)</small></p>
   {% endif %}
+  {% if pv and not card_action %}<input type="hidden" name="expect" value="{{ pv.expect }}">{% endif %}
+  {% if pv %}
+  <div class="card-plan">
+    {% for row in pv.rows %}<p class="big-line">{{ row }}</p>{% endfor %}
+    <p class="small">{{ pv.line }}</p>
+    {% if pv.reply and not (ai and ai.draft is not none) %}<p class="small muted">ဖောက်သည်ဆီ ပို့မယ့်စာ:</p>
+    <pre class="example">{{ pv.reply }}</pre>{% endif %}
+  </div>
+  {% endif %}
+  {% if ai and ai.draft is not none %}
+  <label>🧠 AI ရေးထားတဲ့ အဖြေ (✅ နှိပ်မှ ပို့မယ် — စစ်ပြီး ပြင်ပါ)
+    <textarea name="draft" rows="3" maxlength="1000">{{ rq.get("draft", ai.draft) }}</textarea></label>
+  {% endif %}
+  <details class="card-edit" {% if not pv or rq %}open{% endif %}>
+  <summary>✏️ ပြင်မယ်</summary>
   {% for q in card.products %}
   {% set pre = ai.products.get(q.position) if ai else none %}
+  {% set name = "p" ~ q.position %}
   <fieldset class="question">
     <legend>“{{ q.words }}” ဆိုတာ ဘယ်ပစ္စည်းလဲ?{% if q.is_full_bottle %} · {{ t("full bottle") }}{% elif q.size_ml %} · {{ q.size_ml }}ml{% endif %}</legend>
     {% if q.kind == "partial" and q.options %}<p class="small muted">“{{ q.options[0].name }}” ရဲ့ nickname ပါပေမယ့် တခြားစာလုံးတွေလည်း ပါတယ် — ဒီပစ္စည်းပဲလား?</p>{% endif %}
     <div class="choices">
       {% for p in q.options %}
-      <label class="choice"><input type="radio" name="p{{ q.position }}" value="{{ p.id }}" {% if (pre and pre == p.id | string) or (not pre and loop.first) %}checked{% endif %}><span>{{ p.name }} <small>{{ p.brand }}</small>{% if pre and pre == p.id | string %} 🧠{% endif %}</span></label>
+      <label class="choice"><input type="radio" name="{{ name }}" value="{{ p.id }}" {{ on(rq, name, p.id | string, pre, loop.first) }}><span>{{ p.name }} <small>{{ p.brand }}</small>{% if pre and pre == p.id | string %} 🧠{% endif %}</span></label>
       {% endfor %}
-      <label class="choice"><input type="radio" name="p{{ q.position }}" value="search" {% if not q.options and not pre %}checked{% endif %}><span>🔍 ရှာမယ်</span></label>
-      <label class="choice"><input type="radio" name="p{{ q.position }}" value="new"><span>➕ ပစ္စည်းအသစ်</span></label>
-      <label class="choice"><input type="radio" name="p{{ q.position }}" value="not_stocked" {% if pre == "not_stocked" %}checked{% endif %}><span>🚫 ဒီပစ္စည်း မရှိဘူး{% if pre == "not_stocked" %} 🧠{% endif %}</span></label>
+      <label class="choice"><input type="radio" name="{{ name }}" value="search" {{ on(rq, name, "search", pre, not q.options) }}><span>🔍 ရှာမယ်</span></label>
+      <label class="choice"><input type="radio" name="{{ name }}" value="new" {{ on(rq, name, "new", none, false) }}><span>➕ ပစ္စည်းအသစ်</span></label>
+      <label class="choice"><input type="radio" name="{{ name }}" value="not_stocked" {{ on(rq, name, "not_stocked", pre, false) }}><span>🚫 ဒီပစ္စည်း မရှိဘူး{% if pre == "not_stocked" %} 🧠{% endif %}</span></label>
     </div>
     <label>🔍 ပစ္စည်းအားလုံး
       <select name="search{{ q.position }}">
         <option value="">— ရွေးပါ —</option>
-        {% for p in all_products %}<option value="{{ p.id }}">{{ p.name }} · {{ p.brand }}</option>{% endfor %}
+        {% for p in all_products %}<option value="{{ p.id }}" {% if rq.get("search" ~ q.position) == p.id | string %}selected{% endif %}>{{ p.name }} · {{ p.brand }}</option>{% endfor %}
       </select>
     </label>
+    {% if card.multi %}
+    {% set apre = ai.actions.get(q.position) if ai else none %}
+    <div class="choices">
+      {% for value, label in action_choices %}
+      <label class="choice"><input type="radio" name="act{{ q.position }}" value="{{ value }}" {{ on(rq, "act" ~ q.position, value, apre, loop.first) }}><span>{{ label }}{% if apre == value %} 🧠{% endif %}</span></label>
+      {% endfor %}
+    </div>
+    {% endif %}
     <details class="new-product">
       <summary class="small">➕ ပစ္စည်းအသစ် အချက်အလက်</summary>
       <div class="grid">
@@ -49,13 +79,9 @@
     <legend>ဖောက်သည်က ဘာလုပ်ချင်တာလဲ?</legend>
     <div class="choices">
       {% for value, label in intent_choices %}
-      <label class="choice"><input type="radio" name="intent" value="{{ value }}" {% if (ai and ai.intent == value) or (not (ai and ai.intent) and loop.first) %}checked{% endif %}><span>{{ label }}{% if ai and ai.intent == value %} 🧠{% endif %}</span></label>
+      <label class="choice"><input type="radio" name="intent" value="{{ value }}" {{ on(rq, "intent", value, ai.intent if ai else none, loop.first) }}><span>{{ label }}{% if ai and ai.intent == value %} 🧠{% endif %}</span></label>
       {% endfor %}
     </div>
-    {% if ai and ai.draft is not none %}
-    <label>🧠 AI ရေးထားတဲ့ အဖြေ (“မေးခွန်း” ရွေးရင် ✅ နှိပ်မှ ပို့မယ် — စစ်ပြီး ပြင်ပါ)
-      <textarea name="draft" rows="3" maxlength="1000">{{ ai.draft }}</textarea></label>
-    {% endif %}
   </fieldset>
   {% endif %}
   {% for q in card.sizes %}
@@ -65,19 +91,18 @@
     <div class="choices">
       {% for s in q.sizes %}
       {% set v = s | string if s else 'full' %}
-      <label class="choice"><input type="radio" name="size{{ q.position }}" value="{{ v }}" {% if (pre and pre == v) or (not pre and loop.first) %}checked{% endif %}><span>{{ s ~ "ml" if s else t("Full bottle") }}{% if pre == v %} 🧠{% endif %}</span></label>
+      <label class="choice"><input type="radio" name="size{{ q.position }}" value="{{ v }}" {{ on(rq, "size" ~ q.position, v, pre, loop.first) }}><span>{{ s ~ "ml" if s else t("Full bottle") }}{% if pre == v %} 🧠{% endif %}</span></label>
       {% endfor %}
     </div>
   </fieldset>
   {% endfor %}
-  <fieldset class="learn">
-    <label class="check"><input type="checkbox" name="learn" value="1" checked> 📘 နောက်တစ်ခါ ဒီလိုရေးရင် အလိုအလျောက် လုပ်ပေးပါ</label>
-    {% for q in card.products %}
-    <label>သင်ပေးမယ့် စာလုံး (ပစ္စည်း) <input name="nick{{ q.position }}" value="{{ ai.nicknames.get(q.position, q.nickname) if ai else q.nickname }}" maxlength="255"></label>
-    {% endfor %}
-    {% if card.ask_intent %}
-    <label>သင်ပေးမယ့် စာလုံး (လုပ်ချင်တာ) <input name="phrase" value="{{ (ai.phrase if ai and ai.phrase) or card.phrase }}" maxlength="120"></label>
+  </details>
+  <div class="buttons">
+    {% if pv or card_action %}
+    <button class="primary big">✅ ပို့မယ်</button>
+    {% else %}
+    <button class="primary big" formaction="/messages/{{ m.id }}/teach/preview">ဆက်လုပ်မယ် →</button>
     {% endif %}
-  </fieldset>
-  <button class="primary big">ဆက်လုပ်မယ် →</button>
+    <button class="quiet" name="nothing" value="1">🙅 ဘာမှမလုပ်နဲ့</button>
+  </div>
 </form>

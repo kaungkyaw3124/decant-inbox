@@ -12,6 +12,11 @@ Questions:
   size     a buy without a size: the sizes sold + full bottle
 Undo (the action's Undo button) also removes the patterns and resolutions the card created
 and puts the old parse back.
+
+docs/SPEC-v4.11-ai-first.md L5: the card on the dashboard is SIMPLE — the AI's answer (or the most
+likely one) is pre-selected, the reply it will send is shown (preview()), and the admin taps
+✅ ပို့မယ် / ✏️ ပြင်မယ် / 🙅 ဘာမှမလုပ်နဲ့. No teaching words: learning is automatic (L4). Each item
+may have its own action (add / remove / ask price) when one message does several things.
 """
 import re
 from dataclasses import dataclass, field
@@ -44,12 +49,15 @@ INTENT_CHOICES = (
     ("ask_delivery", "ပစ္စည်းရောက်ပြီလားမေး"),
     ("previous_item", "အရင်ကဟာ ပြန်ယူမယ်"),
     ("change_info", "လိပ်စာ / ဖုန်း ပြောင်းချင်"),
+    ("modify_cart", "တစ်ခု ဖြုတ်ပြီး တခြားဟာ ယူမယ်"),
     ("greeting", "နှုတ်ဆက်တာ"),
     ("question", "မေးခွန်း — ကိုယ်တိုင်ဖြေမယ်"),
     ("ignore", "ဘာမှမလုပ်နဲ့"),
 )
 INTENT_VALUES = tuple(v for v, _ in INTENT_CHOICES)
 COMMON_SIZES = (2, 5, 10)
+ACTION_CHOICES = (("add", "ယူမယ်"), ("remove", "ဖြုတ်မယ်"), ("ask_price", "ဈေးမေး"))
+ACTION_ICONS = {"add": "➕", "remove": "➖", "ask_price": "💬"}
 
 
 class CardError(Exception):
@@ -83,6 +91,7 @@ class Card:
     sizes: list[SizeQuestion] = field(default_factory=list)
     phrase: str = ""  # proposed intent phrase
     ai: object | None = None  # app.ai.hints.Hint: the AI's answers, pre-selected (docs/SPEC-v4.6-ai.md S3)
+    multi: bool = False  # several actions in one message: each item has its own action (4.11 L2)
 
     @property
     def count(self) -> int:
@@ -131,7 +140,7 @@ def build(session: Session, message: Message) -> Card | None:
     result = session.scalar(select(ParseResult).where(ParseResult.message_id == message.id, ParseResult.is_current))
     if result is None or result.method == "human" or result.intent in ("greeting", "address", "confirm", "done"):
         return None
-    card = Card(message, result)
+    card = Card(message, result, multi=result.intent == "modify_cart")
     items = _items(session, result)
     open_texts = {u.position for u in unknown.open_unknowns(session, message)}
     for item in items:
@@ -244,6 +253,8 @@ class Answers:
     phrase: str = ""
     via_ai: bool = False  # the card showed the AI's answers: patterns are "AI + <user>"
     draft: str = ""  # the (edited) AI draft answer to a question
+    actions: dict[int, str] = field(default_factory=dict)  # position -> add | remove | ask_price (4.11 L2)
+    nothing: bool = False  # 🙅 ဘာမှမလုပ်နဲ့ (4.11 L5)
 
 
 def _int(value: str, low: int, high: int) -> int | None:
@@ -255,7 +266,7 @@ def read_form(form) -> Answers:
     """Answers from the card form (see _card.html)."""
     a = Answers(learn=form.get("learn") == "1", phrase=str(form.get("phrase", "")).strip(),
                 intent=str(form.get("intent") or "") or None, via_ai=str(form.get("ai_call") or "").isdigit(),
-                draft=str(form.get("draft") or "").replace("\r\n", "\n").strip())
+                draft=str(form.get("draft") or "").replace("\r\n", "\n").strip(), nothing=form.get("nothing") == "1")
     for key in form.keys():
         if m := re.fullmatch(r"p(\d+)", key):
             pos = int(m.group(1))
@@ -269,6 +280,8 @@ def read_form(form) -> Answers:
                                                  _int(form.get(f"bottle{pos}"), 1, 1000))
         elif m := re.fullmatch(r"size(\d+)", key):
             a.sizes[int(m.group(1))] = str(form.get(key))
+        elif (m := re.fullmatch(r"act(\d+)", key)) and str(form.get(key)) in dict(ACTION_CHOICES):
+            a.actions[int(m.group(1))] = str(form.get(key))
     return a
 
 
@@ -327,6 +340,9 @@ def apply(session: Session, message: Message, answers: Answers, user: User) -> A
     card = build(session, message)
     if card is None:
         raise CardError("ဒီစာကို ဖြေပြီးသားပါ။")
+    if answers.nothing:  # 🙅 (4.11 L5)
+        return Applied(None, "ignore", {"patterns": [], "unknown_requests": [], "prev_result": card.result.id,
+                                        "corrections": []})
     if card.ask_intent and answers.intent not in INTENT_VALUES:
         raise CardError("ဖောက်သည်က ဘာလုပ်ချင်တာလဲ — တစ်ခု ရွေးပါ။")
     intent = answers.intent if card.ask_intent else card.result.intent
@@ -395,7 +411,18 @@ def apply(session: Session, message: Message, answers: Answers, user: User) -> A
         new_items.append(ParseItem(position=item.position, product_id=pid, size_ml=None if full else size,
                                    is_full_bottle=full, quantity=item.quantity, unknown_text=unknown_text,
                                    from_context=False if match == "human" else item.from_context, match=match,
-                                   name_text=item.name_text))
+                                   name_text=item.name_text,
+                                   action=answers.actions.get(item.position, item.action)))
+    if intent == "modify_cart" or len({i.action for i in new_items if i.action}) > 1:  # 4.11 L2
+        for item in new_items:
+            item.action = item.action or "add"
+        if len({i.action for i in new_items}) > 1:
+            intent = "modify_cart"
+        else:
+            intent = {"add": "buy", "remove": "remove", "ask_price": "ask_price"}[new_items[0].action] \
+                if new_items else intent
+            for item in new_items:
+                item.action = None
     if card.ask_intent and answers.learn and answers.phrase and intent in patterns.LEARNABLE_INTENTS:
         _learn(session, applied, "intent_phrase", answers.phrase, user, message,
                f"“{answers.phrase}” = {dict(INTENT_CHOICES)[intent]}", intent=intent)
@@ -494,7 +521,79 @@ def preview_line(session: Session, applied: Applied, suggestion) -> str:
         "cancel_order": "အော်ဒါကို ပယ်ဖျက်ပြီး ပြန်ပြောမယ်။",
         "faq": "FAQ အဖြေ ပို့မယ်။",
         "cart_list": "ခြင်းထဲက စာရင်း ပို့မယ်။",
+        "cart_change": "ခြင်းကို ပြင်ပြီး ဖောက်သည်ဆီ တစ်စာတည်း ပို့မယ်။",
+        "choose_product": "ဖောက်သည်ကို ဘယ်ဟာလဲ နံပါတ်နဲ့ ရွေးခိုင်းမယ်။",
     }.get(suggestion.kind, suggestion.label)
+
+
+# ---------- the simple card (docs/SPEC-v4.11-ai-first.md L5) ----------
+
+@dataclass
+class Preview:
+    rows: list[str]  # one per item: "➕ Y Eau de Parfum 10ml ×1"
+    line: str  # what ✅ does, one Burmese sentence
+    reply: str | None  # the exact text the customer gets
+    expect: str  # fingerprint of that reply ("" = open the preview page first)
+
+
+def default_answers(card: Card) -> Answers | None:
+    """What the card shows pre-selected: the AI's answers, else the most likely ones."""
+    ai = card.ai
+    a = Answers(learn=False, via_ai=ai is not None, draft=(ai.draft or "") if ai is not None else "")
+    for q in card.products:
+        pre = ai.products.get(q.position) if ai is not None else None
+        if pre is None and not q.options:
+            return None  # the admin must pick (🔍 / ➕): no preview
+        a.products[q.position] = pre or str(q.options[0].id)
+    for q in card.sizes:
+        pre = ai.sizes.get(q.position) if ai is not None else None
+        a.sizes[q.position] = pre or (str(q.sizes[0]) if q.sizes[0] else "full")
+    if card.ask_intent:
+        a.intent = (ai.intent if ai is not None and ai.intent else None) or INTENT_VALUES[0]
+    if ai is not None:
+        a.actions = dict(ai.actions)
+    return a
+
+
+def preview(session: Session, card: Card, user: User) -> Preview | None:
+    """The card's pre-selected answers run for real inside a savepoint, then rolled back (same code
+    as ✅, so the shown reply is exactly what goes out)."""
+    from app.orders import actions  # late import: actions -> learning
+    from app.replies import templates as replies
+
+    answers = default_answers(card)
+    if answers is None:
+        return None
+    texts = replies.load(session)
+    savepoint = session.begin_nested()
+    try:
+        applied = apply(session, card.message, answers, user)
+        if applied.intent == "question":
+            reply = answers.draft or None
+            out = Preview([], "ဒီအဖြေကို ဖောက်သည်ဆီ ပို့မယ်။" if reply else "Chat ကိုဖွင့်ပြီး ကိုယ်တိုင် ဖြေမယ်။", reply, "")
+        else:
+            suggestion = None
+            if applied.result is not None and not applied.price_needed:
+                suggestion = actions.suggest(session, card.message, applied.result, texts)
+            rows = []
+            if applied.result is not None:
+                for item in _items(session, applied.result):
+                    product = session.get(Product, item.product_id) if item.product_id else None
+                    size = size_label(None if item.is_full_bottle else item.size_ml,
+                                      product.full_size_ml if product else None) \
+                        if (item.size_ml or item.is_full_bottle) else ""
+                    name = product.name if product else f"🚫 {item.unknown_text or '?'}"
+                    action = item.action or {"remove": "remove", "ask_price": "ask_price",
+                                             "ask_stock": "ask_price"}.get(applied.intent, "add")
+                    qty = f" ×{item.quantity}" if (item.quantity or 1) != 1 else ""
+                    rows.append(f"{ACTION_ICONS[action]} {name} {size}{qty}".replace("  ", " ").strip())
+            out = Preview(rows, preview_line(session, applied, suggestion), suggestion.text if suggestion else None,
+                          suggestion.fingerprint if suggestion else "")
+    except CardError:
+        savepoint.rollback()
+        return None
+    savepoint.rollback()
+    return out
 
 
 # ---------- price needed (a staff member added a product without a price) ----------

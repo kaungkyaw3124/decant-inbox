@@ -9,7 +9,9 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.core.base import Base, created_at_column
 
 INTENTS = ("buy", "ask_stock", "ask_price", "other", "unknown", "remove", "confirm", "done", "address",
-           "ask_delivery", "cancel_order", "greeting", "previous_item", "change_info", "payment_sent")
+           "ask_delivery", "cancel_order", "greeting", "previous_item", "change_info", "payment_sent",
+           "modify_cart")  # docs/SPEC-v4.11-ai-first.md L2: adds and removes in one message
+ITEM_ACTIONS = ("add", "remove", "ask_price")  # per item (L2); None = what the intent says
 PARSE_METHODS = ("rules", "ai", "human")
 
 
@@ -48,6 +50,7 @@ class ParseItem(Base):
     item is also copied to parse_results.product_id/size_ml/quantity for v1 readers."""
 
     __tablename__ = "parse_items"
+    __table_args__ = (CheckConstraint(f"action IN {ITEM_ACTIONS}", name="action"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
     parse_result_id: Mapped[int] = mapped_column(ForeignKey("parse_results.id"), index=True)
@@ -62,3 +65,7 @@ class ParseItem(Base):
     # 4.1 partial match ("hawas for him" with alias "hawas"): the alias' product, a suggestion only
     candidate_product_id: Mapped[int | None] = mapped_column(ForeignKey("products.id"))
     name_text: Mapped[str | None] = mapped_column(String(255))  # the customer's words for the product (4.2)
+    # docs/SPEC-v4.11-ai-first.md: what to do with this item (L2), and 2-3 products it may be (L3:
+    # the customer is asked to choose)
+    action: Mapped[str | None] = mapped_column(String(12))
+    candidates: Mapped[list[int] | None] = mapped_column(JSONB)

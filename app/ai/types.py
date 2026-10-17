@@ -2,8 +2,9 @@
 from dataclasses import asdict, dataclass
 
 INTENTS = ("buy", "ask_price", "ask_stock", "remove", "cancel_order", "confirm", "done", "address", "ask_delivery",
-           "greeting", "previous_item", "change_info", "payment_sent", "question", "other")
+           "greeting", "previous_item", "change_info", "payment_sent", "modify_cart", "question", "other")
 LEARN_KINDS = ("nickname", "intent_phrase", "not_stocked")
+ACTIONS = ("add", "remove", "ask_price")  # docs/SPEC-v4.11-ai-first.md L2
 
 
 @dataclass(frozen=True)
@@ -13,6 +14,8 @@ class AIItem:
     qty: int
     not_in_list: str | None  # the customer's words for a perfume we don't have
     unclear_text: str | None  # words the AI could not map
+    action: str | None = None  # add | remove | ask_price (L2); None = what the intent says
+    candidates: tuple[int, ...] = ()  # 2-3 listed products it may be (L3: the customer chooses)
 
     @property
     def is_full(self) -> bool:
@@ -52,7 +55,9 @@ class AIResult:
         if not isinstance(data, dict):
             raise ValueError("not an object")
         items = tuple(AIItem(_opt_int(i["product_id"]), _opt_str(i["size"]), int(i["qty"]),
-                             _opt_str(i["not_in_list"]), _opt_str(i["unclear_text"])) for i in data["items"])
+                             _opt_str(i["not_in_list"]), _opt_str(i["unclear_text"]),
+                             _opt_str(i.get("action")),  # missing in answers stored before v4.11
+                             tuple(_opt_int(c) for c in (i.get("candidates") or []))) for i in data["items"])
         learn = tuple(AILearn(str(x["text"]), str(x["kind"]), _opt_int(x["product_id"]), _opt_str(x["intent"]))
                       for x in data["learn"])
         confidence = float(data["confidence"])

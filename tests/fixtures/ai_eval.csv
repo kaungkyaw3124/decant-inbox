@@ -49,3 +49,15 @@ q03,ကျေးဇူးပါ,,,,other,,,thanks
 q04,ပို့ခ ဘယ်လောက်လဲ,,,,question/ask_delivery/ask_price,,,delivery fee question
 x01,အိမ်ပြောင်းသွားလို့ ပို့ရမယ့်နေရာ ပြောင်းပေးပါ,"S: ဖုန်း 09111222333၊ လိပ်စာ No. 5, Sanchaung ကိုပဲ ပို့ပေးရမလား။",Sauvage Eau de Parfum 5ml x1,,change_info,,,v4.8: wants another delivery place (not a seed phrase)
 x02,လိပ်စာ,"S: ဖုန်း 09111222333၊ လိပ်စာ No. 5, Sanchaung ကိုပဲ ပို့ပေးရမလား။",Sauvage Eau de Parfum 5ml x1,,other/question/change_info/confirm,,,v4.8: the keyword alone is not an address
+m01,Y edp မယူတော့ဘူး ဗျ liquid brun 10 ml ယူပါမယ်,,Y Eau de Parfum 10ml x1,,modify_cart,Y Eau de Parfum@any>remove;!liquid brun@10ml>add,,v4.11 live case: remove + not sold
+m02,sauvage မယူတော့ဘူး good girl 5ml ယူမယ်,,Sauvage Eau de Parfum 10ml x1,,modify_cart,Sauvage Eau de Parfum@any>remove;Good Girl@5ml>add,,remove + add known
+m03,aventus ကို ဖြုတ်ပေးပါ ပြီးတော့ bleu de chanel 10ml ထည့်ပေး,,Aventus 5ml x1; Good Girl 5ml x1,,modify_cart,Aventus@any>remove;Bleu de Chanel Eau de Parfum@10ml>add,,remove + add with ပြီးတော့
+m04,good girl မယူတော့ဘူးနော် miss dior 5ml ဘယ်လောက်လဲ,,Good Girl 5ml x1,,modify_cart,Good Girl@any>remove;Miss Dior@5ml>ask_price,,remove + price question
+m05,eros မယူတော့ဘူး,,Sauvage Eau de Parfum 5ml x1,,remove/other/question/cancel_order,,,remove a product that is NOT in the cart
+m06,ysl 10ml ယူမယ်,,,,buy,?ysl@10ml{Y Eau de Parfum|Libre},,brand alone: offer Y EDP or Libre
+m07,ysl 5ml ဘယ်လောက်လဲ,,,,ask_price,?ysl@5ml{Y Eau de Parfum|Libre},,brand alone price: offer the two
+m08,armani 10ml ယူမယ်,,,,buy,?armani@10ml{Stronger With You|Stronger With You Intensely|Acqua di Gio Profumo},,brand alone with 3 products
+m09,stronger with you 10ml ယူမယ် intensely မဟုတ်ဘူး,,,,buy,Stronger With You@10ml,,the plain one (not a choice)
+m10,Y edp ကို ဖြုတ်ပြီး libre 10ml ပြောင်းယူမယ်,,Y Eau de Parfum 10ml x1,,modify_cart,Y Eau de Parfum@any>remove;Libre@10ml>add,,swap one for another
+m11,sauvage elixir ဖြုတ်ပေး sauvage edp 5ml ပဲ ယူမယ်,,Sauvage Elixir 5ml x1,,modify_cart,Sauvage Elixir@any>remove;Sauvage Eau de Parfum@5ml>add,,swap flanker for the EDP
+m12,dior 5ml ရှိလား,,,,ask_stock/ask_price,?dior@5ml{Miss Dior|Sauvage Elixir|Sauvage Eau de Parfum},,brand alone stock question

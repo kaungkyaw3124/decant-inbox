@@ -3,10 +3,11 @@
 Session = signed cookie (Starlette SessionMiddleware) holding user_id + csrf token.
 Every POST must carry the csrf token (form field or X-CSRF-Token header).
 """
+import re
 import secrets
 import time
 from collections import defaultdict
-from urllib.parse import quote
+from urllib.parse import quote, urlsplit
 
 from argon2 import PasswordHasher
 from argon2.exceptions import InvalidHashError, VerifyMismatchError
@@ -99,13 +100,36 @@ def current_user(request: Request, db: Session = Depends(get_db)) -> User:
     return user
 
 
+class FormExpired(Exception):
+    """docs/SPEC-v4.11-ai-first.md L6: a form with an old token. Nothing is done; the admin is sent back
+    to the same page (its card answers kept), or htmx reloads the page."""
+
+    def __init__(self, back: str, keep: list[tuple[str, str]]):
+        self.back, self.keep = back, keep
+
+
+KEEP_FIELDS = re.compile(r"(?:p|size|search|qty|act)\d+|intent|draft")  # a card's answers (_card.html)
+
+
 async def verify_csrf(request: Request) -> None:
     if request.method != "POST":
         return
     expected = request.session.get("csrf")
-    sent = request.headers.get("x-csrf-token") or (await request.form()).get("csrf")
-    if not expected or not sent or not secrets.compare_digest(str(sent), expected):
+    form = await request.form()
+    sent = request.headers.get("x-csrf-token") or form.get("csrf")
+    if not sent:
         raise HTTPException(403, "Form expired. Go back, reload the page and try again.")
+    if not expected or not secrets.compare_digest(str(sent), expected):
+        back = str(form.get("back") or "")
+        if not back.startswith("/") or back.startswith(("//", "/\\")):
+            referer = urlsplit(request.headers.get("referer") or "")
+            same = referer.netloc in ("", request.url.netloc)
+            back = (referer.path + (f"?{referer.query}" if referer.query else "")) if same and referer.path else "/"
+        keep = [(k, str(v)[:500]) for k, v in form.multi_items() if KEEP_FIELDS.fullmatch(k)][:40]
+        match = re.fullmatch(r"/messages/(\d+)/teach(?:/preview)?", request.url.path)
+        if match:
+            keep.insert(0, ("restore", match.group(1)))
+        raise FormExpired(back, keep if match else [])
 
 
 def owner_only(user: User = Depends(current_user)) -> User:

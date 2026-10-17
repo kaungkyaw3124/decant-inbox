@@ -7,6 +7,7 @@ Usage: .venv/bin/uvicorn app.web.main:app --host 127.0.0.1 --port 8080 --no-acce
 """
 import sys
 from pathlib import Path
+from urllib.parse import urlencode
 
 from fastapi import Depends, FastAPI, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -21,7 +22,7 @@ from app.web import (
     ai as ai_pages, auto as auto_pages, catalog, chats, health, help as help_pages, i18n, inbox, learning, orders, payments, practice,
     prices, sales, settings as settings_pages, users,
 )
-from app.web.auth import LoginRequired, authenticate, client_ip, current_user, locked_out, login, verify_csrf
+from app.web.auth import FormExpired, LoginRequired, authenticate, client_ip, current_user, locked_out, login, verify_csrf
 from app.web.deps import get_db, templates
 
 settings = get_settings()
@@ -62,6 +63,19 @@ def redirect_to_login(request: Request, exc: LoginRequired):
     if request.headers.get("hx-request"):  # make htmx do a full-page redirect
         return HTMLResponse("", headers={"HX-Redirect": "/login"})
     return RedirectResponse(f"/login?next={exc.next_url}", status_code=303)
+
+
+@app.exception_handler(FormExpired)
+def form_expired(request: Request, exc: FormExpired):
+    """docs/SPEC-v4.11-ai-first.md L6: never act; back to the same page with the card answers kept."""
+    if request.headers.get("hx-request"):
+        return HTMLResponse("", headers={"HX-Refresh": "true"})
+    inbox.flash(request, "ဒီစာမျက်နှာ သက်တမ်းကုန်သွားလို့ ပြန်ဖွင့်ပေးထားပါတယ်။ ထပ်နှိပ်ပေးပါ။")
+    path, _, fragment = exc.back.partition("#")
+    if exc.keep:
+        path += ("&" if "?" in path else "?") + urlencode(exc.keep)
+        fragment = f"card-{dict(exc.keep)['restore']}"
+    return RedirectResponse(path + (f"#{fragment}" if fragment else ""), status_code=303)
 
 
 @app.exception_handler(StarletteHTTPException)

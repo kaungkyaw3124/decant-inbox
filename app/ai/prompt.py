@@ -9,7 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.ai.privacy import mask
-from app.ai.types import INTENTS, LEARN_KINDS
+from app.ai.types import ACTIONS, INTENTS, LEARN_KINDS
 from app.models import FaqEntry, LearnedPattern, Message, Order, OrderItem, Outbox, Product, ProductAlias
 from app.models.orders import OPEN_STATUSES, PAID_STATUSES
 from app.pricing.prices import current_prices
@@ -88,6 +88,8 @@ context to understand it (e.g. "that one", "the previous one", "10ml too").
 - ask_price: asks the price (ဈေး, ဘယ်လောက်, price, how much). A price question with a product is ask_price, not buy.
 - ask_stock: asks if we have it (ရှိလား, ရလား about a perfume or size, available, in stock).
 - remove: no longer wants a NAMED item that is in the cart (မယူတော့ဘူး, ဖြုတ်ပေး, cancel + product).
+- modify_cart: ONE message that both removes an item from the cart AND adds or asks about another one
+  ("Y edp မယူတော့ဘူး liquid brun 10ml ယူပါမယ်"). Every item then needs its action.
 - cancel_order: cancels the whole order, no product named.
 - confirm: agrees to the list / order (ok, ဟုတ်ကဲ့, အဆင်ပြေတယ်).
 - done: says that is all (ဒါပဲ, ဒါပါပဲ).
@@ -117,15 +119,23 @@ context to understand it (e.g. "that one", "the previous one", "10ml too").
   "liquid brun"). If you cannot tell which listed product they mean: product_id = null and
   unclear_text = their words. Never set both product_id and not_in_list.
 - A BRAND NAME ALONE ("ysl", "dior", "armani", "jpg", "chanel") is NOT a product when the list has more
-  than one product of that brand: product_id = null, unclear_text = their words, confidence < 0.6. Use
-  the brand only when the recent chat or the cart shows which of them is meant (e.g. "ysl" with only
-  Y Eau de Parfum in the cart). Never pick the most popular one.
+  than one product of that brand: product_id = null, unclear_text = their words, and candidates = those
+  products when there are 2 or 3 of them (the shop then asks the customer to choose, so your confidence is
+  how sure you are that it is ONE OF THE CANDIDATES, usually high). More than 3: candidates = [] and
+  confidence < 0.6. Use the brand as a product only when the recent chat or the cart shows which one is
+  meant (e.g. "ysl" with only Y Eau de Parfum in the cart). Never pick the most popular one.
 - A product named in an EARLIER message (recent chat / cart) may be meant by "it", "this one",
   "10ml too" or a size alone: use it only when that is clear.
 - size: "2ml", "5ml", "10ml" ... or "full" for a full bottle (အပြည့်, ဗူးလိုက်, full bottle, full size, or the
   bottle size itself). null when no size is said. Never guess a size.
 - qty: number of pieces (၂ခု / 2 ခု / x2 / 2 pcs = 2). Default 1. "5ml" is a size, not a quantity.
 - For remove: the item(s) from the cart that the customer no longer wants (size from the cart if not said).
+  Only products that are in the CART NOW can be removed.
+- action: what to do with THIS item: "add" (buy / add to the cart), "remove" (take it out of the cart) or
+  "ask_price" (price / stock question). Required for modify_cart; for other intents it may be null.
+- candidates: when the words clearly mean ONE of 2-3 listed products but you cannot tell which (a brand
+  name alone, "ysl 10ml" = Y Eau de Parfum or Libre): product_id = null, unclear_text = their words,
+  candidates = those 2-3 product ids (most likely first). Otherwise [].
 
 ## learn (0-3 entries; words worth remembering so the shop's rules understand them next time)
 - nickname: the customer's words for a LISTED product that are not already one of its nicknames,
@@ -136,9 +146,12 @@ context to understand it (e.g. "that one", "the previous one", "10ml too").
   ask_delivery, greeting, previous_item, change_info).
 - text must be copied EXACTLY from the customer message (same spelling). No sizes, numbers or
   [PHONE]/[ADDRESS]. Leave learn empty when nothing is new.
+- Only SHORT reusable words: a product name or nickname, or an intent phrase of at most 4 words. Never
+  the whole message or a whole sentence, never particles alone (နော်, ဗျ, ရှင့်, ပါ).
 
 ## confidence, reason, draft_answer
-- confidence 0-1: how sure you are that intent AND every item are right. Use < 0.6 when guessing.
+- confidence 0-1: how sure you are that intent AND every item are right (for an item with candidates: that
+  it is one of them). Use < 0.6 when guessing.
 - reason: short English, max 20 words, e.g. "ysl edp = Y EDP; 10ml; ယူပါမယ် = buy".
 - draft_answer: only for intent "question": a short, polite Burmese answer from the shop (ending
   with ရှင့် / နော်) that a staff member will check before sending. No prices, no stock or delivery
@@ -172,13 +185,15 @@ def schema(catalog: Catalog) -> dict:
             "intent": {"type": "string", "enum": list(INTENTS)},
             "items": {"type": "array", "items": {
                 "type": "object", "additionalProperties": False,
-                "required": ["product_id", "size", "qty", "not_in_list", "unclear_text"],
+                "required": ["product_id", "size", "qty", "not_in_list", "unclear_text", "action", "candidates"],
                 "properties": {
                     "product_id": {"type": ["integer", "null"], "enum": [*ids, None]},
                     "size": {"type": ["string", "null"], "enum": [*catalog.all_sizes, None]},
                     "qty": {"type": "integer"},
                     "not_in_list": {"type": ["string", "null"]},
                     "unclear_text": {"type": ["string", "null"]},
+                    "action": {"type": ["string", "null"], "enum": [*ACTIONS, None]},
+                    "candidates": {"type": "array", "items": {"type": "integer", "enum": ids}},
                 }}},
             "learn": {"type": "array", "items": {
                 "type": "object", "additionalProperties": False,

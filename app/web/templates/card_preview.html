@@ -7,6 +7,7 @@
 </section>
 <section class="card notice">
   <h2>ဒါလုပ်မယ်</h2>
+  {% if changed %}<p class="small problem-text">ပြင်လိုက်တဲ့အတွက် ပို့မယ့်စာ ပြောင်းသွားပါတယ် — စစ်ပြီး ✅ နှိပ်ပါ။</p>{% endif %}
   <p class="big-line">{{ line }}</p>
   {% if reply %}<p class="small muted">ဖောက်သည်ဆီ ပို့မယ့်စာ ({{ undo_seconds }} စက္ကန့်အတွင်း “{{ t("Undo") }}” နှိပ်ပြီး ပြန်ဖျက်လို့ရတယ်):</p>
   <pre class="example">{{ reply }}</pre>{% endif %}

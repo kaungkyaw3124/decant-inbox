@@ -213,3 +213,11 @@ details.teach-box > summary { cursor: pointer; display: inline-flex; }
 .toc { background: var(--bg); border-radius: 10px; padding: 8px 12px; margin-bottom: 8px; }
 .practice-head .big-line { margin: 6px 0 0; }
 .top nav { flex-wrap: wrap; row-gap: 6px; }
+/* docs/SPEC-v4.11-ai-first.md L5: the simple card; L7: older items */
+.teach .card-plan { background: var(--bg); border-radius: 10px; padding: 10px 12px; }
+.teach .card-plan .big-line { margin: 0 0 4px; }
+.teach .card-plan pre.example { margin: 6px 0 0; white-space: pre-wrap; }
+.teach details.card-edit > summary { cursor: pointer; font-weight: 600; padding: 6px 0; }
+.teach details.card-edit[open] { display: grid; gap: 8px; }
+.ai-banner { background: var(--bg); }
+details.older > summary { cursor: pointer; font-weight: 600; }

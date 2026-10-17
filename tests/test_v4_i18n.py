@@ -245,7 +245,7 @@ def test_e3_help_page_renders_the_guide(shop, db):
     owner, _ = shop
     page = owner.get("/help").text
     assert "ဝန်ထမ်း လမ်းညွှန်" in page and '<h2 id="s1">' in page
-    for section in ("စာတစ်စောင် ဝင်လာရင် ဘာလုပ်ရမလဲ", "📘 သင်ပေးကတ်", "💳 ငွေလွှဲ စစ်နည်း", "KPay app",
+    for section in ("စာတစ်စောင် ဝင်လာရင် ဘာလုပ်ရမလဲ", "👀 စစ်ပြီး ဖြေမယ် ကတ်",  # 4.11 L5 "💳 ငွေလွှဲ စစ်နည်း", "KPay app",
                     "❗ မလုပ်ရမယ့်အရာများ", "🙋 မသိရင် ဘယ်သူ့ကို မေးမလဲ", "📦 ထုပ် → 🚚 ပို့ → ✅ ရောက်"):
         assert section in page, section
     staff, _ = burmese_client(db, "helpme", "staff")

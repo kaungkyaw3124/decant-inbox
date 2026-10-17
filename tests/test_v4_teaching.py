@@ -94,8 +94,9 @@ def test_b1_fuzzy_name_card_teaches_nickname(shop, db):
     page = card_page(client, mid)
     assert "“ysl edp” ဆိုတာ ဘယ်ပစ္စည်းလဲ?" in page
     assert f'name="p0" value="{pid(db, "Y Eau de Parfum")}" checked' in page  # Y EDP first
-    assert 'name="nick0" value="ysl edp"' in page and 'name="phrase"' not in page  # buy is known: no Q-intent
-    assert "📘 သင်ပေးမယ်" in client.get("/").text  # also in Needs you
+    assert 'name="phrase"' not in page  # buy is known: no Q-intent
+    assert 'name="nick0"' not in page and 'name="learn"' not in page  # 4.11 L5: no teaching box on the card
+    assert "👀 စစ်ပြီး ဖြေမယ်" in client.get("/").text  # also in Needs you
 
     shown = preview(client, token, mid, p0=str(pid(db, "Y Eau de Parfum")), nick0="ysl edp")
     assert "Y Eau de Parfum 10ml ကို ခြင်းထဲထည့်ပြီး စာရင်းပို့မယ်။" in shown
@@ -107,7 +108,7 @@ def test_b1_fuzzy_name_card_teaches_nickname(shop, db):
     assert items(db) == [("Y Eau de Parfum", 10, False, 1, 34000)]
     assert learned(db) == [("nickname", "ysl edp", "pending", "Y Eau de Parfum", 0, 0)]  # "ရောယူပါမယ်" = buy, known
     assert scalar(db, "SELECT method FROM parse_results WHERE message_id = :m AND is_current", m=mid) == "human"
-    assert "📘 သင်ပေးမယ်" not in card_page(client, mid)  # answered
+    assert "👀 စစ်ပြီး ဖြေမယ်" not in card_page(client, mid)  # answered
 
 
 def test_b1b_new_intent_phrase_is_learned(shop, db):
@@ -115,7 +116,7 @@ def test_b1b_new_intent_phrase_is_learned(shop, db):
     y_shop(db)
     mid = say(db, 1, "ysl edp 10ml လေးထည့်ထားပေး")
     page = card_page(client, mid)
-    assert "ဖောက်သည်က ဘာလုပ်ချင်တာလဲ?" in page and 'name="phrase" value="လေးထည့်ထားပေး"' in page
+    assert "ဖောက်သည်က ဘာလုပ်ချင်တာလဲ?" in page and 'name="phrase"' not in page  # 4.11 L5: no teaching box
     teach(client, token, mid, p0=str(pid(db, "Y Eau de Parfum")), nick0="ysl edp", intent="buy",
           phrase="လေးထည့်ထားပေး")
     assert len(deliver(db)) == 1

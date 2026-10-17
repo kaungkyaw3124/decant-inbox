@@ -28,9 +28,16 @@ KIND_TITLES = {"nickname": "📛 Nicknames (ပစ္စည်းနာမည်
 WEEK = timedelta(days=7)
 
 
-def card_context(db: Session) -> dict:
-    """What every teaching card needs besides the card itself."""
-    return {"all_products": [p for p in products_for_select(db) if p.active], "intent_choices": cards.INTENT_CHOICES}
+def card_context(db: Session, shown: list | None = None, user: User | None = None) -> dict:
+    """What every card needs besides the card itself; shown: the cards on the page, whose reply
+    preview (docs/SPEC-v4.11-ai-first.md L5) is made for `user`."""
+    previews = {}
+    if user is not None:
+        for card in shown or []:
+            if card is not None:
+                previews[card.message.id] = cards.preview(db, card, user)
+    return {"all_products": [p for p in products_for_select(db) if p.active], "intent_choices": cards.INTENT_CHOICES,
+            "action_choices": cards.ACTION_CHOICES, "previews": previews}
 
 
 def _form_fields(form) -> list[tuple[str, str]]:
@@ -46,7 +53,10 @@ def _card_error(request: Request, message_id: int, back: str, note: str) -> Redi
 async def teach_preview(request: Request, message_id: int, db: Session = Depends(get_db),
                         user: User = Depends(current_user)):
     """Step 1: show what ✅ will do (computed by the same code, then rolled back)."""
-    form = await request.form()
+    return _preview_page(request, db, await request.form(), message_id, user)
+
+
+def _preview_page(request: Request, db: Session, form, message_id: int, user: User, changed: bool = False):
     back = safe_back(str(form.get("back", "/")), "/")
     message = get_message(db, message_id)
     answers = cards.read_form(form)
@@ -69,7 +79,7 @@ async def teach_preview(request: Request, message_id: int, db: Session = Depends
         "m": message, "c": db.get(Customer, message.customer_id), "line": line,
         "reply": draft or (suggestion.text if suggestion else None), "learned": applied.learned, "learn": answers.learn,
         "warnings": applied.warnings, "fields": _form_fields(form), "expect": suggestion.fingerprint if suggestion else "",
-        "back": back, "undo_seconds": UNDO_SECONDS})
+        "back": back, "undo_seconds": UNDO_SECONDS, "changed": changed})
 
 
 @router.post("/messages/{message_id}/teach")
@@ -98,9 +108,11 @@ async def teach_confirm(request: Request, message_id: int, db: Session = Depends
         suggestion = None
         if applied.result is not None and not applied.price_needed:
             suggestion = actions.suggest(db, message, applied.result, texts)
+        if form.get("expect") and applied.result is not None and not applied.price_needed and (
+                suggestion is None or form.get("expect") != suggestion.fingerprint):
+            db.rollback()  # the answers were changed (✏️) or the cart / price changed: show the new reply first
+            return _preview_page(request, db, form, message_id, user, changed=True)
         if suggestion is not None:
-            if form.get("expect") and form.get("expect") != suggestion.fingerprint:
-                raise actions.Refused("The reply changed meanwhile (price, cart). Check it again.")
             action = actions.perform(db, message, suggestion.fingerprint, user, texts)
             action.undo = {**action.undo, "teach": applied.undo}
             note = f"Done. The reply goes out in {UNDO_SECONDS} s unless you undo." if action.outbox_id else "Done."
@@ -206,9 +218,12 @@ def learning_page(request: Request, db: Session = Depends(get_db)):
                       .where(LearnedPattern.status.in_(patterns.LIVE))
                       .order_by(LearnedPattern.kind, LearnedPattern.id.desc())).all()
     pending = {k: [r for r in rows if r[0].kind == k and r[0].status == "pending"] for k in KIND_TITLES}
-    approved = [r for r in rows if r[0].status == "approved"]
+    approved = [r for r in rows if r[0].status == "approved" and not r[0].auto_learned]
+    auto_learned = [r for r in rows if r[0].status == "approved" and r[0].auto_learned]  # 4.11 L4
     return templates.TemplateResponse(request, "learning.html", {
-        "pending": pending, "approved": approved, "kind_titles": KIND_TITLES,
+        "pending": pending, "approved": approved, "auto_learned": auto_learned, "kind_titles": KIND_TITLES,
+        "auto_learned_week": sum(1 for r in auto_learned if r[0].approved_at and
+                                 r[0].approved_at >= datetime.now(UTC) - WEEK),
         "conflicts": patterns.conflicts(db), "handled_week": handled_this_week(db),
         "settings": patterns.settings(db), "products": [p for p in products_for_select(db) if p.active],
         "intents": [(v, label) for v, label in cards.INTENT_CHOICES if v in patterns.LEARNABLE_INTENTS],

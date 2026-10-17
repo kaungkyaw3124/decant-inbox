@@ -30,11 +30,12 @@ from app.parser.normalize import normalize
 log = logging.getLogger("ai")
 WINDOW = timedelta(hours=24)  # only fresh messages (never history imports or old re-parses)
 UNSURE_MATCHES = ("fuzzy", "multiple", "ambiguous", "partial", "context", "none")
-PRODUCT_INTENTS = ("buy", "ask_price", "ask_stock", "remove")
+PRODUCT_INTENTS = ("buy", "ask_price", "ask_stock", "remove", "modify_cart")
 # AUTO may act on these (cancel_order only with an open cart; previous_item only when the history has it)
 AUTO_INTENTS = ("buy", "ask_price", "ask_stock", "remove", "cancel_order", "confirm", "address", "greeting",
-                "ask_delivery", "previous_item", "change_info", "payment_sent")
+                "ask_delivery", "previous_item", "change_info", "payment_sent", "modify_cart")
 NOT_IN_LIST_AUTO = 0.9
+MAX_CANDIDATES = 3  # docs/SPEC-v4.11-ai-first.md L3: more -> a person decides
 NOT_IN_LIST_HINT = 0.85
 CALL_KINDS = ("shadow", "accepted", "corrected", "auto", "rejected", "error", "unused")  # = a request was made
 
@@ -90,8 +91,8 @@ def _items(session: Session, result: ParseResult) -> list[ParseItem]:
 
 def rules_unsure(session: Session, message: Message, result: ParseResult) -> str | None:
     """Why the rules are not certain about this message (None = certain, no AI needed).
-    Messages an approved learned pattern handles are certain (match "learned"); pending ones are
-    one-tap 📘 suggestions already, so no AI either."""
+    Messages an approved learned pattern handles are certain (match "learned"); a pending one is
+    read by the AI (docs/SPEC-v4.11-ai-first.md L4: that counts towards automatic learning)."""
     from app.orders import previous, unknown  # late imports: orders -> parser
     from app.replies import faq
 
@@ -99,6 +100,10 @@ def rules_unsure(session: Session, message: Message, result: ParseResult) -> str
         return None
     if result.method != "rules":
         return None
+    from app.learning import patterns  # late import
+
+    if patterns.not_certain(session, list(result.learned_ids or [])):
+        return "learned pattern waiting"  # docs/SPEC-v4.11-ai-first.md L4: the AI reads it (counts a use)
     if faq.for_message(session, message, result) is not None:
         return None  # an FAQ answers it
     items = _items(session, result)
@@ -291,10 +296,17 @@ def auto_apply(session: Session, message: Message, rules: ParseResult, ai: AIRes
                catalog: prompt.Catalog, cfg: dict) -> str | None:
     """Use the AI's answer as the parse result (method="ai") when it is certain enough.
     Returns None when applied, else why not (the result then stays a SHADOW hint)."""
-    from app.models import Order  # late imports: orders -> parser
+    from app.models import Order, OrderItem  # late imports: orders -> parser
     from app.models.orders import OPEN_STATUSES
     from app.orders import previous
 
+    open_order = session.scalar(select(Order.id).where(Order.customer_id == message.customer_id,
+                                                       Order.status.in_(OPEN_STATUSES)))
+    in_cart = set(session.scalars(select(OrderItem.product_id).where(
+        OrderItem.order_id == open_order, OrderItem.removed_at.is_(None)))) if open_order else set()
+    ai, dropped = checker.removes_in_cart(ai, in_cart)  # docs/SPEC-v4.11-ai-first.md L2
+    if dropped:
+        call.error = "; ".join(dropped)[:255]
     if ai.confidence < cfg["threshold"]:
         return f"confidence {ai.confidence:.2f} below {cfg['threshold']}"
     if ai.intent not in AUTO_INTENTS:
@@ -306,10 +318,14 @@ def auto_apply(session: Session, message: Message, rules: ParseResult, ai: AIRes
     if intent in PRODUCT_INTENTS + ("previous_item",) and not ai.items:
         return "no items"
     for item in ai.items:
-        if item.product_id is None and not (item.not_in_list and ai.confidence >= NOT_IN_LIST_AUTO):
+        choose = item.product_id is None and not item.not_in_list and 2 <= len(item.candidates) <= MAX_CANDIDATES
+        if item.product_id is None and not choose and not (item.not_in_list and ai.confidence >= NOT_IN_LIST_AUTO):
             return "an item without a product"
-        if item.product_id is not None and intent in ("buy", "previous_item") and item.size is None:
+        adds = intent in ("buy", "previous_item") or (intent == "modify_cart" and item.action == "add")
+        if (item.product_id is not None or choose) and adds and item.size is None:
             return "a buy without a size"
+        if choose and checker.effective_action(ai, item) == "remove":
+            return "which item to remove is not clear"
     if intent == "previous_item":
         history = {c.key for c in previous.candidates(session, message)}
         if not all((i.product_id, i.size_ml, i.is_full) in history for i in ai.items):
@@ -330,10 +346,14 @@ def auto_apply(session: Session, message: Message, rules: ParseResult, ai: AIRes
     session.add(result)
     session.flush()
     for position, item in enumerate(items):
+        choose = item.product_id is None and not item.not_in_list and bool(item.candidates)
         session.add(ParseItem(parse_result_id=result.id, position=position, product_id=item.product_id,
                               size_ml=item.size_ml, is_full_bottle=item.is_full, quantity=item.qty,
                               unknown_text=item.not_in_list[:255] if item.not_in_list else None, from_context=False,
-                              match="ai", name_text=None))
+                              match="candidates" if choose else "ai",
+                              name_text=item.unclear_text[:255] if choose and item.unclear_text else None,
+                              action=item.action if intent == "modify_cart" else None,
+                              candidates=list(item.candidates) if choose else None))
         if item.not_in_list:  # "we don't have it", counted in Wanted (resolved by the AI, no user)
             norm = normalize(item.not_in_list)[:255]
             if norm and not session.scalar(select(UnknownRequest.id).where(
@@ -341,7 +361,7 @@ def auto_apply(session: Session, message: Message, rules: ParseResult, ai: AIRes
                 session.add(UnknownRequest(message_id=message.id, customer_id=message.customer_id,
                                            text=item.not_in_list[:255], normalized_text=norm, size_ml=item.size_ml,
                                            is_full_bottle=item.is_full, resolution="not_stocked", resolved_by=None))
-    taught = learn(session, ai, None, message.id)
+    taught = learn(session, ai, None, message)
     call.decision, call.decided_at = "auto", datetime.now(UTC)
     session.add(AuditLog(user_id=None, action="ai.auto", details={
         "message_id": message.id, "ai_call_id": call.id, "parse_result_id": result.id, "intent": intent,
@@ -350,15 +370,21 @@ def auto_apply(session: Session, message: Message, rules: ParseResult, ai: AIRes
     return None
 
 
-def learn(session: Session, ai: AIResult, user, message_id: int) -> list[int]:
-    """The AI's learn entries become PENDING learned patterns (via_ai). Returns their ids."""
+def learn(session: Session, ai: AIResult, user, message: Message) -> list[int]:
+    """docs/SPEC-v4.11-ai-first.md L4: the AI's learn entries (short reusable words only) become
+    PENDING learned patterns (via_ai); the same words read the same way again count a use, and
+    after 3 (no correction in between) the pattern is approved by itself ("🧠 auto-learn").
+    Returns the ids of the patterns created or counted."""
     from app.learning import patterns
 
     ids = []
     for entry in ai.learn:
-        taught = patterns.teach(session, entry.kind, entry.text, user, product_id=entry.product_id,
-                                intent=entry.intent if entry.kind == "intent_phrase" else None,
-                                message_id=message_id, via_ai=True)
-        if taught.status == "saved":
-            ids.append(taught.pattern.id)
+        if not patterns.reusable(session, entry.kind, entry.text, message.normalized_text or "",
+                                 product_id=entry.product_id):
+            continue
+        pattern = patterns.ai_resolved(session, entry.kind, entry.text, product_id=entry.product_id,
+                                       intent=entry.intent if entry.kind == "intent_phrase" else None,
+                                       message_id=message.id, user=user)
+        if pattern is not None:
+            ids.append(pattern.id)
     return ids

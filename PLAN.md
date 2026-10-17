@@ -3,9 +3,9 @@
 Read CLAUDE.md first. This file tracks where we are.
 
 ## RESUME HERE (updated 2026-10-17 by planning chat)
-- v1-v4.10 DONE (AI SHADOW, auto-graduate ON). OWNER TEST SCRIPT 4.9 + 4.10 is in REPORT.md.
-- NOW epic 4.11 docs/SPEC-v4.11-ai-first.md (AI-first: AUTO now, multi-action messages, ask the
-  customer to choose, automatic learning, simple admin card, form-expired fix, Older section).
+- v1-v4.11 DONE (2026-10-17). AI mode AUTO (owner skipped shadow), auto-graduate OFF, brake ON.
+  OWNER TEST SCRIPT 4.9 + 4.10 and OWNER TEST SCRIPT 4.11 are in REPORT.md (owner tests pending).
+- NEXT: wait for the owner's test results / the next spec from the planning chat.
 - Owner checks: `bash scripts/status.sh`; AI numbers at /ai.
 
 ## Status
@@ -26,6 +26,7 @@ Read CLAUDE.md first. This file tracks where we are.
 | 11 | v4.8 (docs/SPEC-v4.8-change-info.md): change address / phone, live bug fix | ✅ Done, live (owner test pending) |
 | 12 | v4.9 (docs/SPEC-v4.9-greeting.md): smart greeting | ✅ Done, live (owner test pending) |
 | 13 | v4.10 (docs/SPEC-v4.10-interruptions.md): interruptions, resume line, locked paid orders | ✅ Done, live (owner test pending) |
+| 14 | v4.11 (docs/SPEC-v4.11-ai-first.md): AI-first (AUTO, multi-action, customer chooses, auto-learning, simple card) | ✅ Done, live in AUTO (owner test pending) |
 
 ## Phase 0 checklist
 - [x] Step 0: rollback safety net scripts in ~/hardening/

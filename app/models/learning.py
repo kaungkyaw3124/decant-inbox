@@ -39,5 +39,7 @@ class LearnedPattern(Base):
     confirmed_uses: Mapped[int] = mapped_column(Integer, server_default="0", default=0)
     corrections: Mapped[int] = mapped_column(Integer, server_default="0", default=0)
     source_message_id: Mapped[int | None] = mapped_column(ForeignKey("messages.id"))
+    # docs/SPEC-v4.11-ai-first.md L4: approved by itself after the AI read the same words the same way 3 times
+    auto_learned: Mapped[bool] = mapped_column(Boolean, server_default=false(), default=False)
     # docs/SPEC-v4.6-ai.md: the AI proposed it (shown as "AI + <user>", or "AI" in AUTO mode)
     via_ai: Mapped[bool] = mapped_column(Boolean, server_default=false(), default=False)

@@ -21,16 +21,20 @@ rules-6 (docs/SPEC-v4.md 4.3): previous_item ("ဟိုနေ့ကဟာ ထ�
 named and it is not a price / stock / remove question; parse_choice() reads "1", "1 နဲ့ 2", "အကုန်".
 rules-8 (docs/SPEC-v4.10-interruptions.md): payment_sent ("ငွေလွှဲပြီးပါပြီ", "paid", "transferred") —
 "I paid" in words; the screenshot is what counts.
+rules-9 (docs/SPEC-v4.11-ai-first.md L2, L3): a message that removes one item and adds / asks about
+another ("Y edp မယူတော့ဘူး ဗျ liquid brun 10 ml ယူပါမယ်") is split into clauses (ဗျ, နော်, ပြီးတော့, commas,
+after an action word); every item gets its clause's action and the intent is modify_cart. An
+ambiguous name shared by 2-3 products keeps them as candidates (the customer is asked to choose).
 rules-7 (docs/SPEC-v4.8-change-info.md): change_info ("လိပ်စာ ပြောင်းချင်ပါတယ်", "ဖုန်းအသစ်", "change address");
 an address needs real CONTENT (township, street, number, ward or a long text): keywords alone
 ("လိပ်စာ", "ပို့ပေးပါ", "address") are not an address and never an agreement.
 """
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 from rapidfuzz import fuzz
 
-PARSER_VERSION = "rules-8"
+PARSER_VERSION = "rules-9"
 NEEDS_REVIEW_BELOW = 0.6  # dashboard shows results under this as "needs review"
 FUZZY_THRESHOLD = 88      # rapidfuzz partial_ratio, 0-100
 FUZZY_MIN_ALIAS_LEN = 5   # shorter aliases match too much by accident
@@ -149,6 +153,8 @@ class ParsedItem:
     match: str = "none"  # exact | fuzzy | multiple | ambiguous | inherited | context | partial | none
     candidate_id: int | None = None  # partial: the product whose alias is inside the name
     name_text: str | None = None  # the customer's words for the product ("ysl edp"), for teaching
+    action: str | None = None  # rules-9: add | remove | ask_price when one message does several things
+    candidates: tuple[int, ...] = ()  # rules-9: ambiguous name shared by 2-3 products (customer chooses)
 
 
 @dataclass(frozen=True)
@@ -527,6 +533,7 @@ def _items(text: str, aliases: list[Alias], full_sizes: dict[int, int],
                     product_id, how = context_product_id, "context"
         if product_id is None and unknown is None and not sizes and not full and how != "ambiguous":
             continue  # nothing product-related in this part (e.g. "ယူပါမယ်" on its own line)
+        candidates = _candidates(part, aliases) if how == "ambiguous" else ()
         bottle = full_sizes.get(product_id) if product_id else None
         if full or not sizes:
             sizes_for_part: list[int | None] = [None]
@@ -535,8 +542,74 @@ def _items(text: str, aliases: list[Alias], full_sizes: dict[int, int],
         for size in sizes_for_part:
             is_full = full or (size is not None and bottle is not None and size == bottle)
             items.append(ParsedItem(product_id, None if is_full else size, is_full, qty, unknown,
-                                    how == "context", how, candidate, words))
+                                    how == "context", how, candidate, words, candidates=candidates))
     return items
+
+
+MAX_CANDIDATES = 3
+
+
+def _candidates(part: str, aliases: list[Alias]) -> tuple[int, ...]:
+    """The products whose names appear in this ambiguous part ("ysl" = Y EDP and Libre): 2-3, else ()."""
+    found: list[int] = []
+    for alias in sorted(aliases, key=lambda a: -len(a.normalized_alias)):
+        if alias.pending or alias.product_id in found:
+            continue
+        if _exact_spans(part, alias.normalized_alias):
+            found.append(alias.product_id)
+    return tuple(found) if 2 <= len(found) <= MAX_CANDIDATES else ()
+
+
+# rules-9: clauses of a message that does several things ("X မယူတော့ဘူး ဗျ Y 10ml ယူပါမယ်")
+_CLAUSE_SPLIT_RE = re.compile(r"\s(?:ဗျ|ဗျာ|နော်|ပြီးတော့|ပြီး\s*တော့|then)\s|(?<!\d),|,(?!\d)|[၊။\n]")
+_ACTION_RES = (("remove", REMOVE_RE), ("add", BUY_RE), ("ask_price", ASK_PRICE_RE), ("ask_price", ASK_STOCK_RE))
+_ACTION_TAIL_RE = re.compile(r"\S*")
+
+
+def _clause_action(text: str) -> str | None:
+    for action, pattern in _ACTION_RES:
+        if pattern.search(text):
+            return action
+    return None
+
+
+def clauses(text: str) -> list[str]:
+    """Split at ဗျ / နော် / ပြီးတော့ / commas, and right after an action word that has more text after it."""
+    out = []
+    for piece in _CLAUSE_SPLIT_RE.split(f" {text} "):
+        rest = piece.strip()
+        while rest:
+            ends = [m.end() for _, pattern in _ACTION_RES if (m := pattern.search(rest))]
+            if not ends:
+                out.append(rest)
+                break
+            end = min(ends)
+            end += _ACTION_TAIL_RE.match(rest, end).end() - end  # "မယူတော့" + "ဘူး"
+            out.append(rest[:end].strip())
+            rest = rest[end:].strip()
+    return [c for c in out if c]
+
+
+def multi_action(text: str, aliases: list[Alias], full_sizes: dict[int, int],
+                 known_words: dict[int, frozenset[str]], learned: list[int]) -> tuple[ParsedItem, ...] | None:
+    """Items with their own action when the message mixes "remove" with "add" / "ask price" (rules-9),
+    else None."""
+    parts = clauses(text)
+    actions = [_clause_action(c) for c in parts]
+    if len({a for a in actions if a}) < 2 or "remove" not in actions:
+        return None
+    items: list[ParsedItem] = []
+    used: list[int] = []
+    for n, part in enumerate(parts):
+        action = actions[n] or next((a for a in actions[n + 1:] if a), None) or next(
+            (a for a in reversed(actions[:n]) if a), None)  # Burmese: the verb comes after the names
+        for item in _items(part, aliases, full_sizes, None, allow_unknown=True, known_words=known_words,
+                           learned=used):
+            items.append(replace(item, action=action))
+    if len({i.action for i in items}) < 2:
+        return None
+    learned.extend(used)
+    return tuple(items)
 
 
 _MATCH_SCORE = {"exact": 0.5, "inherited": 0.5, "fuzzy": 0.35, "multiple": 0.25, "context": 0.25,
@@ -569,6 +642,14 @@ def parse(normalized_text: str, aliases: list[Alias], full_sizes: dict[int, int]
     if previous:
         item_text = PREVIOUS_RE.sub(" ", item_text)  # "same one" / "last time" are not product names
     keyword_intent = phrase.intent if phrase else find_intent(text)
+    if phrase is None and not phone:
+        mixed = multi_action(item_text, aliases, full_sizes, known_words or {}, learned)
+        if mixed is not None:
+            sure = all(i.product_id and i.match in ("exact", "inherited", "learned") and not i.unknown_text
+                       for i in mixed)
+            first = next((i for i in mixed if i.product_id), mixed[0])
+            return ParseOutcome("modify_cart", first.product_id, first.size_ml, first.quantity, 0.9 if sure else 0.4,
+                                mixed, None, tuple(dict.fromkeys(learned)))
     items = _items(item_text, aliases, full_sizes, context_product_id,
                    allow_unknown=keyword_intent in PRODUCT_INTENTS, known_words=known_words or {}, learned=learned)
     named = [i for i in items if i.match != "context"]

@@ -90,6 +90,17 @@ def apply(session: Session, message: Message, form, user: User) -> tuple[bool, s
            if (p.kind == "nickname" and p.product_id not in chosen) or (p.kind == "intent_phrase" and p.intent != intent)
            or (p.kind == "not_stocked" and any(i.product_id for i in new_items if i.unknown_text is None) and wrong)]
     patterns.add_corrections(session, bad, user, message.id)
+    try:  # docs/SPEC-v4.11-ai-first.md L4: the AI's words from this answer are never learned by themselves
+        from app.ai.types import AIResult
+
+        learned = AIResult.from_json(fix.call.result_json).learn if fix.call.result_json else ()
+    except (KeyError, TypeError, ValueError):
+        learned = ()
+    norms = {(x.kind, patterns.normalize(x.text)) for x in learned}
+    more = [p.id for p in session.scalars(select(LearnedPattern).where(
+        LearnedPattern.via_ai, LearnedPattern.status == "pending", LearnedPattern.id.not_in(bad or [0])))
+            if (p.kind, p.normalized_text) in norms]
+    patterns.add_corrections(session, more, user, message.id)
     session.add(AuditLog(user_id=user.id, action="ai.wrong", details={
         "message_id": message.id, "ai_call_id": fix.call.id, "wrong_product": wrong, "intent": intent}))
     reason = graduation.record_decision(session, fix.call, "corrected", user, wrong)

@@ -6,14 +6,14 @@
 {%- endmacro %}
 {% block content %}
 <section class="card practice-head">
-  <h1>🎓 {{ t("Practice") }} {{ ui.help("Practice messages: try the buttons and teaching cards. Nothing is saved and nothing is sent to anyone.") }}</h1>
+  <h1>🎓 {{ t("Practice") }} {{ ui.help("Practice messages: try the buttons and the check cards. Nothing is saved and nothing is sent to anyone.") }}</h1>
   <p class="notice small">{{ t("Practice mode: nothing is saved, nothing is sent.") }}</p>
   <p class="big-line">{{ t("Score") }}: <b>{{ right_count }} / {{ done_count }}</b>{% if step != "home" %} · {{ t("Message {n} of {total}", n=n, total=total) }}{% endif %}</p>
 </section>
 
 {% if step == "home" %}
 <section class="card stack">
-  <p>{{ t("You get {n} practice messages, like real customers write. For each one, do what you would do in the inbox: tap the button if the app's reply is right, or answer the teaching card.", n=total) }}</p>
+  <p>{{ t("You get {n} practice messages, like real customers write. For each one, do what you would do in the inbox: tap the button if the app's reply is right; on a card, check what the app understood, then ✅ send, ✏️ change or 🙅 do nothing.", n=total) }}</p>
   <p>{{ t("After each answer you see if it was right and what the customer would get.") }}</p>
   <form method="post" action="/practice/reset" class="buttons">
     <input type="hidden" name="csrf" value="{{ csrf }}">
@@ -30,8 +30,8 @@
 {% if error %}<p class="flash bad" role="alert">{{ tr(error) }}</p>{% endif %}
 {% if card %}
 <section class="card notice" id="card">
-  <h2>📘 သင်ပေးမယ်</h2>
-  <p class="muted small">{{ t("The app is not sure. Answer the questions like in the inbox.") }}</p>
+  <h2>👀 စစ်ပြီး ဖြေမယ်</h2>
+  <p class="muted small">{{ t("The app is not sure. Check its answer like in the inbox.") }}</p>
   {% include "_card.html" %}
 </section>
 {% elif quick %}

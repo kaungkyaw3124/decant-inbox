@@ -11,7 +11,7 @@ CODES = {
     "buy": "ဝယ်မယ်", "ask_stock": "ရှိလားမေး", "ask_price": "ဈေးမေး", "other": "အခြား", "unknown": "မသိ",
     "remove": "ဖြုတ်မယ်", "confirm": "အတည်ပြု", "address": "လိပ်စာ", "ask_delivery": "ရောက်ပြီလားမေး",
     "cancel_order": "အော်ဒါပယ်", "greeting": "နှုတ်ဆက်", "previous_item": "အရင်ကဟာ", "question": "မေးခွန်း",
-    "ignore": "ဘာမှမလုပ်", "change_info": "လိပ်စာ/ဖုန်း ပြောင်း", "payment_sent": "ငွေလွှဲပြီး (ပုံမပါ)",
+    "ignore": "ဘာမှမလုပ်", "change_info": "လိပ်စာ/ဖုန်း ပြောင်း", "payment_sent": "ငွေလွှဲပြီး (ပုံမပါ)", "modify_cart": "ဖြုတ်ပြီး ထည့်",
     # message review
     "new": "အသစ်", "done": "ပြီးပြီ", "ignored": "လျစ်လျူရှုထား",
     # orders
@@ -458,11 +458,11 @@ MY = {
     # ---------- practice ----------
     "Practice mode: nothing is saved, nothing is sent.": "လေ့ကျင့်ခန်း — ဘာမှ မသိမ်းဘူး၊ ဘာမှ မပို့ဘူး။",
     "Message {n} of {total}": "စာ {total} စောင်ထဲက {n}",
-    "You get {n} practice messages, like real customers write. For each one, do what you would do in the inbox: tap the button if the app's reply is right, or answer the teaching card.":
-        "ဖောက်သည်တွေ တကယ်ရေးသလို လေ့ကျင့်စာ {n} စောင် ရမယ်။ တစ်စောင်ချင်းမှာ စာဝင်ထဲ လုပ်သလို လုပ်ပါ — App ရဲ့ ဖြေစာ မှန်ရင် ခလုတ်နှိပ်ပါ၊ မဟုတ်ရင် သင်ပေးကတ်ကို ဖြေပါ။",
+    "You get {n} practice messages, like real customers write. For each one, do what you would do in the inbox: tap the button if the app's reply is right; on a card, check what the app understood, then ✅ send, ✏️ change or 🙅 do nothing.":
+        "ဖောက်သည်တွေ တကယ်ရေးသလို လေ့ကျင့်စာ {n} စောင် ရမယ်။ တစ်စောင်ချင်းမှာ စာဝင်ထဲ လုပ်သလို လုပ်ပါ — App ရဲ့ ဖြေစာ မှန်ရင် ခလုတ်နှိပ်ပါ၊ ကတ်ပေါ်လာရင် App နားလည်တာကို စစ်ပြီး ✅ ပို့မယ်၊ ✏️ ပြင်မယ် (သို့) 🙅 ဘာမှမလုပ်နဲ့ ကို နှိပ်ပါ။",
     "After each answer you see if it was right and what the customer would get.": "ဖြေပြီးတိုင်း မှန်မမှန်နဲ့ ဖောက်သည် ရမယ့်စာကို ပြမယ်။",
     "Read the staff guide first": "ဝန်ထမ်းလမ်းညွှန် အရင်ဖတ်ပါ", "Practice customer": "လေ့ကျင့်ခန်း ဖောက်သည်",
-    "The app is not sure. Answer the questions like in the inbox.": "App မသေချာဘူး။ စာဝင်ထဲလိုပဲ မေးခွန်းတွေ ဖြေပါ။",
+    "The app is not sure. Check its answer like in the inbox.": "App မသေချာဘူး။ စာဝင်ထဲလိုပဲ သူ့အဖြေကို စစ်ပါ။",
     "The app understood:": "App နားလည်တာ:", "The app understood": "App နားလည်တာ",
     "This is wrong — don't send": "ဒါ မှားနေတယ် — မပို့နဲ့", "Check the product, size and price before you tap.": "မနှိပ်ခင် ပစ္စည်း၊ ဆိုဒ်နဲ့ ဈေး စစ်ပါ။",
     "The app can't answer this one by itself. In the real inbox you would open the chat and reply yourself.":
@@ -471,8 +471,8 @@ MY = {
     "so tapping was right.": "ဒါကြောင့် နှိပ်တာ မှန်တယ်။",
     "so the button was wrong: don't tap, answer the card or reply yourself.": "ဒါကြောင့် ခလုတ်က မှားတယ် — မနှိပ်နဲ့၊ ကတ်ဖြေပါ (သို့) ကိုယ်တိုင် ဖြေပါ။",
     "The customer would get (practice — not sent):": "ဖောက်သည် ရမယ့်စာ (လေ့ကျင့်ခန်း — မပို့ပါ):",
-    "Practice messages: try the buttons and teaching cards. Nothing is saved and nothing is sent to anyone.":
-        "လေ့ကျင့်စာတွေ — ခလုတ်တွေနဲ့ သင်ပေးကတ်တွေ စမ်းကြည့်ပါ။ ဘာမှ မသိမ်းဘူး၊ ဘယ်သူ့ဆီမှ မပို့ဘူး။",
+    "Practice messages: try the buttons and the check cards. Nothing is saved and nothing is sent to anyone.":
+        "လေ့ကျင့်စာတွေ — ခလုတ်တွေနဲ့ စစ်ပြီးဖြေတဲ့ ကတ်တွေ စမ်းကြည့်ပါ။ ဘာမှ မသိမ်းဘူး၊ ဘယ်သူ့ဆီမှ မပို့ဘူး။",
 
     # reply template names (Settings > Reply templates)
     "Greeting (added in front if we haven't messaged them for 6 h)": "နှုတ်ဆက်စာ (၆ နာရီအတွင်း စာမပို့ရသေးရင် ရှေ့မှာ ထည့်)",
@@ -651,4 +651,21 @@ MY = {
     "Paid order is locked: the customer asked to change it": "ငွေချေပြီး အော်ဒါ ပိတ်ထား: ဖောက်သည်က ပြင်ချင်တယ်",
     "Order #{no} changed (owner). Tell the customer yourself if needed.": "Order #{no} ပြင်ပြီး (ပိုင်ရှင်)။ လိုရင် ဖောက်သည်ကို ကိုယ်တိုင် ပြောပါ။",
     "Not saved: write the reason.": "မသိမ်းရသေး: အကြောင်းရင်း ရေးပါ။",
+    # AI-first inbox (docs/SPEC-v4.11-ai-first.md)
+    "AUTO since {date}": "{date} ကစပြီး AUTO", "owner skipped shadow": "ပိုင်ရှင်က SHADOW ကို ကျော်ခဲ့",
+    "safety brake ON": "အန္တရာယ်ကင်း ဘရိတ် ဖွင့်ထား",
+    "One message removes and adds: line for each removed item": "တစ်စာထဲမှာ ဖြုတ်ပြီး ထည့်: ဖြုတ်လိုက်တဲ့ ပစ္စည်းတစ်ခုချင်းအတွက် စာကြောင်း",
+    "Nothing left in the cart after removing": "ဖြုတ်ပြီးနောက် ခြင်းထဲ ဘာမှမကျန်",
+    "A name that fits 2-3 products: ask the customer to choose ({options} = numbered lines)":
+        "ပစ္စည်း ၂-၃ ခုနဲ့ ကိုက်တဲ့ နာမည်: ဖောက်သည်ကို ရွေးခိုင်းမယ် ({options} = နံပါတ်တပ်ထားတဲ့ စာကြောင်းများ)",
+    "Undo dismiss": "ဖယ်ထားတာ ပြန်ဖျက်မယ်", "Older ({n})": "အဟောင်း ({n})",
+    "More than 24 h old, and the customer wrote again since. Payments never move here.":
+        "၂၄ နာရီထက် ကြာပြီ၊ ဖောက်သည်က နောက်ထပ် စာရေးထားပြီ။ ငွေလွှဲတွေ ဒီထဲ ဘယ်တော့မှ မရောက်ပါ။",
+    "Dismiss all older": "အဟောင်းအားလုံး ဖယ်မယ်", "cart changed + list": "ခြင်း ပြင်ပြီး စာရင်းပို့",
+    "asked which product": "ဘယ်ပစ္စည်းလဲ မေးပြီး", "Too late to undo.": "ပြန်ဖျက်ဖို့ နောက်ကျသွားပြီ။",
+    "Dismissed {n} older messages. Undo for 60 s.": "အဟောင်း {n} ခု ဖယ်ပြီး။ ၆၀ စက္ကန့်အတွင်း ပြန်ဖျက်လို့ရ။",
+    "Undone: the older messages are back.": "ပြန်ဖျက်ပြီး: အဟောင်းတွေ ပြန်ရောက်ပြီ။",
+    "Auto-learned": "အလိုအလျောက် သင်ယူပြီး", "{n} this week": "ဒီအပတ် {n} ခု",
+    "The AI read the same words the same way {n} times with no correction, so the app now understands them by itself. Remove one if it is wrong.":
+        "AI က ဒီစာလုံးတွေကို အမှားမပြင်ရဘဲ {n} ကြိမ် တူတူ နားလည်ခဲ့လို့ app က ကိုယ်တိုင် နားလည်ပါပြီ။ မှားရင် ဖယ်ပါ။",
 }

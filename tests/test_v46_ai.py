@@ -122,7 +122,7 @@ def test_f1_rejected_answer_goes_to_needs_you(ai, shop, db, bad):
     assert outbox(db) == []  # nothing sent
     page = card_page(client, mid)
     assert "“ysl edp” ဆိုတာ ဘယ်ပစ္စည်းလဲ?" in page and "AI suggests" not in page  # the rules' card, no 🧠
-    assert "📘 သင်ပေးမယ်" in client.get("/").text  # Needs you
+    assert "👀 စစ်ပြီး ဖြေမယ်" in client.get("/").text  # Needs you
     assert scalar(db, "SELECT method FROM parse_results WHERE message_id = :m AND is_current", m=mid) == "rules"
 
 
@@ -185,7 +185,7 @@ def test_f3_daily_cap_then_next_day(ai, shop, db):
     assert len(ai.requests) == 1
     assert [(m, d) for m, d, _, _ in calls(db)] == [(first, "shadow"), (second, "cap")]
     page = client.get("/").text
-    assert "daily limit of 1 calls reached" in page and "📘 သင်ပေးမယ်" in page  # still in Needs you
+    assert "daily limit of 1 calls reached" in page and "👀 စစ်ပြီး ဖြေမယ်" in page  # still in Needs you
     # next day (Yangon time): the counter starts again
     with db.begin() as c:
         c.execute(text("UPDATE ai_calls SET created_at = created_at - interval '1 day'"))
@@ -220,7 +220,7 @@ def test_f4_errors_never_crash(ai, shop, db, kind, notice):
     assert calls(db) == [(mid, "error", False, kind)]
     assert outbox(db) == []
     page = client.get("/").text
-    assert "📘 သင်ပေးမယ်" in page
+    assert "👀 စစ်ပြီး ဖြေမယ်" in page
     if notice:
         assert notice in page
     # the auto engine did not wait forever: the rules' result was decided (not automatic: fuzzy)
@@ -280,7 +280,8 @@ def test_f5_shadow_card_prefilled_then_accepted(ai, shop, db):
     page = card_page(client, mid)
     y = pid(db, "Y Eau de Parfum")
     assert "🧠 <b>AI suggests</b> · ysl edp = Y EDP; 10ml; ယူပါမယ် = buy" in html.unescape(page)
-    assert f'name="p0" value="{y}" checked' in page and 'name="nick0" value="ysl edp"' in page
+    assert f'name="p0" value="{y}" checked' in page
+    assert 'name="nick0"' not in page and 'name="learn"' not in page  # 4.11 L5: no teaching on the card
     shown = preview(client, token, mid, p0=str(y), nick0="ysl edp", ai_call=str(calls_id(db)),
                     ai_hint=hint_json(page))
     assert "Y Eau de Parfum 10ml ကို ခြင်းထဲထည့်ပြီး စာရင်းပို့မယ်။" in shown
@@ -329,7 +330,7 @@ def test_f6_auto_confident_acts_by_itself(ai, shop, db):
     assert deliver(db) == ["မင်္ဂလာပါ။\n" + Y_LIST]
     assert calls(db)[0][1] == "auto"
     assert scalar(db, "SELECT method FROM parse_results WHERE message_id = :m AND is_current", m=mid) == "ai"
-    assert learned(db) == [("nickname", "ysl edp", "pending", "Y Eau de Parfum", 0, 0)]  # pending, not approved
+    assert learned(db) == [("nickname", "ysl edp", "pending", "Y Eau de Parfum", 1, 0)]  # pending (1 of 3 uses, 4.11 L4)
     assert scalar(db, "SELECT via_ai AND taught_by IS NULL FROM learned_patterns") is True
     chat = client.get(f"/chats/{scalar(db, 'SELECT customer_id FROM messages WHERE id = :m', m=mid)}").text
     assert 'class="ai-mark" title="ysl edp = Y EDP; 10ml; ယူပါမယ် = buy (auto)">🧠' in html.unescape(chat)
@@ -370,7 +371,7 @@ def test_f7_not_in_list_auto_reply(ai, shop, db):
     say(db, 1, HAWAS)
     worker_step()
     assert deliver(db) == ["မင်္ဂလာပါ။\nhawas for him ကတော့ လောလောဆယ် မရှိသေးပါဘူးနော်။"]
-    assert learned(db) == [("not_stocked", "hawas for him", "pending", None, 0, 0)]
+    assert learned(db) == [("not_stocked", "hawas for him", "pending", None, 1, 0)]  # 1 of 3 uses (4.11 L4)
     assert scalar(db, "SELECT resolution FROM unknown_requests") == "not_stocked"  # Wanted report
 
 
@@ -411,7 +412,7 @@ def test_f8_question_never_automatic_admin_sends_draft(ai, shop, db):
     page = card_page(client, mid)
     assert 'name="intent" value="question" checked' in page
     assert f'<textarea name="draft" rows="3" maxlength="1000">{DRAFT}</textarea>' in page
-    assert "📘 သင်ပေးမယ်" in client.get("/").text  # shown in Needs you at once (the AI knows what it is)
+    assert "👀 စစ်ပြီး ဖြေမယ်" in client.get("/").text  # shown in Needs you at once (the AI knows what it is)
     edited = DRAFT + " ညနေဘက်အတွက် Sauvage ကိုလည်း ကြည့်ပါဦး။"
     shown = preview(client, token, mid, intent="question", draft=edited, ai_call=str(calls_id(db)),
                     ai_hint=hint_json(page), learn=None)
@@ -419,7 +420,7 @@ def test_f8_question_never_automatic_admin_sends_draft(ai, shop, db):
     confirm(client, token, shown)
     assert deliver(db) == [edited]
     assert calls(db)[0][1] == "corrected"  # the draft was edited
-    assert "📘 သင်ပေးမယ်" not in card_page(client, mid)
+    assert "👀 စစ်ပြီး ဖြေမယ်" not in card_page(client, mid)
 
 
 def test_f8_question_draft_unchanged_is_accepted(ai, shop, db):

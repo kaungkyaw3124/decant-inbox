@@ -7,7 +7,22 @@
   <div class="tile"><span>{{ t("Waiting for approval") }}</span><b>{{ pending.values() | map("length") | sum }}</b></div>
   <div class="tile"><span>{{ t("Approved") }}</span><b>{{ approved | length }}</b></div>
   <div class="tile"><span>{{ t("Handled by learned patterns this week") }}</span><b>{{ handled_week }}</b></div>
+  <div class="tile"><span>🧠 {{ t("Auto-learned") }}</span><b>{{ auto_learned | length }}</b></div>
 </div>
+
+<section class="card" id="auto-learned">
+  <h2>🧠 {{ t("Auto-learned") }} ({{ auto_learned | length }}) <small class="muted">· {{ t("{n} this week", n=auto_learned_week) }}</small></h2>
+  <p class="muted small">{{ t("The AI read the same words the same way {n} times with no correction, so the app now understands them by itself. Remove one if it is wrong.", n=settings.auto_approve_after) }}</p>
+  {% if not auto_learned %}<p class="muted small">{{ t("Nothing yet.") }}</p>{% endif %}
+  <ul class="aliases">
+  {% for p, product, teacher, msg in auto_learned %}
+    <li id="pattern-{{ p.id }}"><span>“<b>{{ p.text }}</b>” → {% if p.kind == "nickname" %}{{ product.name if product else "?" }}{% elif p.kind == "intent_phrase" %}{{ dict(intents).get(p.intent, p.intent) }}{% else %}{{ t("we don't sell it") }}{% endif %}
+      <span class="small muted">· {{ t("used {n}×", n=p.confirmed_uses) }} · {{ p.approved_at | local_time }}{% if msg %} · {{ t("e.g.") }} “{{ msg.raw_text | truncate(60) }}”{% endif %}</span></span>
+      <form method="post" action="/learning/{{ p.id }}/decide" class="inline"><input type="hidden" name="csrf" value="{{ csrf }}">
+        <button name="status" value="rejected" class="link">{{ t("remove") }}</button></form></li>
+  {% endfor %}
+  </ul>
+</section>
 
 {% if conflicts %}
 <section class="card problem" id="conflicts">

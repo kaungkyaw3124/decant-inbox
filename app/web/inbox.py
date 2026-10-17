@@ -146,8 +146,9 @@ def inbox(
 
     needs_you = auto_pages.needs_you(db, owner=user.is_owner) if first_page else None
     return templates.TemplateResponse(request, "inbox.html", {
-        **(card_context(db) if needs_you and (needs_you["teach"] or any(r.card for r in needs_you["unanswered"]))
-           else {}),
+        **(card_context(db, [card for _, _, card in needs_you["teach"]]
+                        + [r.card[1] for r in needs_you["unanswered"] if r.card], user)
+           if needs_you and (needs_you["teach"] or any(r.card for r in needs_you["unanswered"])) else {}),
         "needs_you": needs_you,
         "handled": auto_pages.handled_feed(db) if first_page else [],
         "rows": [row_context(*r, infos[r[0].id]) for r in rows[:PAGE_SIZE]], "f": f,
@@ -166,7 +167,8 @@ def get_message(db: Session, message_id: int) -> Message:
 
 
 @router.get("/messages/{message_id}", response_class=HTMLResponse)
-def message_detail(request: Request, message_id: int, back: str = "/", db: Session = Depends(get_db)):
+def message_detail(request: Request, message_id: int, back: str = "/", db: Session = Depends(get_db),
+                   user: User = Depends(current_user)):
     message = get_message(db, message_id)
     history = db.execute(
         select(ParseResult, Product).outerjoin(Product, Product.id == ParseResult.product_id)
@@ -186,7 +188,7 @@ def message_detail(request: Request, message_id: int, back: str = "/", db: Sessi
 
     ai_fix = corrections.card(db, message)
     return templates.TemplateResponse(request, "message.html", {
-        "card": card, **(card_context(db) if card else {}),
+        "card": card, **(card_context(db, [card], user) if card else {}),
         "ai_fix": ai_fix, "ai_reason": (ai_fix.call.result_json or {}).get("reason") if ai_fix else None,
         "ai_intents": corrections.INTENTS,
         "unknowns": [(u, unknown.suggestions(db, u.text, first=u.candidate_id)) for u in open_unknown],

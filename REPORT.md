@@ -1467,3 +1467,80 @@ waiting for payment / after the screenshot / after approval / after sending, "hi
    change paid Order #N"; the paid order is unchanged.
 10. Orders → All → "🔒 #N" → "Edit locked order": change the address with a reason → saved, in Activity.
     Log in as staff: the button is not there.
+
+## 2026-10-17 — v4.11: AI-first inbox (docs/SPEC-v4.11-ai-first.md)
+**Owner goal:** "I don't want to teach. OpenAI should handle new wording. Ask me only when it really can't decide."
+
+**What was built**
+- **L1 AUTO now, brake ON.** `scripts/ai_auto_now.py` (run at deploy): AI mode = AUTO, auto-graduate OFF, the 4.7
+  safety brake unchanged (wrong product on an AUTO message, < 90% right on the last 30, ≥ 50% errors on the last 20 →
+  back to SHADOW + notice). /ai shows "🧠 AUTO since <date> (owner skipped shadow); safety brake ON".
+- **L2 several actions in one message.** The AI answers each item with an action (add / remove / ask_price) and a new
+  intent `modify_cart`. Our checker drops a "remove" of a product that is not in the cart and lowers the confidence
+  (→ a person decides). The rules split a message into clauses (ဗျ / နော် / ပြီးတော့ / commas / after an action word): when
+  every clause is certain ("stw intensely မယူတော့ဘူး ဗျ sauvage edp 10ml ယူမယ်") the rules handle it without the AI.
+  ONE reply: "{product} ကို ဖြုတ်လိုက်ပါပြီ။" lines, not-stocked lines, prices, then the list + total, or
+  "ခြင်းထဲမှာ ဘာမှ မကျန်တော့ပါဘူး။ တခြား ဘာယူချင်လဲ။" (the empty order is cancelled); while waiting for payment and the total
+  changed: payment info again with "စုစုပေါင်း အသစ်". New templates item_removed, cart_empty.
+- **L3 the customer chooses.** A name that fits 2-3 products ("ysl 10ml" = Y EDP or Libre, from the AI or an ambiguous
+  rules alias) → "ysl 10ml ထဲက ဘယ်ဟာလဲ – 1. … 2. … နံပါတ်လေး ပြောပေးပါနော်။" (template choose_product). The answer "1",
+  "၂" or the name ("libre ပါ") continues the original action (buy / price) with the message's other items, without the
+  AI. 24 h; other replies are parsed normally; more than 3 or none → a person.
+- **L4 automatic learning.** The AI's proposals are filtered to short reusable words (a name, or an intent phrase of
+  ≤ 4 words; no sizes/numbers/particles; never the whole sentence). The same words read the same way again count a use;
+  at 3 uses with no correction → approved by itself ("🧠 auto-learn" in Activity). A correction (🧠 AI was wrong, or a
+  changed card) blocks it for good. A message that uses a still-pending word is read by the AI (that is how it counts).
+  Learning page: new "🧠 Auto-learned" section + counts; "remove" still works.
+- **L5 simple card** (Needs you, message page, practice): the AI's answer (or the most likely one) is pre-selected, one
+  line per item (➕ / ➖ / 💬 product size ×qty) + the exact reply. Buttons **✅ ပို့မယ် / ✏️ ပြင်မယ် / 🙅 ဘာမှမလုပ်နဲ့**.
+  No teaching words, no learn box. If the admin changes something, ✅ first shows the new reply to confirm. Questions:
+  the AI draft in an editable box, never automatic. Staff guide + practice updated.
+- **L6 "Form expired"**: an old token never acts; the admin is sent back to the same page with the flash
+  "ဒီစာမျက်နှာ သက်တမ်းကုန်သွားလို့ ပြန်ဖွင့်ပေးထားပါတယ်။ ထပ်နှိပ်ပေးပါ။" and the card answers restored; htmx → page reload.
+  (A request with NO token is still refused with 403.)
+- **L7 Older**: Needs-you items > 24 h whose customer wrote again since → collapsed "Older (n)" + "🧹 Dismiss all older"
+  (↩️ Undo for 60 s). Payments never move there. The Needs-you count shows current items only.
+
+**Decisions to check**
+- The prompt's old rule "brand alone → confidence < 0.6" now says: with 2-3 products of that brand, give them as
+  candidates and the confidence is "sure it is one of them" (else the choice question would never be automatic).
+- An emptied cart (everything removed) is cancelled quietly; the reply is cart_empty (not "order cancelled").
+- The eval applies the same cart check as AUTO before scoring; it also prints how many removes the check dropped.
+
+**Tests:** 603 passed, 1 skipped (was 580 + 1). New tests/test_v411_ai_first.py (23): L1; M1 live case + remove-only-
+in-cart; M2 rules (no AI call), waiting-for-payment, AI; M3 by number, by name + price, expired (25 h), > 3 candidates;
+M4 card for low confidence / error / cap (pre-selected, exact preview sent, no learn box), changed answer, 🙅, question
+draft; M5 learned after 3 + 4th without AI, correction in between, sentences never learned; M6 brake in AUTO; M7 form
+expired; M8 Older + dismiss + undo + payments; M9 eval scoring. Earlier tests changed only where 4.11 changes them
+(card label "📘 သင်ပေးမယ်" → "👀 စစ်ပြီး ဖြေမယ်", no nickname/phrase boxes on the card, a new AI pattern starts with 1 use).
+Also fixed on the way: the "which one?" step was skipped for price questions.
+
+**Real-API evaluation (M9):** 12 new cases (multi-action incl. the live sentence, remove not in cart, 4 brand-alone
+choices, swaps). Full run: 62 cases, intent+products 100%, 0 wrong product ids, 0 not-in-list mapped, 0 removes outside
+the cart → PASS. Cost $0.006.
+
+**Deployed:** backup product_requests_2026-10-17T0502Z.dump, migration f6f4f1cb85a7 (round trip done), AI mode AUTO
+(auto-graduate OFF, brake ON), parser (rules-9) + web restarted, health ok.
+
+### OWNER TEST SCRIPT 4.11 (second Telegram account, Auto-reply ON; AI replies take ~3-8 s)
+1. Dashboard → 🧠 AI: the banner says "AUTO since … (owner skipped shadow); safety brake ON".
+2. **The live sentence.** Send `ysl y edp 10ml ယူမယ်` → the list. Then send
+   `Y edp မယူတော့ဘူး ဗျ liquid brun 10 ml ယူပါမယ်` → ONE reply:
+   "Y Eau de Parfum… ကို ဖြုတ်လိုက်ပါပြီ။ / liquid brun ကတော့ လောလောဆယ် မရှိသေးပါဘူးနော်။ / ခြင်းထဲမှာ ဘာမှ မကျန်တော့ပါဘူး။ တခြား ဘာယူချင်လဲ။".
+   On /ai the last call is "auto".
+3. **Remove + add.** Send `stw intensely 5ml ယူမယ်`, then `stw intensely မယူတော့ဘူး ဗျ sauvage edp 10ml ယူမယ်` → "Stronger With
+   You Intensely ကို ဖြုတ်လိုက်ပါပြီ။" + the list with only Sauvage 10ml + total (instant: no AI needed).
+4. **Choose.** Send `ysl 10ml ယူမယ်` → "ysl 10ml ထဲက ဘယ်ဟာလဲ – 1. Y Eau de Parfum 10ml 2. Libre 10ml …". Reply `၂` → Libre 10ml is
+   added + the list.
+5. **A question.** Send `ဒီအနံ့က ဘယ်လိုမျိုးလဲ` → no reply. Inbox → 🟡 Needs you shows a 👀 card with the AI's draft in a box.
+   Edit it if you like, tap ✅ ပို့မယ် → it goes out after 10 s.
+6. **Auto-learning.** Pick a new nickname the app does not know, e.g. `lbre 5ml ဘယ်လောက်လဲ` (typo of Libre). Send it 3 times
+   (a minute apart). Each time the price comes. Learning → "🧠 Auto-learned" shows "lbre → Libre" after the 3rd (if the AI
+   did not propose the word, try another nickname). The 4th time the reply is instant and /ai shows no new call.
+7. **Form expired.** Open the inbox in two tabs. In tab 2 log out and log in again. In tab 1 change an answer on a 👀 card
+   and tap ✅ → the page comes back with "ဒီစာမျက်နှာ သက်တမ်းကုန်သွားလို့ ပြန်ဖွင့်ပေးထားပါတယ်။ ထပ်နှိပ်ပေးပါ။", your answer still
+   selected, nothing sent. Tap ✅ again → it works.
+8. **Older.** Tomorrow: an item from today whose customer wrote again is under "Older (n)". "🧹 Dismiss all older" clears
+   them; "↩️ Undo dismiss" (60 s) brings them back. Payments never go there.
+9. **Brake (optional).** If the AI ever picks a wrong product: open the message → 🧠 AI was wrong → choose the right
+   product → the AI goes back to SHADOW with a notice. Switch AUTO on again at /ai when you want.

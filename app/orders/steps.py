@@ -33,7 +33,8 @@ from app.replies.templates import render
 LOCKED_RECENT = timedelta(days=30)  # older paid orders: a new message is just a new conversation
 SHIPPING_LOCKED = ("paid", "packed", "sent_out")  # not delivered yet: a new order is "another order"
 OFFER_TTL = timedelta(hours=24)
-NO_RESUME_KINDS = ("greeting", "change_info", "choose_previous", "hold", "locked", "cancel_order", "delivery")
+NO_RESUME_KINDS = ("greeting", "change_info", "choose_previous", "choose_product", "hold", "locked", "cancel_order",
+                   "delivery")
 ASK_NEW = {"address": "ask_new_address", "phone": "ask_new_phone"}
 RequestRef = aliased(OrderEvent)
 YES_RE = re.compile(r"^(?:ok(?:ay)?|ok\s*ပါ|yes|ဟုတ်(?:ကဲ့)?|ဟုတ်ပါတယ်|ရ(?:ပါ)?တယ်|ထည့်(?:ပေး|မယ်)(?:ပါ)?|"

@@ -204,7 +204,7 @@ def _apply(session: Session, message: Message, result: ParseResult, texts: dict[
     outcome = _apply_items(session, message, result, texts, address_override, dropped)
     if outcome is None and match is not None and not dropped:
         return _faq(match)  # e.g. "kpay ရလား", "deli ဘယ်နှစ်ရက်ကြာလဲ" without an order
-    if not dropped or (outcome is not None and outcome.kind == "cart_add"):  # cart_add placed them itself
+    if not dropped or (outcome is not None and outcome.kind in ("cart_add", "cart_change")):  # placed them itself
         return outcome
     if outcome is None:
         if any(i.product_id or i.unknown_text for i in _remaining(session, message, result)):
@@ -232,6 +232,8 @@ def _apply_items(session: Session, message: Message, result: ParseResult, texts:
     intent = result.intent
     customer = session.get(Customer, message.customer_id)
     items = _remaining(session, message, result)
+    if any(i.candidates and not i.product_id for i in items):  # docs/SPEC-v4.11-ai-first.md L3: which one?
+        return _choose_product(session, message, customer, result, items, texts)
 
     if intent in ("ask_price", "ask_stock"):
         if not _certain(items):
@@ -272,15 +274,17 @@ def _apply_items(session: Session, message: Message, result: ParseResult, texts:
     phones, address = contact_in(message)
     if address_override is not None and address is not None:
         address = address_override.strip()[:500] or address
-    asks_change = intent in ("buy", "previous_item", "remove", "change_info") or (
+    asks_change = intent in ("buy", "previous_item", "remove", "change_info", "modify_cart") or (
         intent == "address" and bool(phones or address))
     if order is not None and order.status == "photo_received" and asks_change:
         return _hold_request(session, message, order, intent, texts)
     locked = steps.locked_order(session, customer.id)
-    if locked is not None and intent in ("remove", "change_info", "address") and asks_change and (
+    if locked is not None and intent in ("remove", "change_info", "address", "modify_cart") and asks_change and (
             order is None or (intent == "change_info" and order.status == "cart" and not order.address
                               and not order.phones and locked.status in steps.SHIPPING_LOCKED)):
         return _locked(session, message, locked, intent, texts)  # nothing is changed; Needs you
+    if intent == "modify_cart":  # L2: removes + adds / price questions in one message, one reply
+        return _modify(session, message, customer, order, items, texts, dropped)
     if intent == "previous_item":
         return _previous(session, message, customer, order, result, texts)
     if intent == "cancel_order":
@@ -339,6 +343,127 @@ def _apply_items(session: Session, message: Message, result: ParseResult, texts:
     if phones or address:
         return _contact(session, message, customer, order, phones, address, texts, before)
     return None
+
+
+INTENT_ACTION = {"buy": "add", "previous_item": "add", "ask_price": "ask_price", "ask_stock": "ask_price",
+                 "remove": "remove"}
+ACTION_INTENT = {"add": "buy", "ask_price": "ask_price", "remove": "remove"}
+
+
+def item_action(result: ParseResult, item: ParseItem) -> str | None:
+    """add | remove | ask_price: the item's own action (L2), else what the message intent says."""
+    return item.action or INTENT_ACTION.get(result.intent)
+
+
+def _choose_product(session: Session, message: Message, customer: Customer, result: ParseResult,
+                    items: list[ParseItem], texts: dict[str, str]) -> Outcome | None:
+    """docs/SPEC-v4.11-ai-first.md L3: "ysl 10ml" = Y EDP or Libre? Ask the CUSTOMER (numbered); their
+    answer "1" / "၂" / the name continues the original action with the message's other items."""
+    asked = next(i for i in items if i.candidates and not i.product_id)
+    action = item_action(result, asked)
+    if action not in ("add", "ask_price") or any(i.from_context for i in items):
+        return None  # which one to REMOVE: a person looks at the cart
+    if action == "add" and not (asked.size_ml or asked.is_full_bottle):
+        return None
+    pending = []
+    for i in items:
+        if i is asked:
+            continue
+        if not i.product_id or i.unknown_text or (i.candidates and not i.product_id):
+            return None  # something else is unclear too: a person decides
+        pending.append({"product_id": i.product_id, "size_ml": i.size_ml, "is_full_bottle": i.is_full_bottle,
+                        "quantity": i.quantity or 1, "action": item_action(result, i)})
+    products = {p.id: p for p in session.scalars(select(Product).where(Product.id.in_(asked.candidates),
+                                                                       Product.active))}
+    options = [{"product_id": pid, "size_ml": None if asked.is_full_bottle else asked.size_ml,
+                "is_full_bottle": asked.is_full_bottle} for pid in asked.candidates if pid in products]
+    if not 2 <= len(options) <= 3:
+        return None
+    prompt = ChoicePrompt(customer_id=customer.id, message_id=message.id, options=options,
+                          quantity=asked.quantity or 1, kind="product", action=action, pending=pending or None,
+                          expires_at=datetime.now(UTC) + previous.PROMPT_TTL)
+    session.add(prompt)
+    session.flush()
+    size = size_label(None if asked.is_full_bottle else asked.size_ml,
+                      products[options[0]["product_id"]].full_size_ml) if (asked.size_ml or asked.is_full_bottle) \
+        else ""
+    words = " ".join(filter(None, [asked.name_text or "", size])).strip() or (message.raw_text or "")[:40]
+    lines = "\n".join(f"{n}. {previous.label(session, o) if (o['size_ml'] or o['is_full_bottle']) else products[o['product_id']].name}"
+                      for n, o in enumerate(options, 1))
+    return Outcome("choose_product", "🔢 Ask the customer which product", render(texts["choose_product"], words=words,
+                                                                                 options=lines),
+                   "choice", f"“{words}” fits {len(options)} products; their answer “1” / the name continues.",
+                   undo={"prompt": prompt.id})
+
+
+def _modify(session: Session, message: Message, customer: Customer, order: Order | None, items: list[ParseItem],
+            texts: dict[str, str], dropped: list[str]) -> Outcome | None:
+    """docs/SPEC-v4.11-ai-first.md L2: remove + add (+ price questions) in one message, ONE reply:
+    removed lines, not-stocked lines, prices, then the list + total (or "nothing left"), or payment
+    info again with the new total while waiting for payment."""
+    if any(i.from_context or not i.product_id or i.unknown_text or not i.action for i in items):
+        return None  # something is unclear: a person decides
+    removes = [i for i in items if i.action == "remove"]
+    adds = [i for i in items if i.action == "add"]
+    asks = [i for i in items if i.action == "ask_price"]
+    if order is None and not adds:
+        return None
+    if order is not None and order.status not in ("cart", "confirmed", "waiting_payment"):
+        return None
+    waiting = order is not None and order.status == "waiting_payment"
+    wanted = []
+    for i in adds:
+        w = cart.normalize_wanted(session, _wanted(i))
+        price, in_stock = cart.price_of(session, w.product_id, w.size_ml, w.is_full_bottle)
+        if price is None or not in_stock:
+            return None  # no price / out of stock: a person answers
+        wanted.append(w)
+    price_text = ""
+    if asks:
+        price_items = list(dict.fromkeys(compose.PriceItem(i.product_id, "full" if i.is_full_bottle else str(
+            i.size_ml) if i.size_ml else "all") for i in asks))
+        made = compose.price_reply(session, price_items, texts)
+        if made.problems or made.notes or not made.text:
+            return None
+        price_text = made.text
+    created = order is None
+    order = order or cart.open_cart(session, customer.id, create=True)
+    before = _order_state(order)
+    old_total = order.total_mmk
+    removed = cart.remove_items(session, order, [_wanted(i) for i in removes]) if removes else []
+    changed = cart.add_items(session, order, wanted, message.id,
+                             more=bool(MORE_RE.search(message.normalized_text or ""))) if wanted else []
+    if not removed and not changed and not price_text:
+        return None  # nothing happened (removes of items not in the cart)
+    undo = {"restore": removed, "added": [i for i in changed if i > 0], "removed": [-i for i in changed if i < 0],
+            "order": before, "created_order": created}
+    lines = []
+    for i in removes:
+        product = session.get(Product, i.product_id)
+        size = size_label(None if i.is_full_bottle else i.size_ml, product.full_size_ml) \
+            if (i.size_ml or i.is_full_bottle) else ""
+        lines.append(render(texts["item_removed"], product=f"{product.name} {size}".strip()))
+    lines += dropped
+    if price_text:
+        lines.append(price_text)
+    order.list_sent_at = datetime.now(UTC)
+    view = cart.view(session, order)
+    note = f"Removes {len(removed)} item(s), adds {len(wanted)}."
+    if view.empty:
+        cart.cancel(session, order)
+        order.cancel_note = "customer removed every item"
+        lines.append(texts["cart_empty"])
+        return Outcome("cart_change", "🔁 Change the cart + reply (nothing left)", "\n".join(lines), "cart",
+                       note + " Nothing left: the order is cancelled.", order.id, undo)
+    if waiting and order.total_mmk != old_total:
+        _keep_waiting(session, order, before, old_total, undo)
+        lines.append(cart.payment_text(session, order, texts, changed=True))
+        return Outcome("cart_change", "🔁 Change the cart + 💳 payment info with the new total", "\n".join(lines),
+                       "payment_info", note + f" New total {view.total:,} ကျပ်. Still waiting for payment.", order.id,
+                       undo)
+    lines.append(cart.cart_text(session, order, texts))
+    return Outcome("cart_change", "🔁 Change the cart + send list", "\n".join(lines), "cart",
+                   note + f" Cart total {view.total:,} ကျပ်.", order.id, undo)
 
 
 def _payment_sent(order: Order | None, texts: dict[str, str]) -> Outcome | None:

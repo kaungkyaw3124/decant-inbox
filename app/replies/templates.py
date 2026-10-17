@@ -143,6 +143,14 @@ TEMPLATES: tuple[TemplateDef, ...] = (
     TemplateDef("choose_previous", "“The previous one”: several earlier items – ask which ({options} = numbered lines)",
                 "အရင်က ယူထားတာတွေပါ –\n{options}\nဘယ်ဟာလဲ နံပါတ်လေး ပြောပေးပါနော်။",
                 {"options": "1. Good Girl 5ml\n2. Aventus 10ml"}),
+    # docs/SPEC-v4.11-ai-first.md: several actions in one message (L2), the customer chooses (L3)
+    TemplateDef("item_removed", "One message removes and adds: line for each removed item",
+                "{product} ကို ဖြုတ်လိုက်ပါပြီ။", {"product": "Y Eau de Parfum 10ml"}),
+    TemplateDef("cart_empty", "Nothing left in the cart after removing",
+                "ခြင်းထဲမှာ ဘာမှ မကျန်တော့ပါဘူး။ တခြား ဘာယူချင်လဲ။", {}),
+    TemplateDef("choose_product", "A name that fits 2-3 products: ask the customer to choose ({options} = numbered lines)",
+                "{words} ထဲက ဘယ်ဟာလဲ –\n{options}\nနံပါတ်လေး ပြောပေးပါနော်။",
+                {"words": "ysl 10ml", "options": "1. Y Eau de Parfum 10ml\n2. Libre 10ml"}),
     TemplateDef("order_cancelled", "Customer cancelled the order",
                 "အော်ဒါ cancel လုပ်ပြီးပါပြီ။ နောက်မှ ပြန်မှာချင်ရင် ပြောပေးပါနော်။", {}),
 )

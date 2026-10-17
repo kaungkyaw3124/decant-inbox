@@ -20,7 +20,8 @@ from app.models import AICall, AuditLog, Product, User
 # the AI's intent -> the card's "what do they want?" answer
 CARD_INTENT = {"buy": "buy", "ask_price": "ask_price", "ask_stock": "ask_stock", "remove": "remove",
                "cancel_order": "cancel_order", "ask_delivery": "ask_delivery", "previous_item": "previous_item",
-               "greeting": "greeting", "change_info": "change_info", "question": "question", "other": "ignore"}
+               "greeting": "greeting", "change_info": "change_info", "question": "question", "other": "ignore",
+               "modify_cart": "modify_cart"}
 
 
 @dataclass
@@ -30,6 +31,7 @@ class Hint:
     confidence: float
     products: dict[int, str] = field(default_factory=dict)  # position -> product id | "not_stocked"
     sizes: dict[int, str] = field(default_factory=dict)  # position -> "5" | "full"
+    actions: dict[int, str] = field(default_factory=dict)  # position -> add | remove | ask_price (4.11 L2)
     intent: str | None = None
     nicknames: dict[int, str] = field(default_factory=dict)
     phrase: str | None = None
@@ -40,6 +42,7 @@ class Hint:
         """The form fields the AI pre-selected (compared with what the admin sends)."""
         out = {f"p{pos}": v for pos, v in self.products.items()}
         out.update({f"size{pos}": v for pos, v in self.sizes.items()})
+        out.update({f"act{pos}": v for pos, v in self.actions.items()})
         if self.intent:
             out["intent"] = self.intent
         return out
@@ -94,6 +97,8 @@ def apply(session: Session, card) -> None:
     paired: dict[int, AIItem] = {}
     for q, item in zip(sorted(card.products, key=lambda q: q.position), remaining):
         paired[q.position] = item
+        if ai.intent == "modify_cart" and item.action:
+            hint.actions[q.position] = item.action
         if item.product_id is not None:
             hint.products[q.position] = str(item.product_id)
             if all(p.id != item.product_id for p in q.options):
@@ -113,6 +118,8 @@ def apply(session: Session, card) -> None:
             item = next((a for a in ai.items if rule is not None and a.product_id == rule.product_id), None)
         if item is not None and (value := _size_value(item, q.sizes)):
             hint.sizes[q.position] = value
+    if ai.intent == "modify_cart":
+        card.multi = True
     intent = CARD_INTENT.get(ai.intent)
     if intent and (card.ask_intent or intent != card.result.intent):
         card.ask_intent = True
@@ -161,9 +168,18 @@ def record(session: Session, message_id: int, form, user: User) -> str | None:
     if decision == "unused":
         call.decision, call.decided_by = decision, user.id
         return decision
-    from app.ai import graduation  # late import: graduation -> service -> this package
+    from app.ai import graduation, service  # late import: graduation -> service -> this package
+    from app.learning import patterns
+    from app.models import Message
 
     graduation.record_decision(session, call, decision, user, wrong)
+    found = latest(session, message_id)
+    if found is not None:  # docs/SPEC-v4.11-ai-first.md L4: accepted = the AI read it right
+        ai = found[1]
+        if decision == "accepted":
+            service.learn(session, ai, user, session.get(Message, message_id))
+        else:
+            patterns.ai_corrected(session, ai.learn, user, message_id)
     return decision
 
 

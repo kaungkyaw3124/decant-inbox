@@ -5,6 +5,7 @@
 <h1>🧠 {{ t("AI helper") }}</h1>
 <p class="muted small">{{ t("The AI only reads messages the rules are not sure about. It never writes to customers: replies come from your templates and prices.") }}</p>
 {% for n in notices %}<p class="flash problem-text">{{ tr(n) }}</p>{% endfor %}
+{% if cfg.mode == "auto" %}<p class="flash ai-banner">🧠 {% if auto_since %}{{ t("AUTO since {date}", date=auto_since | local_time) }}{% else %}AUTO{% endif %}{% if cfg.skipped_shadow %} ({{ t("owner skipped shadow") }}){% endif %}; {{ t("safety brake ON") }}</p>{% endif %}
 
 <section class="card">
   <h2>{{ t("Mode") }} {{ ui.help("OFF: no AI. SHADOW: the AI fills in teaching cards, a person checks. AUTO: when the AI is sure, the app acts by itself with the usual safety rules.") }}</h2>

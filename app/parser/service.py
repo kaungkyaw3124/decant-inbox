@@ -78,7 +78,8 @@ def stored_items(session: Session, result_id: int) -> tuple[ParsedItem, ...]:
     rows = session.scalars(select(ParseItem).where(ParseItem.parse_result_id == result_id)
                            .order_by(ParseItem.position))
     return tuple(ParsedItem(r.product_id, r.size_ml, r.is_full_bottle, r.quantity, r.unknown_text,
-                            r.from_context, r.match or "none", r.candidate_product_id, r.name_text) for r in rows)
+                            r.from_context, r.match or "none", r.candidate_product_id, r.name_text, r.action,
+                            tuple(r.candidates or ())) for r in rows)
 
 
 def _same(session: Session, result: ParseResult, outcome: ParseOutcome) -> bool:
@@ -102,7 +103,8 @@ def add_items(session: Session, result_id: int, items) -> None:
             is_full_bottle=item.is_full_bottle, quantity=item.quantity,
             unknown_text=item.unknown_text[:255] if item.unknown_text else None, from_context=item.from_context,
             match=item.match, candidate_product_id=item.candidate_id,
-            name_text=item.name_text[:255] if item.name_text else None))
+            name_text=item.name_text[:255] if item.name_text else None, action=item.action,
+            candidates=list(item.candidates) or None))
 
 
 def parse_message(session: Session, message: Message, aliases: list[Alias],

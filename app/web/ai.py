@@ -50,7 +50,16 @@ def ai_page(request: Request, db: Session = Depends(get_db)):
         "cfg": ai_settings.load(db), "modes": MODE_LABELS, "reasonings": ai_settings.REASONING,
         "today": report.period(db, report.today_start(now)), "month": report.period(db, report.month_start(now)),
         "notices": report.notices(db, now), "calls": _call_rows(db), "evaluation": report.latest_eval(),
-        "eval_running": report.eval_running(now), "progress": graduation.progress(db, now)})
+        "eval_running": report.eval_running(now), "progress": graduation.progress(db, now),
+        "auto_since": _since(ai_settings.load(db).get("auto_since"))})
+
+
+def _since(value: str | None) -> datetime | None:
+    """docs/SPEC-v4.11-ai-first.md L1: the banner "AUTO since <date>"."""
+    try:
+        return datetime.fromisoformat(value) if value else None
+    except ValueError:
+        return None
 
 
 def _save(request: Request, db: Session, user: User, values: dict, what: str) -> RedirectResponse:

@@ -2,7 +2,8 @@
 AI provider with the live product list, print ✅/❌ per case, accuracy by field, cost and
 latency, and save a report under data/exports/ (git-ignored).
 
-PASS: intent+products correct >= 90%, ZERO wrong product ids, not_in_list never mapped.
+PASS: intent+products correct >= 90%, ZERO wrong product ids, not_in_list never mapped, and (v4.11) "remove"
+only for products in the case's cart.
 Exit code 0 = pass, 1 = fail, 2 = could not run (no key / provider error on every case).
 
 Usage: .venv/bin/python -m scripts.ai_eval [--reasoning low|medium] [--model NAME] [--only o01,o02]
@@ -10,6 +11,8 @@ Usage: .venv/bin/python -m scripts.ai_eval [--reasoning low|medium] [--model NAM
 Fixture columns: expect_intent "a/b" = either is right; expect_items "Name@5ml*2;!words@10ml"
 (! = not in our list, ? = must stay unknown, size "any" = not checked, empty = no items, * = not checked;
 `allowed` = products that may appear when items are not checked).
+docs/SPEC-v4.11-ai-first.md: ">remove" / ">add" / ">ask_price" after an item = its action must be that;
+"?ysl@10ml{Y Eau de Parfum|Libre}" = unknown with candidates: the AI must offer 2-3 of those (never others).
 """
 import argparse
 import csv
@@ -22,7 +25,7 @@ from pathlib import Path
 
 from sqlalchemy import select
 
-from app.ai import prompt, providers
+from app.ai import checker, prompt, providers
 from app.ai import settings as ai_settings
 from app.ai.privacy import mask
 from app.ai.service import Understood, understand
@@ -41,6 +44,8 @@ class Expected:
     product_id: int | None
     size: str | None  # "5ml" | "full" | None (no size) | "*" (any)
     qty: int
+    action: str | None = None  # v4.11: add | remove | ask_price (None = not checked)
+    candidates: frozenset[int] = frozenset()  # v4.11: the AI should offer 2-3 of these
 
 
 def parse_items(spec: str, ids: dict[str, int]) -> list[Expected] | None:
@@ -50,13 +55,26 @@ def parse_items(spec: str, ids: dict[str, int]) -> list[Expected] | None:
         return None
     out = []
     for part in filter(None, (p.strip() for p in spec.split(";"))):
+        part, _, action = part.partition(">")
+        part, _, candidates = part.partition("{")
         name, _, rest = part.partition("@")
         size, _, qty = (rest or "-").partition("*")
         size = None if size in ("", "-") else "*" if size == "any" else size
         kind = "not_in_list" if name.startswith("!") else "unclear" if name.startswith("?") else "product"
         pid = ids[name.lower()] if kind == "product" else None
-        out.append(Expected(kind, pid, size, int(qty or 1)))
+        options = frozenset(ids[c.strip().lower()] for c in candidates.rstrip("}").split("|") if c.strip())
+        out.append(Expected(kind, pid, size, int(qty or 1), action.strip() or None, options))
     return out
+
+
+def cart_ids(row: dict, ids: dict[str, int]) -> set[int]:
+    """Products in the case's cart ("Y Eau de Parfum 10ml x1; ...")."""
+    found = set()
+    for line in filter(None, (x.strip().lower() for x in row.get("cart", "").split(";"))):
+        name = max((n for n in ids if line.startswith(n)), key=len, default=None)
+        if name:
+            found.add(ids[name])
+    return found
 
 
 @dataclass
@@ -69,6 +87,7 @@ class Score:
     wrong_product: bool  # a product id that is not one of the expected ones
     nil_mapped: bool  # a not-in-list case mapped to a product
     notes: list[str]
+    remove_not_in_cart: bool = False  # v4.11: "remove" of a product that is not in the cart
 
 
 def score(row: dict, got: Understood, ids: dict[str, int]) -> Score:
@@ -78,6 +97,10 @@ def score(row: dict, got: Understood, ids: dict[str, int]) -> Score:
     notes = []
     if r is None:
         return Score(False, False, False, False, False, False, False, ["no result: " + ", ".join(got.problems)])
+    in_cart = cart_ids(row, ids)
+    bad_remove = any(checker.effective_action(r, i) == "remove" and i.product_id not in in_cart for i in r.items)
+    if bad_remove:
+        notes.append("remove of a product that is not in the cart")
     intent_ok = r.intent in row["expect_intent"].split("/")
     if not intent_ok:
         notes.append(f"intent {r.intent} (want {row['expect_intent']})")
@@ -86,7 +109,7 @@ def score(row: dict, got: Understood, ids: dict[str, int]) -> Score:
         wrong = [p for p in got_pids if p not in allowed]
         if wrong:
             notes.append(f"unexpected product ids {wrong}")
-        return Score(intent_ok, not wrong, True, True, True, bool(wrong), False, notes)
+        return Score(intent_ok, not wrong, True, True, True, bool(wrong), False, notes, bad_remove)
     want_pids = [e.product_id for e in expected if e.kind == "product"]
     wrong = [p for p in got_pids if p not in want_pids]
     products_ok = Counter(got_pids) == Counter(want_pids)
@@ -103,7 +126,8 @@ def score(row: dict, got: Understood, ids: dict[str, int]) -> Score:
         if e.kind == "product":
             match = next((i for i in r.items if i.product_id == e.product_id), None)
         else:
-            match = next((i for i in r.items if i.product_id is None), None)
+            match = next((i for i in r.items if i.product_id is None and bool(i.not_in_list) == (
+                e.kind == "not_in_list")), None)
         if match is None:
             continue
         if e.size != "*" and match.size != e.size:
@@ -112,7 +136,14 @@ def score(row: dict, got: Understood, ids: dict[str, int]) -> Score:
         if match.qty != e.qty:
             qty_ok = False
             notes.append(f"qty {match.qty} (want {e.qty})")
-    return Score(intent_ok, products_ok and nil_ok, sizes_ok, qty_ok, nil_ok, bool(wrong), nil_mapped, notes)
+        if e.action and checker.effective_action(r, match) != e.action:
+            products_ok = False
+            notes.append(f"action {checker.effective_action(r, match)} (want {e.action})")
+        if e.candidates and not (2 <= len(match.candidates) <= 3 and set(match.candidates) <= e.candidates):
+            products_ok = False
+            notes.append(f"candidates {list(match.candidates)} (want 2-3 of {sorted(e.candidates)})")
+    return Score(intent_ok, products_ok and nil_ok, sizes_ok, qty_ok, nil_ok, bool(wrong), nil_mapped, notes,
+                 bad_remove)
 
 
 def context(row: dict) -> prompt.Context:
@@ -144,10 +175,15 @@ def main() -> int:
         rows = [r for r in rows if r["id"] in wanted]
     print(f"AI evaluation: {len(rows)} cases, model {model}, reasoning {reasoning}\n")
     results = []
+    raw_bad_removes = 0
     for row in rows:
         got = understand(provider, catalog, context(row), model, reasoning)
+        if got.result is not None:  # the same cart check as AUTO (service.auto_apply): removes only from the cart
+            raw_bad_removes += score(row, got, ids).remove_not_in_cart
+            got.result, dropped = checker.removes_in_cart(got.result, cart_ids(row, ids))
+            got.problems = got.problems + dropped if dropped else got.problems
         s = score(row, got, ids)
-        ok = s.intent and s.products and not s.wrong_product
+        ok = s.intent and s.products and not s.wrong_product and not s.remove_not_in_cart
         results.append((row, got, s, ok))
         mark = "✅" if ok else "❌"
         extra = "" if ok else "  <- " + "; ".join(s.notes)
@@ -163,22 +199,25 @@ def main() -> int:
     both = sum(x[3] for x in results) / n
     wrong = sum(x[2].wrong_product for x in results)
     nil_mapped = sum(x[2].nil_mapped for x in results)
+    bad_removes = sum(x[2].remove_not_in_cart for x in results)
     cost = sum(x[1].cost for x in results)
     latency = sum(x[1].latency_ms for x in answered) / len(answered)
     cached = sum(x[1].cached_tokens for x in results)
     tokens_in = sum(x[1].input_tokens for x in results)
-    passed = both >= PASS_ACCURACY and wrong == 0 and nil_mapped == 0
+    passed = both >= PASS_ACCURACY and wrong == 0 and nil_mapped == 0 and bad_removes == 0
     summary = {
         "at": datetime.now(UTC).isoformat(timespec="seconds"), "model": model, "reasoning": reasoning,
         "cases": len(results), "intent_and_products": round(both, 3),
         "by_field": {k: round(v, 3) for k, v in field_acc.items()}, "wrong_product_cases": wrong,
-        "not_in_list_mapped": nil_mapped, "cost_usd": round(cost, 5), "avg_latency_ms": round(latency),
+        "not_in_list_mapped": nil_mapped, "remove_not_in_cart": bad_removes,
+        "remove_not_in_cart_before_checker": raw_bad_removes, "cost_usd": round(cost, 5), "avg_latency_ms": round(latency),
         "input_tokens": tokens_in, "cached_tokens": cached, "rejected_or_errors": len(results) - len(answered)
                                                                                   + sum(bool(x[1].problems) for x in answered),
         "passed": passed,
     }
     print(f"\nintent+products {both:.0%} (need {PASS_ACCURACY:.0%}) · wrong product ids in {wrong} cases (need 0) · "
-          f"not_in_list mapped {nil_mapped} (need 0)")
+          f"not_in_list mapped {nil_mapped} (need 0) · remove not in cart {bad_removes} (need 0; "
+          f"{raw_bad_removes} dropped by the cart check)")
     print("by field: " + " · ".join(f"{k} {v:.0%}" for k, v in field_acc.items()))
     print(f"cost ${cost:.4f} · avg latency {latency:.0f} ms · cached input {cached}/{tokens_in} tokens")
     print("PASS ✅" if passed else "FAIL ❌")

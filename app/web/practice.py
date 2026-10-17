@@ -156,16 +156,18 @@ def practice_reset(request: Request):
 
 
 @router.get("/practice/{n}", response_class=HTMLResponse)
-def practice_step(request: Request, n: int, db: Session = Depends(get_db)):
+def practice_step(request: Request, n: int, db: Session = Depends(get_db), user: User = Depends(current_user)):
     exercise, total = _exercise(db, n)
     with sandbox() as session:
         message = _message(session, exercise)
         card = cards.build(session, message)
+        preview = cards.preview(session, card, session.get(User, user.id)) if card else None  # 4.11 L5
         suggestion = None if card else actions.suggest(session, message, current_result(session, message.id),
                                                        replies.load(session))
         return templates.TemplateResponse(request, "practice.html", {
             "step": "question", "m": message, "card": card, "quick": suggestion,
-            "app_understood": _answer(session, current_result(session, message.id)), "card_action": f"/practice/{n}", "back": f"/practice/{n}", **_context(db, request, n, total, exercise)})
+            "app_understood": _answer(session, current_result(session, message.id)), "card_action": f"/practice/{n}", "back": f"/practice/{n}", **_context(db, request, n, total, exercise),
+            "previews": {message.id: preview}})
 
 
 @router.post("/practice/{n}", response_class=HTMLResponse)

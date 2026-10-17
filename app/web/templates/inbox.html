@@ -4,10 +4,11 @@
 {% set kind_label = {"price": "price reply", "cart_add": "added to cart + list", "cart_remove": "removed + list",
                      "cart_list": "cart list", "confirm": "confirmed", "contact": "phone/address", "address": "address",
                      "not_stocked": "we don't have it", "delivery": "delivery status", "cancel_order": "order cancelled",
-                     "faq": "FAQ answer", "greeting": "greeting", "choose_previous": "asked which earlier item"} %}
+                     "faq": "FAQ answer", "greeting": "greeting", "choose_previous": "asked which earlier item",
+                     "cart_change": "cart changed + list", "choose_product": "asked which product"} %}
 {% set customer = t("Customer") %}
 {% if needs_you is not none %}
-<section class="card needs-you {% if needs_you.count %}notice{% endif %}">
+<section class="card needs-you {% if needs_you.count %}notice{% endif %}" id="needs-you">
   <h2>🟡 {{ t("Needs you") }} ({{ needs_you.count }}) {{ ui.help("Messages the app could not answer by itself. Work from top to bottom; each line says what to do.") }}</h2>
   {% if not needs_you.count %}<p class="muted small">{{ t("Nothing waiting for you.") }}</p>{% endif %}
   <ul class="feed">
@@ -66,10 +67,10 @@
       {% endif %}</li>
   {% endfor %}
   {% for m, c, card in needs_you.teach %}
-    <li class="teach-row"><a href="/messages/{{ m.id }}"><b>📘 {{ c.display_name or c.username or customer }}</b>: {{ m.raw_text | truncate(70) }}</a>
+    <li class="teach-row"><a href="/messages/{{ m.id }}"><b>{{ "🧠" if card.ai else "❓" }} {{ c.display_name or c.username or customer }}</b>: {{ m.raw_text | truncate(70) }}</a>
       {% if card.products %}<span class="badge warn">❓ {{ card.products | map(attribute="words") | join(", ") }}</span>{% endif %}
       <span class="small muted">{{ m.received_at | age }}</span>
-      <details class="teach-box"><summary class="button primary">📘 သင်ပေးမယ်</summary>
+      <details class="teach-box" open><summary class="button primary">👀 စစ်ပြီး ဖြေမယ်</summary>
         {% with back = "/" %}{% include "_card.html" %}{% endwith %}
       </details></li>
   {% endfor %}
@@ -103,7 +104,7 @@
         {% for mid in u.message_ids %}<input type="hidden" name="message_id" value="{{ mid }}">{% endfor %}
         <button class="link" name="status" value="done">{{ t("done") }}</button> <button class="link" name="status" value="ignored">{{ t("ignore") }}</button></form>
       {% if u.card %}{% set m, card = u.card %}
-      <details class="teach-box"><summary class="button primary">📘 သင်ပေးမယ်</summary>
+      <details class="teach-box" open><summary class="button primary">👀 စစ်ပြီး ဖြေမယ်</summary>
         {% with back = "/" %}{% include "_card.html" %}{% endwith %}
       </details>{% endif %}
       {% if u.faq %}{% set mid, match = u.faq %}
@@ -130,6 +131,21 @@
     <li class="muted"><a href="/chats/{{ c.id }}">ℹ️ {{ c.display_name or c.username or customer }}</a>: {{ t("order cancelled automatically (not paid)") }}{% if o.cancel_note %} · {{ tr(o.cancel_note) }}{% endif %}</li>
   {% endfor %}
   </ul>
+  {% if needs_you.dismissed %}
+  <form method="post" action="/needs-you/dismiss-older/{{ needs_you.dismissed.id }}/undo" class="inline"><input type="hidden" name="csrf" value="{{ csrf }}">
+    <button class="quiet">↩️ {{ t("Undo dismiss") }}</button></form>
+  {% endif %}
+  {% if needs_you.older_count %}
+  <details class="older" id="older">
+    <summary>{{ t("Older ({n})", n=needs_you.older_count) }} {{ ui.help("More than 24 h old, and the customer wrote again since. Payments never move here.") }}</summary>
+    <ul class="feed small">
+    {% for link, c, text_, at in needs_you.older %}<li><a href="{{ link }}">{{ c.display_name or c.username or customer }}: {{ text_ | truncate(60) }}</a> <span class="muted">{{ at | age }}</span></li>{% endfor %}
+    </ul>
+    <form method="post" action="/needs-you/dismiss-older" class="inline"><input type="hidden" name="csrf" value="{{ csrf }}">
+      {% for mid in needs_you.older_ids %}<input type="hidden" name="message_id" value="{{ mid }}">{% endfor %}
+      <button class="quiet">🧹 {{ t("Dismiss all older") }}</button></form>
+  </details>
+  {% endif %}
 </section>
 {% if handled %}
 <details class="card" {% if auto_on %}open{% endif %}>

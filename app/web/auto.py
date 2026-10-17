@@ -3,10 +3,10 @@ from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import RedirectResponse
-from sqlalchemy import select
+from sqlalchemy import delete, exists, func, select, update
 from sqlalchemy.orm import Session
 
-from app.models import AuditLog, Customer, FaqEntry, Message, Outbox, Product, QuickAction, User
+from app.models import AuditLog, Customer, FaqEntry, Message, MessageReview, Outbox, Product, QuickAction, User
 from app.models.outbox import UNDO_SECONDS
 from app.learning import cards, patterns
 from app.orders import auto, followups, payments, unknown
@@ -198,15 +198,59 @@ def needs_you(db: Session, now: datetime | None = None, owner: bool = True) -> d
 
     requests = steps.open_requests(db)
     change_sent = change.requests_for_sent_orders(db, now)
+    # docs/SPEC-v4.11-ai-first.md L7: > 24 h old and the customer wrote again since -> "Older (n)"
+    latest_in = dict(db.execute(select(Message.customer_id, func.max(Message.received_at)).where(
+        Message.direction == "in").group_by(Message.customer_id)).all())
+
+    def old(at: datetime, customer_id: int) -> bool:
+        return at < now - OLDER_AFTER and latest_in.get(customer_id, at) > at
+
+    unknown_rows = [(m, customers[m.customer_id], unknown.open_unknowns(db, m)) for m in unknown_msgs]
+    teach_rows = [(m, customers[m.customer_id], card) for m, card in teach]
+    older = {
+        "teach": [r for r in teach_rows if old(r[0].received_at, r[0].customer_id)],
+        "unknown": [r for r in unknown_rows if old(r[0].received_at, r[0].customer_id)],
+        "unanswered": [r for r in unanswered if old(r.last_at, r.customer.id)],
+        "faq_hints": [r for r in hints if old(r[0].received_at, r[0].customer_id)],
+    }
+    moved = {id(r) for rows in older.values() for r in rows}
+    teach_rows = [r for r in teach_rows if id(r) not in moved]
+    unknown_rows = [r for r in unknown_rows if id(r) not in moved]
+    unanswered = [r for r in unanswered if id(r) not in moved]
+    hints = [r for r in hints if id(r) not in moved]
+    teach, unknown_msgs = [(m, card) for m, _, card in teach_rows], [m for m, _, _ in unknown_rows]
+    older_rows: dict[int, tuple] = {}  # message id -> (link, customer, text, time): each message once
+    for m, c, *_ in older["teach"] + older["unknown"] + older["faq_hints"]:
+        older_rows.setdefault(m.id, (f"/messages/{m.id}", c, m.raw_text or "", m.received_at))
+    for r in older["unanswered"]:
+        for mid in r.message_ids:
+            older_rows.setdefault(mid, (f"/chats/{r.customer.id}#bottom", r.customer, r.last_text, r.last_at))
+    older_ids = sorted(older_rows)
     return {"faq_hints": hints, "payments": to_check, "cancels": cancels, "unpaid": unpaid, "unanswered": unanswered,
-            "unknown": [(m, customers[m.customer_id], unknown.open_unknowns(db, m)) for m in unknown_msgs],
-            "teach": [(m, customers[m.customer_id], card) for m, card in teach],
+            "unknown": unknown_rows, "teach": teach_rows,
+            "older": [older_rows[i] for i in older_ids], "older_ids": older_ids, "older_count": len(older_ids),
+            "dismissed": recent_dismiss(db, now),
             "price_needed": price_needed, "to_approve": to_approve, "conflicts": conflicts,
             "failed": failed, "paused": paused, "auto_cancelled": followups.auto_cancelled(db, now),
             "ai_notices": ai_notices, "changed_paid": changed_paid, "change_sent": change_sent, "requests": requests,
             "count": len(ai_notices) + len(changed_paid) + len(change_sent) + len(requests) + len(to_check) + len(cancels) + len(unpaid) + len(unknown_msgs) + len(unanswered)
                      + len(hints) + len(failed) + len(paused) + len(teach) + len(price_needed)
                      + (1 if to_approve else 0) + len(conflicts)}
+
+
+OLDER_AFTER = timedelta(hours=24)
+DISMISS_UNDO = timedelta(seconds=60)
+
+
+def recent_dismiss(db: Session, now: datetime) -> AuditLog | None:
+    """The last "Dismiss all older" of the last 60 s that was not undone (its Undo button)."""
+    row = db.scalar(select(AuditLog).where(AuditLog.action == "needs_you.dismiss_older",
+                                           AuditLog.created_at >= now - DISMISS_UNDO).order_by(AuditLog.id.desc())
+                    .limit(1))
+    if row is None or db.scalar(select(exists().where(AuditLog.action == "needs_you.dismiss_undo",
+                                                      AuditLog.details["dismiss_id"].as_integer() == row.id))):
+        return None
+    return row
 
 
 def handled_feed(db: Session, limit: int = 30) -> list:
@@ -250,3 +294,41 @@ def faq_hint_done(request: Request, message_id: int, db: Session = Depends(get_d
     db.add(AuditLog(user_id=user.id, action="faq.hint_done", details={"message_id": message_id}))
     db.commit()
     return RedirectResponse("/", status_code=303)
+
+
+@router.post("/needs-you/dismiss-older")
+async def dismiss_older(request: Request, db: Session = Depends(get_db), user: User = Depends(current_user)):
+    """docs/SPEC-v4.11-ai-first.md L7: "Dismiss all older" = those messages marked done (Undo for 60 s).
+    Payments are never in Older."""
+    form = await request.form()
+    ids = sorted({int(v) for v in form.getlist("message_id") if str(v).isdigit()})
+    if not ids:
+        raise HTTPException(400, "Nothing to dismiss")
+    previous = {str(mid): status for mid, status in db.execute(
+        select(MessageReview.message_id, MessageReview.status).where(MessageReview.message_id.in_(ids)))}
+    followups.clear(db, ids, "done", user)
+    db.add(AuditLog(user_id=user.id, action="needs_you.dismiss_older", details={
+        "message_ids": ids, "previous": previous}))
+    db.commit()
+    flash(request, f"Dismissed {len(ids)} older messages. Undo for 60 s.")
+    return RedirectResponse("/#needs-you", status_code=303)
+
+
+@router.post("/needs-you/dismiss-older/{audit_id}/undo")
+def dismiss_older_undo(request: Request, audit_id: int, db: Session = Depends(get_db),
+                       user: User = Depends(current_user)):
+    row = recent_dismiss(db, datetime.now(UTC))
+    if row is None or row.id != audit_id:
+        flash(request, "Too late to undo.")
+        return RedirectResponse("/#needs-you", status_code=303)
+    previous = row.details.get("previous") or {}
+    for mid in row.details["message_ids"]:
+        before = previous.get(str(mid))
+        if before is None:
+            db.execute(delete(MessageReview).where(MessageReview.message_id == mid))
+        else:
+            db.execute(update(MessageReview).where(MessageReview.message_id == mid).values(status=before))
+    db.add(AuditLog(user_id=user.id, action="needs_you.dismiss_undo", details={"dismiss_id": row.id}))
+    db.commit()
+    flash(request, "Undone: the older messages are back.")
+    return RedirectResponse("/#needs-you", status_code=303)

@@ -106,7 +106,7 @@ def test_c5_no_history_needs_you(shop, db):
     switch_on(db, since=datetime.now(UTC) - timedelta(minutes=1))
     mid = msg(db, "ဟိုနေ့ကဟာ ထပ်ယူမယ်")
     assert "replied" not in run_auto() and deliver(db) == [] and button(client, mid) is None
-    assert "📘 သင်ပေးမယ်" in client.get("/").text
+    assert "👀 စစ်ပြီး ဖြေမယ်" in client.get("/").text
     page = card_page(client, mid)
     assert "ဆိုတာ ဘယ်ပစ္စည်းလဲ?" in page and "ဘယ် size လဲ?" in page
     stw = scalar(db, "SELECT id FROM products WHERE name = 'Stronger With You Intensely'")

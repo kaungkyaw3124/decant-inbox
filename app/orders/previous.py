@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 
 from app.models import ChoicePrompt, Message, Order, OrderItem, ParseItem, ParseResult, Product
 from app.models.orders import OPEN_STATUSES, PAID_STATUSES
+from app.parser.normalize import normalize
 from app.parser.rules import ParsedItem, ParseOutcome, parse_choice
 from app.pricing.prices import size_label
 
@@ -93,13 +94,34 @@ def open_prompt(session: Session, message: Message) -> ChoicePrompt | None:
     return prompt
 
 
+def _named(session: Session, prompt: ChoicePrompt, normalized: str) -> list[int] | None:
+    """docs/SPEC-v4.11-ai-first.md L3: the answer names exactly one option ("libre ပါ")."""
+    from app.models import ProductAlias  # late import
+
+    ids = [o["product_id"] for o in prompt.options]
+    names: dict[int, set[str]] = {pid: set() for pid in ids}
+    for pid, name in session.execute(select(Product.id, Product.name).where(Product.id.in_(ids))):
+        names[pid].add(normalize(name))
+    for pid, alias in session.execute(select(ProductAlias.product_id, ProductAlias.normalized_alias)
+                                      .where(ProductAlias.product_id.in_(ids))):
+        names[pid].add(alias)
+    text = f" {normalized} "
+    hits = [n for n, pid in enumerate(ids, 1)
+            if any(f" {w} " in text for w in names[pid] if w and not any(
+                w in other for q, others in names.items() if q != pid for other in others))]
+    return hits if len(hits) == 1 else None
+
+
 def as_choice(session: Session, message: Message, normalized: str) -> ParseOutcome | None:
-    """"1" / "1 နဲ့ 2" / "အကုန်" answering an open numbered list -> a buy of those items."""
+    """"1" / "1 နဲ့ 2" / "အကုန်" answering an open numbered list -> a buy of those items. A product
+    choice (docs/SPEC-v4.11-ai-first.md L3) continues its own action with the message's other items."""
     if message.direction != "in":
         return None
     prompt = open_prompt(session, message)
     if prompt is None:
         return None
+    if prompt.kind == "product":
+        return _product_choice(session, message, prompt, normalized)
     picked = parse_choice(normalized, len(prompt.options))
     if not picked:
         return None
@@ -109,3 +131,25 @@ def as_choice(session: Session, message: Message, normalized: str) -> ParseOutco
                   for o in (prompt.options[n - 1] for n in picked))
     first = items[0]
     return ParseOutcome("buy", first.product_id, first.size_ml, first.quantity, 1.0, items)
+
+
+ACTION_INTENT = {"add": "buy", "ask_price": "ask_price", "remove": "remove"}
+
+
+def _product_choice(session: Session, message: Message, prompt: ChoicePrompt, normalized: str) -> ParseOutcome | None:
+    picked = parse_choice(normalized, len(prompt.options)) or _named(session, prompt, normalized)
+    if not picked or len(picked) != 1:
+        return None
+    prompt.answered_message_id = message.id
+    o = prompt.options[picked[0] - 1]
+    chosen = [(o["product_id"], None if o["is_full_bottle"] else o["size_ml"], o["is_full_bottle"], prompt.quantity,
+               prompt.action)]
+    rest = [(p["product_id"], p["size_ml"], p["is_full_bottle"], p.get("quantity", 1), p.get("action"))
+            for p in prompt.pending or []]
+    actions = {a for *_, a in chosen + rest}
+    mixed = len(actions) > 1
+    items = tuple(ParsedItem(pid, size, full, qty, match="choice", action=action if mixed else None)
+                  for pid, size, full, qty, action in chosen + rest)
+    intent = "modify_cart" if mixed else ACTION_INTENT.get(prompt.action, "buy")
+    first = items[0]
+    return ParseOutcome(intent, first.product_id, first.size_ml, first.quantity, 1.0, items)

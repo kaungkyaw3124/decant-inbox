@@ -9,7 +9,13 @@ approved: exactly like a seed alias / keyword (auto allowed). It becomes approve
 owner approves it, or after `auto_approve_after` one-tap accepts with no corrections.
 rejected: ignored. A nickname never overrides an alias of a DIFFERENT product: such a
 conflict is not saved, the owner decides ("Needs you" / Learning page).
+
+Automatic learning (docs/SPEC-v4.11-ai-first.md L4): the AI proposes short reusable words; the
+same words read the same way 3 times (different messages, no correction) -> approved by itself
+("🧠 auto-learn", auto_learned). A correction of the AI's reading stops it for good; the owner
+can still remove it on the Learning page.
 """
+import re
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
@@ -305,3 +311,88 @@ def resolve_conflict(session: Session, conflict: AuditLog, use_new: bool, user: 
 def pending_count(session: Session) -> int:
     return session.scalar(select(func.count()).select_from(LearnedPattern).where(LearnedPattern.status == "pending"))
 
+
+
+# ---------- automatic learning from the AI (docs/SPEC-v4.11-ai-first.md L4) ----------
+
+PARTICLES = frozenset({"နော်", "ဗျ", "ဗျာ", "ရှင့်", "ရှင်", "ပါ", "ခင်ဗျာ", "ခင်ဗျ", "ဦး", "လေ", "ကွ", "sis", "bro",
+                       "pls", "please", "ok", "ah", "a"})
+MAX_PHRASE_WORDS = 4
+MAX_NICKNAME_WORDS = 5
+_SIZE_RE = re.compile(r"\d+\s*(?:ml|မီလီ)|\bfull\b|အပြည့်|ဗူးလိုက်")
+
+
+def reusable(session: Session, kind: str, text: str, message_text: str, product_id: int | None = None) -> bool:
+    """Short reusable words only (the old K3 rule): a product name / nickname or an intent phrase of
+    at most 4 words; no sizes or numbers (a number in the product's own name is fine), not only
+    particles, never the whole message when it is a sentence."""
+    words = [w for w in normalize(text).split() if w]
+    while words and words[0] in PARTICLES:
+        words.pop(0)
+    while words and words[-1] in PARTICLES:
+        words.pop()
+    if not words:
+        return False
+    norm = " ".join(words)
+    if _SIZE_RE.search(norm) or "[" in norm:
+        return False
+    if len(words) > (MAX_NICKNAME_WORDS if kind != "intent_phrase" else MAX_PHRASE_WORDS):
+        return False
+    digits = re.findall(r"\d+", norm)
+    if digits:
+        if kind != "nickname" or product_id is None:
+            return False
+        product = session.get(Product, product_id)
+        name = normalize(f"{product.brand} {product.name}") if product else ""
+        if not all(d in name for d in digits):
+            return False
+    message_words = normalize(message_text).split()
+    if norm == " ".join(message_words) and len(message_words) >= 3:
+        return False  # the whole sentence
+    if kind in ("nickname", "not_stocked") and find_intent(norm):
+        return False  # "ysl edp ယူမယ်" is a sentence, not a name
+    return True
+
+
+def ai_resolved(session: Session, kind: str, text: str, *, product_id: int | None = None, intent: str | None = None,
+                message_id: int | None = None, user: User | None = None) -> LearnedPattern | None:
+    """The AI (AUTO, or a card a person accepted unchanged) read these words this way. A new
+    pattern starts pending with 1 use; the same words + meaning again counts a use; at
+    `auto_approve_after` uses (default 3) with no corrections it is approved (🧠 auto-learn).
+    Returns the pattern created or counted (None: known already, conflict, invalid)."""
+    taught = teach(session, kind, text, user, product_id=product_id, intent=intent, message_id=message_id,
+                   via_ai=True)
+    if taught.status == "saved":
+        pattern = taught.pattern
+        pattern.confirmed_uses = 1
+    elif taught.status == "known":
+        norm = normalize(" ".join(text.split())[:255])
+        pattern = session.scalar(select(LearnedPattern).where(
+            LearnedPattern.kind == kind, LearnedPattern.normalized_text == norm, LearnedPattern.status == "pending",
+            LearnedPattern.product_id.is_(product_id) if product_id is None else LearnedPattern.product_id == product_id,
+            LearnedPattern.intent.is_(intent) if intent is None else LearnedPattern.intent == intent).limit(1))
+        if pattern is None or pattern.source_message_id == message_id:
+            return None  # a seed / approved word, or the same message again
+        pattern.confirmed_uses += 1
+    else:
+        return None
+    n = settings(session)["auto_approve_after"]
+    if n > 0 and pattern.confirmed_uses >= n and pattern.corrections == 0:
+        pattern.status, pattern.approved_at, pattern.approved_by = "approved", datetime.now(UTC), None
+        pattern.auto_learned = True
+        session.add(AuditLog(user_id=None, action="learning.auto_learned", details={
+            "actor": "🧠 auto-learn", "pattern_id": pattern.id, "kind": pattern.kind, "text": pattern.text,
+            "uses": pattern.confirmed_uses, "message_id": message_id}))
+    session.flush()
+    return pattern
+
+
+def ai_corrected(session: Session, ai_learn, user: User | None, message_id: int) -> list[int]:
+    """A person changed the AI's reading of a message: the pending patterns with the AI's words
+    for it get a correction (never auto-approved). Returns their ids."""
+    norms = {(x.kind, normalize(x.text)) for x in ai_learn}
+    ids = [p.id for p in session.scalars(select(LearnedPattern).where(LearnedPattern.status == "pending",
+                                                                      LearnedPattern.via_ai))
+           if (p.kind, p.normalized_text) in norms]
+    add_corrections(session, ids, user, message_id)
+    return ids
