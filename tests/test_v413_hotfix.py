@@ -32,6 +32,6 @@ def test_q0_disagreeing_readers_still_go_to_a_person(auto_ai, shop, db):
     client, token = shop
     cart_for(client, token, db, phone="09777123456")
     auto_ai.answer = lambda _: {**full("address"), "address": addr("No 5, 45 လမ်း, Yankin", "Yankin", "45 လမ်း",
-                                                                     "No 5", confidence=0.7)}
+                                                                     "No 5", confidence=0.8)}
     now_msg(db, "No 5, 45 လမ်း, mandalay")  # the rules read Mandalay, the AI Yankin
     assert open_order(db)[1] is None

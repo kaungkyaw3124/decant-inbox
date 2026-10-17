@@ -26,7 +26,7 @@ TOWNSHIPS_CSV = BASE_DIR / "data" / "townships.csv"
 FIELDS = ("house_no", "street", "ward_or_quarter", "township", "city", "landmark")
 MIN_CHARS = 8
 SURE = 0.85  # the AI's address confidence needed to save without a person
-AGREE = 0.6  # ... or this much when the rules read the same township / city on their own (docs/SPEC-v4.13 Q0)
+AGREE = 0.75  # ... or this much when the rules read the same township / city on their own (docs/SPEC-v4.13 Q0)
 PARTIAL_HOURS = 24  # a partial address waits this long for the township / city answer
 # Shown to the admin (English; i18n_my.py has the Burmese)
 REASONS = {
