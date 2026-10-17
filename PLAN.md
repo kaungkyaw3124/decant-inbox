@@ -3,9 +3,11 @@
 Read CLAUDE.md first. This file tracks where we are.
 
 ## RESUME HERE (updated 2026-10-17 by planning chat)
-- v1-v4.11 DONE (2026-10-17). AI mode AUTO (owner skipped shadow), auto-graduate OFF, brake ON.
-  OWNER TEST SCRIPT 4.9 + 4.10 and OWNER TEST SCRIPT 4.11 are in REPORT.md (owner tests pending).
-- NEXT: wait for the owner's test results / the next spec from the planning chat.
+- v1-v4.11 DONE. AI mode AUTO, brake ON.
+- NOW: epic 4.12 docs/SPEC-v4.12-address-payment-ai.md — N0 repair invalid addresses + gate,
+  N1 AI address assistant, N2 address gates before payment info / approve / confirmation,
+  N3 AI payment-screenshot reader (switch default OFF), N4 /ai switches. Commit + push after
+  each part. Tests P1-P10 + real-API eval gates. Loop until green, deploy, OWNER TEST SCRIPT 4.12.
 - Owner checks: `bash scripts/status.sh`; AI numbers at /ai.
 
 ## Status
