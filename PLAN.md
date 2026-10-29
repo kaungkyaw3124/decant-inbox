@@ -2,6 +2,11 @@
 
 Read CLAUDE.md first. This file tracks where we are.
 
+## NEXT TASK (written by the planning chat; Claude Code runs it with /next)
+Task: build v4.14 test payment code — docs/SPEC-v4.14-test-payment-code.md (all parts T1-T4, tests C1-C11,
+OWNER TEST 4.14 in REPORT.md).
+Status: TODO
+
 ## RESUME HERE (updated 2026-10-29 by planning chat)
 - v1-v4.12 DONE. AI AUTO, brake ON, ai_address ON, ai_screenshot OFF.
 - v4.13 hotfix (docs/SPEC-v4.13-hotfix.md) DONE + deployed 2026-10-17: Q0-Q5, R1-R6, evals PASS. Owner test 4.13
