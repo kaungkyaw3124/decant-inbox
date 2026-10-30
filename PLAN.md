@@ -105,3 +105,7 @@ Do NOT send the URL via the owner's Telegram account (account is read-only).
 ## Later (not v1)
 AI fallback → inventory in ml per bottle + supplies → orders & statuses →
 payments → Viber → reports. Each is a new module with its own tables.
+
+## QUEUE (planning chat adds tasks here; /next takes the first TODO when NEXT TASK is DONE)
+1. v4.15 New UI/UX with Bootstrap 5, mobile-first — docs/SPEC-v4.15-ui-bootstrap.md (U0-U5, goal-driven loop,
+   OWNER TEST 4.15). Status: TODO

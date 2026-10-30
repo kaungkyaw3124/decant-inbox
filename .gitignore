@@ -33,3 +33,6 @@ venv/
 
 # Current Cloudflare quick-tunnel address
 TUNNEL_URL
+
+# UI screenshots (test data only)
+ui-shots/

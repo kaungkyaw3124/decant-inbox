@@ -7,8 +7,12 @@ PLAN.md under "## NEXT TASK". Do it now:
 
 1. Run `git pull --rebase`. Read CLAUDE.md, then PLAN.md, then the latest REPORT.md entry.
 2. Find "## NEXT TASK" in PLAN.md.
-   - If it says `none` or `waiting`, or it is already marked DONE: say "No new task. Ask the planning chat
-     for the next one." and stop.
+   - If it is already marked DONE (or says `none`): look at "## QUEUE" in PLAN.md. Take the first item with
+     Status TODO, copy it into "## NEXT TASK" (Status: TODO), mark it "moved to NEXT TASK" in the QUEUE,
+     commit + push, and do it. If the QUEUE has no TODO item: say "No new task. Ask the planning chat for
+     the next one." and stop.
+   - If NEXT TASK is TODO but some of its work already exists uncommitted (git status), continue from it;
+     never reset or stash it away.
    - If a spec file is named there, read it fully before starting.
 3. Do the task with the loop (unless the task says otherwise):
    a. Implement one part at a time.
