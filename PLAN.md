@@ -5,7 +5,7 @@ Read CLAUDE.md first. This file tracks where we are.
 ## NEXT TASK (written by the planning chat; Claude Code runs it with /next)
 Task: v4.15 New UI/UX with Bootstrap 5, mobile-first — docs/SPEC-v4.15-ui-bootstrap.md (U0-U5, goal-driven loop,
 OWNER TEST 4.15).
-Status: TODO
+Status: DONE 2026-10-31 — see REPORT.md
 
 ## RESUME HERE (updated 2026-10-29 by planning chat)
 - v1-v4.12 DONE. AI AUTO, brake ON, ai_address ON, ai_screenshot OFF.
@@ -13,7 +13,9 @@ Status: TODO
   pending (REPORT.md "OWNER TEST SCRIPT 4.13").
 - v4.14 test payment code DONE + deployed 2026-10-30 (feature OFF until owner sets TEST_PAY_CODE in .env).
   Owner test 4.14 pending (REPORT.md "OWNER TEST SCRIPT 4.14").
-- NEXT: v4.15 UI (QUEUE item 1) — owner types /next. v4.14 reviewed OK by planning chat 2026-10-31.
+- v4.15 new UI (Bootstrap, mobile-first) DONE + deployed 2026-10-31: UI gate 300 views 0 fails, 719 tests.
+  Owner test 4.15 pending (REPORT.md "OWNER TEST SCRIPT 4.15").
+- NEXT: waiting for the planning chat (QUEUE empty).
 - Owner checks: `bash scripts/status.sh`; AI numbers at /ai.
 
 ## Status
@@ -38,6 +40,7 @@ Status: TODO
 | 15 | v4.12 (docs/SPEC-v4.12-address-payment-ai.md): AI address assistant, address gates, AI screenshot reader | ✅ Done, live (ai_address ON, ai_screenshot OFF; owner test pending) |
 | 16 | v4.13 (docs/SPEC-v4.13-hotfix.md): hotfix from live test: never silent (holding reply + watchdog), order_start, address cleaning, no-place = invalid, Mandalay grid | ✅ Done, live (owner test pending) |
 | 17 | v4.14 (docs/SPEC-v4.14-test-payment-code.md): secret test payment code from test accounts, T-numbered test orders, kept out of sales | ✅ Done, live (owner test pending; set TEST_PAY_CODE) |
+| 18 | v4.15 (docs/SPEC-v4.15-ui-bootstrap.md): Bootstrap 5 mobile-first UI, phone tab bar, UI gate (scripts/ui_check.py) | ✅ Done, live (owner test pending) |
 
 ## Phase 0 checklist
 - [x] Step 0: rollback safety net scripts in ~/hardening/

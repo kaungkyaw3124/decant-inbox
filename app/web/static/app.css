@@ -422,3 +422,6 @@ a.button.chip.on { background: var(--st-test); color: #fff; border-color: var(--
   table.stack-table > tbody > tr > td:not([data-label]) { padding-left: 0; }
 }
 .empty::before { content: "✨"; display: block; font-size: 1.8rem; margin-bottom: 4px; }
+/* no JavaScript: the "More" tab links to #more, which opens the sheet by itself */
+.more-sheet:target { visibility: visible; transform: none; }
+.badge.st-confirmed { background: #475569; }

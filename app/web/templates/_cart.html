@@ -4,7 +4,7 @@
 {% set status_label = {"cart": "🛒 cart", "confirmed": "✅ confirmed", "waiting_payment": "💳 waiting for payment",
                        "photo_received": "📷 payment photo received"} %}
 <section class="card cart-pane" id="cart">
-  <h2>{{ t("Cart") }} {% if order %}<span class="badge">{{ tr(status_label.get(order.status, order.status)) }}</span>{% endif %} {{ ui.help("What this customer is buying now. Follow the blue “Next” button: list → confirmed → phone → address → payment info.") }}</h2>
+  <h2>{{ t("Cart") }} {% if order %}<span class="badge st-{{ order.status }}">{{ tr(status_label.get(order.status, order.status)) }}</span>{% endif %} {{ ui.help("What this customer is buying now. Follow the blue “Next” button: list → confirmed → phone → address → payment info.") }}</h2>
 
   {% if order and order.order_no %}<p><b>{{ t("Order #{no}", no=order_label(order)) }}</b></p>{% endif %}
   <p class="small">{% include "_step.html" %}</p>
