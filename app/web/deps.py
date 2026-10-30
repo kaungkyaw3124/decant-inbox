@@ -7,10 +7,12 @@ from zoneinfo import ZoneInfo
 from fastapi import Request
 from fastapi.templating import Jinja2Templates
 from jinja2 import pass_context
+from markupsafe import Markup
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.core.db import SessionLocal
+from app.orders import testpay
 from app.web import i18n
 from app.pricing.prices import format_mmk, size_label
 
@@ -76,7 +78,18 @@ def age(context, value: datetime | None) -> str:
 
 templates.env.filters["local_time"] = local_time
 templates.env.filters["age"] = age
-templates.env.globals.update(format_mmk=format_mmk, size_label=size_label, now=lambda: datetime.now(UTC))
+templates.env.globals.update(format_mmk=format_mmk, size_label=size_label, now=lambda: datetime.now(UTC),
+                             order_label=testpay.order_label)
+
+
+def _hide_code(value):
+    """docs/SPEC-v4.14: the test payment code never appears in a page (message text, search box, ...)."""
+    if isinstance(value, Markup):
+        return Markup(testpay.hide(str(value)))
+    return testpay.hide(value) if isinstance(value, str) else value
+
+
+templates.env.finalize = _hide_code
 
 
 def address_reason(text: str | None) -> str:

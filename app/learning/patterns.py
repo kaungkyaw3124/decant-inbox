@@ -24,6 +24,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
 from app.models import AppSetting, AuditLog, LearnedPattern, Product, ProductAlias, User
+from app.orders import testpay
 from app.parser.normalize import normalize
 from app.parser.rules import Alias, Phrase, find_intent, greeting_only
 
@@ -147,6 +148,8 @@ def teach(session: Session, kind: str, text: str, user: User | None, *, product_
     norm = normalize(text)
     if len(norm.replace(" ", "")) < 2 or norm.isdigit():
         return Taught("invalid", note="Too short to learn.")
+    if testpay.hide(text) != text:  # docs/SPEC-v4.14: the test payment code is never learned
+        return Taught("invalid", note="Not learned.")
     live = session.scalars(select(LearnedPattern).where(
         LearnedPattern.normalized_text == norm, LearnedPattern.status.in_(LIVE))).all()
     if kind in ("nickname", "not_stocked"):

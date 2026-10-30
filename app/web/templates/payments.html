@@ -9,7 +9,7 @@
     <a class="row-main" href="/payments/{{ check.id }}">
       <div class="meta"><span class="who">{{ c.display_name or c.username or t("Customer") }}</span>
         <time>{{ check.created_at | local_time }}</time></div>
-      <p class="text">{% if check.decision == "several" %}📷 {{ t("Several photos ({n}) — ask for one", n=check.photo_count) }}{% else %}📷 {{ t("Screenshot · total {total} ကျပ်", total=format_mmk(order.total_mmk)) }}{% endif %}</p>
+      <p class="text">{% if check.is_test %}🧪 {{ t("TEST PAYMENT — no money") }} · {{ format_mmk(order.total_mmk) }} ကျပ်{% elif check.decision == "several" %}📷 {{ t("Several photos ({n}) — ask for one", n=check.photo_count) }}{% else %}📷 {{ t("Screenshot · total {total} ကျပ်", total=format_mmk(order.total_mmk)) }}{% endif %}</p>
     </a>
   </li>
 {% else %}

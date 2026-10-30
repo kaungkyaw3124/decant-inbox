@@ -6,14 +6,14 @@ from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
 from app.core import audit
 from app.models import Customer, Order, OrderEvent, OrderItem, User
 from app.models.orders import LOCKED_STATUSES, MAX_PHONES, PAID_STATUSES
 from app.orders import address as address_rules
-from app.orders import cart, change, delivery, followups, reports, steps
+from app.orders import cart, change, delivery, followups, reports, steps, testpay
 from app.replies import templates as replies
 from app.web.auth import current_user, owner_only, verify_csrf
 from app.web.deps import get_db, templates
@@ -42,17 +42,24 @@ def _order(db: Session, order_id: int, lock: bool = True) -> Order:
 
 
 @router.get("/orders", response_class=HTMLResponse)
-def orders_page(request: Request, tab: str = "to_pack", db: Session = Depends(get_db)):
+def orders_page(request: Request, tab: str = "to_pack", show_test: str = "", confirm_clear: str = "",
+                db: Session = Depends(get_db)):
     tab = tab if tab in TABS else "to_pack"
     label, statuses, oldest_first = TABS[tab]
+    # docs/SPEC-v4.14: test orders only with "Show test orders", and never once cleared
+    shown = (Order.is_test.is_(False) | (Order.cancel_note.is_distinct_from(testpay.CLEARED) & Order.is_test)
+             if show_test else Order.is_test.is_(False))
     query = select(Order, Customer).join(Customer, Customer.id == Order.customer_id).where(
-        Order.status.in_(statuses), Order.order_no.is_not(None))
+        Order.status.in_(statuses), Order.order_no.is_not(None), shown)
     order_by = Order.paid_at.asc() if oldest_first else Order.paid_at.desc()
     rows = db.execute(query.order_by(order_by, Order.id).limit(LIST_SIZE)).all()
-    counts = {key: len(db.scalars(select(Order.id).where(Order.status.in_(st), Order.order_no.is_not(None))).all())
+    counts = {key: len(db.scalars(select(Order.id).where(Order.status.in_(st), Order.order_no.is_not(None),
+                                                         shown)).all())
               for key, (_, st, _) in TABS.items() if key in ("to_pack", "to_send", "sent")}
     return templates.TemplateResponse(request, "orders.html", {
-        "tab": tab, "tabs": TABS, "counts": counts, "status_labels": STATUS_LABELS,
+        "tab": tab, "tabs": TABS, "counts": counts, "status_labels": STATUS_LABELS, "show_test": bool(show_test),
+        "confirm_clear": bool(confirm_clear), "test_open": db.scalar(select(func.count()).select_from(Order).where(
+            Order.is_test, Order.status.in_(delivery.CANCELLABLE))),
         "rows": [(o, c, cart.view(db, o)) for o, c in rows], "item_name": cart.item_name,
         "undo": delivery.undoable(db, [o.id for o, _ in rows]), "now": datetime.now(UTC),
         "contact_history": change.history(db, [o.id for o, _ in rows]), "locked_statuses": LOCKED_STATUSES})
@@ -75,7 +82,7 @@ def set_status(request: Request, order_id: int, to: str = Form(...), deli_name: 
         flash(request, str(exc))
         return _back(request, back, order)
     done = {"packed": "📦 Packed", "sent_out": "🚚 Sent out", "delivered": "✅ Delivered"}[to]
-    flash(request, f"Order #{order.order_no}: {done}." + (" The customer gets the message in 60 s (Undo to stop it)."
+    flash(request, f"Order #{testpay.order_label(order)}: {done}." + (" The customer gets the message in 60 s (Undo to stop it)."
                                                           if event.outbox_id else " Undo for 60 s."))
     return _back(request, back, order)
 
@@ -92,10 +99,23 @@ def cancel_order(request: Request, order_id: int, note: str = Form(""), message:
         db.rollback()
         flash(request, str(exc))
         return _back(request, back, order)
-    flash(request, f"Order{f' #{order.order_no}' if order.order_no else ''} cancelled"
+    flash(request, f"Order{f' #{testpay.order_label(order)}' if order.order_no else ''} cancelled"
                    + (" (message in 60 s; Undo to stop it)." if template else ". Nothing sent.")
                    + (" Refund outside the system." if order.paid_at else ""))
     return _back(request, back, order)
+
+
+@router.post("/orders/clear-test", dependencies=[Depends(owner_only)])
+def clear_test_orders(request: Request, sure: str = Form(""), db: Session = Depends(get_db),
+                      user: User = Depends(current_user)):
+    """docs/SPEC-v4.14-test-payment-code.md T4: confirmed twice (the button, then "I'm sure")."""
+    if sure != "1":
+        return RedirectResponse("/orders?tab=all&show_test=1&confirm_clear=1#clear-test", status_code=303)
+    n = testpay.clear(db, user)
+    audit.record(db, user, "test_code.clear_orders", cancelled=n)
+    db.commit()
+    flash(request, f"🗑 {n} test orders cancelled (kept in the database, hidden).")
+    return RedirectResponse("/orders?tab=all", status_code=303)
 
 
 @router.post("/orders/{order_id}/remind")
@@ -181,7 +201,7 @@ async def edit_locked(request: Request, order_id: int, db: Session = Depends(get
     audit.record(db, user, "order.edit_locked", order_id=order.id, order_no=order.order_no, reason=reason,
                  before=before, after=after)
     db.commit()
-    flash(request, f"Order #{order.order_no} changed (owner). Tell the customer yourself if needed.")
+    flash(request, f"Order #{testpay.order_label(order)} changed (owner). Tell the customer yourself if needed.")
     return RedirectResponse(back + f"#order-{order.id}", status_code=303)
 
 

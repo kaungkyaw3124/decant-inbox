@@ -52,7 +52,7 @@ from app.models import (
     ParseResult, Product, QuickAction, UnknownRequest, User,
 )
 from app.models.outbox import UNDO_SECONDS
-from app.orders import address, cart, change, delivery, previous, steps, unknown
+from app.orders import address, cart, change, delivery, previous, steps, unknown, testpay
 from app.parser.normalize import normalize
 from app.parser.rules import CHANGE_PHONE_RE, NEEDS_REVIEW_BELOW, change_kind, has_greeting, find_phones, replace_words
 from app.pricing.prices import size_label
@@ -278,7 +278,7 @@ def _apply_items(session: Session, message: Message, result: ParseResult, texts:
         if shipping is None:
             return None  # no paid order: the admin answers (Needs you)
         return Outcome("delivery", "💬 Reply delivery status", delivery.status_answer(shipping, texts), "delivery",
-                       f"Order #{shipping.order_no} is {shipping.status.replace('_', ' ')}.")
+                       f"Order #{testpay.order_label(shipping)} is {shipping.status.replace('_', ' ')}.")
     order = cart.open_cart(session, customer.id)
     # docs/SPEC-v4.10-interruptions.md: "I paid" in words; changes after the screenshot; locked paid orders
     if intent == "payment_sent":
@@ -508,9 +508,9 @@ def _hold_request(session: Session, message: Message, order: Order, intent: str,
 def _locked(session: Session, message: Message, order: Order, intent: str, texts: dict[str, str]) -> Outcome:
     """Paid orders are locked (owner rule, 4.10): the locked reply, nothing changed, Needs you."""
     event = steps.record_request(session, order, message, _WHAT.get(intent, intent))
-    return Outcome("locked", f"🔒 Reply “Order #{order.order_no} can't be changed” + Needs you",
+    return Outcome("locked", f"🔒 Reply “Order #{testpay.order_label(order)} can't be changed” + Needs you",
                    steps.locked_line(texts, order), "hold",
-                   f"Order #{order.order_no} is paid: nothing is changed. Needs you: {_WHAT.get(intent, intent)}.",
+                   f"Order #{testpay.order_label(order)} is paid: nothing is changed. Needs you: {_WHAT.get(intent, intent)}.",
                    order.id, {"events": [event.id]})
 
 
@@ -576,7 +576,7 @@ def _buy(session: Session, message: Message, customer: Customer, order: Order | 
                             size=size_label(None if w.is_full_bottle else w.size_ml, product.full_size_ml)))
     lines = [cart.cart_text(session, order, texts, notes + dropped)]
     if locked is not None:  # the paid order is locked: this is a NEW order
-        lines.insert(0, render(texts["locked_new_order"], order_no=str(locked.order_no)))
+        lines.insert(0, render(texts["locked_new_order"], order_no=testpay.order_label(locked)))
     view = cart.view(session, order)
     partial = sellable < len(items)
     label = (f"🛒 Add {sellable} known item{'s' if sellable > 1 else ''} + send list" if partial
@@ -585,7 +585,7 @@ def _buy(session: Session, message: Message, customer: Customer, order: Order | 
     if view.problems:
         note += " To check (red in the cart): " + ", ".join(view.problems) + "."
     if locked is not None:
-        note = f"Order #{locked.order_no} is paid and locked: a NEW order. " + note
+        note = f"Order #{testpay.order_label(locked)} is paid and locked: a NEW order. " + note
     return Outcome("cart_add", label, "\n".join(lines), "cart", note, order.id, undo)
 
 

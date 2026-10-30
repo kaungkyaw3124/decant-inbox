@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 from app.core.config import get_settings
 from app.models import AppSetting, AuditLog, Order, OrderEvent, Outbox, PaymentCheck, User
 from app.models.orders import OPEN_STATUSES, SHIPPING_STATUSES
-from app.orders import cart
+from app.orders import cart, testpay
 from app.replies import compose
 from app.replies import templates as replies
 from app.replies.templates import render
@@ -78,15 +78,15 @@ def local_date(value: datetime) -> str:
 
 
 def sent_out_text(order: Order, texts: dict[str, str]) -> str:
-    return render(texts["order_sent_out"], order_no=str(order.order_no), deli_line=deli_line(order, texts))
+    return render(texts["order_sent_out"], order_no=testpay.order_label(order), deli_line=deli_line(order, texts))
 
 
 def status_answer(order: Order, texts: dict[str, str]) -> str:
     """Reply to "when will it arrive?" for a paid / packed / sent-out order."""
     if order.status == "sent_out":
-        return render(texts["delivery_sent"], order_no=str(order.order_no), sent_date=local_date(order.sent_out_at),
+        return render(texts["delivery_sent"], order_no=testpay.order_label(order), sent_date=local_date(order.sent_out_at),
                       deli_line=deli_line(order, texts))
-    return render(texts["delivery_preparing"], order_no=str(order.order_no))
+    return render(texts["delivery_preparing"], order_no=testpay.order_label(order))
 
 
 def shipping_order(session: Session, customer_id: int) -> Order | None:
@@ -139,7 +139,7 @@ def move(session: Session, order: Order, to: str, user: User | None, texts: dict
     if to not in MOVES:
         raise OrderError("Unknown status.")
     if order.status not in MOVES[to]:
-        raise OrderError(f"Order #{order.order_no} is {order.status.replace('_', ' ')}; it can't become "
+        raise OrderError(f"Order #{testpay.order_label(order)} is {order.status.replace('_', ' ')}; it can't become "
                          f"{to.replace('_', ' ')}.")
     before = _snapshot(order)
     order.status, order.updated_at = to, now

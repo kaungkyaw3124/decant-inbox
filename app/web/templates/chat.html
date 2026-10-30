@@ -17,8 +17,15 @@
       {% if c.auto_reply_off %}<button name="off" value="0" class="quiet">{{ t("Allow auto-reply") }}</button>
       {% else %}<button name="off" value="1" class="quiet">{{ t("Never auto-reply to this customer") }}</button>{% endif %}
     </form>
+    {% if user_role == "owner" %}
+    <form method="post" action="/customers/{{ c.id }}/tester" class="inline">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <button name="on" value="{{ 0 if c.is_tester else 1 }}" class="quiet">🧪 {{ t("Test account") }}: {{ t("ON") if c.is_tester else t("OFF") }}</button>
+    </form>
+    {% endif %}
   </div>
 </header>
+{% if c.is_tester and user_role == "owner" %}<p class="flash warnbox">🧪 {{ t("Test account: the test payment code works in this chat; its orders are test orders (T1, T2, ...).") }}</p>{% endif %}
 {% if c.auto_reply_off %}<p class="flash warnbox">🤖 {{ t("Auto-reply is off for this customer.") }}</p>{% endif %}
 {% if paused_until %}
 <form method="post" action="/customers/{{ c.id }}/resume-auto" class="flash warnbox paused">

@@ -2,5 +2,5 @@
 {% set labels = {"need_confirm": "⏳ waiting: same phone & address?", "need_phone": "⏳ waiting: phone",
                  "need_address": "⏳ waiting: address", "waiting_new_info": "⏳ waiting: new address / phone",
                  "waiting_payment": "⏳ waiting payment", "photo_received": "📷 payment screenshot to check"} %}
-{% if step.kind == "locked" %}<span class="badge step locked">🔒 {{ t("Order #{no} locked", no=step.order.order_no) }}</span>
+{% if step.kind == "locked" %}<span class="badge step locked">🔒 {{ t("Order #{no} locked", no=order_label(step.order)) }}</span>
 {% elif step.kind in labels %}<span class="badge step">{{ t(labels[step.kind]) }}{% if step.kind == "waiting_payment" and total_changed_at %} · {{ t("total changed {time}", time=total_changed_at | local_time("%H:%M")) }}{% endif %}</span>{% endif %}

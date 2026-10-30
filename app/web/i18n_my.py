@@ -741,4 +741,28 @@ MY = {
         "၆၀ စက္ကန့်အတွင်း ဘယ်သူမှ မဖြေနိုင်: ခဏစောင့်ခိုင်း (၁၀ မိနစ်မှာ အများဆုံး တစ်ခါ)",
     "💬 Ask which product": "💬 ဘယ်ပစ္စည်းလဲ မေးမယ်", "asked which product to order": "ဘယ်ပစ္စည်း မှာမလဲ မေးပြီး",
     "Customer wants to order but names no product: ask which one": "မှာချင်ပေမယ့် ပစ္စည်း မပြော: ဘယ်ဟာလဲ မေးမယ်",
+    # docs/SPEC-v4.14-test-payment-code.md
+    "Test account": "စမ်းသပ်အကောင့်", "Test accounts": "စမ်းသပ်အကောင့်များ", "Test payments": "စမ်းသပ် ငွေချေမှု",
+    "Test account: the test payment code works in this chat; its orders are test orders (T1, T2, ...).":
+        "စမ်းသပ်အကောင့်: ဒီ chat မှာ စမ်းသပ်ကုဒ် အလုပ်လုပ်တယ်၊ အော်ဒါတွေက စမ်းသပ်အော်ဒါ (T1, T2, ...) ဖြစ်မယ်။",
+    "Test payment code (TEST_PAY_CODE in .env)": "စမ်းသပ် ငွေချေကုဒ် (.env ထဲက TEST_PAY_CODE)",
+    "set": "ထည့်ထားပြီ", "not set (feature off)": "မထည့်ရသေး (ပိတ်ထား)",
+    "none (turn on “🧪 Test account” on a chat page)": "မရှိသေး (chat စာမျက်နှာမှာ “🧪 စမ်းသပ်အကောင့်” ဖွင့်ပါ)",
+    "Auto-approve test payments (5 s after the code)": "စမ်းသပ် ငွေချေမှုကို အလိုအလျောက် အတည်ပြု (ကုဒ်ပြီး ၅ စက္ကန့်)",
+    "TEST PAYMENT — no money": "စမ်းသပ် ငွေချေမှု — ငွေမပါ",
+    "The test account sent the test payment code instead of a screenshot.":
+        "စမ်းသပ်အကောင့်က screenshot အစား စမ်းသပ်ကုဒ် ပို့ထားတယ်။",
+    "Transaction ID": "Transaction ID", "the Order ID will be a test number (T1, T2, ...)":
+        "အော်ဒါနံပါတ်က စမ်းသပ်နံပါတ် (T1, T2, ...) ဖြစ်မယ်",
+    "Show test orders": "စမ်းသပ်အော်ဒါတွေ ပြမယ်", "Clear test orders": "စမ်းသပ်အော်ဒါတွေ ရှင်းမယ်", "test": "စမ်းသပ်",
+    "Cancel {n} test orders that are not delivered? Nothing is sent and nothing is deleted.":
+        "မရောက်သေးတဲ့ စမ်းသပ်အော်ဒါ {n} ခု ပယ်မလား? ဘာမှ မပို့ဘူး၊ ဘာမှ မဖျက်ဘူး။",
+    "Yes, I'm sure": "ဟုတ်ကဲ့၊ သေချာတယ်",
+    "⚠️ someone sent the test payment code — change TEST_PAY_CODE":
+        "⚠️ တစ်ယောက်ယောက်က စမ်းသပ်ကုဒ် ပို့ထားတယ် — TEST_PAY_CODE ပြောင်းပါ",
+    "🧪 test code but no order waiting for payment": "🧪 စမ်းသပ်ကုဒ် ရောက်ပေမယ့် ငွေစောင့်နေတဲ့ အော်ဒါ မရှိ",
+    "🧪 Test account: the test payment code works in this chat.": "🧪 စမ်းသပ်အကောင့်: ဒီ chat မှာ စမ်းသပ်ကုဒ် အလုပ်လုပ်တယ်။",
+    "Not a test account any more.": "စမ်းသပ်အကောင့် မဟုတ်တော့ဘူး။",
+    "🗑 {n} test orders cancelled (kept in the database, hidden).": "🗑 စမ်းသပ်အော်ဒါ {n} ခု ပယ်ပြီး (database ထဲ သိမ်းထား၊ ဖျောက်ထား)။",
+    "🧪 test payment code": "🧪 စမ်းသပ်ကုဒ်",
 }

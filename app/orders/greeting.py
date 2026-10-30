@@ -21,7 +21,7 @@ from sqlalchemy.orm import Session
 from app.learning import patterns
 from app.models import Order, Outbox
 from app.models.orders import OPEN_STATUSES
-from app.orders import cart, delivery
+from app.orders import cart, delivery, testpay
 from app.pricing.prices import format_mmk
 from app.replies import compose
 from app.replies.templates import render
@@ -63,9 +63,9 @@ def body(session: Session, customer_id: int, texts: dict[str, str]) -> str:
     if order is not None and order.status == "photo_received":
         return texts["greeting_photo_received"]
     if shipping is not None and shipping.status in ("paid", "packed"):
-        return render(texts["greeting_preparing"], order_no=str(shipping.order_no))
+        return render(texts["greeting_preparing"], order_no=testpay.order_label(shipping))
     if shipping is not None and shipping.status == "sent_out":
-        return render(texts["greeting_sent"], order_no=str(shipping.order_no),
+        return render(texts["greeting_sent"], order_no=testpay.order_label(shipping),
                       sent_date=delivery.local_date(shipping.sent_out_at))
     return texts["greeting_reply"]
 

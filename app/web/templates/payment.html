@@ -5,7 +5,7 @@
 <p><a href="/payments">← {{ t("Payments") }}</a> · <a href="/chats/{{ c.id }}">{{ t("Open chat") }}</a></p>
 <section class="card">
   <h1>💳 {{ c.display_name or c.username or t("Customer") }}</h1>
-  <p class="muted small">{{ check.created_at | local_time("%d %b %H:%M") }} · {{ t("order status") }}: {{ code(order.status) }}{% if order.order_no %} · {{ t("Order #{no}", no=order.order_no) }}{% endif %}</p>
+  <p class="muted small">{{ check.created_at | local_time("%d %b %H:%M") }} · {{ t("order status") }}: {{ code(order.status) }}{% if order.order_no %} · {{ t("Order #{no}", no=order_label(order)) }}{% endif %}</p>
   <table class="cart-items">
     <tbody>{% for i, p in cart.lines %}<tr><td>{{ p.name if p else i.unknown_text }} <span class="muted small">{{ item_size(i, p) }}</span></td><td class="num">{{ format_mmk((i.unit_price_mmk or 0) * i.quantity) }}</td></tr>{% endfor %}</tbody>
     <tfoot><tr><th>{{ t("Expected total") }}</th><th class="num">{{ format_mmk(cart.total) }} ကျပ်</th></tr></tfoot>
@@ -25,7 +25,7 @@
 
 {% if check.decision in ("several", "pending") and not may_decide %}
 <section class="card">
-  {% if check.decision == "pending" %}{% include "_payment_shot.html" %}{% endif %}
+  {% if check.is_test %}<p class="flash warnbox"><b>🧪 {{ t("TEST PAYMENT — no money") }}</b> {{ t("The test account sent the test payment code instead of a screenshot.") }}</p>{% elif check.decision == "pending" %}{% include "_payment_shot.html" %}{% endif %}
   <p class="notice small">ငွေစစ်တာကို ပိုင်ရှင်က လုပ်ပါမယ်{% if lang != "my" %} (only the owner checks payments now){% endif %}.</p>
 </section>
 {% elif check.decision == "several" %}
@@ -39,7 +39,7 @@
 </section>
 {% elif check.decision == "pending" %}
 <section class="card">
-  {% include "_payment_shot.html" %}
+  {% if check.is_test %}<p class="flash warnbox"><b>🧪 {{ t("TEST PAYMENT — no money") }}</b> {{ t("The test account sent the test payment code instead of a screenshot.") }}</p>{% else %}{% include "_payment_shot.html" %}{% endif %}
 </section>
 <form method="post" action="/payments/{{ check.id }}/approve" class="card stack">
   <input type="hidden" name="csrf" value="{{ csrf }}">
@@ -48,6 +48,9 @@
     <div class="flash warnbox" role="alert"><b>{{ t("Please check") }}:</b><ul>{% for w in warnings %}<li>{{ tr(w) }}</li>{% endfor %}</ul></div>
     <input type="hidden" name="confirmed" value="1">
   {% endif %}
+  {% if check.is_test %}
+  <p class="small">{{ t("Transaction ID") }}: <b>TEST-{{ check.id }}</b> · {{ t("the Order ID will be a test number (T1, T2, ...)") }}</p>
+  {% else %}
   {{ ui.help("Open your KPay / AYA app, find this payment, copy its transaction ID and the amount here. Approve only if the money really arrived.") }}
   <div class="grid">
     <label>{{ t("Transaction ID (from your KPay / AYA history)") }} <input name="transaction_id" value="{{ form.transaction_id }}" required maxlength="64" autocomplete="off">
@@ -57,6 +60,7 @@
       <select name="method">{% for m in methods %}<option {% if form.method == m.name %}selected{% endif %}>{{ m.name }}</option>{% endfor %}</select>
     </label>
   </div>
+  {% endif %}
   <button class="primary">{{ "✅ " ~ t("Approve anyway") if warnings else "✅ " ~ t("Approve") }}</button>
   <p class="muted small">{{ t("Gives the Order ID and sends the confirmation (10 s, Cancel in the chat).") }}</p>
   <details>

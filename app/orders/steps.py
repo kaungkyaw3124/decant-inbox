@@ -26,7 +26,7 @@ from sqlalchemy.orm import Session, aliased
 from app.learning import patterns
 from app.models import Customer, Message, Order, OrderEvent
 from app.models.orders import LOCKED_STATUSES, OPEN_STATUSES
-from app.orders import address, cart
+from app.orders import address, cart, testpay
 from app.parser.rules import ParsedItem, ParseOutcome
 from app.replies.templates import render
 
@@ -179,5 +179,5 @@ def close_request(session: Session, request: OrderEvent, user, outcome: str) -> 
 
 
 def locked_line(texts: dict[str, str], order: Order) -> str:
-    return render(texts["order_locked"], order_no=str(order.order_no))
+    return render(texts["order_locked"], order_no=testpay.order_label(order))
 

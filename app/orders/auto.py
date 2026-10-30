@@ -33,7 +33,7 @@ from app.models import (
     AppSetting, AuditLog, AutoRun, Customer, Message, Outbox, ParseItem, ParseResult, QuickAction, User,
 )
 from app.learning import patterns
-from app.orders import actions, cart
+from app.orders import actions, cart, testpay
 from app.replies import faq
 from app.replies import templates as replies
 
@@ -151,6 +151,8 @@ def decide(session: Session, message: Message, now: datetime, ai_mode: str | Non
         return _skip(session, message.id, "auto-reply off for this customer")
     if message.kind != "text":
         return _skip(session, message.id, "photo / file")
+    if customer.is_tester and testpay.is_code(message.raw_text):
+        return _skip(session, message.id, "test payment code")  # handled like a screenshot (testpay.scan)
     from app.ai import service as ai, settings as ai_settings  # late import: ai -> orders
 
     if ai_mode is None:

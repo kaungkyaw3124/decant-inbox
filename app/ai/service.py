@@ -25,6 +25,7 @@ from app.ai.types import AIResult
 from app.core.config import get_settings
 from app.core.db import SessionLocal
 from app.models import AICall, AuditLog, Customer, Message, ParseItem, ParseResult, UnknownRequest
+from app.orders import testpay
 from app.parser.normalize import normalize
 
 log = logging.getLogger("ai")
@@ -181,7 +182,8 @@ def candidates(session: Session, now: datetime, limit: int = 20) -> list[int]:
         if _not_needed.get(message_id) == result_id:
             continue
         message, result = session.get(Message, message_id), session.get(ParseResult, result_id)
-        if cards.handled(session, message) or not rules_unsure(session, message, result):
+        if cards.handled(session, message) or testpay.is_code(message.raw_text) or not rules_unsure(
+                session, message, result):
             _not_needed[message_id] = result_id
             continue
         found.append(message_id)
@@ -193,7 +195,7 @@ def candidates(session: Session, now: datetime, limit: int = 20) -> list[int]:
 def waiting_for_ai(session: Session, message: Message, result: ParseResult) -> bool:
     """AUTO mode: the auto engine waits for the AI's answer on this message (see auto.decide, which
     calls this only in AUTO mode)."""
-    if result.method != "rules" or providers.get() is None:
+    if result.method != "rules" or providers.get() is None or testpay.is_code(message.raw_text):
         return False
     if session.scalar(select(exists().where(AICall.message_id == message.id))):
         return False

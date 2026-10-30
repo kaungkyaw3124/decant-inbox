@@ -41,6 +41,10 @@ class Settings(BaseSettings):
     ai_price_cached_in: float = 0.01
     ai_price_out: float = 0.50
 
+    # docs/SPEC-v4.14-test-payment-code.md: secret code the owner's test account sends instead of a payment
+    # screenshot. Empty = feature off. Never print or log it.
+    test_pay_code: SecretStr | None = None
+
     @property
     def database_url(self) -> URL:
         return URL.create(

@@ -17,7 +17,7 @@ from app.core.db import SessionLocal
 from app.core.heartbeat import beat
 from app.models import Message
 from app.learning import patterns
-from app.orders import auto, cart, delivery, followups, holding, payments
+from app.orders import auto, cart, delivery, followups, holding, payments, testpay
 from app.parser.rules import PARSER_VERSION
 from app.parser.service import (
     load_aliases, load_full_sizes, load_known_words, load_phrases, parse_message, unparsed_message_ids,
@@ -73,7 +73,7 @@ def reparse_if_catalog_changed(last: int | None) -> int:
 
 
 def scan_payments() -> None:
-    """Payment screenshots -> payment checks (Step 5)."""
+    """Payment screenshots -> payment checks (Step 5); the test payment code (docs/SPEC-v4.14)."""
     try:
         with SessionLocal.begin() as session:
             found = payments.scan(session)
@@ -81,6 +81,13 @@ def scan_payments() -> None:
             log.info("payment photos: %d new/changed checks", found)
     except Exception:
         log.exception("payment scan failed")
+    try:
+        with SessionLocal.begin() as session:
+            codes, approved = testpay.scan(session), testpay.run_auto_approve(session)
+        if codes or approved:
+            log.info("test payments: %d code messages, %d auto-approved", codes, approved)
+    except Exception:
+        log.exception("test payment step failed")
 
 
 def housekeeping() -> None:

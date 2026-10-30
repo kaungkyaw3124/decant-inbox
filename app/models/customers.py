@@ -32,3 +32,5 @@ class Customer(Base):
     auto_resumed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     # docs/SPEC-v4.10-interruptions.md: when we last added a "resume line" (at most every 10 min)
     resume_line_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # docs/SPEC-v4.14-test-payment-code.md: the owner's own test account (the test payment code works here only)
+    is_tester: Mapped[bool] = mapped_column(Boolean, server_default=false(), default=False)

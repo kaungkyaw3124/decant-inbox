@@ -11,6 +11,7 @@ tell the AI "this is an address" and identify nobody)."""
 import re
 import unicodedata
 
+from app.orders import testpay
 from app.parser.normalize import normalize, to_unicode
 from app.parser.rules import _PHONE_RE
 
@@ -50,7 +51,8 @@ def _mask_numbers_as_written(text: str) -> str:
 
 def mask(text: str, keep_address: bool = False) -> str:
     """Normalized text (Burmese digits as 0-9) with personal details replaced; keep_address: the text
-    as written with only phones and long numbers replaced."""
+    as written with only phones and long numbers replaced. The test payment code never reaches the AI."""
+    text = testpay.hide(text or "")
     if keep_address:
         out = unicodedata.normalize("NFC", to_unicode(text or ""))
         out = re.sub(r"[^\S\n]+", " ", re.sub(r" *\n\s*", "\n", out))

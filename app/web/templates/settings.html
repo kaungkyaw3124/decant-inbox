@@ -30,6 +30,15 @@
   <button class="primary">{{ t("Save") }}</button>
 </form>
 
+<form method="post" action="/settings/test-payments" class="card stack" id="test-payments">
+  <h2>🧪 {{ t("Test payments") }}</h2>
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <p class="small">{{ t("Test payment code (TEST_PAY_CODE in .env)") }}: <b>{{ t("set") if test_code_set else t("not set (feature off)") }}</b></p>
+  <p class="small">{{ t("Test accounts") }}: {% for c in testers %}<a href="/chats/{{ c.id }}">{{ c.display_name or c.username or c.id }}</a>{% if not loop.last %}, {% endif %}{% else %}<span class="muted">{{ t("none (turn on “🧪 Test account” on a chat page)") }}</span>{% endfor %}</p>
+  <label class="check"><input type="checkbox" name="auto_approve" value="1" {% if test_auto_approve %}checked{% endif %}> {{ t("Auto-approve test payments (5 s after the code)") }}</label>
+  <button class="primary">{{ t("Save") }}</button>
+</form>
+
 <form method="post" action="/settings/vial-costs" class="card stack" id="vial-costs">
   <h2>🧪 {{ t("Vial cost per decant size") }}</h2>
   <input type="hidden" name="csrf" value="{{ csrf }}">

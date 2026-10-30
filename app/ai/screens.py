@@ -29,6 +29,7 @@ from app.core.config import BASE_DIR, get_settings
 from app.core.db import SessionLocal
 from app.models import MediaDownload, Order, PaymentCheck, PaymentMethod
 from app.models.outbox import MEDIA_DIR
+from app.orders import testpay
 from app.pricing.prices import format_mmk
 
 log = logging.getLogger("ai.screens")
@@ -189,7 +190,7 @@ def warnings(session: Session, check: PaymentCheck, order: Order, total: int) ->
         if used is not None:
             other = session.get(Order, used.order_id)
             found.append(Warning("duplicate", f"Transaction no. {r.transaction_no} from the screenshot was already "
-                                              f"used for order #{other.order_no}."))
+                                              f"used for order #{testpay.order_label(other)}."))
     when = r.when
     if when is not None:
         tz = ZoneInfo(get_settings().timezone)

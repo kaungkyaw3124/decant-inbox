@@ -5,8 +5,8 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
-from app.models import AuditLog, FaqEntry, PaymentMethod, ReplyTemplate, User
-from app.orders import auto, delivery
+from app.models import AuditLog, Customer, FaqEntry, PaymentMethod, ReplyTemplate, User
+from app.orders import auto, delivery, testpay
 from app.pricing import costs
 from app.pricing.prices import DEFAULT_SIZES, current_prices
 from app.replies import faq
@@ -37,6 +37,8 @@ def _page(request: Request, db: Session, errors: dict[str, str] | None = None,
         "rule_limits": delivery.RULE_LIMITS, "rules_error": (errors or {}).get("rules"),
         "faqs": db.scalars(select(FaqEntry).order_by(FaqEntry.sort_order, FaqEntry.id)).all(),
         "faq_error": (errors or {}).get("faq"), "faq_error_id": (errors or {}).get("faq_id"),
+        "test_code_set": testpay.code() is not None, "test_auto_approve": testpay.auto_approve(db),
+        "testers": db.scalars(select(Customer).where(Customer.is_tester).order_by(Customer.id)).all(),
         "vials": costs.vial_costs(db), "vial_sizes": _decant_sizes(db), "vial_error": (errors or {}).get("vial")}, status_code=status_code)
 
 
@@ -56,6 +58,15 @@ def _log(db: Session, user: User, action: str, **details) -> None:
 @router.get("", response_class=HTMLResponse)
 def settings_page(request: Request, db: Session = Depends(get_db)):
     return _page(request, db)
+
+
+@router.post("/test-payments")
+def test_payments(request: Request, auto_approve: str = Form(""), db: Session = Depends(get_db),
+                  user: User = Depends(current_user)):
+    testpay.set_auto_approve(db, auto_approve == "1", user)
+    db.commit()
+    flash(request, "Saved.")
+    return RedirectResponse("/settings#test-payments", status_code=303)
 
 
 @router.post("/payment-methods")

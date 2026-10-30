@@ -54,6 +54,20 @@ def customer_auto(request: Request, customer_id: int, off: str = Form(...), db: 
     return RedirectResponse(f"/chats/{customer_id}", status_code=303)
 
 
+@router.post("/customers/{customer_id}/tester", dependencies=[Depends(owner_only)])
+def customer_tester(request: Request, customer_id: int, on: str = Form(...), db: Session = Depends(get_db),
+                    user: User = Depends(current_user)):
+    """docs/SPEC-v4.14-test-payment-code.md: the test payment code works only from a test account."""
+    customer = _customer(db, customer_id)
+    customer.is_tester = on == "1"
+    db.add(AuditLog(user_id=user.id, action="customer.tester", details={"customer_id": customer_id,
+                                                                         "is_tester": customer.is_tester}))
+    db.commit()
+    flash(request, "🧪 Test account: the test payment code works in this chat." if customer.is_tester
+          else "Not a test account any more.")
+    return RedirectResponse(f"/chats/{customer_id}", status_code=303)
+
+
 @router.post("/customers/{customer_id}/resume-auto")
 def resume(request: Request, customer_id: int, db: Session = Depends(get_db), user: User = Depends(current_user)):
     customer = _customer(db, customer_id)
@@ -263,6 +277,12 @@ def needs_you(db: Session, now: datetime | None = None, owner: bool = True) -> d
     from app.ai import report as ai_report  # late import: ai -> orders -> this module's imports
 
     ai_notices = ai_report.notices(db, now)  # docs/SPEC-v4.6-ai.md S5: errors, no credit, limits
+    from app.orders import testpay  # docs/SPEC-v4.14: owner only, the last 24 h
+
+    test_notes = ([("⚠️ someone sent the test payment code — change TEST_PAY_CODE", c, at)
+                   for c, at in testpay.notes(db, "test_code.non_tester", now - timedelta(hours=24))]
+                  + [("🧪 test code but no order waiting for payment", c, at)
+                     for c, at in testpay.notes(db, "test_code.no_order", now - timedelta(hours=24))]) if owner else []
     from app.orders import change  # docs/SPEC-v4.8-change-info.md
 
     changed_paid = change.changed_after_payment(db)
@@ -304,9 +324,9 @@ def needs_you(db: Session, now: datetime | None = None, owner: bool = True) -> d
             "dismissed": recent_dismiss(db, now),
             "price_needed": price_needed, "to_approve": to_approve, "conflicts": conflicts,
             "failed": failed, "paused": paused, "auto_cancelled": followups.auto_cancelled(db, now),
-            "ai_notices": ai_notices, "changed_paid": changed_paid, "change_sent": change_sent, "requests": requests,
+            "ai_notices": ai_notices, "test_notes": test_notes, "changed_paid": changed_paid, "change_sent": change_sent, "requests": requests,
             "address_checks": address_checks, "payment_warnings": payment_warnings, "waiting": waiting,
-            "count": len(waiting) + len(address_checks) + len(ai_notices) + len(changed_paid) + len(change_sent) + len(requests) + len(to_check) + len(cancels) + len(unpaid) + len(unknown_msgs) + len(unanswered)
+            "count": len(waiting) + len(address_checks) + len(ai_notices) + len(test_notes) + len(changed_paid) + len(change_sent) + len(requests) + len(to_check) + len(cancels) + len(unpaid) + len(unknown_msgs) + len(unanswered)
                      + len(hints) + len(failed) + len(paused) + len(teach) + len(price_needed)
                      + (1 if to_approve else 0) + len(conflicts)}
 

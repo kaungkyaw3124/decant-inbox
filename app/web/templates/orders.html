@@ -5,16 +5,29 @@
 <h1>{{ t("Orders") }} {{ ui.help("Paid orders. Pack them, then press Sent out when the deli takes them, then Delivered.") }}</h1>
 <nav class="tabs" aria-label="{{ t('Orders') }}">
   {% for key, (label, _, _) in tabs.items() %}
-  <a href="/orders?tab={{ key }}" {% if tab == key %}aria-current="page"{% endif %}>{{ tr(label) }}{% if counts.get(key) %} <span class="badge">{{ counts[key] }}</span>{% endif %}</a>
+  <a href="/orders?tab={{ key }}{% if show_test %}&show_test=1{% endif %}" {% if tab == key %}aria-current="page"{% endif %}>{{ tr(label) }}{% if counts.get(key) %} <span class="badge">{{ counts[key] }}</span>{% endif %}</a>
   {% endfor %}
 </nav>
+<p class="small"><a href="/orders?tab={{ tab }}{% if not show_test %}&show_test=1{% endif %}">🧪 {{ t("Show test orders") }}: {{ t("ON") if show_test else t("OFF") }}</a></p>
+{% if user_role == "owner" and test_open %}
+  {% if confirm_clear %}
+  <form method="post" action="/orders/clear-test" class="card stack problem" id="clear-test">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <p>{{ t("Cancel {n} test orders that are not delivered? Nothing is sent and nothing is deleted.", n=test_open) }}</p>
+    <label class="check"><input type="checkbox" name="sure" value="1" required> {{ t("Yes, I'm sure") }}</label>
+    <button class="danger">🗑 {{ t("Clear test orders") }}</button>
+  </form>
+  {% else %}
+  <form method="post" action="/orders/clear-test" class="inline"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="link danger">🗑 {{ t("Clear test orders") }}</button></form>
+  {% endif %}
+{% endif %}
 <ul class="rows orders">
 {% for o, c, v in rows %}
   {% set ev = undo.get(o.id) %}
   <li class="row order-row" id="order-{{ o.id }}">
     <div class="row-main">
       <div class="meta">
-        <span class="who"><b>{% if o.status in locked_statuses %}🔒 {% endif %}#{{ o.order_no }}</b> · <a href="/chats/{{ c.id }}">{{ c.display_name or c.username or t("Customer") }}</a></span>
+        <span class="who"><b>{% if o.status in locked_statuses %}🔒 {% endif %}#{{ order_label(o) }}</b>{% if o.is_test %} <span class="badge warn">🧪 {{ t("test") }}</span>{% endif %} · <a href="/chats/{{ c.id }}">{{ c.display_name or c.username or t("Customer") }}</a></span>
         <span class="badge">{{ tr(status_labels.get(o.status, o.status)) }}</span>
         <time title="{{ t('paid') }} {{ o.paid_at | local_time }}">{{ o.paid_at | age }}</time>
       </div>

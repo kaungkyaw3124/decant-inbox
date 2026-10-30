@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from app.ai import screens
 from app.models import AuditLog, Customer, Order, PaymentCheck, PaymentMethod, User
 from app.orders import address as address_rules
-from app.orders import cart, payments
+from app.orders import cart, payments, testpay
 from app.replies import templates as replies
 from app.web import staff
 from app.web.auth import current_user, verify_csrf
@@ -100,7 +100,7 @@ def approve(request: Request, check_id: int, transaction_id: str = Form(""), amo
         return _card(request, db, check, form, found)
     db.commit()
     order = db.get(Order, check.order_id)
-    flash(request, f"Approved: Order #{order.order_no}. The confirmation goes out in a few seconds (Cancel in the chat).")
+    flash(request, f"Approved: Order #{testpay.order_label(order)}. The confirmation goes out in a few seconds (Cancel in the chat).")
     return RedirectResponse(f"/chats/{order.customer_id}#bottom", status_code=303)
 
 

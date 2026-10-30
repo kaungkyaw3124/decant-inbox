@@ -7,7 +7,7 @@ from datetime import datetime
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.models import Message, ParseItem, ParseResult, Product, UnknownRequest
+from app.models import Customer, Message, ParseItem, ParseResult, Product, UnknownRequest
 from app.pricing.prices import latest_prices, size_label
 
 ASK_INTENTS = ("buy", "ask_price", "ask_stock")
@@ -24,11 +24,12 @@ class Wanted:
 
 def wanted(session: Session) -> list[Wanted]:
     rows = []
+    not_test = Message.customer_id.not_in(select(Customer.id).where(Customer.is_tester))  # docs/SPEC-v4.14
     for name, times, customers, last in session.execute(
             select(func.max(UnknownRequest.text), func.count(), func.count(UnknownRequest.customer_id.distinct()),
                    func.max(Message.received_at))
             .join(Message, Message.id == UnknownRequest.message_id)
-            .where(UnknownRequest.resolution == "not_stocked").group_by(UnknownRequest.normalized_text)):
+            .where(UnknownRequest.resolution == "not_stocked", not_test).group_by(UnknownRequest.normalized_text)):
         rows.append(Wanted(name, "not_stocked", times, customers, last))
 
     # asks for a size that is out of stock now
@@ -38,7 +39,7 @@ def wanted(session: Session) -> list[Wanted]:
     for item, message in session.execute(
             select(ParseItem, Message).join(ParseResult, ParseResult.id == ParseItem.parse_result_id)
             .join(Message, Message.id == ParseResult.message_id)
-            .where(ParseResult.is_current, ParseResult.intent.in_(ASK_INTENTS), Message.direction == "in",
+            .where(ParseResult.is_current, ParseResult.intent.in_(ASK_INTENTS), Message.direction == "in", not_test,
                    ParseItem.product_id.is_not(None), ParseItem.from_context.is_(False))):
         size = None if item.is_full_bottle else item.size_ml
         if (item.size_ml or item.is_full_bottle) and stock.get(item.product_id, {}).get(size) is False:

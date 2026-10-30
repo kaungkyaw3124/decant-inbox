@@ -122,7 +122,7 @@ def report(session: Session, key: str, first: date, last: date) -> Report:
     rows = session.execute(
         select(OrderItem, Order, Product).join(Order, Order.id == OrderItem.order_id)
         .join(Product, Product.id == OrderItem.product_id)
-        .where(Order.status.in_(PAID_STATUSES), Order.paid_at >= start, Order.paid_at < end,
+        .where(Order.status.in_(PAID_STATUSES), Order.is_test.is_(False), Order.paid_at >= start, Order.paid_at < end,
                OrderItem.removed_at.is_(None))
         .order_by(Order.paid_at, OrderItem.id)).all()
     total = Group("Total")
@@ -151,7 +151,7 @@ def report(session: Session, key: str, first: date, last: date) -> Report:
 def unstamped_orders(session: Session, first: date, last: date) -> list[Order]:
     start, end = bounds(first, last)
     return list(session.scalars(select(Order).join(OrderItem, OrderItem.order_id == Order.id).where(
-        Order.status.in_(PAID_STATUSES), Order.paid_at >= start, Order.paid_at < end,
+        Order.status.in_(PAID_STATUSES), Order.is_test.is_(False), Order.paid_at >= start, Order.paid_at < end,
         OrderItem.removed_at.is_(None), OrderItem.unit_cost_mmk.is_(None)).distinct()))
 
 

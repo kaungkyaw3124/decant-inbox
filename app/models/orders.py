@@ -86,6 +86,8 @@ class Order(Base):
     address_invalid: Mapped[bool] = mapped_column(Boolean, server_default=false(), default=False)
     address_partial: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     address_partial_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # docs/SPEC-v4.14-test-payment-code.md: paid with the test code (order_no from test_order_no_seq = T1, T2, ...)
+    is_test: Mapped[bool] = mapped_column(Boolean, server_default=false(), default=False)
     created_at: Mapped[datetime] = created_at_column()
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(),
                                                  default=func.now())  # last change: idle carts expire
@@ -201,6 +203,8 @@ class PaymentCheck(Base):
     ai_read: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     ai_read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     ai_cost_usd: Mapped[float] = mapped_column(Numeric(12, 8), server_default="0", default=0)
+    # docs/SPEC-v4.14-test-payment-code.md: the test payment code instead of a screenshot (no money)
+    is_test: Mapped[bool] = mapped_column(Boolean, server_default=false(), default=False)
 
 
 class AutoRun(Base):
