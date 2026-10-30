@@ -1734,3 +1734,51 @@ deploy (outbox 0, holding replies 0).
    Send another unclear message within 10 min → no second "please wait". Fix the address in the card → payment info goes.
 4. **Mandalay grid.** In a new cart send `၇၃ လမ်း (၄၅ x ၄၆ ကြား) မန္တလေး` → payment info, city Mandalay.
 Cancel the test carts afterwards (Orders → cancel), so they do not count in /sales.
+
+## 2026-10-30 — v4.14: test payment code (docs/SPEC-v4.14-test-payment-code.md)
+
+### What was built (commit `65a2615`)
+- **T1** migration `b4e7c2d91a03`: `customers.is_tester`, `orders.is_test`, `payment_checks.is_test`, sequence
+  `test_order_no_seq` (1..1000, so test numbers never reach real #1001+). One helper `testpay.order_label(order)`
+  ("1001" or "T1") is used everywhere an Order ID is shown or sent (confirmation, packed/sent/locked/greeting
+  replies, /orders, /payments, Needs you, flashes).
+- **T2** `app/orders/testpay.py` `scan()` runs in the parser worker next to `payments.scan`. Tester + order in
+  waiting_payment (payment info sent) + text == code (trim, case-sensitive, ၀-၉ → 0-9) → pending test check,
+  order photo_received + is_test, message marked done (no AI, no auto reply, nothing learned). Tester with no
+  waiting order → Needs you "🧪 test code but no order waiting for payment". Non-tester → normal message +
+  AuditLog `test_code.non_tester` (message id + customer id only) → Needs you "⚠️ someone sent the test payment code".
+- **T3** /payments: "🧪 TEST PAYMENT — no money" banner, no screenshot, transaction ID `TEST-<check id>`, no amount
+  warnings; the address gate still applies. Approve → next T-number. /settings (owner only) → "🧪 Test payments":
+  code set / not set, list of test accounts, "Auto-approve test payments" (default OFF; system approves a test
+  check 5 s after it is created; never real checks; if the address is missing it stays on /payments).
+- **T4** /sales, profit (unstamped orders) and the Wanted report exclude test orders / testers. /orders: 🧪 badge,
+  "Show test orders" (default OFF), owner-only "🗑 Clear test orders" (button, then "Yes, I'm sure") → cancels
+  undelivered test orders with nothing sent; they stay in the database and are hidden.
+- Code secrecy: `.env` TEST_PAY_CODE (8+ letters/digits, else OFF), `.env.example` has `TEST_PAY_CODE=`. Every page
+  replaces the code with "🧪 test payment code" (Jinja finalize), the AI mask does the same, learning refuses it.
+
+**Decisions to check**
+- The AI weekly summary contains only AI numbers (no orders), so nothing to exclude there.
+- "Daily/weekly reports" = /sales (it has today / week / month ranges); no separate report exists.
+- The code is only recognised in messages from the last hour (history imports never trigger it).
+
+**Tests:** 716 passed, 1 skipped (was 703 + 1). tests/test_v414_test_payment.py (13): C1-C10 (C4 has 4 cases);
+C11 = full suite. Migration down/up round trip done on a scratch database.
+
+**Deployed:** backup product_requests_2026-10-29T1834Z.dump taken before the migration; migration b4e7c2d91a03
+applied; parser + web restarted 2026-10-30 18:51 UTC; health ok. TEST_PAY_CODE is not set yet → feature OFF until
+the owner sets it.
+
+### OWNER TEST SCRIPT 4.14 (second Telegram account, Auto-reply ON)
+1. On the server: add `TEST_PAY_CODE=<your secret, 8+ letters/digits>` to `.env`, then
+   `systemctl --user restart decant-parser decant-web`. /settings → 🧪 Test payments shows "set".
+2. Chats → your second account → click "🧪 Test account: OFF" → it becomes ON (yellow note under it).
+3. From the second account: order a product → phone → address → payment info arrives → send your code.
+   Expect: the same "received" behaviour as a screenshot. /payments shows the 🧪 TEST PAYMENT card.
+4. Approve (no transaction ID needed) → the customer gets the confirmation with Order ID **T1**.
+   /orders: T1 visible only with "Show test orders: ON", with a 🧪 badge. /sales does not change.
+5. Mark T1 packed / sent out / delivered → the messages say "Order #T1".
+6. /settings → tick "Auto-approve test payments" → Save. Repeat 3 → confirmation with T2 within ~10 s.
+7. From any other account send the code → nothing special happens; Inbox → Needs you shows
+   "⚠️ someone sent the test payment code".
+8. /orders → "🗑 Clear test orders" → tick "Yes, I'm sure" → test orders that are not delivered are cancelled; nothing is sent.

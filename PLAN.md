@@ -9,13 +9,15 @@ NOTE 2026-10-31: a previous session already wrote most of it but did NOT commit 
 migration 20261029_b4e7c2d91a03, tests/test_v414_test_payment.py, ~30 modified files). Continue from that
 work, do not start over and never reset/stash it. First compare `alembic current` with heads and back up the
 DB before any migration.
-Status: TODO
+Status: DONE 2026-10-30 — see REPORT.md
 
 ## RESUME HERE (updated 2026-10-29 by planning chat)
 - v1-v4.12 DONE. AI AUTO, brake ON, ai_address ON, ai_screenshot OFF.
 - v4.13 hotfix (docs/SPEC-v4.13-hotfix.md) DONE + deployed 2026-10-17: Q0-Q5, R1-R6, evals PASS. Owner test 4.13
   pending (REPORT.md "OWNER TEST SCRIPT 4.13").
-- NEXT: build v4.14 test payment code (docs/SPEC-v4.14-test-payment-code.md). Owner asked 2026-10-29.
+- v4.14 test payment code DONE + deployed 2026-10-30 (feature OFF until owner sets TEST_PAY_CODE in .env).
+  Owner test 4.14 pending (REPORT.md "OWNER TEST SCRIPT 4.14").
+- NEXT: waiting for the planning chat.
 - Owner checks: `bash scripts/status.sh`; AI numbers at /ai.
 
 ## Status
@@ -39,7 +41,7 @@ Status: TODO
 | 14 | v4.11 (docs/SPEC-v4.11-ai-first.md): AI-first (AUTO, multi-action, customer chooses, auto-learning, simple card) | ✅ Done, live in AUTO (owner test pending) |
 | 15 | v4.12 (docs/SPEC-v4.12-address-payment-ai.md): AI address assistant, address gates, AI screenshot reader | ✅ Done, live (ai_address ON, ai_screenshot OFF; owner test pending) |
 | 16 | v4.13 (docs/SPEC-v4.13-hotfix.md): hotfix from live test: never silent (holding reply + watchdog), order_start, address cleaning, no-place = invalid, Mandalay grid | ✅ Done, live (owner test pending) |
-| 17 | v4.14 (docs/SPEC-v4.14-test-payment-code.md): secret test payment code from test accounts, T-numbered test orders, kept out of sales | ⏳ To build |
+| 17 | v4.14 (docs/SPEC-v4.14-test-payment-code.md): secret test payment code from test accounts, T-numbered test orders, kept out of sales | ✅ Done, live (owner test pending; set TEST_PAY_CODE) |
 
 ## Phase 0 checklist
 - [x] Step 0: rollback safety net scripts in ~/hardening/
