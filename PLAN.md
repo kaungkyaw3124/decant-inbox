@@ -5,6 +5,10 @@ Read CLAUDE.md first. This file tracks where we are.
 ## NEXT TASK (written by the planning chat; Claude Code runs it with /next)
 Task: build v4.14 test payment code — docs/SPEC-v4.14-test-payment-code.md (all parts T1-T4, tests C1-C11,
 OWNER TEST 4.14 in REPORT.md).
+NOTE 2026-10-31: a previous session already wrote most of it but did NOT commit (app/orders/testpay.py,
+migration 20261029_b4e7c2d91a03, tests/test_v414_test_payment.py, ~30 modified files). Continue from that
+work, do not start over and never reset/stash it. First compare `alembic current` with heads and back up the
+DB before any migration.
 Status: TODO
 
 ## RESUME HERE (updated 2026-10-29 by planning chat)
