@@ -17,7 +17,7 @@ Status: DONE 2026-10-30 — see REPORT.md
   pending (REPORT.md "OWNER TEST SCRIPT 4.13").
 - v4.14 test payment code DONE + deployed 2026-10-30 (feature OFF until owner sets TEST_PAY_CODE in .env).
   Owner test 4.14 pending (REPORT.md "OWNER TEST SCRIPT 4.14").
-- NEXT: waiting for the planning chat.
+- NEXT: v4.15 UI (QUEUE item 1) — owner types /next. v4.14 reviewed OK by planning chat 2026-10-31.
 - Owner checks: `bash scripts/status.sh`; AI numbers at /ai.
 
 ## Status
