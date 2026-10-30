@@ -9,7 +9,7 @@
 </form>
 <ul class="rows">
 {% for c, m in rows %}
-  <li class="row">
+  <li class="item">
     <a class="row-main" href="/chats/{{ c.id }}">
       <div class="meta">
         <span class="who">{{ c.display_name or ("@" ~ c.username if c.username else t("Customer") ~ " " ~ c.external_user_id) }}</span>

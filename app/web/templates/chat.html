@@ -37,7 +37,7 @@
 
 <nav class="tabs phone-tabs" aria-label="{{ t('View') }}">
   <a href="/chats/{{ c.id }}" {% if tab != "cart" %}aria-current="page"{% endif %}>{{ t("Chat") }}</a>
-  <a href="/chats/{{ c.id }}?tab=cart#cart" {% if tab == "cart" %}aria-current="page"{% endif %}>{{ t("Cart") }}{% if cart and not cart.empty %} ({{ cart.lines|length }}){% endif %}</a>
+  <a href="/chats/{{ c.id }}?tab=cart#cart" data-bs-toggle="offcanvas" data-bs-target="#cart-sheet" aria-controls="cart-sheet" {% if tab == "cart" %}aria-current="page"{% endif %}>🛒 {{ t("Cart") }}{% if cart and not cart.empty %} ({{ cart.lines|length }}){% endif %}</a>
 </nav>
 
 <div class="chat-layout">
@@ -46,7 +46,16 @@
   </section>
 
   <div class="side">
+  {# phone: a sheet opened by "🛒 Cart" (?tab=cart opens it without JavaScript); laptop: the right column #}
+  <div class="offcanvas-lg offcanvas-end cart-sheet {% if tab == 'cart' %}show{% endif %}" tabindex="-1" id="cart-sheet" aria-labelledby="cart-sheet-title">
+    <div class="offcanvas-header d-lg-none">
+      <h2 class="offcanvas-title" id="cart-sheet-title">🛒 {{ t("Cart") }}</h2>
+      <a class="btn-close" href="/chats/{{ c.id }}" data-bs-dismiss="offcanvas" data-bs-target="#cart-sheet" aria-label="{{ t('Close') }}"></a>
+    </div>
+    <div class="offcanvas-body">
   {% include "_cart.html" %}
+    </div>
+  </div>
 
   <section class="card reply-pane {% if tab == 'cart' %}phone-hidden{% endif %}" id="reply">
     <nav class="tabs" aria-label="{{ t('Reply type') }}">

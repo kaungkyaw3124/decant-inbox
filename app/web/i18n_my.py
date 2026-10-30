@@ -765,4 +765,13 @@ MY = {
     "Not a test account any more.": "စမ်းသပ်အကောင့် မဟုတ်တော့ဘူး။",
     "🗑 {n} test orders cancelled (kept in the database, hidden).": "🗑 စမ်းသပ်အော်ဒါ {n} ခု ပယ်ပြီး (database ထဲ သိမ်းထား၊ ဖျောက်ထား)။",
     "🧪 test payment code": "🧪 စမ်းသပ်ကုဒ်",
+    # docs/SPEC-v4.15-ui-bootstrap.md: menu, dialogs
+    "More": "နောက်ထပ်", "Menu": "မီနူး", "Close": "ပိတ်မယ်", "Yes, do it": "ဟုတ်ကဲ့၊ လုပ်မယ်",
+    "customers waiting": "စောင့်နေတဲ့ ဖောက်သည်", "payments to check": "စစ်ရမယ့် ငွေလွှဲ",
+    "orders to pack": "ထုပ်ရမယ့် အော်ဒါ", "learning cards": "သင်ပေးရမယ့် ကတ်",
+    "Reject this payment? The customer gets the message.": "ဒီငွေလွှဲကို ငြင်းမလား။ ဖောက်သည်ဆီ စာပို့မယ်။",
+    "Change a paid order? The change and the reason are kept in Activity.":
+        "ငွေချေပြီး အော်ဒါကို ပြင်မလား။ ပြင်တာနဲ့ အကြောင်းပြချက်ကို Activity မှာ သိမ်းထားမယ်။",
+    "Cancel this paid order? Refund the customer outside the system.":
+        "ငွေချေပြီး ဒီအော်ဒါကို ပယ်မလား။ ငွေပြန်အမ်းတာကို စနစ်အပြင်မှာ လုပ်ပါ။",
 }

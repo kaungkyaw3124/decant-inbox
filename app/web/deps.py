@@ -23,8 +23,31 @@ def csrf_token(request: Request) -> str:
     return request.session["csrf"]
 
 
+_needs: dict[str, tuple[float, int]] = {}  # role -> (monotonic time, Needs you count)
+
+
+def needs_count(session: Session, role: str) -> int:
+    """The Inbox counter in the menu. shortcut: cached 60 s per process (needs_you takes ~0.7 s), make
+    needs_you cheaper if the counter must be live."""
+    import time
+
+    from app.web.auto import needs_you  # late import: auto imports this module
+
+    at, count = _needs.get(role, (0.0, 0))
+    if time.monotonic() - at > 60:
+        count = needs_you(session, owner=role == "owner")["count"]
+        _needs[role] = (time.monotonic(), count)
+    return count
+
+
+def remember_needs(role: str, count: int) -> None:
+    import time
+
+    _needs[role] = (time.monotonic(), count)
+
+
 def _template_context(request: Request) -> dict:
-    auto_on, payments_open, to_pack, role, to_learn = False, 0, 0, None, 0
+    auto_on, payments_open, to_pack, role, to_learn, needs = False, 0, 0, None, 0, 0
     lang = request.session.get("lang", i18n.DEFAULT)  # before login: the last user's language
     if request.session.get("user_id"):  # the switch and the badges are on every page
         from sqlalchemy import func, select
@@ -40,10 +63,11 @@ def _template_context(request: Request) -> dict:
             if row:
                 role, lang = row
             to_learn = patterns.pending_count(session)
+            needs = needs_count(session, role) if role else 0
     t, tr, code = i18n.for_lang(lang)
     return {"csrf": csrf_token(request), "flash": request.session.pop("flash", None),
             "path": request.url.path, "auto_on": auto_on, "payments_open": payments_open, "to_pack": to_pack,
-            "user_role": role, "to_learn": to_learn, "lang": lang, "t": t, "tr": tr, "code": code}
+            "user_role": role, "to_learn": to_learn, "needs_count": needs, "lang": lang, "t": t, "tr": tr, "code": code}
 
 
 templates = Jinja2Templates(

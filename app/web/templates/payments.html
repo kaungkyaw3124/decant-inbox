@@ -5,7 +5,7 @@
 <h1>💳 {{ t("Payments to check") }} {{ ui.help("Payment screenshots from customers. Open one, find the same transaction in your KPay / AYA app, type its ID and approve.") }}</h1>
 <ul class="rows">
 {% for check, order, c in rows %}
-  <li class="row">
+  <li class="item">
     <a class="row-main" href="/payments/{{ check.id }}">
       <div class="meta"><span class="who">{{ c.display_name or c.username or t("Customer") }}</span>
         <time>{{ check.created_at | local_time }}</time></div>

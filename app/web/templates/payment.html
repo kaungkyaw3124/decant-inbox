@@ -25,7 +25,7 @@
 
 {% if check.decision in ("several", "pending") and not may_decide %}
 <section class="card">
-  {% if check.is_test %}<p class="flash warnbox"><b>🧪 {{ t("TEST PAYMENT — no money") }}</b> {{ t("The test account sent the test payment code instead of a screenshot.") }}</p>{% elif check.decision == "pending" %}{% include "_payment_shot.html" %}{% endif %}
+  {% if check.is_test %}<div class="test-banner"><p class="big-line">🧪 {{ t("TEST PAYMENT — no money") }}</p><p class="small">{{ t("The test account sent the test payment code instead of a screenshot.") }}</p></div>{% elif check.decision == "pending" %}{% include "_payment_shot.html" %}{% endif %}
   <p class="notice small">ငွေစစ်တာကို ပိုင်ရှင်က လုပ်ပါမယ်{% if lang != "my" %} (only the owner checks payments now){% endif %}.</p>
 </section>
 {% elif check.decision == "several" %}
@@ -39,7 +39,7 @@
 </section>
 {% elif check.decision == "pending" %}
 <section class="card">
-  {% if check.is_test %}<p class="flash warnbox"><b>🧪 {{ t("TEST PAYMENT — no money") }}</b> {{ t("The test account sent the test payment code instead of a screenshot.") }}</p>{% else %}{% include "_payment_shot.html" %}{% endif %}
+  {% if check.is_test %}<div class="test-banner"><p class="big-line">🧪 {{ t("TEST PAYMENT — no money") }}</p><p class="small">{{ t("The test account sent the test payment code instead of a screenshot.") }}</p></div>{% else %}{% include "_payment_shot.html" %}{% endif %}
 </section>
 <form method="post" action="/payments/{{ check.id }}/approve" class="card stack">
   <input type="hidden" name="csrf" value="{{ csrf }}">
@@ -52,22 +52,28 @@
   <p class="small">{{ t("Transaction ID") }}: <b>TEST-{{ check.id }}</b> · {{ t("the Order ID will be a test number (T1, T2, ...)") }}</p>
   {% else %}
   {{ ui.help("Open your KPay / AYA app, find this payment, copy its transaction ID and the amount here. Approve only if the money really arrived.") }}
+  {% set received = form.amount_mmk %}
+  <div class="compare" data-total="{{ cart.total }}">
+    <div><span>{{ t("Expected total") }}</span><b>{{ format_mmk(cart.total) }}</b></div>
+    <div><span>{{ t("Amount received (ကျပ်)") }}</span><b class="compare-amount">{{ format_mmk(received) if received else "—" }}</b>
+      <i class="compare-mark">{% if received %}{{ "✅" if received == cart.total else "⚠️" }}{% endif %}</i></div>
+  </div>
   <div class="grid">
     <label>{{ t("Transaction ID (from your KPay / AYA history)") }} <input name="transaction_id" value="{{ form.transaction_id }}" required maxlength="64" autocomplete="off">
       {% if reading and form.transaction_id and form.transaction_id == reading.transaction_no %}<span class="small notice-line">🧠 {{ t("from the screenshot: compare it with your KPay / AYA history") }}</span>{% endif %}</label>
-    <label>{{ t("Amount received (ကျပ်)") }} <input name="amount" value="{{ form.amount_mmk or '' }}" inputmode="numeric"></label>
+    <label>{{ t("Amount received (ကျပ်)") }} <input name="amount" value="{{ form.amount_mmk or '' }}" inputmode="numeric" data-compare></label>
     <label>{{ t("Method") }}
       <select name="method">{% for m in methods %}<option {% if form.method == m.name %}selected{% endif %}>{{ m.name }}</option>{% endfor %}</select>
     </label>
   </div>
   {% endif %}
-  <button class="primary">{{ "✅ " ~ t("Approve anyway") if warnings else "✅ " ~ t("Approve") }}</button>
+  <button class="primary approve big">{{ "✅ " ~ t("Approve anyway") if warnings else "✅ " ~ t("Approve") }}</button>
   <p class="muted small">{{ t("Gives the Order ID and sends the confirmation (10 s, Cancel in the chat).") }}</p>
-  <details>
-    <summary>❌ {{ t("Reject") }}</summary>
+  <details class="reject">
+    <summary class="button danger">❌ {{ t("Reject") }}</summary>
     <div class="buttons">
       {% for key, label in reasons.items() %}
-      <button formaction="/payments/{{ check.id }}/reject" formnovalidate name="reason" value="{{ key }}">{{ tr(label) }}</button>
+      <button formaction="/payments/{{ check.id }}/reject" formnovalidate name="reason" value="{{ key }}" class="danger" data-confirm="{{ t('Reject this payment? The customer gets the message.') }}">{{ tr(label) }}</button>
       {% endfor %}
     </div>
     <p class="muted small">{{ t("“Amount too low” uses the amount received above to ask for the rest.") }}</p>

@@ -8,14 +8,14 @@
   <a href="/orders?tab={{ key }}{% if show_test %}&show_test=1{% endif %}" {% if tab == key %}aria-current="page"{% endif %}>{{ tr(label) }}{% if counts.get(key) %} <span class="badge">{{ counts[key] }}</span>{% endif %}</a>
   {% endfor %}
 </nav>
-<p class="small"><a href="/orders?tab={{ tab }}{% if not show_test %}&show_test=1{% endif %}">🧪 {{ t("Show test orders") }}: {{ t("ON") if show_test else t("OFF") }}</a></p>
+<p class="buttons small"><a class="button chip{% if show_test %} on{% endif %}" href="/orders?tab={{ tab }}{% if not show_test %}&show_test=1{% endif %}">🧪 {{ t("Show test orders") }}: {{ t("ON") if show_test else t("OFF") }}</a></p>
 {% if user_role == "owner" and test_open %}
   {% if confirm_clear %}
   <form method="post" action="/orders/clear-test" class="card stack problem" id="clear-test">
     <input type="hidden" name="csrf" value="{{ csrf }}">
     <p>{{ t("Cancel {n} test orders that are not delivered? Nothing is sent and nothing is deleted.", n=test_open) }}</p>
     <label class="check"><input type="checkbox" name="sure" value="1" required> {{ t("Yes, I'm sure") }}</label>
-    <button class="danger">🗑 {{ t("Clear test orders") }}</button>
+    <button class="danger" data-confirm="{{ t('Cancel {n} test orders that are not delivered? Nothing is sent and nothing is deleted.', n=test_open) }}">🗑 {{ t("Clear test orders") }}</button>
   </form>
   {% else %}
   <form method="post" action="/orders/clear-test" class="inline"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="link danger">🗑 {{ t("Clear test orders") }}</button></form>
@@ -24,11 +24,11 @@
 <ul class="rows orders">
 {% for o, c, v in rows %}
   {% set ev = undo.get(o.id) %}
-  <li class="row order-row" id="order-{{ o.id }}">
+  <li class="item order-row" id="order-{{ o.id }}">
     <div class="row-main">
       <div class="meta">
-        <span class="who"><b>{% if o.status in locked_statuses %}🔒 {% endif %}#{{ order_label(o) }}</b>{% if o.is_test %} <span class="badge warn">🧪 {{ t("test") }}</span>{% endif %} · <a href="/chats/{{ c.id }}">{{ c.display_name or c.username or t("Customer") }}</a></span>
-        <span class="badge">{{ tr(status_labels.get(o.status, o.status)) }}</span>
+        <span class="who"><b>{% if o.status in locked_statuses %}🔒 {% endif %}#{{ order_label(o) }}</b>{% if o.is_test %} <span class="badge test">🧪 {{ t("test") }}</span>{% endif %} · <a href="/chats/{{ c.id }}">{{ c.display_name or c.username or t("Customer") }}</a></span>
+        <span class="badge st-{{ o.status }}">{{ tr(status_labels.get(o.status, o.status)) }}</span>
         <time title="{{ t('paid') }} {{ o.paid_at | local_time }}">{{ o.paid_at | age }}</time>
       </div>
       <p class="text">{% for i, p in v.lines %}{{ item_name(i, p) }}{% if not loop.last %}, {% endif %}{% endfor %}
@@ -52,7 +52,7 @@
           <label>{{ t("Phones") }} <input name="phones" value="{{ (o.phones or []) | join(', ') }}"></label>
           {% for i, p in v.lines %}<label class="check"><input type="checkbox" name="remove_item" value="{{ i.id }}"> {{ t("Remove") }} {{ item_name(i, p) }}</label>{% endfor %}
           <label>{{ t("Reason (required)") }} <input name="reason" required minlength="3" maxlength="300"></label>
-          <button class="danger">{{ t("Save the change") }}</button>
+          <button class="danger" data-confirm="{{ t('Change a paid order? The change and the reason are kept in Activity.') }}">{{ t("Save the change") }}</button>
         </form></details>
       {% endif %}
     </div>
@@ -95,7 +95,7 @@
           <label>{{ t("Note (refund, reason)") }} <input name="note" maxlength="500"></label>
           <label class="check"><input type="radio" name="message" value="order_cancelled" checked> {{ t("Send “order cancelled” to the customer") }}</label>
           <label class="check"><input type="radio" name="message" value="none"> {{ t("Send nothing") }}</label>
-          <button class="danger">{{ t("Cancel order") }}</button>
+          <button class="danger" data-confirm="{{ t('Cancel this paid order? Refund the customer outside the system.') }}">{{ t("Cancel order") }}</button>
         </form>
       </details>
       {% endif %}

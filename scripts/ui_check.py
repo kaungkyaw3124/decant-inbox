@@ -19,21 +19,25 @@ import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-os.chdir(ROOT)
 sys.path.insert(0, str(ROOT))
 from app.core.config import get_settings  # noqa: E402
 
 DB = get_settings().db_name + "_uicheck"
-os.environ.update(DB_NAME=DB, WEB_SECRET_KEY="ui-check-only", AI_PROVIDER="off", WEB_COOKIE_SECURE="false",
-                  TEST_PAY_CODE="UiCheck2468")
-get_settings.cache_clear()
+
+
+def use_check_database() -> None:
+    """Before anything opens the database: this process only ever talks to DB (fake data)."""
+    os.chdir(ROOT)
+    os.environ.update(DB_NAME=DB, WEB_SECRET_KEY="ui-check-only", AI_PROVIDER="off", WEB_COOKIE_SECURE="false",
+                      TEST_PAY_CODE="UiCheck2468")
+    get_settings.cache_clear()
 
 SHOTS = ROOT / "ui-shots"
 INVENTORY = ROOT / "tests" / "fixtures" / "ui_inventory.json"
 LIBS = Path.home() / ".cache" / "ui-check-libs"
 PORT = 8765
 WIDTHS = (360, 768, 1280)
-DAILY = ("inbox", "chats", "chat", "payments", "payment", "orders")
+DAILY = ("inbox", "chats", "chat", "payments", "payment", "payment-test", "orders", "orders-test")
 SKIP = {"/healthz", "/media/{message_id}", "/payments/{check_id}/shot", "/sales/export.xlsx",
         "/prices/export.xlsx", "/login"}  # files / JSON, not pages
 PARTIALS = {"/messages/{message_id}/row", "/chats/{customer_id}/thread"}
@@ -270,6 +274,7 @@ VOLATILE = re.compile(r"(expect=|key=)[^ ]*|[?&]t=\d+")
 def run(quick: bool, save_inventory: bool) -> int:
     from playwright.sync_api import sync_playwright
 
+    use_check_database()
     ids = build_database()
     serve()
     SHOTS.mkdir(exist_ok=True)
@@ -286,6 +291,15 @@ def run(quick: bool, save_inventory: bool) -> int:
             errors: list[str] = []
             page.on("console", lambda m: errors.append(m.text) if m.type == "error" else None)
             page.on("pageerror", lambda e: errors.append(str(e)))
+            if role == "owner":  # the login page, before logging in
+                for width in widths:
+                    page.set_viewport_size({"width": width, "height": 800})
+                    page.goto(f"http://127.0.0.1:{PORT}/login")
+                    page.screenshot(path=SHOTS / f"login-{width}.png", full_page=True)
+                    for check, problems in sorted(page.evaluate(CHECKS_JS, [width, "my"]).items()):
+                        if problems:
+                            failures += 1
+                            lines.append(f"FAIL {check.upper()} login {width}: " + "; ".join(problems[:6]))
             log_in(page, username)
             for lang in langs:
                 set_language(page, lang)
@@ -303,6 +317,7 @@ def run(quick: bool, save_inventory: bool) -> int:
                             continue  # owner-only page: the inventory keeps the 403 (C7 checks it stays)
                         found = {"c1": ([f"HTTP {status}"] if status != 200 else []) + errors[:3]}
                         if not partial:
+                            page.wait_for_function("document.fonts.status === 'loaded'")
                             page.screenshot(path=SHOTS / f"{name}-{role}-{lang}-{width}.png", full_page=True)
                             found |= page.evaluate(CHECKS_JS, [width, lang])
                         for check, problems in sorted(found.items()):

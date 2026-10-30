@@ -1,5 +1,5 @@
 {% set waiting = quick_action and quick_action[1] and quick_action[1].status in ("queued", "sending") %}
-<li class="row status-{{ status }}" id="msg-{{ m.id }}"{% if waiting %} hx-get="/messages/{{ m.id }}/row" hx-trigger="every 3s" hx-swap="outerHTML"{% endif %}>
+<li class="item status-{{ status }}" id="msg-{{ m.id }}"{% if waiting %} hx-get="/messages/{{ m.id }}/row" hx-trigger="every 3s" hx-swap="outerHTML"{% endif %}>
   <a class="row-main" href="/messages/{{ m.id }}?back={{ back | default('/') | urlencode }}">
     <div class="meta">
       <span class="who">{{ c.display_name or ("@" ~ c.username if c.username else t("Customer") ~ " " ~ c.external_user_id) }}</span>

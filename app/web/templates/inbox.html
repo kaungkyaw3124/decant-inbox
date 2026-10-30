@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% import "_ui.html" as ui with context %}
+{% block title %}{{ t("Inbox") }} · Decant Inbox{% endblock %}
 {% block content %}
 {% set kind_label = {"price": "price reply", "cart_add": "added to cart + list", "cart_remove": "removed + list",
                      "cart_list": "cart list", "confirm": "confirmed", "contact": "phone/address", "address": "address",
@@ -9,6 +10,14 @@
                      "order_start": "asked which product to order"} %}
 {% set customer = t("Customer") %}
 {% if needs_you is not none %}
+{% set waiting_n = needs_you.waiting | length + needs_you.unanswered | length %}
+{% set cards_n = needs_you.teach | length + (to_learn if user_role == "owner" else 0) %}
+<nav class="today" aria-label="{{ t('Today') }}">
+  <a href="#needs-you" class="{{ 'hot' if waiting_n }}"><b>{{ waiting_n }}</b><span>⏰ {{ t("customers waiting") }}</span></a>
+  <a href="/payments" class="{{ 'hot' if payments_open }}"><b>{{ payments_open }}</b><span>💳 {{ t("payments to check") }}</span></a>
+  <a href="/orders" class="{{ 'hot' if to_pack }}"><b>{{ to_pack }}</b><span>📦 {{ t("orders to pack") }}</span></a>
+  <a href="{{ '/learning' if user_role == 'owner' and to_learn else '#needs-you' }}" class="{{ 'hot' if cards_n }}"><b>{{ cards_n }}</b><span>🧠 {{ t("learning cards") }}</span></a>
+</nav>
 <section class="card needs-you {% if needs_you.count %}notice{% endif %}" id="needs-you">
   <h2>🟡 {{ t("Needs you") }} ({{ needs_you.count }}) {{ ui.help("Messages the app could not answer by itself. Work from top to bottom; each line says what to do.") }}</h2>
   {% if not needs_you.count %}<p class="muted small">{{ t("Nothing waiting for you.") }}</p>{% endif %}
@@ -80,7 +89,7 @@
           <label>{{ t("Note") }} <input name="note" maxlength="500"></label>
           <label class="check"><input type="radio" name="message" value="order_cancelled" checked> {{ t("Send “order cancelled”") }}</label>
           <label class="check"><input type="radio" name="message" value="none"> {{ t("Send nothing") }}</label>
-          <button class="danger">{{ t("Cancel order") }}</button>
+          <button class="danger" data-confirm="{{ t('Cancel this paid order? Refund the customer outside the system.') }}">{{ t("Cancel order") }}</button>
         </form></details>
       <form method="post" action="/needs-you/clear" class="inline"><input type="hidden" name="csrf" value="{{ csrf }}">
         <input type="hidden" name="message_id" value="{{ m.id }}"><button class="link">{{ t("keep order (done)") }}</button></form></li>

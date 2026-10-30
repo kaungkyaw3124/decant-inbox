@@ -4,15 +4,50 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="htmx-config" content='{"includeIndicatorStyles": false}'>
+<meta name="theme-color" content="#5b2d8c">
 <title>{% block title %}Decant Inbox{% endblock %}</title>
-<link rel="stylesheet" href="/static/style.css">
+<link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+<link rel="preload" href="/static/vendor/noto-sans-myanmar-5.3.0/noto-sans-myanmar-myanmar-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/static/vendor/bootstrap-5.3.8/bootstrap.min.css">
+<link rel="stylesheet" href="/static/icons.css">
+<link rel="stylesheet" href="/static/app.css">
 <script src="/static/htmx-2.0.4.min.js" defer></script>
+<script src="/static/vendor/bootstrap-5.3.8/bootstrap.min.js" defer></script>
 <script src="/static/quick.js" defer></script>
+<script src="/static/app.js" defer></script>
 </head>
-<body hx-headers='{"X-CSRF-Token": "{{ csrf }}"}' data-sending-in="{{ t('Sending in {n} s') }}" data-sending="💬 {{ t('sending…') }}">
+<body hx-headers='{"X-CSRF-Token": "{{ csrf }}"}' data-sending-in="{{ t('Sending in {n} s') }}" data-sending="💬 {{ t('sending…') }}"
+      class="{% if request.session.get('user_id') %}signed-in{% endif %}">
 {% if request.session.get("user_id") %}
+{% set daily = [("/", "bi-inbox", "Inbox", needs_count, path == "/"),
+                ("/chats", "bi-chat-dots", "Chats", 0, path.startswith("/chats")),
+                ("/payments", "bi-wallet2", "Payments", payments_open, path.startswith("/payments")),
+                ("/orders", "bi-box-seam", "Orders", to_pack, path.startswith("/orders"))] %}
+{% set more = [("/products", "bi-droplet", "Products", true, 0),
+               ("/prices", "bi-tags", "Prices", user_role == "owner", 0),
+               ("/sales", "bi-graph-up", "Sales", true, 0),
+               ("/reports/wanted", "bi-clipboard-data", "Reports", true, 0),
+               ("/learning", "bi-mortarboard", "Learning", user_role == "owner", to_learn),
+               ("/ai", "bi-cpu", "AI", user_role == "owner", 0),
+               ("/settings", "bi-gear", "Settings", user_role == "owner", 0),
+               ("/users", "bi-people", "Users", user_role == "owner", 0),
+               ("/health", "bi-heart-pulse", "Health", true, 0),
+               ("/practice", "bi-controller", "Practice", true, 0),
+               ("/help", "bi-question-circle", "Help", true, 0)] %}
+{% macro lang_and_logout(cls="") %}
+    <form method="post" action="/language" class="inline lang-switch {{ cls }}">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <input type="hidden" name="back" value="{{ request.url.path }}">
+      {% if lang == "my" %}<button class="link" name="language" value="en" lang="en" title="{{ t('Switch the dashboard to English') }}"><i class="bi bi-translate"></i> English</button>
+      {% else %}<button class="link" name="language" value="my" lang="my" title="{{ t('Switch the dashboard to Burmese') }}"><i class="bi bi-translate"></i> မြန်မာ</button>{% endif %}
+    </form>
+    <form method="post" action="/logout" class="inline {{ cls }}">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <button class="link"><i class="bi bi-box-arrow-right"></i> {{ t("Log out") }}</button>
+    </form>
+{% endmacro %}
 <header class="top">
-  <a class="brand" href="/">Decant Inbox</a>
+  <a class="brand" href="/"><span class="brand-mark" aria-hidden="true"></span><span class="brand-name">Decant Inbox</span></a>
   {% if user_role == "owner" %}
   <form method="post" action="/auto-reply" class="inline auto-switch {{ 'on' if auto_on else 'off' }}">
     <input type="hidden" name="csrf" value="{{ csrf }}">
@@ -21,40 +56,54 @@
     <button title="{{ t('Click to turn auto-reply OFF') if auto_on else t('Click to turn auto-reply ON') }}">🤖 {{ t("Auto-reply") }}: <b>{{ t("ON") if auto_on else t("OFF") }}</b></button>
   </form>
   {% else %}<span class="auto-switch {{ 'on' if auto_on else 'off' }} small">🤖 {{ t("Auto-reply") }}: <b>{{ t("ON") if auto_on else t("OFF") }}</b></span>{% endif %}
-  <nav>
-    <a href="/" {% if path == "/" %}aria-current="page"{% endif %}>{{ t("Inbox") }}</a>
-    <a href="/payments" {% if path.startswith("/payments") %}aria-current="page"{% endif %}>{{ t("Payments") }}{% if payments_open %} <span class="badge warn">{{ payments_open }}</span>{% endif %}</a>
-    <a href="/orders" {% if path.startswith("/orders") %}aria-current="page"{% endif %}>{{ t("Orders") }}{% if to_pack %} <span class="badge">{{ to_pack }}</span>{% endif %}</a>
-    <a href="/chats" {% if path.startswith("/chats") %}aria-current="page"{% endif %}>{{ t("Chats") }}</a>
-    <a href="/products" {% if path.startswith("/products") %}aria-current="page"{% endif %}>{{ t("Products") }}</a>
-    {% if user_role == "owner" %}<a href="/prices" {% if path.startswith("/prices") %}aria-current="page"{% endif %}>{{ t("Prices") }}</a>{% endif %}
-    <a href="/sales" {% if path.startswith("/sales") %}aria-current="page"{% endif %}>{{ t("Sales") }}</a>
-    <a href="/reports/wanted" {% if path.startswith("/reports") %}aria-current="page"{% endif %}>{{ t("Reports") }}</a>
-    {% if user_role == "owner" %}
-    <a href="/learning" {% if path.startswith("/learning") %}aria-current="page"{% endif %}>{{ t("Learning") }}{% if to_learn %} <span class="badge">{{ to_learn }}</span>{% endif %}</a>
-    <a href="/ai" {% if path.startswith("/ai") %}aria-current="page"{% endif %}>🧠 {{ t("AI") }}</a>
-    <a href="/settings" {% if path.startswith("/settings") %}aria-current="page"{% endif %}>{{ t("Settings") }}</a>
-    <a href="/users" {% if path.startswith("/users") or path.startswith("/activity") %}aria-current="page"{% endif %}>{{ t("Users") }}</a>
-    {% endif %}
-    <a href="/health" {% if path == "/health" %}aria-current="page"{% endif %}>{{ t("Health") }}</a>
-    <a href="/practice" {% if path.startswith("/practice") %}aria-current="page"{% endif %}>🎓 {{ t("Practice") }}</a>
-    <a href="/help" {% if path == "/help" %}aria-current="page"{% endif %}>❓ {{ t("Help") }}</a>
-    <form method="post" action="/language" class="inline lang-switch">
-      <input type="hidden" name="csrf" value="{{ csrf }}">
-      <input type="hidden" name="back" value="{{ request.url.path }}">
-      {% if lang == "my" %}<button class="link" name="language" value="en" lang="en" title="{{ t('Switch the dashboard to English') }}">🌐 English</button>
-      {% else %}<button class="link" name="language" value="my" lang="my" title="{{ t('Switch the dashboard to Burmese') }}">🌐 မြန်မာ</button>{% endif %}
-    </form>
-    <form method="post" action="/logout" class="inline">
-      <input type="hidden" name="csrf" value="{{ csrf }}">
-      <button class="link">{{ t("Log out") }}</button>
-    </form>
+  <nav class="desk-nav" aria-label="{{ t('Menu') }}">
+    {% for href, icon, label, count, current in daily %}
+    <a href="{{ href }}" {% if current %}aria-current="page"{% endif %}>{{ t(label) }}{% if count %} <span class="badge{% if href == '/payments' %} warn{% endif %}">{{ count }}</span>{% endif %}</a>
+    {% endfor %}
+    <details class="more-menu">
+      <summary>{{ t("More") }}{% if to_learn and user_role == "owner" %} <span class="badge">{{ to_learn }}</span>{% endif %}</summary>
+      <div class="more-list">
+        {% for href, icon, label, shown, count in more if shown %}
+        <a href="{{ href }}" {% if path.startswith(href) or (href == "/users" and path.startswith("/activity")) %}aria-current="page"{% endif %}><i class="bi {{ icon }}"></i> {{ t(label) }}{% if count %} <span class="badge">{{ count }}</span>{% endif %}</a>
+        {% endfor %}
+        {{ lang_and_logout() }}
+      </div>
+    </details>
   </nav>
 </header>
+<nav class="tabbar" aria-label="{{ t('Menu') }}">
+  {% for href, icon, label, count, current in daily %}
+  <a href="{{ href }}" {% if current %}aria-current="page"{% endif %}><i class="bi {{ icon }}"></i><span>{{ t(label) }}</span>{% if count %}<b class="count">{{ count }}</b>{% endif %}</a>
+  {% endfor %}
+  <a href="#more" data-bs-toggle="offcanvas" data-bs-target="#more" role="button" aria-controls="more"><i class="bi bi-grid"></i><span>{{ t("More") }}</span>{% if to_learn and user_role == "owner" %}<b class="count">{{ to_learn }}</b>{% endif %}</a>
+</nav>
+<aside class="offcanvas offcanvas-bottom more-sheet" tabindex="-1" id="more" aria-labelledby="more-title">
+  <div class="offcanvas-header">
+    <h2 class="offcanvas-title" id="more-title">{{ t("More") }}</h2>
+    <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="{{ t('Close') }}"></button>
+  </div>
+  <div class="offcanvas-body">
+    <div class="sheet-grid">
+      {% for href, icon, label, shown, count in more if shown %}
+      <a href="{{ href }}"><i class="bi {{ icon }}"></i><span>{{ t(label) }}</span>{% if count %}<b class="count">{{ count }}</b>{% endif %}</a>
+      {% endfor %}
+    </div>
+    <div class="sheet-foot">{{ lang_and_logout() }}</div>
+  </div>
+</aside>
 {% endif %}
 <main class="{% block main_class %}{% endblock %}">
-{% if flash %}<p class="flash" role="status">{{ tr(flash) }}</p>{% endif %}
+{% if flash %}<div class="toast-zone"><div class="flash toast show" role="status" data-autohide><div class="toast-body">{{ tr(flash) }}</div><button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="{{ t('Close') }}"></button></div></div>{% endif %}
 {% block content %}{% endblock %}
 </main>
+<div class="modal fade" id="confirm" tabindex="-1" aria-labelledby="confirm-text" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered"><div class="modal-content">
+    <div class="modal-body"><p id="confirm-text" class="big-line"></p></div>
+    <div class="modal-footer">
+      <button type="button" class="quiet" data-bs-dismiss="modal">{{ t("Back") }}</button>
+      <button type="button" class="danger-solid" id="confirm-yes">{{ t("Yes, do it") }}</button>
+    </div>
+  </div></div>
+</div>
 </body>
 </html>

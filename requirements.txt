@@ -19,4 +19,4 @@ SQLAlchemy==2.0.54
 Telethon==1.45.0
 uvicorn==0.54.0
 Pillow==13.0.0  # only scripts/make_payment_screens.py (synthetic receipts for tests / the 4.12 eval)
-playwright==1.64.1  # only scripts/ui_check.py (UI gate, dev). Vendored UI files (app/web/static/vendor): Bootstrap 5.3.8, Bootstrap Icons 1.13.1, Noto Sans Myanmar (fontsource 5.3.0, OFL)
+playwright==1.64.1  # only scripts/ui_check.py (UI gate, dev). Vendored UI files (app/web/static/vendor): Bootstrap 5.3.8 (css + bootstrap.min.js, no Popper), Bootstrap Icons 1.13.1, Noto Sans Myanmar (fontsource 5.3.0, OFL)
