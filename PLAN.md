@@ -112,3 +112,5 @@ payments → Viber → reports. Each is a new module with its own tables.
    OWNER TEST 4.15). Status: moved to NEXT TASK 2026-10-31
 2. v4.16 HOTFIX from live test 2026-10-31 09:46 — docs/SPEC-v4.16-hotfix-new-order-after-paid.md (Q0-Q4, R1-R7,
    OWNER TEST 4.16). Status: moved to NEXT TASK 2026-10-31
+3. v4.17 HOTFIX 2 from live test 2026-10-31 10:27 — docs/SPEC-v4.17-hotfix-more-automatic.md (P0-P5, S1-S7,
+   OWNER TEST 4.17). Status: TODO
