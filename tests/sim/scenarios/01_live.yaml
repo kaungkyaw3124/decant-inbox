@@ -1,0 +1,123 @@
+# Live bugs of October 2026 (4.8-4.17 screenshots, retold with TEST data — never real customer text).
+# hand: true, must pass forever.
+
+- id: live-1027-size-not-sold
+  hand: true
+  tags: [live, size, address, grid]
+  turns:
+    - say: "Swy intensely 20ml ယူပါမယ်\n66 str 28 str ကိုပို့ပေးပါ\n09958745521"
+      expect:
+        reply: auto
+        contains: ["20ml မရှိပါဘူး", "10ml – 33,000", "ဘယ် size ယူမလဲ"]
+        not_contains: ["Stronger With You Intensely 2ml –"]
+        cart: []
+    - say: "10ml"
+      expect:
+        reply: auto
+        contains: ["Stronger With You Intensely 10ml – 33,000", "09958745521", "66 str 28 str"]
+        cart: ["Stronger With You Intensely 10ml x1"]
+        phone: "09958745521"
+        city: Mandalay
+    - say: "ok"
+      expect:
+        reply: auto
+        contains: ["KPay – 09000000001", "screenshot"]
+        status: waiting_payment
+
+- id: live-1027-old-cart-and-paid-order
+  hand: true
+  tags: [live, size, paid]
+  setup: {state: paid, items: ["Sauvage Eau de Parfum 10ml"], age_min: 40}
+  turns:
+    - say: "Swy intensely 20ml ယူပါမယ်\n66 str 28 str ကိုပို့ပေးပါ\n09444555777"
+      expect:
+        reply: auto
+        contains: ["20ml မရှိပါဘူး", "ဘယ် size ယူမလဲ"]
+        cart: []
+    - say: "5ml ပါ"
+      expect:
+        reply: auto
+        contains: ["Stronger With You Intensely 5ml – 18,000", "09444555777"]
+        cart: ["Stronger With You Intensely 5ml x1"]
+        phone: "09444555777"
+
+- id: live-1142-same-order-five-times
+  hand: true
+  tags: [live, repeat]
+  turns:
+    - say: "stw intensely 10ml ယူမယ်"
+      expect: {reply: auto, contains: ["Stronger With You Intensely 10ml – 33,000"], cart: ["Stronger With You Intensely 10ml x1"]}
+    - say: "stw intensely 10ml ယူမယ်"
+      gap_min: 20
+      expect: {reply: auto, contains: ["Stronger With You Intensely 10ml"]}
+    - say: "stw intensely 10ml ယူမယ်"
+      gap_min: 25
+      expect: {reply: auto, contains: ["Stronger With You Intensely 10ml"]}
+
+- id: live-0946-new-order-after-paid
+  hand: true
+  tags: [live, paid, contact]
+  setup: {state: paid, items: ["Stronger With You Intensely 5ml"], age_min: 120}
+  turns:
+    - say: "hi swy intensely 10 ml ဝယ်ချင်လို့ပါ\n09777666555\n66 str 29 str, mandalay ကို ပို့ပေးပါ"
+      expect:
+        reply: auto
+        contains: ["Stronger With You Intensely 10ml – 33,000", "09777666555", "66 str 29 str"]
+        not_contains: ["09400000001", "ဗိုလ်ချုပ်လမ်း"]
+        cart: ["Stronger With You Intensely 10ml x1"]
+        phone: "09777666555"
+
+- id: live-0948-address-after-paid
+  hand: true
+  tags: [live, paid, address]
+  setup: {state: paid, items: ["Stronger With You Intensely 5ml"], age_min: 120, saved: false}
+  turns:
+    - say: "sauvage edp 5ml ယူမယ်"
+      expect: {reply: auto, contains: ["Sauvage Eau de Parfum 5ml – 20,000"]}
+    - say: "09777111222"
+      expect: {reply: auto, contains: ["လိပ်စာ"]}
+    - say: "လိပ်စာက 66 str, 28 str mandalay ပါ"
+      expect:
+        reply: auto
+        contains: ["KPay – 09000000001"]
+        not_contains: ["ပြင်ဆင်လို့ မရ"]
+        status: waiting_payment
+        city: Mandalay
+
+- id: live-1013-address-is-not-an-item
+  hand: true
+  tags: [live, address, grid]
+  turns:
+    - say: "aventus 5ml ယူမယ်\n73 x 45 ကိုပို့ပေးပါ\n09450001122"
+      expect:
+        reply: auto
+        contains: ["Aventus 5ml – 65,000", "09450001122"]
+        cart: ["Aventus 5ml x1"]
+        city: Mandalay
+
+- id: live-1017-between-streets
+  hand: true
+  tags: [live, address, grid]
+  turns:
+    - say: "eros 10ml ယူမယ် 09450001133 between 73 & 74, 30 str"
+      expect:
+        reply: auto
+        contains: ["Eros 10ml – 25,000"]
+        cart: ["Eros 10ml x1"]
+
+- id: live-1018-never-silent-waiting-payment
+  hand: true
+  tags: [live, silent]
+  setup: {state: waiting_payment, items: ["Eros 5ml"], age_min: 30}
+  turns:
+    - say: "ငွေလွှဲဖို့ ခဏနေရင် လွှဲမယ်နော်"
+      expect: {reply: any_auto}
+
+- id: live-1015-greeting-then-buy
+  hand: true
+  tags: [live, greeting]
+  turns:
+    - say: "hello"
+      expect: {reply: auto, contains: ["မင်္ဂလာပါ"]}
+    - say: "1 million 10ml ရှိလား"
+      expect: {reply: auto, contains: ["1 Million 10ml က 26,000 ကျပ်ပါ"]}

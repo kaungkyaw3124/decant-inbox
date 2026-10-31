@@ -1,0 +1,45 @@
+{
+"91a7a154ba03a5cb41904da3": {
+"data": {
+"address": null,
+"confidence": 0.95,
+"draft_answer": null,
+"intent": "other",
+"items": [],
+"learn": [],
+"reason": "Says they will transfer later, not that payment has been sent."
+},
+"tokens": [
+4010,
+4007,
+110
+]
+},
+"da0d72d03865ae8213a97a2c": {
+"data": {
+"address": {
+"city": "mandalay",
+"confidence": 0.98,
+"full_text": "66 str, 28 str mandalay",
+"house_no": null,
+"is_change_request": false,
+"landmark": null,
+"missing": [],
+"street": "66 str, 28 str",
+"township": null,
+"ward_or_quarter": null
+},
+"confidence": 0.99,
+"draft_answer": null,
+"intent": "address",
+"items": [],
+"learn": [],
+"reason": "Customer provides delivery address: 66 and 28 streets in Mandalay."
+},
+"tokens": [
+4150,
+4147,
+113
+]
+}
+}
