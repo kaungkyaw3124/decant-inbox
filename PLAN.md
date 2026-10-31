@@ -3,9 +3,9 @@
 Read CLAUDE.md first. This file tracks where we are.
 
 ## NEXT TASK (written by the planning chat; Claude Code runs it with /next)
-Task: v4.15 New UI/UX with Bootstrap 5, mobile-first — docs/SPEC-v4.15-ui-bootstrap.md (U0-U5, goal-driven loop,
-OWNER TEST 4.15).
-Status: DONE 2026-10-31 — see REPORT.md
+Task: v4.16 HOTFIX from live test 2026-10-31 09:46 — docs/SPEC-v4.16-hotfix-new-order-after-paid.md (Q0-Q4, R1-R7,
+OWNER TEST 4.16).
+Status: TODO
 
 ## RESUME HERE (updated 2026-10-29 by planning chat)
 - v1-v4.12 DONE. AI AUTO, brake ON, ai_address ON, ai_screenshot OFF.
@@ -111,4 +111,4 @@ payments → Viber → reports. Each is a new module with its own tables.
 1. v4.15 New UI/UX with Bootstrap 5, mobile-first — docs/SPEC-v4.15-ui-bootstrap.md (U0-U5, goal-driven loop,
    OWNER TEST 4.15). Status: moved to NEXT TASK 2026-10-31
 2. v4.16 HOTFIX from live test 2026-10-31 09:46 — docs/SPEC-v4.16-hotfix-new-order-after-paid.md (Q0-Q4, R1-R7,
-   OWNER TEST 4.16). Status: TODO
+   OWNER TEST 4.16). Status: moved to NEXT TASK 2026-10-31
