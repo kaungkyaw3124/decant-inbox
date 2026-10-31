@@ -114,3 +114,4 @@ payments → Viber → reports. Each is a new module with its own tables.
    OWNER TEST 4.16). Status: moved to NEXT TASK 2026-10-31
 3. v4.17 HOTFIX 2 from live test 2026-10-31 10:27 — docs/SPEC-v4.17-hotfix-more-automatic.md (P0-P5, S1-S7,
    OWNER TEST 4.17). Status: TODO
+4. v4.18 SPEED: first reply within 3 s — docs/SPEC-v4.18-speed.md (S0-S5, T1-T8, OWNER TEST 4.18). Status: TODO
