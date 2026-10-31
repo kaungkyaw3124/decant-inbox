@@ -5,9 +5,9 @@ Read CLAUDE.md first. This file tracks where we are.
 ## NEXT TASK (written by the planning chat; Claude Code runs it with /next)
 Task: v4.16 HOTFIX from live test 2026-10-31 09:46 — docs/SPEC-v4.16-hotfix-new-order-after-paid.md (Q0-Q4, R1-R7,
 OWNER TEST 4.16).
-Status: TODO
+Status: DONE 2026-10-31 — see REPORT.md
 
-## RESUME HERE (updated 2026-10-29 by planning chat)
+## RESUME HERE (updated 2026-10-31 by Claude Code)
 - v1-v4.12 DONE. AI AUTO, brake ON, ai_address ON, ai_screenshot OFF.
 - v4.13 hotfix (docs/SPEC-v4.13-hotfix.md) DONE + deployed 2026-10-17: Q0-Q5, R1-R6, evals PASS. Owner test 4.13
   pending (REPORT.md "OWNER TEST SCRIPT 4.13").
@@ -15,7 +15,9 @@ Status: TODO
   Owner test 4.14 pending (REPORT.md "OWNER TEST SCRIPT 4.14").
 - v4.15 new UI (Bootstrap, mobile-first) DONE + deployed 2026-10-31: UI gate 300 views 0 fails, 719 tests.
   Owner test 4.15 pending (REPORT.md "OWNER TEST SCRIPT 4.15").
-- NEXT: v4.16 hotfix (QUEUE item 2) — owner types /next. v4.15 reviewed OK by planning chat 2026-10-31.
+- v4.16 hotfix (new order after a paid one) DONE + deployed 2026-10-31: 743 tests, address eval PASS, UI gate quick PASS.
+  Owner test 4.16 pending (REPORT.md "OWNER TEST SCRIPT 4.16"; needs TEST_PAY_CODE + Test account ON).
+- NEXT: v4.17 hotfix 2 (QUEUE item 3) — owner types /next. v4.15 reviewed OK by planning chat 2026-10-31.
 - Owner checks: `bash scripts/status.sh`; AI numbers at /ai.
 
 ## Status
@@ -41,6 +43,7 @@ Status: TODO
 | 16 | v4.13 (docs/SPEC-v4.13-hotfix.md): hotfix from live test: never silent (holding reply + watchdog), order_start, address cleaning, no-place = invalid, Mandalay grid | ✅ Done, live (owner test pending) |
 | 17 | v4.14 (docs/SPEC-v4.14-test-payment-code.md): secret test payment code from test accounts, T-numbered test orders, kept out of sales | ✅ Done, live (owner test pending; set TEST_PAY_CODE) |
 | 18 | v4.15 (docs/SPEC-v4.15-ui-bootstrap.md): Bootstrap 5 mobile-first UI, phone tab bar, UI gate (scripts/ui_check.py) | ✅ Done, live (owner test pending) |
+| 19 | v4.16 (docs/SPEC-v4.16-hotfix-new-order-after-paid.md): same-message contact wins, open cart gets changes after a paid order, str grid, test code too early | ✅ Done, live (owner test pending; set TEST_PAY_CODE) |
 
 ## Phase 0 checklist
 - [x] Step 0: rollback safety net scripts in ~/hardening/

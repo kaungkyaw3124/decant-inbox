@@ -1855,3 +1855,63 @@ activity tables, striped test badge contrast.
    Help): nothing scrolls sideways; wide tables are cards.
 6. Try a dangerous button (e.g. Cancel order on a test order → a dialog asks first; "Back" does nothing).
 7. On the laptop: same pages, top menu + "More ▾"; everything you could do before is still there.
+
+## 2026-10-31 — v4.16 hotfix: new order after a paid one (docs/SPEC-v4.16-hotfix-new-order-after-paid.md)
+
+**Q0 root cause (live messages 103 / 105 / 107, customer 11, paid Order #1003 = order 32, new cart = order 34)**
+- **103** (09:46, buy + phone + address): AI `buy` 0.96 (ai_calls 13, it also read the address
+  "66 str 29 str, mandalay" at 0.9) → `cart_add` (quick_actions 21). Confirmed: `_buy` never read the phone/address of
+  its own message; order 34 stayed `address NULL, phones []`, so `cart_text` offered the saved ones (from #1003).
+  Second cause: the validator did not know "str", so even the AI's address was only "partial".
+- **105** (the code): `TEST_PAY_CODE` is **not set** in `.env` and customer 11 is **not marked as tester**, so it was
+  an ordinary message: rules `other` → auto skipped "intent other" → watchdog holding reply after 60 s. Q4 adds the
+  "too early" reply for testers, but the feature stays off until the code is set.
+- **107** (09:48, address): AI `change_info` 0.97 → `locked` on #1003 (quick_actions 22). Confirmed: the `_locked`
+  branch fired because cart 34 had no own address/phones (it only *showed* the saved ones).
+
+**Built**
+- Q1 `actions._take_contact`: in `_buy` and `_modify` (not while waiting for payment), the message's phone(s) become
+  the order's ONLY phones (`replace_phones`) and a sure valid address is saved (`set_address`) before the reply; a
+  partial one is kept 24 h and the list ends with "ဘယ်မြို့နယ်လဲ" (also `cart.closing_line` now asks for the missing
+  township instead of offering the old address); an invalid one ends with "send the address"; an AI-unsure one →
+  Needs you (as the address step). Undo restores customer phones/address. A phone-only message on a cart without
+  phones of its own also uses only that phone (`_contact`).
+- Rules parser **rules-11**: a part naming a place (township/city list, "N str", "လမ်း", …) without product or size is
+  no unknown item; change words without a product are `change_info` even with "order" in the text.
+  `cart.address_from_message` drops order lines (ml / ဝယ်ချင် / ယူမယ် / မှာချင်) from the address.
+- Q2 the locked reply only when there is no open order, or the message names the paid order
+  (`steps.names_order`: "#1003", "1003" not inside a phone, "T1", "ငွေလွှဲပြီးသား", "paid one/order"); a cart that
+  shows saved contact counts as having contact.
+- Q3 grid with str/st/street: "66 str 29 str", "66 str, 28 str", "66st x 28st", "၆၆ လမ်း ၂၈ လမ်း".
+- Q4 `testpay._too_early` (testers only): cart/confirmed order that only waits for "yes" (items, phone, valid address,
+  payment method) → confirm + payment info + test check in one go; otherwise template **test_code_too_early**.
+  Audit `test_code.too_early`. No holding reply (message marked done as before). Non-testers unchanged.
+
+**Decisions to check**
+- 09:48 now: an address while the cart is still "cart" counts as agreement (rule since v2 Step 4d), so the reply is
+  **payment info** (the spec allows "or payment info").
+- J2 owner story step 6 changed: "လိပ်စာပြောင်းချင်တယ်" with a NEW cart open now asks for the new address of the new
+  cart (Q2); the step now says "Order #1001 ရဲ့ လိပ်စာပြောင်းချင်တယ်" and still gets the locked reply (R4).
+- Buy + address in ONE line ("sauvage 10ml ယူမယ် ဗဟန်း") is not read by the rules (order line dropped); the AI reads it.
+- Not done: contact in a buy message while **waiting for payment** (would need a payment-info resend rule; unchanged).
+
+**Tests:** 743 passed, 1 skipped (was 719 + 1). New tests/test_v416_hotfix.py (24: R1 rules + AI path, partial,
+phone-only, no contact, undo; R2 live + fallback-contact case; R3; R4 ×3 + phone≠order id; R5 ×5 + order line;
+R6 ready / too early / no holding / non-tester). UI gate `--quick`: 32 views, 0 failed.
+**Eval:** `scripts.ai_eval --addresses` 56 cases (+7: live 09:46, 09:48, 5 str grids): township 100%, phone in text 0,
+keyword-only 0 → **PASS** ($0.007). Deployed (parser + web restarted), /healthz all ok.
+
+### OWNER TEST SCRIPT 4.16
+Before: put a `TEST_PAY_CODE=` (8+ letters/digits) in `.env`, then `systemctl --user restart decant-parser decant-web`;
+dashboard → Chats → your second account → customer → turn **Test account** ON.
+1. From the second account (it has the paid Order #1003), send ONE message:
+   `hi swy 10 ml ဝယ်ချင်လို့ပါ` / `09xxxxxxxxx` (any number, not the saved one) / `66 str 29 str, mandalay ကို ပို့ပေးပါ`
+   (three lines). Expect: "Order #1003 ကတော့ အတည်ပြုပြီးသားပါ…", the SWY 10ml line, total, and
+   "ဖုန်း <the NEW number>၊ လိပ်စာ 66 str 29 str, mandalay ကိုပဲ ပို့ပေးရမလား။" — no old phone/address.
+2. Send `လိပ်စာက 66 str, 28 str mandalay ပါ`. Expect: payment info (NOT "Order #1003 … ပြင်ဆင်လို့ မရ").
+   Dashboard → Orders: the new order has address "66 str, 28 str mandalay"; #1003 is unchanged.
+3. Send the test code. Expect no reply text from the code itself; Payments shows the 🧪 test check for the new order.
+4. Too early: send `swy 5ml ယူမယ်` (new cart) from an account with no saved phone — or after step 3, start a new
+   cart and send the code before answering. If phone + address are known you get payment info at once; if not,
+   "🧪 Test code ရပါတယ်၊ ဒါပေမဲ့ order ကို အရင် အတည်ပြုပေးပါ…".
+5. Send `Order #1003 ရဲ့ လိပ်စာပြောင်းချင်တယ်` → the locked reply for #1003 (Needs you shows the request).
