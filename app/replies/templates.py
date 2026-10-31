@@ -108,6 +108,12 @@ TEMPLATES: tuple[TemplateDef, ...] = (
     TemplateDef("order_locked", "Paid order is locked: the customer asked to change it",
                 "Order #{order_no} က ငွေလွှဲပြီး အတည်ပြုပြီးသားဖြစ်လို့ ပြင်ဆင်လို့ မရတော့ပါဘူးနော်။ အကူအညီလိုရင် "
                 "ခဏစောင့်ပေးပါ၊ ပြန်ဆက်သွယ်ပေးပါမယ်။", {"order_no": "1004"}),
+    TemplateDef("size_not_available", "Known product, size not on the price list: ask which size (in-stock sizes)",
+                "{product} က {size} မရှိပါဘူးနော်။ ရနိုင်တဲ့ size တွေ: {sizes_with_prices}။ ဘယ် size ယူမလဲ?",
+                {"product": "Stronger With You Intensely", "size": "20ml",
+                 "sizes_with_prices": "2ml – 8,000 / 5ml – 18,000 / 10ml – 33,000 ကျပ်"}),
+    TemplateDef("old_cart_items", "A new buy while an unconfirmed cart is older than 30 min (line in the list)",
+                "အရင်က ရွေးထားတာလည်း ပါပါတယ်၊ မလိုရင် ဖျက်ပေးပါ့မယ်။", {}),
     TemplateDef("test_code_too_early", "Test account sent the test payment code before payment info (testers only)",
                 "🧪 Test code ရပါတယ်၊ ဒါပေမဲ့ order ကို အရင် အတည်ပြုပေးပါ (ငွေလွှဲအချက်အလက် မပို့ရသေးပါ)။", {}),
     TemplateDef("several_photos", "Several photos sent at once",

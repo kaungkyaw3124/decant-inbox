@@ -9,6 +9,7 @@ last 30 days.
                    parsed normally
   0             -> Needs you (teaching card)
 """
+import re
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
@@ -18,7 +19,7 @@ from sqlalchemy.orm import Session
 from app.models import ChoicePrompt, Message, Order, OrderItem, ParseItem, ParseResult, Product
 from app.models.orders import OPEN_STATUSES, PAID_STATUSES
 from app.parser.normalize import normalize
-from app.parser.rules import ParsedItem, ParseOutcome, parse_choice
+from app.parser.rules import _FULL_RE, ParsedItem, ParseOutcome, parse_choice
 from app.pricing.prices import size_label
 
 ASKED_WINDOW = timedelta(days=30)
@@ -122,6 +123,8 @@ def as_choice(session: Session, message: Message, normalized: str) -> ParseOutco
         return None
     if prompt.kind == "product":
         return _product_choice(session, message, prompt, normalized)
+    if prompt.kind == "size":
+        return _size_choice(message, prompt, normalized)
     picked = parse_choice(normalized, len(prompt.options))
     if not picked:
         return None
@@ -134,6 +137,32 @@ def as_choice(session: Session, message: Message, normalized: str) -> ParseOutco
 
 
 ACTION_INTENT = {"add": "buy", "ask_price": "ask_price", "remove": "remove"}
+
+
+ORDINALS = {"ပထမ": 1, "ဒုတိယ": 2, "တတိယ": 3, "စတုတ္ထ": 4, "first": 1, "second": 2, "third": 3, "fourth": 4}
+_ANSWER_WORDS = re.compile(r"\s*(?:ယူပါမယ်|ယူမယ်|ဟာ|ပါ|နော်|ဗျ|ရှင့်|ရှင်|လေး|ကို|က|size|ပဲ)(?=\s|$)")
+
+
+def _size_choice(message: Message, prompt: ChoicePrompt, normalized: str) -> ParseOutcome | None:
+    """docs/SPEC-v4.17 P3: the answer to "ဘယ် size ယူမလဲ?": a size we offered ("10ml", "၁၀", "10"), its place
+    in the list ("ဒုတိယ", "2" when 2ml is not offered) or "full". Anything else is an ordinary message."""
+    text = " ".join(_ANSWER_WORDS.sub(" ", f" {normalized} ").split())
+    sizes = [None if o["is_full_bottle"] else o["size_ml"] for o in prompt.options]
+    pick = None
+    if m := re.fullmatch(r"(\d+)\s*(ml)?", text):
+        n = int(m.group(1))
+        pick = sizes.index(n) if n in sizes else (n - 1 if not m.group(2) and 1 <= n <= len(sizes) else None)
+    elif text in ORDINALS and ORDINALS[text] <= len(sizes):
+        pick = ORDINALS[text] - 1
+    elif _FULL_RE.fullmatch(text) and None in sizes:
+        pick = sizes.index(None)
+    if pick is None:
+        return None
+    prompt.answered_message_id = message.id
+    o = prompt.options[pick]
+    item = ParsedItem(o["product_id"], None if o["is_full_bottle"] else o["size_ml"], o["is_full_bottle"],
+                      prompt.quantity, match="choice")
+    return ParseOutcome("buy", item.product_id, item.size_ml, item.quantity, 1.0, (item,))
 
 
 def _product_choice(session: Session, message: Message, prompt: ChoicePrompt, normalized: str) -> ParseOutcome | None:

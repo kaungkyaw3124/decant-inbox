@@ -324,6 +324,8 @@ def auto_apply(session: Session, message: Message, rules: ParseResult, ai: AIRes
     in_cart = set(session.scalars(select(OrderItem.product_id).where(
         OrderItem.order_id == open_order, OrderItem.removed_at.is_(None)))) if open_order else set()
     ai, dropped = checker.removes_in_cart(ai, in_cart)  # docs/SPEC-v4.11-ai-first.md L2
+    ai, in_address = checker.address_items(ai)  # docs/SPEC-v4.17 P2
+    dropped += in_address
     if dropped:
         call.error = "; ".join(dropped)[:255]
     if ai.confidence < cfg["threshold"]:

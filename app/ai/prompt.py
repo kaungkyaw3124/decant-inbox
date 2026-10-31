@@ -130,6 +130,8 @@ context to understand it (e.g. "that one", "the previous one", "10ml too").
   "10ml too" or a size alone: use it only when that is clear.
 - size: "2ml", "5ml", "10ml" ... or "full" for a full bottle (အပြည့်, ဗူးလိုက်, full bottle, full size, or the
   bottle size itself). null when no size is said. Never guess a size.
+- The delivery ADDRESS and PHONE are never items: street numbers, "str", "st", "street", "လမ်း", "x", house
+  numbers and phone digits ("66 str 28 str", "no 12", "၆၆ လမ်း", "73x45", "09…") give no product, size or qty.
 - qty: number of pieces (၂ခု / 2 ခု / x2 / 2 pcs = 2). Default 1. "5ml" is a size, not a quantity.
 - For remove: the item(s) from the cart that the customer no longer wants (size from the cart if not said).
   Only products that are in the CART NOW can be removed.

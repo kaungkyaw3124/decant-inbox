@@ -294,6 +294,8 @@ def validate(full_text: str | None, parts: dict | None = None, *, source: str = 
     if township is not None:
         p.township, out.township = township.label, township
         city = (township.city_my, township.city_en)  # "ချမ်းမြသာစည်" holds the town "သာစည်" (Thazi)
+    if city is None and _GRID.search(text):
+        city = ("မန္တလေး", "Mandalay")  # docs/SPEC-v4.17 P4: a street grid ("66 str 28 str", "73 x 45") is Mandalay
     if city:
         p.city = f"{city[0]} ({city[1]})"
     p.house_no = p.house_no or _first(_HOUSE, text)

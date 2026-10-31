@@ -24,7 +24,7 @@ from sqlalchemy import exists, select
 from sqlalchemy.orm import Session, aliased
 
 from app.learning import patterns
-from app.models import Customer, Message, Order, OrderEvent
+from app.models import ChoicePrompt, Customer, Message, Order, OrderEvent
 from app.models.orders import LOCKED_STATUSES, OPEN_STATUSES
 from app.orders import address, cart, testpay
 from app.parser.rules import ParsedItem, ParseOutcome
@@ -107,6 +107,9 @@ def with_resume(session: Session, kind: str, text: str | None, customer_id: int,
     line = resume_text(session, step(session, customer_id), texts)
     if not line or line.strip() in text:
         return text, False  # nothing pending, or the reply asks for it already
+    if session.scalar(select(exists().where(ChoicePrompt.customer_id == customer_id, ChoicePrompt.kind == "size",
+                                            ChoicePrompt.answered_message_id.is_(None), ChoicePrompt.expires_at > now))):
+        return text, False  # docs/SPEC-v4.17 P4: one question at a time, the size first
     minutes = patterns.settings(session)["resume_line_minutes"]
     last = session.scalar(select(Customer.resume_line_at).where(Customer.id == customer_id))
     if minutes and last is not None and now - last < timedelta(minutes=minutes):

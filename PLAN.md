@@ -5,7 +5,7 @@ Read CLAUDE.md first. This file tracks where we are.
 ## NEXT TASK (written by the planning chat; Claude Code runs it with /next)
 Task: v4.17 HOTFIX 2 from live test 2026-10-31 10:27 — docs/SPEC-v4.17-hotfix-more-automatic.md (P0-P5, S1-S7,
 OWNER TEST 4.17).
-Status: TODO
+Status: DONE 2026-10-31 — see REPORT.md
 
 ## RESUME HERE (updated 2026-10-31 by Claude Code)
 - v1-v4.12 DONE. AI AUTO, brake ON, ai_address ON, ai_screenshot OFF.
@@ -17,7 +17,9 @@ Status: TODO
   Owner test 4.15 pending (REPORT.md "OWNER TEST SCRIPT 4.15").
 - v4.16 hotfix (new order after a paid one) DONE + deployed 2026-10-31: 743 tests, address eval PASS, UI gate quick PASS.
   Owner test 4.16 pending (REPORT.md "OWNER TEST SCRIPT 4.16"; needs TEST_PAY_CODE + Test account ON).
-- NEXT: v4.17 hotfix 2 (QUEUE item 3) — owner types /next. v4.15 reviewed OK by planning chat 2026-10-31.
+- v4.17 hotfix 2 (size not sold → size question, address never an item, grid = Mandalay, old-cart line) DONE +
+  deployed 2026-10-31: 770 tests, both AI evals PASS, UI gate quick PASS. Owner test 4.17 pending (REPORT.md).
+- NEXT: the next QUEUE item — owner types /next.
 - Owner checks: `bash scripts/status.sh`; AI numbers at /ai.
 
 ## Status
@@ -44,6 +46,7 @@ Status: TODO
 | 17 | v4.14 (docs/SPEC-v4.14-test-payment-code.md): secret test payment code from test accounts, T-numbered test orders, kept out of sales | ✅ Done, live (owner test pending; set TEST_PAY_CODE) |
 | 18 | v4.15 (docs/SPEC-v4.15-ui-bootstrap.md): Bootstrap 5 mobile-first UI, phone tab bar, UI gate (scripts/ui_check.py) | ✅ Done, live (owner test pending) |
 | 19 | v4.16 (docs/SPEC-v4.16-hotfix-new-order-after-paid.md): same-message contact wins, open cart gets changes after a paid order, str grid, test code too early | ✅ Done, live (owner test pending; set TEST_PAY_CODE) |
+| 20 | v4.17 (docs/SPEC-v4.17-hotfix-more-automatic.md): size not sold → automatic size question, address/phone never items, grid without city = Mandalay, old-cart line | ✅ Done, live (owner test pending) |
 
 ## Phase 0 checklist
 - [x] Step 0: rollback safety net scripts in ~/hardening/

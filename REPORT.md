@@ -1915,3 +1915,71 @@ dashboard → Chats → your second account → customer → turn **Test account
    cart and send the code before answering. If phone + address are known you get payment info at once; if not,
    "🧪 Test code ရပါတယ်၊ ဒါပေမဲ့ order ကို အရင် အတည်ပြုပေးပါ…".
 5. Send `Order #1003 ရဲ့ လိပ်စာပြောင်းချင်တယ်` → the locked reply for #1003 (Needs you shows the request).
+
+## 2026-10-31 — v4.17 hotfix 2: more automatic, never silent (docs/SPEC-v4.17-hotfix-more-automatic.md)
+
+**P0 root cause (live messages 109 at 10:31 and its resend 111 at 10:58, customer 11, open cart = order 34 with
+Stronger With You 10ml, paid Order #1003)**
+- Both arrived **before** the 4.16 deploy, so they ran on rules-10.
+- **Not silent:** the 4.13 watchdog did fire: holding reply 60 s later for both (outbox 30 → message 110, outbox 31 →
+  message 112, audit `auto.holding`). After that holding reply nothing else came, because nothing could answer
+  automatically:
+  - rules-10 parse (389 / 394): STW Intensely **20ml** + an unknown item **"str str"** cut from the address
+    "66 str 28 str" → auto skipped ("no certain reply"); the one-tap card was built from that, so the address made
+    an item (the invented 2ml came from that address item; cards are built when the page opens, not stored).
+  - AI: 109 = **timeout** (ai_calls error, 0 ms); 111 = `buy` STW Intensely with **size null**, 0.88 ("20ml is not a
+    listed size"), address "66 str 28 str" 0.83, decision `shadow`.
+  - 20ml is not sold (STW Intensely: 2 / 5 / 10 ml), and no code path answered "size not sold" → a person was needed.
+- After the 4.16 deploy both were re-parsed (rules-11: no "str str" item any more, 448).
+- **Test code (09:46):** `TEST_PAY_CODE` is still **not set** in `.env` and customer 11 is still **not marked as
+  tester** → it is an ordinary message (🧠 AI card).
+
+**Built**
+- P3 `actions._buy`: a known product with a size that is not on the price list (or "full" with no full-bottle price)
+  is not added. If the product has in-stock sizes, the reply asks which one (template **size_not_available**, e.g.
+  "Stronger With You Intensely က 20ml မရှိပါဘူးနော်။ ရနိုင်တဲ့ size တွေ: 2ml – 8,000 / 5ml – 18,000 / 10ml – 33,000
+  ကျပ်။ ဘယ် size ယူမလဲ?"). Prices come only from the price list, never invented. A `ChoicePrompt(kind="size")` remembers
+  it (undo removes it). Other sellable items of the same message are added, and it is ONE reply. Several size
+  questions in one message, or this while waiting for payment → a person (as before). A product with NO price at
+  all is unchanged ("we'll check").
+- P3 answer `previous._size_choice`: "10ml", "10", "၁၀", "5ml ပါ", a place number ("2" when 2ml is not offered),
+  "ဒုတိယ" / "second", "full" → that size goes into the cart and the normal next step follows. Anything else
+  (e.g. "20ml" again) is an ordinary message. `steps.with_resume` adds no resume line while the size is open
+  (one question at a time).
+- P2 rules **rules-12**: "between 73 & 74" is an address line too (rules-11 already kept address/phone lines out of
+  products). AI: the prompt says address and phone are never items; `checker.address_items` drops an AI item whose
+  only words are inside the address the AI read (logged in ai_calls.error).
+- P4 `address.validate`: a street grid without a city ("66 str 28 str", "73 x 45") counts as Mandalay → valid; with
+  4.16 Q1 the new phone + address go on the new cart.
+- P5: a cart older than 30 min that gets a new buy shows all items plus the line **old_cart_items**
+  "အရင်က ရွေးထားတာလည်း ပါပါတယ်၊ မလိုရင် ဖျက်ပေးပါ့မယ်။".
+- P1: the watchdog already covers every unanswered message (it fired live). S4 now pins it with the exact live
+  setup (open cart + locked paid order + an earlier holding reply 40 min ago).
+
+**Decisions to check**
+- After the size answer the confirm line shows the address as the customer wrote it ("လိပ်စာ 66 str 28 str ကိုပဲ
+  ပို့ပေးရမလား။"), not rewritten as "66 x 28 လမ်း, Mandalay". The saved city is Mandalay.
+- Size first, then the address question (the spec's "one question at a time").
+- Test change: `tests/test_cart.py::test_partial_cart` used "Sauvage 3ml" (Sauvage sells 5/10 ml) as the
+  "no price" example. With P3 that now asks the size, so the test first removes Sauvage's prices to keep testing a
+  product with no price at all. The assertions are unchanged.
+
+**Tests:** 770 passed, 1 skipped (was 743 + 1). New tests/test_v417_hotfix.py (27: S1 rules + AI path, S2 "10ml" → confirm with the NEW
+phone/address + 5 answer forms + a non-answer, S3 12 address/phone variants + AI drop + grid = Mandalay, S4, S5 ×2,
+S6). UI gate `--quick`: 32 views, 0 failed.
+**Evals (real API):** product eval PASS (100% all fields, $0.007); address eval 57 cases (+a57 = the live 10:27
+message): township 100%, phone in text 0, keyword-only 0 → **PASS** ($0.007).
+
+### OWNER TEST SCRIPT 4.17
+Before (for step 4 only): put a `TEST_PAY_CODE=` (8+ letters/digits) in `.env`, then
+`systemctl --user restart decant-parser decant-web`; dashboard → Chats → your second account → turn **Test account** ON.
+1. From the second account send ONE message (three lines):
+   `Swy intensely 20ml ယူပါမယ်` / `66 str 28 str ကိုပို့ပေးပါ` / `09xxxxxxxxx` (a new number).
+   Expect within a few seconds ONE reply: your open cart lines (if any) + total, "အရင်က ရွေးထားတာလည်း ပါပါတယ်…" if that
+   cart is older than 30 min, and "Stronger With You Intensely က 20ml မရှိပါဘူးနော်။ ရနိုင်တဲ့ size တွေ: 2ml – 8,000 /
+   5ml – 18,000 / 10ml – 33,000 ကျပ်။ ဘယ် size ယူမလဲ?". No 2ml item. No Needs you card.
+2. Send `10ml`. Expect: SWY Intensely 10ml in the list, then "ဖုန်း <the NEW number>၊ လိပ်စာ 66 str 28 str ကိုပဲ
+   ပို့ပေးရမလား။". Dashboard → the chat's Cart: city Mandalay, the new phone.
+3. Send `ok`. Expect payment info.
+4. Send the test code. Expect: Payments shows the 🧪 test check; approve it → a T-order.
+5. Optional: `10ml မယူတော့ဘူး` removes a line, as before.

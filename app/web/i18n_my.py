@@ -650,6 +650,10 @@ MY = {
     "Paid order is locked: the new items become a NEW order (first line)":
         "ငွေချေပြီး အော်ဒါ ပိတ်ထား: ပစ္စည်းအသစ်တွေက အော်ဒါအသစ် (ပထမစာကြောင်း)",
     "Paid order is locked: the customer asked to change it": "ငွေချေပြီး အော်ဒါ ပိတ်ထား: ဖောက်သည်က ပြင်ချင်တယ်",
+    "Known product, size not on the price list: ask which size (in-stock sizes)":
+        "ပစ္စည်း သိတယ်၊ ဒီ size ဈေးစာရင်းမှာ မရှိ: ဘယ် size ယူမလဲ မေး (ပစ္စည်းရှိတဲ့ size တွေ)",
+    "A new buy while an unconfirmed cart is older than 30 min (line in the list)":
+        "မအတည်ပြုရသေးတဲ့ ခြင်း မိနစ် ၃၀ ကျော်နေချိန် အသစ်ဝယ်: စာရင်းထဲ ထည့်ပြမယ့် စာကြောင်း",
     "Test account sent the test payment code before payment info (testers only)":
         "Test account က ငွေလွှဲအချက်အလက် မပို့ခင် test code ပို့လာတယ် (tester တွေအတွက်သာ)",
     "Order #{no} changed (owner). Tell the customer yourself if needed.": "Order #{no} ပြင်ပြီး (ပိုင်ရှင်)။ လိုရင် ဖောက်သည်ကို ကိုယ်တိုင် ပြောပါ။",

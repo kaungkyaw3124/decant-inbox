@@ -33,13 +33,14 @@ with no product, size or unknown item; the shop asks which product.
 rules-11 (docs/SPEC-v4.16-hotfix-new-order-after-paid.md Q1): a part that names a place ("66 str 29 str, mandalay")
 without a product or size is an address line, not an unknown item; change words without a product are
 change_info even with "order" / "ငွေလွှဲပြီး" in the message.
+rules-12 (docs/SPEC-v4.17-hotfix-more-automatic.md P2): "between 73 & 74" is an address line too.
 """
 import re
 from dataclasses import dataclass, field, replace
 
 from rapidfuzz import fuzz
 
-PARSER_VERSION = "rules-11"
+PARSER_VERSION = "rules-12"
 NEEDS_REVIEW_BELOW = 0.6  # dashboard shows results under this as "needs review"
 FUZZY_THRESHOLD = 88      # rapidfuzz partial_ratio, 0-100
 FUZZY_MIN_ALIAS_LEN = 5   # shorter aliases match too much by accident
@@ -229,7 +230,7 @@ _ADDRESS_CONTENT_RE = _rx(r"\d", r"\S{2,}လမ်း", r"ရပ်ကွက်"
                           _w(r"(?:street|str|st|road|rd|lane|ward|quarter|qtr|township|tsp|no|bldg|building|room)"))
 # docs/SPEC-v4.16 Q1: an address line in a buy message ("66 str 29 str, mandalay") is no unknown product
 _PLACE_RE = _rx(r"\S{2,}လမ်း", r"\d\s*လမ်း", r"ရပ်ကွက်", r"မြို့နယ်", *TOWNSHIPS, *(_w(t) for t in TOWNSHIPS_LATIN),
-                _w(r"(?:street|str|st|road|rd|lane|ward|quarter|qtr|township|tsp|mdy|ygn)"), r"\d\s*st(?:r)?(?![a-z])")
+                _w(r"(?:street|str|st|road|rd|lane|ward|quarter|qtr|township|tsp|mdy|ygn|between)"), r"\d\s*st(?:r)?(?![a-z])")
 
 
 def address_content(text: str) -> str | None:

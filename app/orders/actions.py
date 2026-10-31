@@ -55,7 +55,7 @@ from app.models.outbox import UNDO_SECONDS
 from app.orders import address, cart, change, delivery, previous, steps, unknown, testpay
 from app.parser.normalize import normalize
 from app.parser.rules import CHANGE_PHONE_RE, NEEDS_REVIEW_BELOW, change_kind, has_greeting, find_phones, replace_words
-from app.pricing.prices import size_label
+from app.pricing.prices import current_prices, format_mmk, size_label
 from app.replies import compose, faq
 from app.replies.templates import render
 
@@ -567,7 +567,7 @@ def _buy(session: Session, message: Message, customer: Customer, order: Order | 
     waiting = order is not None and order.status == "waiting_payment"
     if waiting and any(not i.product_id for i in items):
         return None  # unknown item while waiting for payment: "we'll check" + teaching card (auto mode)
-    add, out_of_stock, sellable = [], [], 0
+    add, out_of_stock, sellable, no_size = [], [], 0, []
     for i in items:
         w = cart.normalize_wanted(session, _wanted(i))
         if w.product_id is not None:
@@ -575,11 +575,14 @@ def _buy(session: Session, message: Message, customer: Customer, order: Order | 
             if price is not None and not in_stock:
                 out_of_stock.append(w)
                 continue
+            if price is None and (w.size_ml or w.is_full_bottle) and (sold := _sold_sizes(session, w.product_id)):
+                no_size.append((w, sold))  # docs/SPEC-v4.17 P3: "20ml" of a 2/5/10 ml product -> ask the size
+                continue
             sellable += price is not None
         add.append(w)
-    if not sellable:
-        return None  # nothing we can sell from this message: use the chat
-    if waiting and (out_of_stock or sellable < len(add)):
+    if (not sellable and not no_size) or len(no_size) > 1:
+        return None  # nothing we can sell from this message (or several size questions): use the chat
+    if waiting and (out_of_stock or sellable < len(add) or no_size):
         return None  # no price / out of stock while waiting for payment: a person answers
     phones, read = ([], None) if waiting else contact_in(session, message)
     if read is not None and read.valid and not read.sure:
@@ -591,8 +594,9 @@ def _buy(session: Session, message: Message, customer: Customer, order: Order | 
         return None
     before = _order_state(order)
     old_total = order.total_mmk
+    earlier = not created and not cart.view(session, order).empty and order.created_at < datetime.now(UTC) - OLD_CART
     more = bool(MORE_RE.search(message.normalized_text or ""))
-    changed = cart.add_items(session, order, add, message.id, more=more)
+    changed = cart.add_items(session, order, add, message.id, more=more) if add else []
     order.list_sent_at = datetime.now(UTC)
     undo = {"added": [i for i in changed if i > 0], "removed": [-i for i in changed if i < 0],
             "order": before, "created_order": created}
@@ -610,7 +614,12 @@ def _buy(session: Session, message: Message, customer: Customer, order: Order | 
         notes.append(render(texts["out_of_stock"], product=product.name,
                             size=size_label(None if w.is_full_bottle else w.size_ml, product.full_size_ml)))
     question = _take_contact(session, message, customer, order, phones, read, texts, undo)
-    lines = [cart.cart_text(session, order, texts, notes + dropped, question)]
+    if earlier:  # docs/SPEC-v4.17 P5: the old unconfirmed cart is still in the list
+        notes.append(texts["old_cart_items"])
+    if no_size:  # one question at a time: the size first
+        question = _ask_size(session, message, customer, *no_size[0], texts, undo)
+    empty = cart.view(session, order).empty
+    lines = [question if empty else cart.cart_text(session, order, texts, notes + dropped, question)]
     if locked is not None:  # the paid order is locked: this is a NEW order
         lines.insert(0, render(texts["locked_new_order"], order_no=testpay.order_label(locked)))
     view = cart.view(session, order)
@@ -622,7 +631,34 @@ def _buy(session: Session, message: Message, customer: Customer, order: Order | 
         note += " To check (red in the cart): " + ", ".join(view.problems) + "."
     if locked is not None:
         note = f"Order #{testpay.order_label(locked)} is paid and locked: a NEW order. " + note
+    if no_size:
+        label = (label.replace(" + send list", "") if sellable else "🛒") + " + ask the size"
+        note += " Size not sold: the customer is asked which size (their answer adds it)."
     return Outcome("cart_add", label, "\n".join(lines), "cart", note, order.id, undo)
+
+
+OLD_CART = timedelta(minutes=30)
+
+
+def _sold_sizes(session: Session, product_id: int) -> list:
+    """The in-stock sizes with a price (decants first, then the full bottle)."""
+    return [p for p in current_prices(session, [product_id]).get(product_id, []) if p.in_stock]
+
+
+def _ask_size(session: Session, message: Message, customer: Customer, wanted: cart.WantedItem, sold: list,
+              texts: dict[str, str], undo: dict) -> str:
+    """docs/SPEC-v4.17 P3: "{product} က 20ml မရှိပါဘူး… ဘယ် size ယူမလဲ?"; the answer "10ml" / "၁၀" / "ဒုတိယ"
+    (app/orders/previous.py) adds that size."""
+    product = session.get(Product, wanted.product_id)
+    prompt = ChoicePrompt(customer_id=customer.id, message_id=message.id, kind="size", quantity=wanted.quantity,
+                          options=[{"product_id": product.id, "size_ml": p.size_ml, "is_full_bottle": p.size_ml is None}
+                                   for p in sold], expires_at=datetime.now(UTC) + previous.PROMPT_TTL)
+    session.add(prompt)
+    session.flush()
+    undo["prompt"] = prompt.id
+    prices = " / ".join(f"{size_label(p.size_ml, product.full_size_ml)} – {format_mmk(p.price_mmk)}" for p in sold)
+    return render(texts["size_not_available"], product=product.name, sizes_with_prices=f"{prices} ကျပ်",
+                  size=size_label(None if wanted.is_full_bottle else wanted.size_ml, product.full_size_ml))
 
 
 def _previous(session: Session, message: Message, customer: Customer, order: Order | None, result: ParseResult,

@@ -1,5 +1,7 @@
 """Our own check of every AI answer (docs/SPEC-v4.6-ai.md S1). Any problem -> the whole
 result is rejected and treated as "AI unsure" (the message goes to Needs you as before)."""
+from dataclasses import replace
+
 from app.ai.prompt import Catalog
 from app.ai.types import ACTIONS, INTENTS, LEARN_KINDS, AIResult
 from app.parser.normalize import normalize
@@ -92,3 +94,21 @@ def removes_in_cart(result: AIResult, cart_product_ids: set[int]) -> tuple[AIRes
         return result, []
     confidence = max(round(result.confidence - REMOVE_NOT_IN_CART_PENALTY * len(dropped), 2), 0.0)
     return AIResult(result.intent, tuple(kept), result.learn, confidence, result.reason, result.draft_answer), dropped
+
+
+def address_items(result: AIResult) -> tuple[AIResult, list[str]]:
+    """docs/SPEC-v4.17 P2: an item whose words are only inside the address the AI read ("str" of
+    "66 str 28 str") is no product: dropped (the reply then follows the other items)."""
+    where = normalize((result.address or {}).get("full_text") or "")
+    if not where:
+        return result, []
+    kept, dropped = [], []
+    for n, item in enumerate(result.items):
+        words = normalize(item.not_in_list or item.unclear_text or "") if item.product_id is None else ""
+        if words and words in where:
+            dropped.append(f"item {n + 1}: “{words}” is part of the address")
+            continue
+        kept.append(item)
+    if not dropped:
+        return result, []
+    return replace(result, items=tuple(kept)), dropped

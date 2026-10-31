@@ -149,6 +149,9 @@ def test_whole_flow_phone_first_with_undo(shop, db):
 
 def test_partial_cart(shop, db):
     client, token = shop
+    with db.begin() as c:  # a known product with NO price at all (a size it does not sell asks the size: v4.17 P3)
+        c.execute(text("DELETE FROM product_prices WHERE product_id = "
+                       "(SELECT id FROM products WHERE name = 'Sauvage Eau de Parfum')"))
     buy = say(db, 1, "stw intensely 5ml, ysl y edp 5ml, sauvage edp 3ml, hawas ice 10ml ယူမယ်", customer="95")
     label, tooltip, _ = button(client, buy)
     assert label == "🛒 Add 1 known item + send list"
