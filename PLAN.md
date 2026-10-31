@@ -15,7 +15,7 @@ Status: DONE 2026-10-31 — see REPORT.md
   Owner test 4.14 pending (REPORT.md "OWNER TEST SCRIPT 4.14").
 - v4.15 new UI (Bootstrap, mobile-first) DONE + deployed 2026-10-31: UI gate 300 views 0 fails, 719 tests.
   Owner test 4.15 pending (REPORT.md "OWNER TEST SCRIPT 4.15").
-- NEXT: waiting for the planning chat (QUEUE empty).
+- NEXT: v4.16 hotfix (QUEUE item 2) — owner types /next. v4.15 reviewed OK by planning chat 2026-10-31.
 - Owner checks: `bash scripts/status.sh`; AI numbers at /ai.
 
 ## Status
@@ -110,3 +110,5 @@ payments → Viber → reports. Each is a new module with its own tables.
 ## QUEUE (planning chat adds tasks here; /next takes the first TODO when NEXT TASK is DONE)
 1. v4.15 New UI/UX with Bootstrap 5, mobile-first — docs/SPEC-v4.15-ui-bootstrap.md (U0-U5, goal-driven loop,
    OWNER TEST 4.15). Status: moved to NEXT TASK 2026-10-31
+2. v4.16 HOTFIX from live test 2026-10-31 09:46 — docs/SPEC-v4.16-hotfix-new-order-after-paid.md (Q0-Q4, R1-R7,
+   OWNER TEST 4.16). Status: TODO
