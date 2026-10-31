@@ -3,9 +3,9 @@
 Read CLAUDE.md first. This file tracks where we are.
 
 ## NEXT TASK (written by the planning chat; Claude Code runs it with /next)
-Task: v4.16 HOTFIX from live test 2026-10-31 09:46 — docs/SPEC-v4.16-hotfix-new-order-after-paid.md (Q0-Q4, R1-R7,
-OWNER TEST 4.16).
-Status: DONE 2026-10-31 — see REPORT.md
+Task: v4.17 HOTFIX 2 from live test 2026-10-31 10:27 — docs/SPEC-v4.17-hotfix-more-automatic.md (P0-P5, S1-S7,
+OWNER TEST 4.17).
+Status: TODO
 
 ## RESUME HERE (updated 2026-10-31 by Claude Code)
 - v1-v4.12 DONE. AI AUTO, brake ON, ai_address ON, ai_screenshot OFF.
@@ -116,7 +116,7 @@ payments → Viber → reports. Each is a new module with its own tables.
 2. v4.16 HOTFIX from live test 2026-10-31 09:46 — docs/SPEC-v4.16-hotfix-new-order-after-paid.md (Q0-Q4, R1-R7,
    OWNER TEST 4.16). Status: moved to NEXT TASK 2026-10-31
 3. v4.17 HOTFIX 2 from live test 2026-10-31 10:27 — docs/SPEC-v4.17-hotfix-more-automatic.md (P0-P5, S1-S7,
-   OWNER TEST 4.17). Status: TODO
+   OWNER TEST 4.17). Status: moved to NEXT TASK 2026-10-31
 4. v4.19 NEEDS YOU CARDS: one customer = one clear card — docs/SPEC-v4.19-needs-you-cards.md (N1-N5, K1-K8,
    mockup docs/mockups/needs-you-phone.dc.html, OWNER TEST 4.19). Status: TODO
 5. v4.18 SPEED: first reply within 3 s — docs/SPEC-v4.18-speed.md (S0-S5, T1-T8, OWNER TEST 4.18). Status: TODO
