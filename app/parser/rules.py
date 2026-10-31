@@ -30,13 +30,16 @@ an address needs real CONTENT (township, street, number, ward or a long text): k
 ("လိပ်စာ", "ပို့ပေးပါ", "address") are not an address and never an agreement.
 rules-10 (docs/SPEC-v4.13-hotfix.md Q2): order_start — "I want to order" (မှာချင်လို့ပါ, order တင်ချင်, want to order)
 with no product, size or unknown item; the shop asks which product.
+rules-11 (docs/SPEC-v4.16-hotfix-new-order-after-paid.md Q1): a part that names a place ("66 str 29 str, mandalay")
+without a product or size is an address line, not an unknown item; change words without a product are
+change_info even with "order" / "ငွေလွှဲပြီး" in the message.
 """
 import re
 from dataclasses import dataclass, field, replace
 
 from rapidfuzz import fuzz
 
-PARSER_VERSION = "rules-10"
+PARSER_VERSION = "rules-11"
 NEEDS_REVIEW_BELOW = 0.6  # dashboard shows results under this as "needs review"
 FUZZY_THRESHOLD = 88      # rapidfuzz partial_ratio, 0-100
 FUZZY_MIN_ALIAS_LEN = 5   # shorter aliases match too much by accident
@@ -179,6 +182,8 @@ class ParseOutcome:
 
 
 def find_intent(text: str, has_product_or_size: bool = False) -> str | None:
+    if not has_product_or_size and change_kind(text):
+        return "change_info"  # "ငွေလွှဲပြီးသား order ရဲ့ လိပ်စာပြောင်းချင်တယ်": "order" here is no buy (rules-11)
     for intent, pattern in (("remove", REMOVE_RE), ("buy", BUY_RE), ("ask_price", ASK_PRICE_RE),
                             ("ask_stock", ASK_STOCK_RE)):
         if pattern.search(text):
@@ -221,7 +226,10 @@ _ADDRESS_KEYWORDS_RE = _rx(
     r"နော်", r"ရှင့်", r"ရှင်", r"ခင်ဗျာ", r"ခင်ဗျ", r"ဗျ", r"ပါ", r"တယ်", r"လေး", r"ဖုန်း(?:နံပါတ်)?", _w("phone"))
 _ADDRESS_CONTENT_RE = _rx(r"\d", r"\S{2,}လမ်း", r"ရပ်ကွက်", r"မြို့နယ်", r"အိမ်", r"တိုက်", r"ကွက်", r"ဈေး", r"ဘုရား",
                           r"ကျောင်း", r"ဆေးရုံ", *TOWNSHIPS, *(_w(t) for t in TOWNSHIPS_LATIN),
-                          _w(r"(?:street|st|road|rd|lane|ward|quarter|qtr|township|tsp|no|bldg|building|room)"))
+                          _w(r"(?:street|str|st|road|rd|lane|ward|quarter|qtr|township|tsp|no|bldg|building|room)"))
+# docs/SPEC-v4.16 Q1: an address line in a buy message ("66 str 29 str, mandalay") is no unknown product
+_PLACE_RE = _rx(r"\S{2,}လမ်း", r"\d\s*လမ်း", r"ရပ်ကွက်", r"မြို့နယ်", *TOWNSHIPS, *(_w(t) for t in TOWNSHIPS_LATIN),
+                _w(r"(?:street|str|st|road|rd|lane|ward|quarter|qtr|township|tsp|mdy|ygn)"), r"\d\s*st(?:r)?(?![a-z])")
 
 
 def address_content(text: str) -> str | None:
@@ -534,6 +542,9 @@ def _items(text: str, aliases: list[Alias], full_sizes: dict[int, int],
             elif alias is not None and alias.learned_id is not None:  # taught with a teaching card
                 how = "learned_pending" if alias.pending else "learned"
                 learned.append(alias.learned_id)
+        if product_id is None and not sizes and not full and how not in ("ambiguous", "partial") \
+                and _PLACE_RE.search(part):
+            continue  # an address line
         if product_id is None and how not in ("ambiguous", "partial"):
             unknown = unknown_product_text(part) if (allow_unknown or sizes or full) else None
             if unknown is None and (sizes or full):

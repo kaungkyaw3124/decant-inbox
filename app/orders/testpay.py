@@ -14,13 +14,13 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
-from app.models import AppSetting, AuditLog, Customer, Message, MessageReview, Order, PaymentCheck, User
+from app.models import AppSetting, AuditLog, Customer, Message, MessageReview, Order, Outbox, PaymentCheck, User
 
 AUTO_SETTING = "test_pay_auto_approve"
 AUTO_AFTER = timedelta(seconds=5)
 CLEARED = "test order cleared"
 LOOKBACK = timedelta(hours=1)  # older messages (history imports) are never treated as the code
-SEEN = ("test_code.used", "test_code.no_order", "test_code.non_tester")  # one of these per code message
+SEEN = ("test_code.used", "test_code.no_order", "test_code.non_tester", "test_code.too_early")  # one of these per code message
 LABEL = "🧪 test payment code"
 VALID = re.compile(r"[A-Za-z0-9]{8,}")
 _DIGITS = str.maketrans("၀၁၂၃၄၅၆၇၈၉", "0123456789")
@@ -81,15 +81,18 @@ def scan(session: Session, now: datetime | None = None) -> int:
             done += 1
             continue
         order = _waiting_order(session, customer.id)
-        if order is not None and message.received_at >= order.payment_info_sent_at:
+        early = None if order is not None else _too_early(session, message, customer)
+        if early is not None:
+            order, action = early
+        else:
+            action = "test_code.used" if order is not None and message.received_at >= order.payment_info_sent_at \
+                else "test_code.no_order"
+        if action == "test_code.used":
             check = PaymentCheck(order_id=order.id, message_id=message.id, decision="pending", is_test=True)
             session.add(check)
             order.status, order.is_test = "photo_received", True
             session.flush()
             details |= {"check_id": check.id, "order_id": order.id}
-            action = "test_code.used"
-        else:
-            action = "test_code.no_order"
         session.add(AuditLog(user_id=None, action=action, details=details))
         # handled like a screenshot: no card, no AI, no holding reply, nothing learned
         session.execute(insert(MessageReview).values(message_id=message.id, status="done", reviewed_at=now)
@@ -97,6 +100,38 @@ def scan(session: Session, now: datetime | None = None) -> int:
         done += 1
     session.flush()
     return done
+
+
+def _too_early(session: Session, message: Message, customer: Customer) -> tuple[Order, str] | None:
+    """docs/SPEC-v4.16 Q4: the code before payment info. A cart that only waits for "yes" (items, phone,
+    valid address): yes + payment info + the test check in one go; otherwise tell the tester why nothing
+    happened. None = no cart / confirmed order (the 4.14 "no order" note)."""
+    from app.orders import cart  # late import: cart -> address -> parser
+    from app.replies import templates as replies
+
+    order = cart.open_cart(session, customer.id)
+    if order is None or order.status not in ("cart", "confirmed"):
+        return None
+    texts = replies.load(session)
+    ready = session.begin_nested()
+    if order.status == "cart":
+        cart.confirm(session, order)
+    cart.use_saved_contact(session, order, customer)
+    if not cart.payment_problems(session, order, customer):
+        body = cart.payment_text(session, order, texts)
+        cart.payment_info_sent(session, order)
+        ready.commit()
+        _reply(session, message, body, "payment_info")
+        return order, "test_code.used"
+    ready.rollback()  # not ready: the order stays as it was
+    _reply(session, message, texts["test_code_too_early"], "custom")
+    return order, "test_code.too_early"
+
+
+def _reply(session: Session, message: Message, body: str, kind: str) -> None:
+    session.add(Outbox(customer_id=message.customer_id, text=body, reply_kind=kind, status="queued",
+                       idempotency_key=f"test-code-{message.id}", created_by=None, send_after=datetime.now(UTC),
+                       source_message_id=message.id))
 
 
 def auto_approve(session: Session) -> bool:

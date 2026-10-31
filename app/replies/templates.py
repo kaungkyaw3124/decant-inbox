@@ -108,6 +108,8 @@ TEMPLATES: tuple[TemplateDef, ...] = (
     TemplateDef("order_locked", "Paid order is locked: the customer asked to change it",
                 "Order #{order_no} က ငွေလွှဲပြီး အတည်ပြုပြီးသားဖြစ်လို့ ပြင်ဆင်လို့ မရတော့ပါဘူးနော်။ အကူအညီလိုရင် "
                 "ခဏစောင့်ပေးပါ၊ ပြန်ဆက်သွယ်ပေးပါမယ်။", {"order_no": "1004"}),
+    TemplateDef("test_code_too_early", "Test account sent the test payment code before payment info (testers only)",
+                "🧪 Test code ရပါတယ်၊ ဒါပေမဲ့ order ကို အရင် အတည်ပြုပေးပါ (ငွေလွှဲအချက်အလက် မပို့ရသေးပါ)။", {}),
     TemplateDef("several_photos", "Several photos sent at once",
                 "transaction id ပါတဲ့ screenshot တစ်ပုံတည်း ပို့ပေးပါနော်။", {}),
     TemplateDef("order_confirmed", "Payment approved: order confirmation",

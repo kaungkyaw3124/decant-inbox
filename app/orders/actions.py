@@ -290,9 +290,12 @@ def _apply_items(session: Session, message: Message, result: ParseResult, texts:
     if order is not None and order.status == "photo_received" and asks_change:
         return _hold_request(session, message, order, intent, texts)
     locked = steps.locked_order(session, customer.id)
+    # docs/SPEC-v4.16 Q2: an open order gets the change, unless the message names the paid one; a cart that
+    # shows the saved phone / address counts as having contact
     if locked is not None and intent in ("remove", "change_info", "address", "modify_cart") and asks_change and (
-            order is None or (intent == "change_info" and order.status == "cart" and not order.address
-                              and not order.phones and locked.status in steps.SHIPPING_LOCKED)):
+            order is None or steps.names_order(message.normalized_text or "", locked) or (
+                intent == "change_info" and order.status == "cart" and not order.address and not order.phones
+                and not cart.has_saved_contact(session, order, customer) and locked.status in steps.SHIPPING_LOCKED)):
         return _locked(session, message, locked, intent, texts)  # nothing is changed; Needs you
     if intent == "modify_cart":  # L2: removes + adds / price questions in one message, one reply
         return _modify(session, message, customer, order, items, texts, dropped)
@@ -439,6 +442,9 @@ def _modify(session: Session, message: Message, customer: Customer, order: Order
         if made.problems or made.notes or not made.text:
             return None
         price_text = made.text
+    phones, read = ([], None) if waiting else contact_in(session, message)
+    if read is not None and read.valid and not read.sure:
+        return None  # docs/SPEC-v4.12: an address the AI is unsure of waits for a person
     created = order is None
     order = order or cart.open_cart(session, customer.id, create=True)
     before = _order_state(order)
@@ -476,7 +482,8 @@ def _modify(session: Session, message: Message, customer: Customer, order: Order
         return Outcome("cart_change", "🔁 Change the cart + 💳 payment info with the new total", "\n".join(lines),
                        "payment_info", note + f" New total {view.total:,} ကျပ်. Still waiting for payment.", order.id,
                        undo)
-    lines.append(cart.cart_text(session, order, texts))
+    lines.append(cart.cart_text(session, order, texts,
+                                question=_take_contact(session, message, customer, order, phones, read, texts, undo)))
     return Outcome("cart_change", "🔁 Change the cart + send list", "\n".join(lines), "cart",
                    note + f" Cart total {view.total:,} ကျပ်.", order.id, undo)
 
@@ -514,6 +521,31 @@ def _locked(session: Session, message: Message, order: Order, intent: str, texts
                    order.id, {"events": [event.id]})
 
 
+def _take_contact(session: Session, message: Message, customer: Customer, order: Order, phones: list[str],
+                  read: address.Check | None, texts: dict[str, str], undo: dict) -> str | None:
+    """docs/SPEC-v4.16 Q1: a phone / address in the buy message itself goes on the order before the reply:
+    only this message's phone(s), and its address instead of the saved one. Returns the question that ends
+    the list when that address is not usable yet (never the old saved one)."""
+    if read is not None and read.status == "invalid" and read.reason == "short":
+        read = None  # "၂", "ok": no address at all
+    if not phones and read is None:
+        return None
+    undo |= {"customer": {"address": customer.address, "address_parts": customer.address_parts,
+                          "address_invalid": customer.address_invalid},
+             "phones": [list(r) for r in cart.phone_rows(session, customer.id)]}
+    if phones:
+        cart.replace_phones(session, order, customer, phones, message.id)
+    if read is None:
+        return None
+    if read.sure:
+        cart.set_address(session, order, customer, read)
+        return None
+    if read.status == "partial":  # kept 24 h like the address step; the answer completes it
+        order.address_partial, order.address_partial_at = {**read.parts.to_json(), "_ask": read.ask}, datetime.now(UTC)
+        return texts[read.ask]
+    return texts["ask_address"]
+
+
 def _keep_waiting(session: Session, order: Order, before: dict, old_total: int, undo: dict) -> None:
     """Items changed while waiting for payment: still waiting (payment info goes again with the new
     total); the change is kept for the payment card."""
@@ -549,6 +581,9 @@ def _buy(session: Session, message: Message, customer: Customer, order: Order | 
         return None  # nothing we can sell from this message: use the chat
     if waiting and (out_of_stock or sellable < len(add)):
         return None  # no price / out of stock while waiting for payment: a person answers
+    phones, read = ([], None) if waiting else contact_in(session, message)
+    if read is not None and read.valid and not read.sure:
+        return None  # docs/SPEC-v4.12: an address the AI is unsure of waits for a person
     created = order is None
     locked = steps.locked_order(session, customer.id, steps.SHIPPING_LOCKED) if created else None
     order = order or cart.open_cart(session, customer.id, create=True)
@@ -574,7 +609,8 @@ def _buy(session: Session, message: Message, customer: Customer, order: Order | 
         product = session.get(Product, w.product_id)
         notes.append(render(texts["out_of_stock"], product=product.name,
                             size=size_label(None if w.is_full_bottle else w.size_ml, product.full_size_ml)))
-    lines = [cart.cart_text(session, order, texts, notes + dropped)]
+    question = _take_contact(session, message, customer, order, phones, read, texts, undo)
+    lines = [cart.cart_text(session, order, texts, notes + dropped, question)]
     if locked is not None:  # the paid order is locked: this is a NEW order
         lines.insert(0, render(texts["locked_new_order"], order_no=testpay.order_label(locked)))
     view = cart.view(session, order)
@@ -682,6 +718,8 @@ def _contact(session: Session, message: Message, customer: Customer, order: Orde
         phones_new_on_order = added != before["phones"]
     else:
         added = cart.add_phones(session, order, customer, phones, message.id) if phones else []
+        if phones and not before["phones"]:  # docs/SPEC-v4.16 Q1: this message's phone(s), not the saved ones
+            order.phones = list(dict.fromkeys(phones))
         phones_new_on_order = bool(set(order.phones or []) - set(before["phones"]))
     new_address = new_text if new_text and (new_text != order.address or order.address_invalid
                                             or (replace and new_text != old_address)) else None

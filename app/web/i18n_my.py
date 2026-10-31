@@ -650,6 +650,8 @@ MY = {
     "Paid order is locked: the new items become a NEW order (first line)":
         "ငွေချေပြီး အော်ဒါ ပိတ်ထား: ပစ္စည်းအသစ်တွေက အော်ဒါအသစ် (ပထမစာကြောင်း)",
     "Paid order is locked: the customer asked to change it": "ငွေချေပြီး အော်ဒါ ပိတ်ထား: ဖောက်သည်က ပြင်ချင်တယ်",
+    "Test account sent the test payment code before payment info (testers only)":
+        "Test account က ငွေလွှဲအချက်အလက် မပို့ခင် test code ပို့လာတယ် (tester တွေအတွက်သာ)",
     "Order #{no} changed (owner). Tell the customer yourself if needed.": "Order #{no} ပြင်ပြီး (ပိုင်ရှင်)။ လိုရင် ဖောက်သည်ကို ကိုယ်တိုင် ပြောပါ။",
     "Not saved: write the reason.": "မသိမ်းရသေး: အကြောင်းရင်း ရေးပါ။",
     # AI-first inbox (docs/SPEC-v4.11-ai-first.md)

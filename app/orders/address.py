@@ -45,7 +45,7 @@ _DIGITS = str.maketrans("၀၁၂၃၄၅၆၇၈၉", "0123456789")
 _DEPENDENT = re.compile("[ါ-ှၖ-ၙၞ-ၠၢ-ၤၧ-ၭၱ-ၴ"
                         "ႂ-ႍႏႚ-ႝ]")
 _CONSONANT = re.compile("[က-ဪဿ၌-၏]")
-_STREET_AFTER = re.compile(r"\s*(?:လမ်း|(?:road|rd|st|street|lane)(?![a-z]))", re.IGNORECASE)
+_STREET_AFTER = re.compile(r"\s*(?:လမ်း|(?:road|rd|str|st|street|lane)(?![a-z]))", re.IGNORECASE)
 # after a SHORT Burmese name ("ပြည်", "ဒလ", "အလုံ"): only these may follow, so "ပြည်သူ့ဆေးရုံ" is no township
 _SHORT_AFTER = re.compile(r"$|[\s,.;:/\-–()\[\]#၊။0-9a-zA-Z]|မြို့|မှာ|က(?![ါ-ှ])|ကို|ထဲ|ဘက်|နား|ရှိ|ပါ|နော်")
 SHORT_NAME = 5  # code points
@@ -55,13 +55,14 @@ _NAMED_TOWNSHIP = re.compile(r"(\S{2,}?)\s*မြို့နယ်|(?<![a-z])([
                              re.IGNORECASE)
 _HOUSE = re.compile(r"အမှတ်\s*[\(\[]?\s*[\d၀-၉][\w/\-]*\s*[\)\]]?|(?<![a-z])(?:no|house|room|rm|apt|unit|bldg)\.?\s*[#:]?\s*"
                     r"[\d၀-၉][\w/\-]*|#\s*[\d၀-၉][\w/\-]*", re.IGNORECASE)
-_STREET = re.compile(r"[\d၀-၉]+\s*လမ်း(?:မ)?(?:ကြီး)?|[^\s,၊။]*လမ်း(?:မ)?(?:ကြီး)?|(?<![a-z])(?:[\w.'-]+\s+){1,3}(?:street|st|road|rd|lane|avenue|ave)"
+_STREET = re.compile(r"[\d၀-၉]+\s*လမ်း(?:မ)?(?:ကြီး)?|[^\s,၊။]*လမ်း(?:မ)?(?:ကြီး)?|(?<![a-z])(?:[\w.'-]+\s+){1,3}(?:street|str|st|road|rd|lane|avenue|ave)"
                      r"\.?(?![a-z])|[\d၀-၉]+\s*[x×]\s*[\d၀-၉]+", re.IGNORECASE)
 # Mandalay grid streets (docs/SPEC-v4.13-hotfix.md Q5): "73 x 45", "၇၃ လမ်း x ၄၅ လမ်း", "၇၃ လမ်း (၄၅ x ၄၆ ကြား)",
 # "၂၆ လမ်း ၈၃ x ၈၄ ကြား",
-# "between 73 & 74", "၇၃ နဲ့ ၇၄ ကြား"
+# "between 73 & 74", "၇၃ နဲ့ ၇၄ ကြား"; docs/SPEC-v4.16 Q3: "66 str 29 str", "66st x 28st", "၆၆ လမ်း ၂၈ လမ်း"
 _GRID = re.compile(r"[\d၀-၉]+\s*လမ်း\s*[,၊]?\s*\(?\s*[\d၀-၉]+\s*(?:လမ်း)?\s*(?:[x×]|နဲ့|နှင့်|&|and)\s*[\d၀-၉]+\s*(?:လမ်း)?\s*"
                    r"ကြား\s*\)?"
+                   r"|[\d၀-၉]+\s*(?:လမ်း|str|st|street)\.?\s*(?:[,၊x×&]\s*)?[\d၀-၉]+\s*(?:လမ်း|str|st|street)(?![a-z])"
                    r"|[\d၀-၉]+\s*(?:လမ်း)?\s*[x×]\s*[\d၀-၉]+(?:\s*လမ်း)?(?:\s*ကြား)?"
                    r"|(?<![a-z])between\s+[\d၀-၉]+\s*(?:st|street|လမ်း)?\s*(?:&|and|-)\s*[\d၀-၉]+(?:\s*(?:st|street|လမ်း)(?![a-z]))?"
                    r"|[\d၀-၉]+\s*(?:လမ်း)?\s*(?:နဲ့|နှင့်|&|-)\s*[\d၀-၉]+\s*(?:လမ်း)?\s*ကြား", re.IGNORECASE)

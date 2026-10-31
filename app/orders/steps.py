@@ -178,6 +178,15 @@ def close_request(session: Session, request: OrderEvent, user, outcome: str) -> 
                            created_by=user.id))
 
 
+_PAID_ONE = re.compile(r"ငွေလွှဲပြီးသား|(?<![a-z])paid (?:one|order)", re.IGNORECASE)
+
+
+def names_order(text: str, order: Order) -> bool:
+    """docs/SPEC-v4.16 Q2: the message means this order: its Order ID ("#1003", "T1") or "the paid one"."""
+    label = re.escape(testpay.order_label(order))
+    return bool(re.search(rf"(?<!\w){label}(?!\d)", text, re.IGNORECASE) or _PAID_ONE.search(text))
+
+
 def locked_line(texts: dict[str, str], order: Order) -> str:
     return render(texts["order_locked"], order_no=testpay.order_label(order))
 

@@ -290,7 +290,8 @@ def test_j2_owner_story(shop, db, tmp_path, monkeypatch):
     [text5] = deliver(db)
     assert text5.startswith(LOCKED_NEW + "\n")
     assert _open(db)[0] == "cart" and _open(db)[4] != paid_id  # a NEW cart
-    _msg(db, 6, "လိပ်စာပြောင်းချင်တယ်", minutes=11)
+    # docs/SPEC-v4.16 Q2: with a new cart open, only a message naming the paid order gets the locked reply
+    _msg(db, 6, "Order #1001 ရဲ့ လိပ်စာပြောင်းချင်တယ်", minutes=11)
     assert deliver(db) == [LOCKED]
     with db.connect() as c:
         assert c.execute(text("SELECT address, total_mmk, status FROM orders WHERE id = :o"),

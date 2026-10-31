@@ -19,6 +19,7 @@ from sqlalchemy.orm import Session
 from app.models import Customer, CustomerPhone, Order, OrderItem, PaymentMethod, Product
 from app.models.orders import MAX_PHONES, OPEN_STATUSES
 from app.orders import address
+from app.parser.normalize import normalize
 from app.pricing.prices import current_prices, format_mmk, size_label
 from app.replies.templates import render
 
@@ -349,7 +350,8 @@ def item_lines(session: Session, order: Order, texts: dict[str, str]) -> list[st
             for i, p in view(session, order).lines if p is not None and i.unit_price_mmk is not None]
 
 
-def cart_text(session: Session, order: Order, texts: dict[str, str], notes: list[str] | None = None) -> str:
+def cart_text(session: Session, order: Order, texts: dict[str, str], notes: list[str] | None = None,
+              question: str | None = None) -> str:
     """Items, total, items we must check, and the next question (Step 4d: the list asks for
     the phone directly; then the address; a returning customer is asked to confirm the
     saved phone and address)."""
@@ -358,7 +360,7 @@ def cart_text(session: Session, order: Order, texts: dict[str, str], notes: list
     if cart.problems:
         lines.append(render(texts["unknown_items_note"], names=", ".join(cart.problems)))
     lines += notes or []  # e.g. out of stock / we don't have it: before the question
-    lines.append(closing_line(session, order, texts))
+    lines.append(question or closing_line(session, order, texts))
     return "\n".join(lines)
 
 
@@ -373,6 +375,8 @@ def closing_line(session: Session, order: Order, texts: dict[str, str]) -> str:
     known = order_address(order) or saved_address(customer)
     if not phones:
         return texts["cart_ask_phone"]
+    if not order_address(order) and (partial := address.pending_partial(order)):
+        return texts[partial.get("_ask") or "ask_township"]  # their new address waits for its township, not the old one
     if not known:
         return texts["ask_address"]
     return render(texts["cart_returning"], phones=", ".join(phones), address=known)
@@ -403,10 +407,15 @@ _PHONE_WORDS = re.compile(
     r"(?i)(?:ဖုန်းနံပါတ်|ဖုန်း|(?<![a-z])(?:phone(?:\s*no)?|ph(?:\s*no)?|tel)(?![a-z])\.?)\s*[:：-]?\s*")
 
 
+# a line that orders a product ("swy 10 ml ဝယ်ချင်လို့ပါ") is never part of the address (docs/SPEC-v4.16 Q1)
+_ORDER_LINE = re.compile(r"\d\s*ml(?![a-z])|ဝယ်ချင်|ယူမယ်|မှာချင်|မှာမယ်")
+
+
 def address_from_message(raw_text: str) -> str:
-    """The message as the address: without phone numbers and without a trailing
+    """The message as the address: without phone numbers, order lines and a trailing
     "ကိုပို့ပေးပါ" (Burmese digits become 0-9)."""
     text = raw_text.translate(str.maketrans("၀၁၂၃၄၅၆၇၈၉", "0123456789"))
+    text = "\n".join(line for line in text.split("\n") if not _ORDER_LINE.search(normalize(line)))
     text = _PHONE_WORDS.sub(" ", _PHONE_IN_TEXT.sub(" ", text))
     text = TRAILING_ASK.sub("", re.sub(r"[ \t]+", " ", text).strip(" ,\n"))
     text = LEADING_ASK.sub("", text, count=1)
