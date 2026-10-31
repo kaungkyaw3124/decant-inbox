@@ -72,7 +72,7 @@ address        none     pay      askphone   pay          changed          addr  
 phone          none     pay      phone      phone        pay              phone+          hold           locked   locked   locked   locked
 change_info    none     asknew   asknew     asknew       asknew           asknew          hold           locked   locked   locked   locked
 paid_no_photo  unans    unans    unans      unans        unans            shot            check          unans    unans    unans    unans
-photo          unans    unans    unans      unans        unans            photo           unans          unans    unans    unans    unans
+photo          name     name     name       unans        name             photo           unans          unans    unans    unans    name
 previous_item  card     choose   choose     choose       choose           choose          hold           choose   choose   choose   choose
 ask_delivery   unans    unans    unans      unans        unans            unans           unans          status   status   status   unans
 """
@@ -107,6 +107,7 @@ OUTCOMES = {
     "shot": "“send the screenshot”",
     "check": "“we'll check” (the screenshot is in Payments)",
     "photo": "no reply; a payment check to do",
+    "name": "“which perfume? write the name” (docs/SPEC-v4.20 A2: a photo when no payment is due)",
     "choose": "numbered list of earlier items",
     "status": "the delivery status of the paid order",
 }
@@ -141,6 +142,8 @@ def check(state: str, message: str, code: str, r) -> None:
             assert r.payment_check and r.open_status == "photo_received"
         elif state != "browsing" and message not in ("photo",):
             assert r.open_status == open_before and r.open_items == (2 if open_before else 0)
+    elif code == "name":
+        assert r.replies == ["ဘယ် perfume လဲ နာမည်လေး ရေးပေးပါနော်။"] and not r.card and not r.requests
     elif code == "add":
         closing = {"browsing": RETURNING, "delivered": RETURNING, "need_address": ASK_ADDRESS}.get(state, RESUME.get(state))
         lines = [STW_5, SAUVAGE_10] if state not in ("browsing", "delivered") else []

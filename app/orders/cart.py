@@ -65,7 +65,10 @@ def open_cart(session: Session, customer_id: int, create: bool = False, lock: bo
 
 
 def price_of(session: Session, product_id: int, size_ml: int | None, full: bool) -> tuple[int | None, bool]:
-    """(unit price, in stock) of a size; None price = not sold / no price."""
+    """(unit price, in stock) of a size; None price = not sold / no price. No size and not full = no price
+    (docs/SPEC-v4.20 A2: it matched the full bottle's row, so "good girl ယူမယ်" became a full bottle)."""
+    if size_ml is None and not full:
+        return None, True
     for p in current_prices(session, [product_id]).get(product_id, []):
         if (full and p.size_ml is None) or (not full and p.size_ml == size_ml):
             return p.price_mmk, p.in_stock
@@ -83,15 +86,22 @@ def normalize_wanted(session: Session, item: WantedItem) -> WantedItem:
 
 
 def add_items(session: Session, order: Order, wanted: list[WantedItem], source_message_id: int | None,
-              more: bool = True) -> list[int]:
+              more: bool = True, replace: bool = False) -> list[int]:
     """Add items to the cart (never replaces it). The same product+size again: quantities
     added up when `more` (the admin's own add, or the customer said ထပ် / more), otherwise
-    the line stays as it is (a customer repeating their order). Returns new item ids, and
-    -id for lines this replaced (for undo)."""
+    the line stays as it is (a customer repeating their order). `replace` (docs/SPEC-v4.20 A2: "aventus
+    10ml ပြောင်းယူမယ်", "2 ခု လုပ်ပေး"): the product's lines in the cart, any size, become this one line with
+    exactly this quantity. Returns new item ids, and -id for lines this replaced (for undo)."""
     changed = []
     for w in (normalize_wanted(session, w) for w in wanted):
         existing = None
-        if w.product_id is not None:
+        if replace and w.product_id is not None:
+            for old in session.scalars(select(OrderItem).where(
+                    OrderItem.order_id == order.id, OrderItem.removed_at.is_(None),
+                    OrderItem.product_id == w.product_id)).all():
+                old.removed_at = datetime.now(UTC)
+                changed.append(-old.id)
+        elif w.product_id is not None:
             existing = session.scalar(select(OrderItem).where(
                 OrderItem.order_id == order.id, OrderItem.removed_at.is_(None), OrderItem.product_id == w.product_id,
                 OrderItem.size_ml.is_(None) if w.is_full_bottle else OrderItem.size_ml == w.size_ml,
@@ -409,13 +419,17 @@ _PHONE_WORDS = re.compile(
 
 # a line that orders a product ("swy 10 ml ဝယ်ချင်လို့ပါ") is never part of the address (docs/SPEC-v4.16 Q1)
 _ORDER_LINE = re.compile(r"\d\s*ml(?![a-z])|ဝယ်ချင်|ယူမယ်|မှာချင်|မှာမယ်")
+# docs/SPEC-v4.20 A2: "aventus 5ml ယူမယ် 0942… အမှတ် 12 ၊ အင်းလျားလမ်း ၊ ဗဟန်း" — the address after the order words
+_ORDER_PART = re.compile(r"^.*(?:\d\s*ml(?![a-z])|ဝယ်ချင်|ယူ(?:ပါ)?မယ်|မှာချင်|မှာ(?:ပါ)?မယ်)(?:လို့)?(?:ပါ)?(?:နော်)?",
+                         re.IGNORECASE)
 
 
 def address_from_message(raw_text: str) -> str:
     """The message as the address: without phone numbers, order lines and a trailing
     "ကိုပို့ပေးပါ" (Burmese digits become 0-9)."""
     text = raw_text.translate(str.maketrans("၀၁၂၃၄၅၆၇၈၉", "0123456789"))
-    text = "\n".join(line for line in text.split("\n") if not _ORDER_LINE.search(normalize(line)))
+    text = "\n".join(_ORDER_PART.sub("", line) if _ORDER_LINE.search(normalize(line)) else line
+                     for line in text.split("\n"))
     text = _PHONE_WORDS.sub(" ", _PHONE_IN_TEXT.sub(" ", text))
     text = TRAILING_ASK.sub("", re.sub(r"[ \t]+", " ", text).strip(" ,\n"))
     text = LEADING_ASK.sub("", text, count=1)

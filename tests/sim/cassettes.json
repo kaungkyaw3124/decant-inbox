@@ -1,24 +1,859 @@
 {
-"91a7a154ba03a5cb41904da3": {
+"01f3f27e8ff3e420d2288b92": {
 "data": {
 "address": null,
-"confidence": 0.95,
+"confidence": 0.99,
+"draft_answer": null,
+"intent": "buy",
+"items": [
+{
+"action": null,
+"candidates": [],
+"not_in_list": null,
+"product_id": 2,
+"qty": 1,
+"size": "10ml",
+"unclear_text": null
+}
+],
+"learn": [
+{
+"intent": null,
+"kind": "nickname",
+"product_id": 2,
+"text": "chanel bleu de chanel eau de parfumm"
+}
+],
+"reason": "Bleu de Chanel Eau de Parfum, 10ml; ဝယ်ချင်ပါတယ် = buy."
+},
+"tokens": [
+3999,
+3930,
+120
+]
+},
+"069958a96b3f30b3c98ab119": {
+"data": {
+"address": null,
+"confidence": 0.98,
+"draft_answer": null,
+"intent": "ask_stock",
+"items": [
+{
+"action": null,
+"candidates": [],
+"not_in_list": null,
+"product_id": 20,
+"qty": 1,
+"size": "10ml",
+"unclear_text": null
+}
+],
+"learn": [],
+"reason": "Names Y Eau de Parfum 10ml and asks if available; stock question takes priority over purchase intent."
+},
+"tokens": [
+4003,
+3930,
+95
+]
+},
+"071a510b995deb9b2392e276": {
+"data": {
+"address": {
+"city": null,
+"confidence": 0.99,
+"full_text": "62 x 30 လမ်း",
+"house_no": null,
+"is_change_request": false,
+"landmark": null,
+"missing": [
+"city",
+"house_no"
+],
+"street": "62 x 30 လမ်း",
+"township": null,
+"ward_or_quarter": null
+},
+"confidence": 0.99,
+"draft_answer": null,
+"intent": "address",
+"items": [],
+"learn": [],
+"reason": "Customer provides a numbered street as the requested delivery address."
+},
+"tokens": [
+4088,
+3930,
+210
+]
+},
+"08000bd03dce2506fc37deb0": {
+"data": {
+"address": {
+"city": null,
+"confidence": 0.99,
+"full_text": "အမှတ် 21 ၊ ဗိုလ်ချုပ်လမ်း ၊ ဗဟန်းမြို့နယ်",
+"house_no": "အမှတ် 21",
+"is_change_request": false,
+"landmark": null,
+"missing": [
+"city"
+],
+"street": "ဗိုလ်ချုပ်လမ်း",
+"township": "ဗဟန်း",
+"ward_or_quarter": null
+},
+"confidence": 0.99,
+"draft_answer": null,
+"intent": "address",
+"items": [],
+"learn": [],
+"reason": "Customer provides a delivery address: house number, street, and township."
+},
+"tokens": [
+4142,
+3930,
+137
+]
+},
+"0a6501c9ca346e5276e86a87": {
+"data": {
+"address": null,
+"confidence": 0.99,
+"draft_answer": null,
+"intent": "ask_price",
+"items": [
+{
+"action": null,
+"candidates": [],
+"not_in_list": null,
+"product_id": 20,
+"qty": 1,
+"size": "2ml",
+"unclear_text": null
+}
+],
+"learn": [],
+"reason": "Y Eau de Parfum is product 20; ၂မီလီလီတာ is 2ml; asks price."
+},
+"tokens": [
+4009,
+3930,
+100
+]
+},
+"0a8b2a4816ce63ccbe425f71": {
+"data": {
+"address": null,
+"confidence": 0.96,
 "draft_answer": null,
 "intent": "other",
 "items": [],
 "learn": [],
-"reason": "Says they will transfer later, not that payment has been sent."
+"reason": "Requests a refund; this is not an order cancellation or a payment confirmation."
 },
 "tokens": [
-4010,
-4007,
-110
+4008,
+3930,
+52
 ]
 },
-"da0d72d03865ae8213a97a2c": {
+"0b07df1fe08b12fabe212d46": {
+"data": {
+"address": null,
+"confidence": 1,
+"draft_answer": null,
+"intent": "buy",
+"items": [
+{
+"action": null,
+"candidates": [],
+"not_in_list": null,
+"product_id": 1,
+"qty": 1,
+"size": "5ml",
+"unclear_text": null
+}
+],
+"learn": [],
+"reason": "ch good girl matches Good Girl; 5ml; wants to order"
+},
+"tokens": [
+3989,
+3930,
+123
+]
+},
+"0ba67b17f046b511beebee7b": {
+"data": {
+"address": null,
+"confidence": 0.99,
+"draft_answer": "KPay နံပါတ်ကို ပြန်ပို့ပေးပါမယ်နော်။",
+"intent": "question",
+"items": [],
+"learn": [],
+"reason": "Asks the shop to resend the KPay number; this is a payment question."
+},
+"tokens": [
+4005,
+3930,
+72
+]
+},
+"0c680f4a0b5f7b802edfc250": {
+"data": {
+"address": null,
+"confidence": 0.98,
+"draft_answer": null,
+"intent": "greeting",
+"items": [],
+"learn": [],
+"reason": "General question asking what perfumes are available; greeting intent includes asking what the shop has."
+},
+"tokens": [
+3988,
+3930,
+55
+]
+},
+"102c9c6c2e7c2ac7fc63eef1": {
 "data": {
 "address": {
-"city": "mandalay",
+"city": null,
+"confidence": 0.99,
+"full_text": "62 x 30 လမ်း",
+"house_no": null,
+"is_change_request": false,
+"landmark": null,
+"missing": [
+"city",
+"house_no"
+],
+"street": "62 x 30 လမ်း",
+"township": null,
+"ward_or_quarter": null
+},
+"confidence": 0.99,
+"draft_answer": null,
+"intent": "address",
+"items": [],
+"learn": [],
+"reason": "Customer provided a numbered street address."
+},
+"tokens": [
+4109,
+3930,
+195
+]
+},
+"11befcf88d02ef0d727c1428": {
+"data": {
+"address": null,
+"confidence": 1,
+"draft_answer": null,
+"intent": "buy",
+"items": [
+{
+"action": null,
+"candidates": [],
+"not_in_list": null,
+"product_id": 18,
+"qty": 1,
+"size": "10ml",
+"unclear_text": null
+}
+],
+"learn": [],
+"reason": "Versace Eros 10ml; wants to order."
+},
+"tokens": [
+3989,
+3930,
+131
+]
+},
+"16b1d5862d97428996c3f134": {
+"data": {
+"address": {
+"city": null,
+"confidence": 0.78,
+"full_text": "66 str 28 str",
+"house_no": null,
+"is_change_request": false,
+"landmark": null,
+"missing": [
+"township",
+"city",
+"house_no"
+],
+"street": "66 str 28 str",
+"township": null,
+"ward_or_quarter": null
+},
+"confidence": 0.84,
+"draft_answer": null,
+"intent": "address",
+"items": [],
+"learn": [],
+"reason": "Customer provided street details in response to the address request."
+},
+"tokens": [
+4089,
+3930,
+266
+]
+},
+"1700ad89830abd92a3b4c5bc": {
+"data": {
+"address": null,
+"confidence": 1,
+"draft_answer": null,
+"intent": "buy",
+"items": [
+{
+"action": null,
+"candidates": [],
+"not_in_list": null,
+"product_id": 7,
+"qty": 1,
+"size": "10ml",
+"unclear_text": null
+}
+],
+"learn": [],
+"reason": "Names Stronger With You and 10ml; wants to buy."
+},
+"tokens": [
+3993,
+3930,
+84
+]
+},
+"177ec35430013570df14f0b2": {
+"data": {
+"address": null,
+"confidence": 0.9,
+"draft_answer": null,
+"intent": "ask_stock",
+"items": [
+{
+"action": null,
+"candidates": [
+4,
+5,
+6
+],
+"not_in_list": null,
+"product_id": null,
+"qty": 1,
+"size": null,
+"unclear_text": "dior"
+}
+],
+"learn": [],
+"reason": "Dior alone may mean Miss Dior, Sauvage EDP, or Sauvage Elixir; ရှိလား asks stock."
+},
+"tokens": [
+3992,
+3930,
+105
+]
+},
+"17c6963b1a5208006bb5e4d8": {
+"data": {
+"address": null,
+"confidence": 0.99,
+"draft_answer": null,
+"intent": "ask_delivery",
+"items": [],
+"learn": [],
+"reason": "Asks where the parcel is now."
+},
+"tokens": [
+4009,
+3930,
+46
+]
+},
+"18f79aa40088a7b03d8794be": {
+"data": {
+"address": null,
+"confidence": 0.86,
+"draft_answer": null,
+"intent": "ask_price",
+"items": [
+{
+"action": null,
+"candidates": [],
+"not_in_list": null,
+"product_id": 16,
+"qty": 1,
+"size": "5ml",
+"unclear_text": null
+}
+],
+"learn": [],
+"reason": "Tom Ford is the only listed Tom Ford product; asks price for 5ml."
+},
+"tokens": [
+3990,
+3930,
+186
+]
+},
+"1a18ca9872d477ed2d5f0cbc": {
+"data": {
+"address": null,
+"confidence": 0.96,
+"draft_answer": null,
+"intent": "buy",
+"items": [
+{
+"action": null,
+"candidates": [],
+"not_in_list": null,
+"product_id": 18,
+"qty": 2,
+"size": "10ml",
+"unclear_text": null
+}
+],
+"learn": [],
+"reason": "Eros 10ml is in the cart; ၂ ခုလုပ်ပေး requests two pieces."
+},
+"tokens": [
+4063,
+3930,
+149
+]
+},
+"1f1345a1ffe8c22fd5683b43": {
+"data": {
+"address": {
+"city": null,
+"confidence": 0.99,
+"full_text": "62 x 30 လမ်း",
+"house_no": null,
+"is_change_request": false,
+"landmark": null,
+"missing": [
+"township"
+],
+"street": "62 x 30 လမ်း",
+"township": null,
+"ward_or_quarter": null
+},
+"confidence": 0.99,
+"draft_answer": null,
+"intent": "address",
+"items": [],
+"learn": [],
+"reason": "Customer provides a numbered street address in response to the address request."
+},
+"tokens": [
+4166,
+3930,
+111
+]
+},
+"1f793af80f32722719d831de": {
+"data": {
+"address": null,
+"confidence": 0.99,
+"draft_answer": null,
+"intent": "buy",
+"items": [
+{
+"action": null,
+"candidates": [],
+"not_in_list": "lattafa khamrah",
+"product_id": null,
+"qty": 1,
+"size": "5ml",
+"unclear_text": null
+}
+],
+"learn": [
+{
+"intent": null,
+"kind": "not_stocked",
+"product_id": null,
+"text": "lattafa khamrah"
+}
+],
+"reason": "Lattafa Khamrah is not listed; 5ml; ယူမယ် = buy."
+},
+"tokens": [
+3992,
+3930,
+163
+]
+},
+"236cb5ec772bd40a9b999d4c": {
+"data": {
+"address": null,
+"confidence": 0.99,
+"draft_answer": null,
+"intent": "buy",
+"items": [
+{
+"action": null,
+"candidates": [],
+"not_in_list": null,
+"product_id": 1,
+"qty": 1,
+"size": "2ml",
+"unclear_text": null
+}
+],
+"learn": [],
+"reason": "Good Girl 2ml requested for purchase."
+},
+"tokens": [
+3990,
+3930,
+119
+]
+},
+"26f85e21a0aabb9872451167": {
+"data": {
+"address": null,
+"confidence": 0.98,
+"draft_answer": null,
+"intent": "buy",
+"items": [
+{
+"action": null,
+"candidates": [],
+"not_in_list": null,
+"product_id": 3,
+"qty": 1,
+"size": "10ml",
+"unclear_text": null
+}
+],
+"learn": [
+{
+"intent": null,
+"kind": "nickname",
+"product_id": 3,
+"text": "aventos"
+}
+],
+"reason": "“aventos” is an obvious typo for Aventus; 10ml; ယူမယ် means buy."
+},
+"tokens": [
+3988,
+3930,
+114
+]
+},
+"27fdd16cea4539133c1519b0": {
+"data": {
+"address": null,
+"confidence": 0.98,
+"draft_answer": null,
+"intent": "other",
+"items": [],
+"learn": [],
+"reason": "ခဏနော် means wait a moment; it is chit-chat."
+},
+"tokens": [
+3996,
+3930,
+51
+]
+},
+"290c4d208560f0a5063290b1": {
+"data": {
+"address": {
+"city": null,
+"confidence": 0.99,
+"full_text": "No. 5, Pyay Road, Kamayut",
+"house_no": "No. 5",
+"is_change_request": false,
+"landmark": null,
+"missing": [],
+"street": "Pyay Road",
+"township": "Kamayut",
+"ward_or_quarter": null
+},
+"confidence": 0.99,
+"draft_answer": null,
+"intent": "address",
+"items": [],
+"learn": [],
+"reason": "Customer provided house number, street, and township as the requested delivery address."
+},
+"tokens": [
+4105,
+3930,
+191
+]
+},
+"29931f0363e132598b99b162": {
+"data": {
+"address": null,
+"confidence": 0.99,
+"draft_answer": null,
+"intent": "buy",
+"items": [
+{
+"action": null,
+"candidates": [],
+"not_in_list": null,
+"product_id": 14,
+"qty": 1,
+"size": "10ml",
+"unclear_text": null
+}
+],
+"learn": [],
+"reason": "1 million matches product 14; 10ml; wants to order."
+},
+"tokens": [
+3989,
+3930,
+87
+]
+},
+"2c82e7413587b53e47a46a95": {
+"data": {
+"address": {
+"city": null,
+"confidence": 0.99,
+"full_text": "အမှတ် 21 ၊ ဗိုလ်ချုပ်လမ်း ၊ ဗဟန်းမြို့နယ်",
+"house_no": "21",
+"is_change_request": false,
+"landmark": null,
+"missing": [],
+"street": "ဗိုလ်ချုပ်လမ်း",
+"township": "ဗဟန်း",
+"ward_or_quarter": null
+},
+"confidence": 0.99,
+"draft_answer": null,
+"intent": "address",
+"items": [],
+"learn": [],
+"reason": "Customer provides house number, street, and township as the requested delivery address."
+},
+"tokens": [
+4108,
+3930,
+199
+]
+},
+"2e10202bc916fbc138ebf1ac": {
+"data": {
+"address": null,
+"confidence": 1,
+"draft_answer": null,
+"intent": "other",
+"items": [],
+"learn": [],
+"reason": "Customer says thank you."
+},
+"tokens": [
+3999,
+3930,
+40
+]
+},
+"2eb16e4f2f6dc1bc40d8051e": {
+"data": {
+"address": {
+"city": null,
+"confidence": 0.98,
+"full_text": "62 x 30 လမ်း",
+"house_no": null,
+"is_change_request": false,
+"landmark": null,
+"missing": [
+"township",
+"city",
+"house_no"
+],
+"street": "62 x 30 လမ်း",
+"township": null,
+"ward_or_quarter": null
+},
+"confidence": 0.98,
+"draft_answer": null,
+"intent": "address",
+"items": [],
+"learn": [],
+"reason": "Provides a numbered street address in response to the address request."
+},
+"tokens": [
+4140,
+3930,
+115
+]
+},
+"3950c8fc34c93859f96c7939": {
+"data": {
+"address": {
+"city": null,
+"confidence": 0.99,
+"full_text": "အမှတ် 3 ၊ ကျောက်ကုန်းလမ်း ၊ ဗဟန်း",
+"house_no": "3",
+"is_change_request": false,
+"landmark": null,
+"missing": [],
+"street": "ကျောက်ကုန်းလမ်း",
+"township": "ဗဟန်း",
+"ward_or_quarter": null
+},
+"confidence": 0.99,
+"draft_answer": null,
+"intent": "address",
+"items": [],
+"learn": [],
+"reason": "Customer provided a delivery address with house number, street, and township."
+},
+"tokens": [
+4076,
+3930,
+221
+]
+},
+"396a80bccd7bbef24a291584": {
+"data": {
+"address": null,
+"confidence": 0.94,
+"draft_answer": null,
+"intent": "other",
+"items": [
+{
+"action": null,
+"candidates": [],
+"not_in_list": null,
+"product_id": 18,
+"qty": 1,
+"size": null,
+"unclear_text": null
+},
+{
+"action": null,
+"candidates": [],
+"not_in_list": null,
+"product_id": 19,
+"qty": 1,
+"size": null,
+"unclear_text": null
+}
+],
+"learn": [],
+"reason": "Customer reports ordering Eros but receiving Libre; no explicit request or supported complaint intent."
+},
+"tokens": [
+4017,
+3930,
+249
+]
+},
+"3deef96abeb6f69fc6fdcedc": {
+"data": {
+"address": {
+"city": "တောင်ကြီး",
+"confidence": 0.99,
+"full_text": "တောင်ကြီး မြို့ ၊ ရပ်ကွက် 5 ၊ ဗိုလ်ချုပ်လမ်း အမှတ် 20",
+"house_no": "အမှတ် 20",
+"is_change_request": false,
+"landmark": null,
+"missing": [],
+"street": "ဗိုလ်ချုပ်လမ်း",
+"township": null,
+"ward_or_quarter": "ရပ်ကွက် 5"
+},
+"confidence": 0.99,
+"draft_answer": null,
+"intent": "address",
+"items": [],
+"learn": [],
+"reason": "Customer provided a complete delivery address in Taunggyi."
+},
+"tokens": [
+4085,
+3930,
+235
+]
+},
+"4148900f81e23cf43ee7599a": {
+"data": {
+"address": {
+"city": null,
+"confidence": 0.97,
+"full_text": "အမှတ် 18 ၊ ဗိုလ်တထောင်လမ်း ၊ ကမာရွတ်",
+"house_no": "18",
+"is_change_request": true,
+"landmark": null,
+"missing": [],
+"street": "ဗိုလ်တထောင်လမ်း",
+"township": "ကမာရွတ်",
+"ward_or_quarter": null
+},
+"confidence": 0.99,
+"draft_answer": null,
+"intent": "change_info",
+"items": [],
+"learn": [],
+"reason": "Provides the requested replacement delivery address after asking to change it."
+},
+"tokens": [
+4042,
+3930,
+274
+]
+},
+"43d3363b83ed2708156b5f55": {
+"data": {
+"address": null,
+"confidence": 1,
+"draft_answer": null,
+"intent": "buy",
+"items": [
+{
+"action": null,
+"candidates": [],
+"not_in_list": null,
+"product_id": 6,
+"qty": 1,
+"size": "5ml",
+"unclear_text": null
+}
+],
+"learn": [],
+"reason": "Dior Sauvage Elixir 5ml; wants to order."
+},
+"tokens": [
+3991,
+3930,
+84
+]
+},
+"4685ae5b0146fe0b324493b6": {
+"data": {
+"address": null,
+"confidence": 0.98,
+"draft_answer": "လက်ကားဈေးနှုန်းနဲ့ လျှော့ပေးနိုင်မနိုင်ကို ဆိုင်ဘက်က စစ်ဆေးပေးပါမယ်ရှင့်။",
+"intent": "question",
+"items": [],
+"learn": [],
+"reason": "Asks whether a wholesale purchase of about 50 pieces can get a discount; no product named."
+},
+"tokens": [
+4007,
+3930,
+204
+]
+},
+"46ca273b651a3c467894edff": {
+"data": {
+"address": {
+"city": "Mandalay",
 "confidence": 0.98,
 "full_text": "66 str, 28 str mandalay",
 "house_no": null,
@@ -34,12 +869,1761 @@
 "intent": "address",
 "items": [],
 "learn": [],
-"reason": "Customer provides delivery address: 66 and 28 streets in Mandalay."
+"reason": "Provides a delivery address: 66 str, 28 str, Mandalay."
 },
 "tokens": [
-4150,
-4147,
+4153,
+0,
+115
+]
+},
+"476c58069f9dc9769ad39fc6": {
+"data": {
+"address": null,
+"confidence": 1,
+"draft_answer": null,
+"intent": "buy",
+"items": [
+{
+"action": null,
+"candidates": [],
+"not_in_list": null,
+"product_id": 20,
+"qty": 1,
+"size": "5ml",
+"unclear_text": null
+}
+],
+"learn": [
+{
+"intent": null,
+"kind": "nickname",
+"product_id": 20,
+"text": "Yves Saint Laurent Y Eau de Parfum"
+}
+],
+"reason": "Y Eau de Parfum 5ml; ဝယ်ချင်ပါတယ် = buy"
+},
+"tokens": [
+4000,
+3930,
 113
+]
+},
+"4844e0aa5890677e9d847e5b": {
+"data": {
+"address": {
+"city": null,
+"confidence": 0.99,
+"full_text": "အမှတ် 7 ၊ ပြည်လမ်း၊ ကမာရွတ်",
+"house_no": "အမှတ် 7",
+"is_change_request": false,
+"landmark": null,
+"missing": [],
+"street": "ပြည်လမ်း",
+"township": "ကမာရွတ်",
+"ward_or_quarter": null
+},
+"confidence": 0.99,
+"draft_answer": null,
+"intent": "address",
+"items": [],
+"learn": [],
+"reason": "Customer provided a house number, street, and township as the delivery address."
+},
+"tokens": [
+4069,
+3930,
+260
+]
+},
+"4a9344d0a25475ccc5f6fbd0": {
+"data": {
+"address": null,
+"confidence": 0.98,
+"draft_answer": null,
+"intent": "buy",
+"items": [
+{
+"action": null,
+"candidates": [],
+"not_in_list": null,
+"product_id": 16,
+"qty": 1,
+"size": "10ml",
+"unclear_text": null
+}
+],
+"learn": [],
+"reason": "10ml refers to Ombre Leather from the recent chat; ယူမယ် means buy."
+},
+"tokens": [
+4060,
+3930,
+91
+]
+},
+"54b1be30f6c191b02cf66755": {
+"data": {
+"address": null,
+"confidence": 0.99,
+"draft_answer": "လက်ဆောင်ပေးဖို့ သင့်တော်မယ့် အနံ့မျိုးကို အကြံပြုပေးနိုင်ပါတယ်ရှင့်။ သူမကြိုက်တဲ့ အနံ့စတိုင်လေး ရှိပါသလားနော်။",
+"intent": "question",
+"items": [],
+"learn": [],
+"reason": "Asks for a perfume recommendation as a gift for his girlfriend."
+},
+"tokens": [
+4001,
+3930,
+107
+]
+},
+"57ef9c0a23be6bd48aeeba4b": {
+"data": {
+"address": null,
+"confidence": 1,
+"draft_answer": null,
+"intent": "other",
+"items": [],
+"learn": [],
+"reason": "ကျေးဇူးပါ means thank you."
+},
+"tokens": [
+3997,
+3930,
+44
+]
+},
+"58ae5c255ad0f2dd4f48da33": {
+"data": {
+"address": null,
+"confidence": 0.99,
+"draft_answer": null,
+"intent": "ask_stock",
+"items": [
+{
+"action": null,
+"candidates": [],
+"not_in_list": null,
+"product_id": 7,
+"qty": 1,
+"size": "10ml",
+"unclear_text": null
+}
+],
+"learn": [],
+"reason": "Stronger With You 10ml ရနိုင်သေးလား asks availability."
+},
+"tokens": [
+3999,
+3930,
+89
+]
+},
+"59cb053688cbb97438f255f1": {
+"data": {
+"address": null,
+"confidence": 0.99,
+"draft_answer": null,
+"intent": "ask_stock",
+"items": [
+{
+"action": null,
+"candidates": [],
+"not_in_list": "lattafa asad",
+"product_id": null,
+"qty": 1,
+"size": "5ml",
+"unclear_text": null
+}
+],
+"learn": [
+{
+"intent": null,
+"kind": "not_stocked",
+"product_id": null,
+"text": "lattafa asad"
+}
+],
+"reason": "Asks if Lattafa Asad 5ml is available; it is not in the product list."
+},
+"tokens": [
+3992,
+3930,
+123
+]
+},
+"5b43b394cd371c3b17058039": {
+"data": {
+"address": null,
+"confidence": 0.99,
+"draft_answer": null,
+"intent": "buy",
+"items": [
+{
+"action": null,
+"candidates": [],
+"not_in_list": null,
+"product_id": 1,
+"qty": 1,
+"size": "2ml",
+"unclear_text": null
+}
+],
+"learn": [
+{
+"intent": null,
+"kind": "nickname",
+"product_id": 1,
+"text": "good gril"
+}
+],
+"reason": "Order request names Carolina Herrera Good Girl, 2ml."
+},
+"tokens": [
+3993,
+3930,
+104
+]
+},
+"5c5469cf154501b23af45e1c": {
+"data": {
+"address": null,
+"confidence": 0.97,
+"draft_answer": null,
+"intent": "buy",
+"items": [
+{
+"action": null,
+"candidates": [],
+"not_in_list": null,
+"product_id": 11,
+"qty": 1,
+"size": "10ml",
+"unclear_text": null
+},
+{
+"action": null,
+"candidates": [],
+"not_in_list": null,
+"product_id": 10,
+"qty": 1,
+"size": "5ml",
+"unclear_text": null
+}
+],
+"learn": [],
+"reason": "Two listed perfumes and sizes are named, implying an order."
+},
+"tokens": [
+3994,
+3930,
+192
+]
+},
+"5f77dcb96bcc52679b63e6ed": {
+"data": {
+"address": null,
+"confidence": 0.68,
+"draft_answer": null,
+"intent": "other",
+"items": [
+{
+"action": null,
+"candidates": [],
+"not_in_list": null,
+"product_id": 18,
+"qty": 1,
+"size": "10ml",
+"unclear_text": null
+}
+],
+"learn": [],
+"reason": "Eros 10ml is identified, but no explicit purchase intent."
+},
+"tokens": [
+3983,
+3930,
+86
+]
+},
+"63b2f36ed401836fcdc53e4a": {
+"data": {
+"address": null,
+"confidence": 0.92,
+"draft_answer": null,
+"intent": "buy",
+"items": [
+{
+"action": null,
+"candidates": [],
+"not_in_list": null,
+"product_id": 20,
+"qty": 1,
+"size": null,
+"unclear_text": "15ml"
+}
+],
+"learn": [],
+"reason": "Y Eau de Parfum identified; customer wants 15ml, which is not a listed size."
+},
+"tokens": [
+3999,
+3930,
+225
+]
+},
+"6b84b122f82e1a1ca12bbc40": {
+"data": {
+"address": {
+"city": null,
+"confidence": 0.99,
+"full_text": "No. 5, Pyay Road, Kamayut",
+"house_no": "No. 5",
+"is_change_request": false,
+"landmark": null,
+"missing": [],
+"street": "Pyay Road",
+"township": "Kamayut",
+"ward_or_quarter": null
+},
+"confidence": 0.99,
+"draft_answer": null,
+"intent": "address",
+"items": [],
+"learn": [],
+"reason": "Provides a delivery address: house number, street, and township."
+},
+"tokens": [
+4096,
+3930,
+116
+]
+},
+"6c6a254ce9b5f151cc4d7230": {
+"data": {
+"address": {
+"city": "မန္တလေး",
+"confidence": 0.99,
+"full_text": "62 လမ်း 30x31 ကြား မန္တလေး",
+"house_no": null,
+"is_change_request": false,
+"landmark": null,
+"missing": [],
+"street": "62 လမ်း 30x31 ကြား",
+"township": null,
+"ward_or_quarter": null
+},
+"confidence": 0.99,
+"draft_answer": null,
+"intent": "address",
+"items": [],
+"learn": [],
+"reason": "Customer provided a Mandalay street address."
+},
+"tokens": [
+4081,
+3930,
+117
+]
+},
+"6dd645ed69ff86d5baf8bbdc": {
+"data": {
+"address": null,
+"confidence": 0.99,
+"draft_answer": null,
+"intent": "ask_stock",
+"items": [
+{
+"action": null,
+"candidates": [],
+"not_in_list": null,
+"product_id": 20,
+"qty": 1,
+"size": "10ml",
+"unclear_text": null
+}
+],
+"learn": [],
+"reason": "Asks whether Y Eau de Parfum 10ml is in stock."
+},
+"tokens": [
+4067,
+3930,
+88
+]
+},
+"6de59a1d5175c27d0b632e18": {
+"data": {
+"address": null,
+"confidence": 0.98,
+"draft_answer": null,
+"intent": "ask_delivery",
+"items": [],
+"learn": [],
+"reason": "Customer asks why the delivery has not arrived yet and says it is taking too long."
+},
+"tokens": [
+4026,
+3930,
+97
+]
+},
+"764b83755a6e3b03b160c900": {
+"data": {
+"address": {
+"city": null,
+"confidence": 0.99,
+"full_text": "အမှတ် 88 ၊ သုခလမ်း ၊ လှိုင်မြို့နယ်",
+"house_no": "အမှတ် 88",
+"is_change_request": false,
+"landmark": null,
+"missing": [
+"city"
+],
+"street": "သုခလမ်း",
+"township": "လှိုင်",
+"ward_or_quarter": null
+},
+"confidence": 0.99,
+"draft_answer": null,
+"intent": "address",
+"items": [],
+"learn": [],
+"reason": "Provides house number, street, and township as the requested delivery address."
+},
+"tokens": [
+4113,
+3930,
+129
+]
+},
+"77e3e86ae7bb6d99c76e7070": {
+"data": {
+"address": {
+"city": null,
+"confidence": 0.99,
+"full_text": "62 x 30 လမ်း",
+"house_no": null,
+"is_change_request": false,
+"landmark": null,
+"missing": [
+"city",
+"house_no"
+],
+"street": "62 x 30 လမ်း",
+"township": null,
+"ward_or_quarter": null
+},
+"confidence": 0.99,
+"draft_answer": null,
+"intent": "address",
+"items": [],
+"learn": [],
+"reason": "Customer provides a numbered street as the delivery address."
+},
+"tokens": [
+4083,
+3930,
+197
+]
+},
+"78dba0c37151ae53f96f9531": {
+"data": {
+"address": null,
+"confidence": 0.99,
+"draft_answer": null,
+"intent": "ask_stock",
+"items": [
+{
+"action": null,
+"candidates": [],
+"not_in_list": "lattafa asad",
+"product_id": null,
+"qty": 1,
+"size": "5ml",
+"unclear_text": null
+}
+],
+"learn": [
+{
+"intent": null,
+"kind": "not_stocked",
+"product_id": null,
+"text": "lattafa asad"
+}
+],
+"reason": "Asks whether Lattafa Asad 5ml is available; it is not in the product list."
+},
+"tokens": [
+4037,
+3930,
+189
+]
+},
+"79a5eeb3a7bbdf05622bcaab": {
+"data": {
+"address": {
+"city": null,
+"confidence": 0.99,
+"full_text": "62 x 30 လမ်း",
+"house_no": null,
+"is_change_request": false,
+"landmark": null,
+"missing": [
+"township",
+"city",
+"house_no"
+],
+"street": "62 x 30 လမ်း",
+"township": null,
+"ward_or_quarter": null
+},
+"confidence": 0.99,
+"draft_answer": null,
+"intent": "address",
+"items": [],
+"learn": [],
+"reason": "Customer provides a numbered street address in response to the address request."
+},
+"tokens": [
+4096,
+3930,
+116
+]
+},
+"84ec45e2f86257ef74720e8a": {
+"data": {
+"address": {
+"city": null,
+"confidence": 0.91,
+"full_text": "35 x 66 လမ်း",
+"house_no": null,
+"is_change_request": false,
+"landmark": null,
+"missing": [
+"township",
+"city",
+"house_no"
+],
+"street": "35 x 66 လမ်း",
+"township": null,
+"ward_or_quarter": null
+},
+"confidence": 0.93,
+"draft_answer": null,
+"intent": "address",
+"items": [],
+"learn": [],
+"reason": "Customer provides a numbered-street address; no township or city is stated."
+},
+"tokens": [
+4080,
+3930,
+247
+]
+},
+"85cee4a4e536475fc3620155": {
+"data": {
+"address": null,
+"confidence": 0.99,
+"draft_answer": null,
+"intent": "other",
+"items": [],
+"learn": [],
+"reason": "Reports a broken bottle; no request or question is stated."
+},
+"tokens": [
+4001,
+3930,
+49
+]
+},
+"8a597b05766b82098763af82": {
+"data": {
+"address": {
+"city": null,
+"confidence": 0.99,
+"full_text": "အမှတ် 21 ၊ ဗိုလ်ချုပ်လမ်း ၊ ဗဟန်းမြို့နယ်",
+"house_no": "အမှတ် 21",
+"is_change_request": false,
+"landmark": null,
+"missing": [
+"city"
+],
+"street": "ဗိုလ်ချုပ်လမ်း",
+"township": "ဗဟန်း",
+"ward_or_quarter": null
+},
+"confidence": 0.99,
+"draft_answer": null,
+"intent": "address",
+"items": [],
+"learn": [],
+"reason": "Provides a delivery address: house number, street, and township."
+},
+"tokens": [
+4120,
+3930,
+136
+]
+},
+"8c9c577ad2d1136803bb27c2": {
+"data": {
+"address": null,
+"confidence": 0.99,
+"draft_answer": null,
+"intent": "buy",
+"items": [
+{
+"action": null,
+"candidates": [],
+"not_in_list": null,
+"product_id": 3,
+"qty": 1,
+"size": "2ml",
+"unclear_text": null
+}
+],
+"learn": [],
+"reason": "Creed Aventus 2ml; wants to order"
+},
+"tokens": [
+3989,
+3930,
+84
+]
+},
+"8d16bea7f4e86d673e09225a": {
+"data": {
+"address": null,
+"confidence": 0.99,
+"draft_answer": null,
+"intent": "ask_stock",
+"items": [
+{
+"action": null,
+"candidates": [],
+"not_in_list": null,
+"product_id": 20,
+"qty": 1,
+"size": "5ml",
+"unclear_text": null
+}
+],
+"learn": [],
+"reason": "Yves Saint Laurent Y Eau de Parfum; asks if 5ml is available."
+},
+"tokens": [
+3997,
+3930,
+91
+]
+},
+"8e3671284c10c9f7e0891eeb": {
+"data": {
+"address": {
+"city": null,
+"confidence": 0.99,
+"full_text": "No. 5, Pyay Road, Kamayut",
+"house_no": "5",
+"is_change_request": false,
+"landmark": null,
+"missing": [],
+"street": "Pyay Road",
+"township": "Kamayut",
+"ward_or_quarter": null
+},
+"confidence": 0.99,
+"draft_answer": null,
+"intent": "address",
+"items": [],
+"learn": [],
+"reason": "Delivery address includes house number, street, and township."
+},
+"tokens": [
+4101,
+3930,
+200
+]
+},
+"8f0fa97a93fd6f978117957c": {
+"data": {
+"address": null,
+"confidence": 0.99,
+"draft_answer": null,
+"intent": "other",
+"items": [],
+"learn": [],
+"reason": "Says they will transfer money later, not that payment has been sent."
+},
+"tokens": [
+4013,
+3930,
+52
+]
+},
+"9560effc6af139c0d71de62c": {
+"data": {
+"address": null,
+"confidence": 0.98,
+"draft_answer": null,
+"intent": "buy",
+"items": [
+{
+"action": null,
+"candidates": [],
+"not_in_list": null,
+"product_id": 13,
+"qty": 1,
+"size": "5ml",
+"unclear_text": null
+}
+],
+"learn": [
+{
+"intent": null,
+"kind": "nickname",
+"product_id": 13,
+"text": "bacarat rouge"
+}
+],
+"reason": "“bacarat rouge” is an obvious misspelling of Baccarat Rouge; 5ml; order မယ် indicates buying."
+},
+"tokens": [
+3988,
+3930,
+117
+]
+},
+"9676f07b510b4771287ee673": {
+"data": {
+"address": {
+"city": null,
+"confidence": 0.96,
+"full_text": "အမှတ် 9 ၊ သုခလမ်း ، ကမာရွတ်",
+"house_no": "အမှတ် 9",
+"is_change_request": true,
+"landmark": null,
+"missing": [
+"city"
+],
+"street": "သုခလမ်း",
+"township": "ကမာရွတ်",
+"ward_or_quarter": null
+},
+"confidence": 0.99,
+"draft_answer": null,
+"intent": "change_info",
+"items": [],
+"learn": [],
+"reason": "Customer provides a new delivery address, replacing the previously confirmed address."
+},
+"tokens": [
+4110,
+3930,
+127
+]
+},
+"96a42ab7955aeb96eff07f29": {
+"data": {
+"address": null,
+"confidence": 0.99,
+"draft_answer": null,
+"intent": "ask_stock",
+"items": [
+{
+"action": null,
+"candidates": [],
+"not_in_list": null,
+"product_id": 15,
+"qty": 1,
+"size": "10ml",
+"unclear_text": null
+}
+],
+"learn": [],
+"reason": "Prada Luna Rossa Carbon 10ml availability question."
+},
+"tokens": [
+4004,
+3930,
+85
+]
+},
+"98f5c1bc18f1f0eb01c2e5bd": {
+"data": {
+"address": {
+"city": null,
+"confidence": 0.99,
+"full_text": "No. 5, Pyay Road, Kamayut",
+"house_no": "No. 5",
+"is_change_request": false,
+"landmark": null,
+"missing": [],
+"street": "Pyay Road",
+"township": "Kamayut",
+"ward_or_quarter": null
+},
+"confidence": 0.99,
+"draft_answer": null,
+"intent": "address",
+"items": [],
+"learn": [],
+"reason": "Provides house number, street and township as requested."
+},
+"tokens": [
+4104,
+3930,
+113
+]
+},
+"9a18e50eca18fe3c4008ac56": {
+"data": {
+"address": null,
+"confidence": 0.99,
+"draft_answer": null,
+"intent": "buy",
+"items": [
+{
+"action": null,
+"candidates": [],
+"not_in_list": null,
+"product_id": 18,
+"qty": 1,
+"size": "10ml",
+"unclear_text": null
+}
+],
+"learn": [],
+"reason": "10ml only; recent chat clearly identifies Eros."
+},
+"tokens": [
+4073,
+3930,
+110
+]
+},
+"9c1bd7e33fde5b38a971c63b": {
+"data": {
+"address": null,
+"confidence": 0.96,
+"draft_answer": null,
+"intent": "other",
+"items": [],
+"learn": [],
+"reason": "Customer reports that the product is leaking; no purchase or listed item is named."
+},
+"tokens": [
+4006,
+3930,
+53
+]
+},
+"9efdf8ba6ece99586e9028d8": {
+"data": {
+"address": {
+"city": null,
+"confidence": 0.98,
+"full_text": "No. 5, Pyay Road, Kamayut",
+"house_no": "No. 5",
+"is_change_request": false,
+"landmark": null,
+"missing": [
+"city"
+],
+"street": "Pyay Road",
+"township": "Kamayut",
+"ward_or_quarter": null
+},
+"confidence": 0.98,
+"draft_answer": null,
+"intent": "address",
+"items": [],
+"learn": [],
+"reason": "Customer provides house number, street, and township as the requested delivery address."
+},
+"tokens": [
+4097,
+3930,
+120
+]
+},
+"9f8dd303344653e40cc891d2": {
+"data": {
+"address": null,
+"confidence": 0.99,
+"draft_answer": null,
+"intent": "buy",
+"items": [
+{
+"action": null,
+"candidates": [],
+"not_in_list": null,
+"product_id": 18,
+"qty": 1,
+"size": "5ml",
+"unclear_text": null
+},
+{
+"action": null,
+"candidates": [],
+"not_in_list": "hawas",
+"product_id": null,
+"qty": 1,
+"size": "5ml",
+"unclear_text": null
+}
+],
+"learn": [
+{
+"intent": null,
+"kind": "not_stocked",
+"product_id": null,
+"text": "hawas"
+}
+],
+"reason": "Eros 5ml is listed; Hawas 5ml is not listed; ယူမယ် means buy."
+},
+"tokens": [
+3994,
+3930,
+152
+]
+},
+"a421d46cc493253cb8b824ab": {
+"data": {
+"address": null,
+"confidence": 0.99,
+"draft_answer": null,
+"intent": "other",
+"items": [],
+"learn": [],
+"reason": "Emoji only; no clear greeting or request."
+},
+"tokens": [
+3980,
+3930,
+46
+]
+},
+"a4bd78e1c768bc96b13788f7": {
+"data": {
+"address": null,
+"confidence": 0.93,
+"draft_answer": "စစ်ပြီး/မပြီးကို စစ်ဆေးပေးပါမယ်ရှင့်။",
+"intent": "question",
+"items": [],
+"learn": [],
+"reason": "စစ်ပြီးပြီလား asks whether something has been checked; no specific item named."
+},
+"tokens": [
+4004,
+3930,
+257
+]
+},
+"a4c110392bfc15ab088073d4": {
+"data": {
+"address": null,
+"confidence": 0.99,
+"draft_answer": null,
+"intent": "remove",
+"items": [
+{
+"action": "remove",
+"candidates": [],
+"not_in_list": null,
+"product_id": 19,
+"qty": 1,
+"size": "5ml",
+"unclear_text": null
+}
+],
+"learn": [],
+"reason": "Customer says they don't want Libre; the cart contains Libre 5ml."
+},
+"tokens": [
+4112,
+3930,
+87
+]
+},
+"a4e8bef5ea87722e2d577957": {
+"data": {
+"address": {
+"city": null,
+"confidence": 0.76,
+"full_text": "66 str 28 str",
+"house_no": null,
+"is_change_request": false,
+"landmark": null,
+"missing": [
+"township",
+"city",
+"house_no"
+],
+"street": "66 str 28 str",
+"township": null,
+"ward_or_quarter": null
+},
+"confidence": 0.83,
+"draft_answer": null,
+"intent": "address",
+"items": [],
+"learn": [],
+"reason": "Customer provides a street address in response to the address request."
+},
+"tokens": [
+4085,
+3930,
+310
+]
+},
+"a7f91a1ce54891c1f2f33e60": {
+"data": {
+"address": {
+"city": null,
+"confidence": 0.83,
+"full_text": "66 str 28 str",
+"house_no": null,
+"is_change_request": false,
+"landmark": null,
+"missing": [
+"township",
+"city",
+"house_no"
+],
+"street": "66 str 28 str",
+"township": null,
+"ward_or_quarter": null
+},
+"confidence": 0.87,
+"draft_answer": null,
+"intent": "address",
+"items": [],
+"learn": [],
+"reason": "Customer provides a street address after being asked for the delivery address."
+},
+"tokens": [
+4107,
+3930,
+306
+]
+},
+"a98b1107c6c9fa7f89aaace0": {
+"data": {
+"address": {
+"city": null,
+"confidence": 0.98,
+"full_text": "62 x 30 လမ်း",
+"house_no": null,
+"is_change_request": false,
+"landmark": null,
+"missing": [
+"township",
+"house_no"
+],
+"street": "62 x 30 လမ်း",
+"township": null,
+"ward_or_quarter": null
+},
+"confidence": 0.98,
+"draft_answer": null,
+"intent": "address",
+"items": [],
+"learn": [],
+"reason": "Customer provides a street address in response to the address request."
+},
+"tokens": [
+4094,
+3930,
+113
+]
+},
+"abd8e42abe16b135eff7c4e5": {
+"data": {
+"address": null,
+"confidence": 0.99,
+"draft_answer": null,
+"intent": "buy",
+"items": [
+{
+"action": null,
+"candidates": [],
+"not_in_list": null,
+"product_id": 19,
+"qty": 1,
+"size": "5ml",
+"unclear_text": null
+}
+],
+"learn": [],
+"reason": "Libre 5ml ထပ်ထည့်ပေး = add to cart."
+},
+"tokens": [
+4065,
+3930,
+133
+]
+},
+"ac08ff4b28a697f4312a39cd": {
+"data": {
+"address": null,
+"confidence": 1,
+"draft_answer": null,
+"intent": "buy",
+"items": [
+{
+"action": null,
+"candidates": [],
+"not_in_list": null,
+"product_id": 2,
+"qty": 1,
+"size": "5ml",
+"unclear_text": null
+}
+],
+"learn": [],
+"reason": "Names Bleu de Chanel Eau de Parfum and 5ml; wants to order."
+},
+"tokens": [
+3994,
+3930,
+87
+]
+},
+"add9b7dbbdc68d75407b1430": {
+"data": {
+"address": null,
+"confidence": 0.98,
+"draft_answer": null,
+"intent": "buy",
+"items": [
+{
+"action": null,
+"candidates": [],
+"not_in_list": null,
+"product_id": 19,
+"qty": 1,
+"size": "5ml",
+"unclear_text": null
+}
+],
+"learn": [],
+"reason": "The recent chat identifies Libre 5ml; ယူမယ် means they want to buy it."
+},
+"tokens": [
+4030,
+3930,
+92
+]
+},
+"af751d88452c4c5c263738e3": {
+"data": {
+"address": {
+"city": null,
+"confidence": 0.99,
+"full_text": "No. 5, Pyay Road, Kamayut",
+"house_no": "No. 5",
+"is_change_request": false,
+"landmark": null,
+"missing": [],
+"street": "Pyay Road",
+"township": "Kamayut",
+"ward_or_quarter": null
+},
+"confidence": 0.99,
+"draft_answer": null,
+"intent": "address",
+"items": [],
+"learn": [],
+"reason": "Provides house number, street, and township in response to address request."
+},
+"tokens": [
+4092,
+3930,
+214
+]
+},
+"b3b44f855509354df6364111": {
+"data": {
+"address": null,
+"confidence": 0.99,
+"draft_answer": null,
+"intent": "ask_stock",
+"items": [
+{
+"action": null,
+"candidates": [],
+"not_in_list": null,
+"product_id": 5,
+"qty": 1,
+"size": "10ml",
+"unclear_text": null
+}
+],
+"learn": [],
+"reason": "Dior Sauvage Eau de Parfum is product 5; asks if 10ml is available."
+},
+"tokens": [
+3999,
+3930,
+140
+]
+},
+"b4b6b6495588158504cce7b0": {
+"data": {
+"address": null,
+"confidence": 1,
+"draft_answer": null,
+"intent": "buy",
+"items": [
+{
+"action": null,
+"candidates": [],
+"not_in_list": null,
+"product_id": 15,
+"qty": 1,
+"size": "5ml",
+"unclear_text": null
+}
+],
+"learn": [],
+"reason": "Prada Luna Rossa Carbon, 5ml; wants to order."
+},
+"tokens": [
+3993,
+3930,
+85
+]
+},
+"b53cf24ac2fcb875efaa43d3": {
+"data": {
+"address": {
+"city": null,
+"confidence": 0.95,
+"full_text": "62 x 30 လမ်း",
+"house_no": null,
+"is_change_request": false,
+"landmark": null,
+"missing": [
+"city",
+"house_no"
+],
+"street": "62 x 30 လမ်း",
+"township": null,
+"ward_or_quarter": null
+},
+"confidence": 0.96,
+"draft_answer": null,
+"intent": "address",
+"items": [],
+"learn": [],
+"reason": "Customer provided a numbered street address; no city or house number is given."
+},
+"tokens": [
+4083,
+3930,
+248
+]
+},
+"b69e0119d744758aaf5bf7a3": {
+"data": {
+"address": {
+"city": null,
+"confidence": 0.99,
+"full_text": "အမှတ် 45, ဗိုလ်ချုပ်လမ်း, ဗဟန်းမြို့နယ်",
+"house_no": "45",
+"is_change_request": false,
+"landmark": null,
+"missing": [],
+"street": "ဗိုလ်ချုပ်လမ်း",
+"township": "ဗဟန်း",
+"ward_or_quarter": null
+},
+"confidence": 0.99,
+"draft_answer": null,
+"intent": "address",
+"items": [],
+"learn": [],
+"reason": "Customer provides house number, street, and township as the requested delivery address."
+},
+"tokens": [
+4098,
+3930,
+202
+]
+},
+"ba0785cb1ffe36eab1091c7b": {
+"data": {
+"address": {
+"city": null,
+"confidence": 0.99,
+"full_text": "အမှတ် 21 ၊ ဗိုလ်ချုပ်လမ်း ၊ ဗဟန်းမြို့နယ်",
+"house_no": "အမှတ် 21",
+"is_change_request": false,
+"landmark": null,
+"missing": [],
+"street": "ဗိုလ်ချုပ်လမ်း",
+"township": "ဗဟန်း",
+"ward_or_quarter": null
+},
+"confidence": 0.99,
+"draft_answer": null,
+"intent": "address",
+"items": [],
+"learn": [],
+"reason": "Provides house number, street, and Bahan township as requested."
+},
+"tokens": [
+4100,
+3930,
+134
+]
+},
+"ba4c11c4a662dcf8049e5a35": {
+"data": {
+"address": null,
+"confidence": 0.96,
+"draft_answer": null,
+"intent": "payment_sent",
+"items": [],
+"learn": [],
+"reason": "Says they will transfer the money this evening, not that payment is already sent."
+},
+"tokens": [
+4004,
+3930,
+55
+]
+},
+"be23d369edd6b1c45d364093": {
+"data": {
+"address": {
+"city": null,
+"confidence": 0.99,
+"full_text": "အမှတ် 21 ၊ ဗိုလ်ချုပ်လမ်း ၊ ဗဟန်းမြို့နယ်",
+"house_no": "အမှတ် 21",
+"is_change_request": false,
+"landmark": null,
+"missing": [],
+"street": "ဗိုလ်ချုပ်လမ်း",
+"township": "ဗဟန်း",
+"ward_or_quarter": null
+},
+"confidence": 0.99,
+"draft_answer": null,
+"intent": "address",
+"items": [],
+"learn": [],
+"reason": "Provides house number, street, and township as requested."
+},
+"tokens": [
+4100,
+3930,
+229
+]
+},
+"beba14a453d6f0d6ddd6e858": {
+"data": {
+"address": {
+"city": null,
+"confidence": 1,
+"full_text": "ဗဟန်း",
+"house_no": null,
+"is_change_request": false,
+"landmark": null,
+"missing": [
+"city",
+"street",
+"house_no"
+],
+"street": null,
+"township": "ဗဟန်း",
+"ward_or_quarter": null
+},
+"confidence": 1,
+"draft_answer": null,
+"intent": "address",
+"items": [],
+"learn": [],
+"reason": "ဗဟန်း is a township provided in response to the address request."
+},
+"tokens": [
+4075,
+3930,
+106
+]
+},
+"c2ea98ee07a65b5cee564fc1": {
+"data": {
+"address": null,
+"confidence": 0.79,
+"draft_answer": "အနံ့မမွှေးဘူးလို့ ခံစားရတာ စိတ်မကောင်းပါဘူးရှင့်။ ဘယ်ရေမွှေးကို ပြောတာလဲ ပြောပြပေးပါနော်။",
+"intent": "question",
+"items": [],
+"learn": [],
+"reason": "Customer says the scent seems fake and is not fragrant; likely an authenticity or product complaint."
+},
+"tokens": [
+4014,
+3930,
+321
+]
+},
+"c9e876501d7520c7389259c9": {
+"data": {
+"address": null,
+"confidence": 0.9,
+"draft_answer": null,
+"intent": "buy",
+"items": [
+{
+"action": null,
+"candidates": [
+20,
+19
+],
+"not_in_list": null,
+"product_id": null,
+"qty": 1,
+"size": "10ml",
+"unclear_text": "ysl"
+}
+],
+"learn": [],
+"reason": "YSL 10ml buy; could mean Y Eau de Parfum or Libre."
+},
+"tokens": [
+3988,
+3930,
+139
+]
+},
+"cb9e9c78d980f5b795713ac6": {
+"data": {
+"address": null,
+"confidence": 0.99,
+"draft_answer": null,
+"intent": "ask_delivery",
+"items": [],
+"learn": [],
+"reason": "Asks when the order will arrive."
+},
+"tokens": [
+4006,
+3930,
+46
+]
+},
+"cc24f524f25243f9cdac9217": {
+"data": {
+"address": null,
+"confidence": 0.99,
+"draft_answer": null,
+"intent": "ask_stock",
+"items": [
+{
+"action": null,
+"candidates": [],
+"not_in_list": "hawas for him",
+"product_id": null,
+"qty": 1,
+"size": "10ml",
+"unclear_text": null
+}
+],
+"learn": [
+{
+"intent": null,
+"kind": "not_stocked",
+"product_id": null,
+"text": "hawas for him"
+}
+],
+"reason": "Asks whether 10ml Hawas for Him is available; not listed."
+},
+"tokens": [
+3991,
+3930,
+144
+]
+},
+"d4ce0fbdb2c6400f26470762": {
+"data": {
+"address": {
+"city": null,
+"confidence": 0.99,
+"full_text": "အမှတ် 21 ၊ ဗိုလ်ချုပ်လမ်း ၊ ဗဟန်းမြို့နယ်",
+"house_no": "21",
+"is_change_request": false,
+"landmark": null,
+"missing": [],
+"street": "ဗိုလ်ချုပ်လမ်း",
+"township": "ဗဟန်း",
+"ward_or_quarter": null
+},
+"confidence": 0.99,
+"draft_answer": null,
+"intent": "address",
+"items": [],
+"learn": [],
+"reason": "Customer provided house number, street, and township as requested."
+},
+"tokens": [
+4116,
+3930,
+209
+]
+},
+"d7dec45a6c5dacedd1555c08": {
+"data": {
+"address": null,
+"confidence": 1,
+"draft_answer": null,
+"intent": "other",
+"items": [],
+"learn": [],
+"reason": "Thumbs-up reaction only; no order or question."
+},
+"tokens": [
+3998,
+3930,
+63
+]
+},
+"d8fd06a45eddaf85b44fc56f": {
+"data": {
+"address": null,
+"confidence": 0.98,
+"draft_answer": null,
+"intent": "ask_stock",
+"items": [
+{
+"action": null,
+"candidates": [],
+"not_in_list": null,
+"product_id": 12,
+"qty": 1,
+"size": null,
+"unclear_text": null
+}
+],
+"learn": [],
+"reason": "La Vie Est Belle is listed; asks if 30ml is available."
+},
+"tokens": [
+4004,
+3930,
+87
+]
+},
+"dcac4790c16708c36b26f1e9": {
+"data": {
+"address": null,
+"confidence": 1,
+"draft_answer": "မန္တလေးပို့ခကို ဆိုင်ဘက်က စစ်ဆေးပေးပါမယ်နော်။",
+"intent": "question",
+"items": [],
+"learn": [],
+"reason": "Asks about the delivery fee to Mandalay, a shop FAQ topic."
+},
+"tokens": [
+3984,
+3930,
+74
+]
+},
+"ddaead2c1951dd38f5e93828": {
+"data": {
+"address": {
+"city": null,
+"confidence": 0.98,
+"full_text": "အမှတ် 33 ၊ မြေနီကုန်းလမ်း",
+"house_no": "အမှတ် 33",
+"is_change_request": false,
+"landmark": null,
+"missing": [
+"township"
+],
+"street": "မြေနီကုန်းလမ်း",
+"township": null,
+"ward_or_quarter": null
+},
+"confidence": 0.98,
+"draft_answer": null,
+"intent": "address",
+"items": [],
+"learn": [],
+"reason": "Provides a house number and street as the requested delivery address."
+},
+"tokens": [
+4087,
+3930,
+172
+]
+},
+"e1c0cebb42121634d54a2c95": {
+"data": {
+"address": null,
+"confidence": 0.9,
+"draft_answer": null,
+"intent": "buy",
+"items": [
+{
+"action": null,
+"candidates": [],
+"not_in_list": null,
+"product_id": 20,
+"qty": 1,
+"size": null,
+"unclear_text": null
+}
+],
+"learn": [],
+"reason": "YSL Y Eau de Parfum matches product 20; wants to buy, but 15ml is not a listed size."
+},
+"tokens": [
+3998,
+3930,
+97
+]
+},
+"e3d78dec4b3a1f99a633c79b": {
+"data": {
+"address": null,
+"confidence": 0.91,
+"draft_answer": null,
+"intent": "buy",
+"items": [
+{
+"action": null,
+"candidates": [],
+"not_in_list": null,
+"product_id": 18,
+"qty": 1,
+"size": "10ml",
+"unclear_text": null
+}
+],
+"learn": [],
+"reason": "ယူမယ် indicates buying; recent chat identifies Eros 10ml."
+},
+"tokens": [
+3986,
+3930,
+87
+]
+},
+"e5dd4b8549ea85139dd8377f": {
+"data": {
+"address": {
+"city": null,
+"confidence": 0.99,
+"full_text": "အမှတ် 88 ၊ သုခလမ်း ၊ လှိုင်မြို့နယ်",
+"house_no": "88",
+"is_change_request": false,
+"landmark": null,
+"missing": [],
+"street": "သုခလမ်း",
+"township": "လှိုင်",
+"ward_or_quarter": null
+},
+"confidence": 0.99,
+"draft_answer": null,
+"intent": "address",
+"items": [],
+"learn": [],
+"reason": "Provides house number, street, and township in response to the delivery-address request."
+},
+"tokens": [
+4111,
+3930,
+199
+]
+},
+"e6d2f651b51b56ff61bd1cde": {
+"data": {
+"address": {
+"city": null,
+"confidence": 0.99,
+"full_text": "No. 5, Pyay Road, Kamayut",
+"house_no": "No. 5",
+"is_change_request": false,
+"landmark": null,
+"missing": [],
+"street": "Pyay Road",
+"township": "Kamayut",
+"ward_or_quarter": null
+},
+"confidence": 0.99,
+"draft_answer": null,
+"intent": "address",
+"items": [],
+"learn": [],
+"reason": "Customer provides a delivery address: house number, street, and township."
+},
+"tokens": [
+4101,
+3930,
+117
+]
+},
+"eb76b35f75c80f6d8fe7349f": {
+"data": {
+"address": {
+"city": null,
+"confidence": 0.98,
+"full_text": "62 x 30 လမ်း",
+"house_no": null,
+"is_change_request": false,
+"landmark": null,
+"missing": [
+"city"
+],
+"street": "62 x 30 လမ်း",
+"township": null,
+"ward_or_quarter": null
+},
+"confidence": 0.98,
+"draft_answer": null,
+"intent": "address",
+"items": [],
+"learn": [],
+"reason": "Customer provides a numbered street as the delivery address."
+},
+"tokens": [
+4154,
+3930,
+253
+]
+},
+"f06d510bd27b0f6edd196ae1": {
+"data": {
+"address": null,
+"confidence": 1,
+"draft_answer": null,
+"intent": "ask_price",
+"items": [
+{
+"action": null,
+"candidates": [],
+"not_in_list": null,
+"product_id": 13,
+"qty": 1,
+"size": "2ml",
+"unclear_text": null
+}
+],
+"learn": [],
+"reason": "Asks how much Baccarat Rouge 540 costs for 2ml."
+},
+"tokens": [
+4016,
+3930,
+85
 ]
 }
 }

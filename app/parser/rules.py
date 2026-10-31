@@ -34,13 +34,14 @@ rules-11 (docs/SPEC-v4.16-hotfix-new-order-after-paid.md Q1): a part that names 
 without a product or size is an address line, not an unknown item; change words without a product are
 change_info even with "order" / "ငွေလွှဲပြီး" in the message.
 rules-12 (docs/SPEC-v4.17-hotfix-more-automatic.md P2): "between 73 & 74" is an address line too.
+rules-13 (docs/SPEC-v4.20-automation-goal.md A2): "လိုချင်" is a buy word; "၂ဘူး" / "နှစ်ဘူး" are quantities.
 """
 import re
 from dataclasses import dataclass, field, replace
 
 from rapidfuzz import fuzz
 
-PARSER_VERSION = "rules-12"
+PARSER_VERSION = "rules-13"
 NEEDS_REVIEW_BELOW = 0.6  # dashboard shows results under this as "needs review"
 FUZZY_THRESHOLD = 88      # rapidfuzz partial_ratio, 0-100
 FUZZY_MIN_ALIAS_LEN = 5   # shorter aliases match too much by accident
@@ -60,7 +61,7 @@ REMOVE_RE = _rx("မယူတော့", "ဖြုတ်ပေး", "ဖြု�
 CANCEL_ORDER_RE = _rx("မယူတော့", "မမှာတော့", "မဝယ်တော့", _w("cancel"))
 # The polite particle ပါ may sit inside: ယူပါမယ်, ဝယ်ပါမယ်, မှာပါမယ်, ယူပါရစေ.
 BUY_RE = _rx("ဝယ်ချင်", "ဝယ်(?:ပါ)?မယ်", "ယူ(?:ပါ)?မယ်", "ယူချင်", "ယူ(?:ပါ)?ရစေ", "မှာ(?:ပါ)?မယ်",
-             "မှာချင်", _w(r"order(?!\s*(?:#|no\.?|number)?\s*\d)"), _w("buy"))
+             "မှာချင်", "လိုချင်", _w(r"order(?!\s*(?:#|no\.?|number)?\s*\d)"), _w("buy"))
 ASK_PRICE_RE = _rx("ဘယ်လောက်", "ဈေး", "စျေး", _w("price"), _w("how much"))
 ASK_STOCK_RE = _rx("ရှိလား", "ရှိသေးလား", "ရလား", _w("instock"), _w("in stock"), _w("available"), _w("avai"))
 # "ပေးပါ(နော်)" = buy, but only when a product or size is named; "ပို့ပေးပါ" = address.
@@ -80,7 +81,10 @@ TOWNSHIPS_LATIN = (
     "taunggyi", "mawlamyine", "bago", "pathein", "monywa", "myitkyina", "lashio", "pyin oo lwin",
 )
 ADDRESS_RE = _rx("ပို့ပေး", "လိပ်စာ", "မြို့နယ်", "ရပ်ကွက်", "လမ်း", _w("address"), _w("township"),
-                 _w("street"), _w("road"), *TOWNSHIPS, *(_w(t) for t in TOWNSHIPS_LATIN))
+                 _w("street"), _w("road"), *TOWNSHIPS, *(_w(t) for t in TOWNSHIPS_LATIN),
+                 # rules-13: a Mandalay street grid alone ("66 str 28 str", "73 x 45", "between 73 & 74")
+                 r"(?<![\d.])\d{1,3}\s*(?:str|st)\.?\s*[,&x×]?\s*\d{1,3}\s*(?:str|st)(?![a-z])",
+                 r"^\s*\d{1,3}\s*[x×]\s*\d{1,3}\s*$", r"(?<![a-z])between\s+\d{1,3}\s*(?:&|and)\s*\d{1,3}")
 # "When will it arrive?" Strong words win over address words; a bare "deli" only counts when
 # nothing else matched and there is no phone number (an address message may say "deli").
 ASK_DELIVERY_RE = _rx(r"ဘယ်\s*တော့\s*ရောက်", "ရောက်ပြီလား", "ရောက်ပြီလဲ", "ပို့ပြီးပြီလား", "ပို့ပြီးပြီလဲ", r"ဘယ်\s*တော့\s*ပို့")
@@ -116,8 +120,10 @@ _CHOICE_TAIL_RE = re.compile(r"(?:ကို)?(?:ပဲ)?(?:ယူ(?:ပါ)?မ�
 
 # Size: a number directly followed by "ml" (normalize() already unified the unit).
 _SIZE_RE = re.compile(r"(?<![\d.])(\d{1,3})\s*mls?(?![a-z])")
-# Quantity: "2 ခု", "၂ဗူး" (digits already converted), "2 pcs", "x2".
-_QTY_RE = re.compile(r"(?<![\d.])(\d{1,2})\s*(?:ခု|ဗူး|pcs|pc|bottles?)(?![a-z])|(?<![a-z])x\s*(\d{1,2})(?!\d)")
+# Quantity: "2 ခု", "၂ဗူး" / "၂ဘူး" (digits already converted), "2 pcs", "x2", "နှစ်ဘူး" (rules-13).
+_QTY_RE = re.compile(r"(?<![\d.])(\d{1,2})\s*(?:ခု|ဗူး|ဘူး|pcs|pc|bottles?)(?![a-z])|(?<![a-z])x\s*(\d{1,2})(?!\d)|"
+                     r"(?<!\S)(တစ်|နှစ်|သုံး|လေး|ငါး)\s*(?:ခု|ဗူး|ဘူး)")
+_QTY_WORDS = {"တစ်": 1, "နှစ်": 2, "သုံး": 3, "လေး": 4, "ငါး": 5}
 _FULL_RE = re.compile(r"(?<![a-z])full\s*(?:size|bottle)?(?![a-z])|fullbottle|ဗူးလိုက်|အပြည့်")
 # Myanmar mobile numbers: 09..., +959..., 959... with 7-9 more digits, spaces/dashes allowed.
 _PHONE_RE = re.compile(r"(?<![\d+])(?:\+?95[\s-]?|0)9(?:[\s-]?\d){7,9}(?![\d])")
@@ -255,7 +261,7 @@ def find_quantity(text: str) -> int:
     m = _QTY_RE.search(text)
     if not m:
         return 1
-    qty = int(m.group(1) or m.group(2))
+    qty = _QTY_WORDS[m.group(3)] if m.group(3) else int(m.group(1) or m.group(2))
     return qty if qty > 0 else 1
 
 

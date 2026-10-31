@@ -326,6 +326,7 @@ def auto_apply(session: Session, message: Message, rules: ParseResult, ai: AIRes
     ai, dropped = checker.removes_in_cart(ai, in_cart)  # docs/SPEC-v4.11-ai-first.md L2
     ai, in_address = checker.address_items(ai)  # docs/SPEC-v4.17 P2
     dropped += in_address
+    ai = checker.said_size(ai, message.normalized_text or "")  # docs/SPEC-v4.20 A2
     if dropped:
         call.error = "; ".join(dropped)[:255]
     if ai.confidence < cfg["threshold"]:

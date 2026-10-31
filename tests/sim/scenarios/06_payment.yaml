@@ -1,0 +1,64 @@
+# Payment words, screenshot, test code, "I paid", partial pay. hand: true.
+# Real payments are never approved automatically: a screenshot goes to a person (counted correct).
+
+- id: pay-screenshot
+  hand: true
+  tags: [payment]
+  setup: {state: waiting_payment, items: ["Eros 5ml"], age_min: 15}
+  turns:
+    - photo: true
+      expect: {reply: any_auto}
+
+- id: pay-i-paid-words
+  hand: true
+  tags: [payment]
+  setup: {state: waiting_payment, items: ["Eros 5ml"], age_min: 15}
+  turns:
+    - say: "ငွေလွှဲပြီးပါပြီ"
+      expect: {reply: auto, contains: ["screenshot"]}
+
+- id: pay-i-paid-english
+  hand: true
+  tags: [payment, english]
+  setup: {state: waiting_payment, items: ["Libre 5ml"], age_min: 15}
+  turns:
+    - say: "paid already"
+      expect: {reply: auto, contains: ["screenshot"]}
+
+- id: pay-how-to-pay
+  hand: true
+  tags: [payment, faq]
+  turns:
+    - say: "ငွေဘယ်လိုလွှဲရမလဲ"
+      expect: {reply: auto, contains: ["KPay"]}
+
+- id: pay-kpay-ok
+  hand: true
+  tags: [payment, faq]
+  turns:
+    - say: "kpay ရလား"
+      expect: {reply: auto, contains: ["KPay"]}
+
+- id: pay-ask-account-again
+  hand: true
+  tags: [payment]
+  setup: {state: waiting_payment, items: ["Eros 5ml"], age_min: 15}
+  turns:
+    - say: "kpay နံပါတ် ပြန်ပို့ပေးပါ"
+      expect: {reply: auto, contains: ["09000000001"]}
+
+- id: pay-after-photo-wait
+  hand: true
+  tags: [payment]
+  setup: {state: photo_received, items: ["Eros 5ml"], age_min: 15}
+  turns:
+    - say: "စစ်ပြီးပြီလား"
+      expect: {reply: person}  # approving a payment is a person's job (the check is in Needs you)
+
+- id: pay-later-promise
+  hand: true
+  tags: [payment]
+  setup: {state: waiting_payment, items: ["Eros 5ml"], age_min: 15}
+  turns:
+    - say: "ညနေ လွှဲပေးမယ်နော်"
+      expect: {reply: any_auto}

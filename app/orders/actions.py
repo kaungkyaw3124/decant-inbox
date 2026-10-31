@@ -42,7 +42,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from sqlalchemy import exists, select
+from sqlalchemy import exists, func, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
@@ -63,6 +63,8 @@ CONTEXT_WINDOW = timedelta(hours=24)
 UNDO_WITHOUT_REPLY = timedelta(seconds=60)  # actions that send nothing can be undone this long
 # "one more of the same": only then does a product+size already in the cart get +qty
 MORE_RE = re.compile(r"ထပ်|(?<![a-z])(?:more|another|again|extra)(?![a-z])|\+\s*1")
+# docs/SPEC-v4.20 A2: "aventus 10ml ပြောင်းယူမယ်", "eros 10ml ၂ ခုလုပ်ပေး": the product's line is replaced
+REPLACE_ITEM_RE = re.compile(r"ပြောင်း|လုပ်\s*ပေး|လုပ်ပါ|အစား|(?<![a-z])(?:change|instead|make it)(?![a-z])")
 
 
 class Refused(Exception):
@@ -250,6 +252,17 @@ def _apply_items(session: Session, message: Message, result: ParseResult, texts:
     if intent in ("ask_price", "ask_stock"):
         if not _certain(items):
             return None
+        unsold = [w for w in (cart.normalize_wanted(session, _wanted(i)) for i in items)
+                  if (w.size_ml or w.is_full_bottle) and cart.price_of(session, w.product_id, w.size_ml,
+                                                                         w.is_full_bottle)[0] is None]
+        if unsold:  # docs/SPEC-v4.20 A2: "libre 3ml ရလား" -> "3ml မရှိပါဘူး… ဘယ် size ယူမလဲ?" (the answer adds it)
+            sold = _sold_sizes(session, unsold[0].product_id)
+            if len(items) > 1 or not sold:
+                return None
+            undo: dict = {}
+            return Outcome("price", "💬 Ask the size", _ask_size(session, message, customer, unsold[0], sold, texts, undo),
+                           "price", "This size is not sold: the customer is asked which size.", None, undo,
+                           edit_query="compose=price")
         price_items = []
         for i in items:
             p = compose.PriceItem(i.product_id, "full" if i.is_full_bottle else str(i.size_ml) if i.size_ml else "all")
@@ -258,7 +271,7 @@ def _apply_items(session: Session, message: Message, result: ParseResult, texts:
         if len(price_items) > compose.MAX_PRICE_ITEMS:
             return None
         made = compose.price_reply(session, price_items, texts)
-        if made.problems or made.notes or not made.text:
+        if made.problems or not made.text:  # notes = out of stock: the out-of-stock line is the answer
             return None
         query = "".join(f"&p{n}={i.product_id}&s{n}={i.size}" for n, i in enumerate(price_items, 1))
         text, note, undo, order_id = made.text, "", {}, None
@@ -575,9 +588,9 @@ def _buy(session: Session, message: Message, customer: Customer, order: Order | 
             if price is not None and not in_stock:
                 out_of_stock.append(w)
                 continue
-            if price is None and (w.size_ml or w.is_full_bottle) and (sold := _sold_sizes(session, w.product_id)):
+            if price is None and (sold := _sold_sizes(session, w.product_id)):
                 no_size.append((w, sold))  # docs/SPEC-v4.17 P3: "20ml" of a 2/5/10 ml product -> ask the size
-                continue
+                continue  # docs/SPEC-v4.20 A2: no size given at all -> ask it too
             sellable += price is not None
         add.append(w)
     if (not sellable and not no_size) or len(no_size) > 1:
@@ -596,7 +609,8 @@ def _buy(session: Session, message: Message, customer: Customer, order: Order | 
     old_total = order.total_mmk
     earlier = not created and not cart.view(session, order).empty and order.created_at < datetime.now(UTC) - OLD_CART
     more = bool(MORE_RE.search(message.normalized_text or ""))
-    changed = cart.add_items(session, order, add, message.id, more=more) if add else []
+    replace = not more and bool(REPLACE_ITEM_RE.search(message.normalized_text or ""))
+    changed = cart.add_items(session, order, add, message.id, more=more, replace=replace) if add else []
     order.list_sent_at = datetime.now(UTC)
     undo = {"added": [i for i in changed if i > 0], "removed": [-i for i in changed if i < 0],
             "order": before, "created_order": created}
@@ -657,6 +671,8 @@ def _ask_size(session: Session, message: Message, customer: Customer, wanted: ca
     session.flush()
     undo["prompt"] = prompt.id
     prices = " / ".join(f"{size_label(p.size_ml, product.full_size_ml)} – {format_mmk(p.price_mmk)}" for p in sold)
+    if not wanted.size_ml and not wanted.is_full_bottle:  # docs/SPEC-v4.20 A2: no size said
+        return render(texts["size_question"], product=product.name, sizes_with_prices=f"{prices} ကျပ်")
     return render(texts["size_not_available"], product=product.name, sizes_with_prices=f"{prices} ကျပ်",
                   size=size_label(None if wanted.is_full_bottle else wanted.size_ml, product.full_size_ml))
 
@@ -731,6 +747,15 @@ def _contact(session: Session, message: Message, customer: Customer, order: Orde
     for a person (Needs you "📍 check address")."""
     if read is not None and read.status == "partial" and read.source != "admin":
         return _ask_missing(session, message, customer, order, phones, read, texts, before)
+    if read is not None and read.status == "invalid" and read.source != "admin" and not phones:
+        # docs/SPEC-v4.20 A2: ask the CUSTOMER for the full address (twice); still unclear -> a person
+        asked = session.scalar(select(func.count()).select_from(Outbox).where(
+            Outbox.customer_id == customer.id, Outbox.text.contains(texts["address_invalid_note"]),
+            Outbox.status != "cancelled", Outbox.created_at >= datetime.now(UTC) - CONTEXT_WINDOW))
+        if asked < 2:
+            return Outcome("contact", "📍 Ask for the full address", texts["address_invalid_note"], "ask_address",
+                           f"Not an address we can deliver to ({read.why}): the customer is asked again.", order.id,
+                           {"order": before})
     if read is not None and not read.sure:
         if read.source == "admin":  # the admin's corrected address must pass the validator too
             raise Refused("Not saved: " + read.why)

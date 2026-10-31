@@ -166,7 +166,8 @@ def test_h3_keyword_only_is_no_address_and_no_agreement(returning, db, body):
     assert intent(db, mid) != "address"
     assert button(client, mid) is None
     auto.run_once(datetime.now(UTC) + timedelta(seconds=5))
-    assert deliver(db) == []  # no payment info
+    # no payment info; docs/SPEC-v4.20 A2: never silent, so the resume line may ask to confirm the saved contact
+    assert all("screenshot" not in t and "KPay" not in t for t in deliver(db))
     assert order_row(db, "92") == ("cart", 33000, None, []) and customer_address(db) == OLD
 
 

@@ -1,0 +1,179 @@
+# Greetings, price, stock, buy one / many; Burmese / English / mixed / Zawgyi / typos / nicknames. hand: true.
+
+- id: greet-mingalarpar
+  hand: true
+  tags: [greeting]
+  turns:
+    - say: "မင်္ဂလာပါ"
+      expect: {reply: auto, contains: ["မင်္ဂလာပါ"]}
+
+- id: greet-hi-english
+  hand: true
+  tags: [greeting]
+  turns:
+    - say: "hi"
+      expect: {reply: auto, contains: ["မင်္ဂလာပါ"]}
+
+- id: greet-then-price-no-size
+  hand: true
+  tags: [greeting, price]
+  turns:
+    - say: "hello ရှင့်"
+      expect: {reply: auto, contains: ["မင်္ဂလာပါ"]}
+    - say: "aventus ဈေးဘယ်လောက်လဲ"
+      expect: {reply: auto, contains: ["Aventus", "5ml – 65,000", "10ml – 125,000"]}
+
+- id: price-one-size-burmese
+  hand: true
+  tags: [price]
+  turns:
+    - say: "sauvage edp 10ml ဘယ်လောက်လဲ"
+      expect: {reply: auto, contains: ["38,000"], cart: []}
+
+- id: price-english
+  hand: true
+  tags: [price, english]
+  turns:
+    - say: "how much is bleu de chanel 5ml?"
+      expect: {reply: auto, contains: ["23,000"]}
+
+- id: price-burmese-digits
+  hand: true
+  tags: [price, burmese]
+  turns:
+    - say: "eros ၅ml ဈေးလေးသိချင်လို့"
+      expect: {reply: auto, contains: ["14,000"]}
+
+- id: stock-ask
+  hand: true
+  tags: [stock]
+  turns:
+    - say: "5ml stronger with you intensely ရှိလား"
+      expect: {reply: auto, contains: ["18,000"]}
+
+- id: stock-ask-zawgyi
+  hand: true
+  tags: [stock, zawgyi]
+  turns:
+    - say: "stw intensely 10ml ရွိလား"
+      expect: {reply: auto, contains: ["33,000"]}
+
+- id: stock-out-of-stock
+  hand: true
+  tags: [stock]
+  turns:
+    - say: "born in roma 10ml ရှိလား"
+      expect: {reply: auto, contains: ["ကုန်နေပါတယ်"], not_contains: ["36,000"]}
+
+- id: buy-one-burmese
+  hand: true
+  tags: [buy]
+  turns:
+    - say: "stw intensely ၅ ml ဝယ်ချင်လို့ပါ"
+      expect:
+        reply: auto
+        contains: ["Stronger With You Intensely 5ml – 18,000", "ဖုန်းနံပါတ်"]
+        cart: ["Stronger With You Intensely 5ml x1"]
+
+- id: buy-one-english
+  hand: true
+  tags: [buy, english]
+  turns:
+    - say: "I want to order 1 million 10ml"
+      expect: {reply: auto, contains: ["1 Million 10ml – 26,000"], cart: ["1 Million 10ml x1"]}
+
+- id: buy-zawgyi
+  hand: true
+  tags: [buy, zawgyi]
+  turns:
+    - say: "eros 10ml ဝယ္ခ်င္တယ္"
+      expect: {reply: auto, contains: ["Eros 10ml – 25,000"], cart: ["Eros 10ml x1"]}
+
+- id: buy-two-products
+  hand: true
+  tags: [buy, many]
+  turns:
+    - say: "stw intensely 5ml, sauvage edp 10ml ယူပါမယ်"
+      expect:
+        reply: auto
+        contains: ["Stronger With You Intensely 5ml – 18,000", "Sauvage Eau de Parfum 10ml – 38,000", "56,000"]
+        cart: ["Stronger With You Intensely 5ml x1", "Sauvage Eau de Parfum 10ml x1"]
+
+- id: buy-three-lines
+  hand: true
+  tags: [buy, many]
+  turns:
+    - say: "eros 5ml\nlibre 10ml\naventus 5ml\nယူမယ်နော်"
+      expect:
+        reply: auto
+        contains: ["Eros 5ml – 14,000", "Libre 10ml – 40,000", "Aventus 5ml – 65,000", "119,000"]
+        cart: ["Eros 5ml x1", "Libre 10ml x1", "Aventus 5ml x1"]
+
+- id: buy-quantity-two
+  hand: true
+  tags: [buy, qty]
+  turns:
+    - say: "eros 10ml ၂ ခု ယူမယ်"
+      expect: {reply: auto, contains: ["50,000"], cart: ["Eros 10ml x2"]}
+
+- id: buy-nickname-bdc
+  hand: true
+  tags: [buy, nickname]
+  turns:
+    - say: "bdc 10ml ယူမယ်"
+      expect: {reply: auto, contains: ["Bleu de Chanel Eau de Parfum 10ml – 43,000"], cart: ["Bleu de Chanel Eau de Parfum 10ml x1"]}
+
+- id: buy-nickname-burmese-name
+  hand: true
+  tags: [buy, nickname, burmese]
+  turns:
+    - say: "ဆော်ဗေ့ 5ml ယူမယ်"
+      expect: {reply: auto, contains: ["Sauvage Eau de Parfum 5ml – 20,000"], cart: ["Sauvage Eau de Parfum 5ml x1"]}
+
+- id: buy-typo-aventus
+  hand: true
+  tags: [buy, typo]
+  turns:
+    - say: "aventos 10ml ယူမယ်"
+      expect:
+        reply: auto
+        any_of: ["Aventus 10ml – 125,000", "Aventus ကို ဆိုလိုတာလား", "Aventus"]
+
+- id: buy-typo-baccarat
+  hand: true
+  tags: [buy, typo]
+  turns:
+    - say: "bacarat rouge 5ml order မယ်"
+      expect:
+        reply: auto
+        any_of: ["Baccarat Rouge 540 5ml – 85,000", "Baccarat Rouge 540"]
+
+- id: buy-mixed-sentence
+  hand: true
+  tags: [buy, mixed]
+  turns:
+    - say: "ညီမ lvb 5ml လေး ယူချင်လို့ပါ ရလား"
+      expect: {reply: auto, contains: ["La Vie Est Belle 5ml – 19,000"], cart: ["La Vie Est Belle 5ml x1"]}
+
+- id: buy-full-bottle
+  hand: true
+  tags: [buy, full]
+  turns:
+    - say: "eros full bottle ယူမယ်"
+      expect: {reply: auto, contains: ["260,000"], cart: ["Eros full x1"]}
+
+- id: price-then-buy
+  hand: true
+  tags: [price, buy]
+  turns:
+    - say: "libre 5ml ဘယ်လောက်လဲ"
+      expect: {reply: auto, contains: ["21,000"]}
+    - say: "ယူမယ်"
+      expect: {reply: auto, contains: ["Libre 5ml – 21,000"], cart: ["Libre 5ml x1"]}
+
+- id: buy-no-size
+  hand: true
+  tags: [buy, size]
+  turns:
+    - say: "good girl ယူမယ်"
+      expect: {reply: auto, contains: ["Good Girl"], any_of: ["ဘယ် size", "5ml – 21,000"]}

@@ -743,8 +743,16 @@ MY = {
     "older than 3 days": "၃ ရက်ကျော်", "not successful": "မအောင်မြင်", "not a receipt": "ပြေစာ မဟုတ်",
     # docs/SPEC-v4.13-hotfix.md
     "customer waiting": "ဖောက်သည် စောင့်နေ", "“please wait” sent at {time}": "{time} မှာ “ခဏစောင့်” ပို့ပြီး",
-    "Nobody could answer within 60 s: please wait (at most every 10 min)":
-        "၆၀ စက္ကန့်အတွင်း ဘယ်သူမှ မဖြေနိုင်: ခဏစောင့်ခိုင်း (၁၀ မိနစ်မှာ အများဆုံး တစ်ခါ)",
+    "Nobody could answer within 10 s: please wait (at most every 10 min)":
+        "၁၀ စက္ကန့်အတွင်း ဘယ်သူမှ မဖြေနိုင်: ခဏစောင့်ခိုင်း (၁၀ မိနစ်မှာ အများဆုံး တစ်ခါ)",
+    # docs/SPEC-v4.20-automation-goal.md
+    "Voice message, sticker, video or file: please write it (docs/SPEC-v4.20 A2)":
+        "အသံ၊ sticker၊ video၊ ဖိုင်: စာနဲ့ ရေးခိုင်း",
+    "The customer wants a product but says no size (docs/SPEC-v4.20 A2)": "size မပြောဘဲ ပစ္စည်း မှာ",
+    "Screenshot being checked and the customer writes again (docs/SPEC-v4.20 A2)":
+        "screenshot စစ်နေတုန်း ဖောက်သည် ထပ်ရေး",
+    "A photo that is not a payment screenshot: which perfume? (docs/SPEC-v4.20 A2)":
+        "ငွေလွှဲ screenshot မဟုတ်တဲ့ ပုံ: ဘယ် perfume လဲ မေး",
     "💬 Ask which product": "💬 ဘယ်ပစ္စည်းလဲ မေးမယ်", "asked which product to order": "ဘယ်ပစ္စည်း မှာမလဲ မေးပြီး",
     "Customer wants to order but names no product: ask which one": "မှာချင်ပေမယ့် ပစ္စည်း မပြော: ဘယ်ဟာလဲ မေးမယ်",
     # docs/SPEC-v4.14-test-payment-code.md

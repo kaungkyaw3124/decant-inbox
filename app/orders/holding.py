@@ -1,33 +1,52 @@
-"""Never leave a customer in silence (docs/SPEC-v4.13-hotfix.md Q1).
+"""Never leave a customer in silence (docs/SPEC-v4.13-hotfix.md Q1, docs/SPEC-v4.20-automation-goal.md G3).
 
-The watchdog (parser worker, every second): a customer text message that is 60 s old and still has no
+The watchdog (parser worker, every second): a customer text message that is 10 s old and still has no
 answer at all — no reply after it (sent, sending or queued), no one-tap / auto action, not marked done —
-while the customer has an order that is not delivered yet, or the message asks to buy / about a price,
 gets the HOLDING reply "ခဏစောင့်ပေးပါနော်၊ စစ်ပြီး ပြန်ပြောပေးပါမယ်။" and is logged "silent message caught".
+Not caught: small talk that needs no answer ("thanks", "ok", 👍, emoji only), unless it is a complaint.
+Complaints / refunds / angry messages (is_complaint) are never answered automatically: a person.
 At most once per 10 minutes per customer; never when a person replied by hand in the last 10 minutes;
 never for ignored customers or customers with auto replies off; only while auto replies are ON.
 Needs you lists these as "⏰ customer waiting" (at the top) until someone answers.
 """
 import logging
+import re
 from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import exists, func, select
 from sqlalchemy.orm import Session
 
 from app.core.db import SessionLocal
-from app.models import AuditLog, Customer, Message, MessageReview, Order, Outbox, ParseResult, QuickAction
-from app.models.orders import OPEN_STATUSES, SHIPPING_STATUSES
+from app.models import AuditLog, Customer, Message, MessageReview, Outbox, QuickAction
 from app.orders import auto
 from app.replies import compose
 from app.replies import templates as replies
 
 log = logging.getLogger("holding")
-WAIT = timedelta(seconds=60)
+WAIT = timedelta(seconds=10)  # G3: the customer hears from us within 10 s (4.13 had 60 s)
 LOOKBACK = timedelta(minutes=30)  # older messages (history imports, a long outage) are not caught here
 ONCE_PER = timedelta(minutes=10)
 HAND_QUIET = timedelta(minutes=10)
 WAITING_FOR = timedelta(hours=24)  # Needs you "⏰ customer waiting"
-ASKING = ("buy", "ask_price", "ask_stock", "order_start", "previous_item", "modify_cart", "remove")
+# a person handles these; a reply must never promise a refund / replacement (docs/SPEC-v4.20 A4)
+COMPLAINT_RE = re.compile(
+    r"ယို(?:နေ|ထွက်|ကျ)|ကွဲ(?:နေ|သွား|ပြီး)|ပျက်(?:နေ|သွား)|မှား(?:ပို့|ရောက်)|ပစ္စည်း\s*မှား|မတူ(?:ဘူး|ပါဘူး)|"
+    r"ပြန်\s*အမ်း|ငွေ\s*ပြန်|အတု|မမွှေး|စိတ်\s*(?:ညစ်|တို|ပျက်)|လိမ်|"
+    r"(?<![a-z])(?:broken|broke|leak\w*|damaged?|refund\w*|fake|wrong (?:item|perfume|bottle)|complain\w*|"
+    r"scam|angry|cheat\w*|return)(?![a-z])", re.IGNORECASE)
+# needs no answer when nothing else is pending: thanks / ok / yes / emoji only (every word one of these)
+SMALL_TALK_RE = re.compile(
+    r"ကျေးဇူး\S*|thank\S*|thx|tq|ty|you|very|so|much|a|lot|ok\S*|okay|ဟုတ်(?:ကဲ့)?\S*|အိုကေ\S*|ရပါပြီ|ရပြီ|"
+    r"good|nice|great|ကောင်းပါတယ်|bye|ဘိုင်|ပါ|နော်|ရှင့်|ရှင်|ဗျ|ဗျာ|ခင်ဗျာ|[^\w]+", re.IGNORECASE)
+
+
+def is_complaint(text: str | None) -> bool:
+    return bool(text and COMPLAINT_RE.search(text))
+
+
+def is_small_talk(text: str | None) -> bool:
+    words = (text or "").split()
+    return bool(words) and not is_complaint(text) and all(SMALL_TALK_RE.fullmatch(w) for w in words)
 
 
 def _answered(session: Session, message: Message):
@@ -43,13 +62,8 @@ def _answered(session: Session, message: Message):
 
 
 def _waiting_customer(session: Session, message: Message) -> bool:
-    """An order that is not delivered yet, or a buy / price question."""
-    if session.scalar(select(exists().where(Order.customer_id == message.customer_id,
-                                            Order.status.in_(OPEN_STATUSES + SHIPPING_STATUSES)))):
-        return True
-    intent = session.scalar(select(ParseResult.intent).where(ParseResult.message_id == message.id,
-                                                             ParseResult.is_current))
-    return intent in ASKING
+    """Every message waits for an answer (G3), except small talk ("thanks", "ok", 👍) — that needs none."""
+    return not is_small_talk(message.raw_text)
 
 
 def silent(session: Session, now: datetime) -> list[Message]:

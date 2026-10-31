@@ -1,0 +1,148 @@
+# Phone and address: same message, Yangon / Mandalay grid / other cities, partial addresses. hand: true.
+
+- id: contact-step-by-step-yangon
+  hand: true
+  tags: [contact, yangon]
+  turns:
+    - say: "eros 10ml ယူမယ်"
+      expect: {reply: auto, contains: ["ဖုန်းနံပါတ်"], cart: ["Eros 10ml x1"]}
+    - say: "09420001111"
+      expect: {reply: auto, contains: ["09420001111", "လိပ်စာ"], phone: "09420001111"}
+    - say: "အမှတ် 45, ဗိုလ်ချုပ်လမ်း, ဗဟန်းမြို့နယ်"
+      expect: {reply: auto, contains: ["KPay – 09000000001", "25,000"], status: waiting_payment, township: Bahan}
+
+- id: contact-phone-and-address-together
+  hand: true
+  tags: [contact, same-message]
+  turns:
+    - say: "libre 5ml ယူမယ်"
+      expect: {reply: auto, cart: ["Libre 5ml x1"]}
+    - say: "09420002222 အမှတ် 7 ၊ ပြည်လမ်း၊ ကမာရွတ်"
+      expect: {reply: auto, contains: ["KPay – 09000000001"], status: waiting_payment, phone: "09420002222", township: Kamayut}
+
+- id: contact-all-in-one-message
+  hand: true
+  tags: [contact, same-message]
+  turns:
+    - say: "aventus 5ml ယူမယ် 09420003333 အမှတ် 12 ၊ အင်းလျားလမ်း ၊ ဗဟန်း"
+      expect: {reply: auto, contains: ["Aventus 5ml – 65,000", "09420003333"], cart: ["Aventus 5ml x1"], phone: "09420003333"}
+    - say: "ဟုတ်ကဲ့"
+      expect: {reply: auto, contains: ["KPay – 09000000001"], status: waiting_payment}
+
+- id: contact-mandalay-grid
+  hand: true
+  tags: [contact, mandalay, grid]
+  turns:
+    - say: "eros 5ml ယူမယ်"
+      expect: {reply: auto}
+    - say: "09420004444"
+      expect: {reply: auto, contains: ["လိပ်စာ"]}
+    - say: "35 x 66 လမ်း"
+      expect: {reply: auto, contains: ["KPay – 09000000001"], city: Mandalay}
+
+- id: contact-mandalay-with-city
+  hand: true
+  tags: [contact, mandalay]
+  turns:
+    - say: "bdc 5ml ယူမယ်"
+      expect: {reply: auto}
+    - say: "09420005555\n62 လမ်း 30x31 ကြား မန္တလေး"
+      expect: {reply: auto, contains: ["KPay – 09000000001"], city: Mandalay}
+
+- id: contact-other-city-taunggyi
+  hand: true
+  tags: [contact, city]
+  turns:
+    - say: "eros 5ml ယူမယ်"
+      expect: {reply: auto}
+    - say: "09420006666 တောင်ကြီး မြို့ ၊ ရပ်ကွက် 5 ၊ ဗိုလ်ချုပ်လမ်း အမှတ် 20"
+      expect: {reply: auto, contains: ["KPay – 09000000001"], city: Taunggyi}
+
+- id: contact-township-only-asks-more
+  hand: true
+  tags: [contact, partial]
+  turns:
+    - say: "libre 10ml ယူမယ်"
+      expect: {reply: auto}
+    - say: "09420007777"
+      expect: {reply: auto, contains: ["လိပ်စာ"]}
+    - say: "ဗဟန်း"
+      expect: {reply: auto, any_of: ["အပြည့်အစုံ", "လိပ်စာ", "KPay"]}
+
+- id: contact-street-without-township
+  hand: true
+  tags: [contact, partial]
+  turns:
+    - say: "eros 10ml ယူမယ်"
+      expect: {reply: auto}
+    - say: "09420008888"
+      expect: {reply: auto}
+    - say: "အမှတ် 33 ၊ မြေနီကုန်းလမ်း"
+      expect: {reply: auto, any_of: ["မြို့နယ်", "ဘယ်မြို့", "KPay"]}
+
+- id: contact-returning-customer-confirm
+  hand: true
+  tags: [contact, returning]
+  setup: {state: browsing, saved: true, age_min: 3000}
+  turns:
+    - say: "eros 10ml ယူမယ်"
+      expect: {reply: auto, contains: ["Eros 10ml – 25,000", "09400000001", "ကိုပဲ ပို့ပေးရမလား"]}
+    - say: "ok"
+      expect: {reply: auto, contains: ["KPay – 09000000001"], status: waiting_payment}
+
+- id: contact-returning-new-address
+  hand: true
+  tags: [contact, returning]
+  setup: {state: browsing, saved: true, age_min: 3000}
+  turns:
+    - say: "eros 5ml ယူမယ်"
+      expect: {reply: auto, contains: ["ကိုပဲ ပို့ပေးရမလား"]}
+    - say: "လိပ်စာ အသစ်ပါ အမှတ် 9 ၊ သုခလမ်း ၊ ကမာရွတ်"
+      expect: {reply: auto, contains: ["KPay – 09000000001"], township: Kamayut}
+
+- id: contact-phone-with-spaces
+  hand: true
+  tags: [contact]
+  turns:
+    - say: "eros 5ml ယူမယ်"
+      expect: {reply: auto}
+    - say: "09 420 009 999"
+      expect: {reply: auto, contains: ["လိပ်စာ"]}
+
+- id: contact-plus95
+  hand: true
+  tags: [contact]
+  turns:
+    - say: "libre 5ml ယူမယ်"
+      expect: {reply: auto}
+    - say: "+959420001212"
+      expect: {reply: auto, contains: ["လိပ်စာ"]}
+
+- id: contact-burmese-digits-phone
+  hand: true
+  tags: [contact, burmese]
+  turns:
+    - say: "eros 5ml ယူမယ်"
+      expect: {reply: auto}
+    - say: "၀၉၄၂၀၀၀၁၃၁၃"
+      expect: {reply: auto, contains: ["လိပ်စာ"]}
+
+- id: contact-two-phones
+  hand: true
+  tags: [contact]
+  turns:
+    - say: "aventus 5ml ယူမယ်"
+      expect: {reply: auto}
+    - say: "09420001414, 09420001515"
+      expect: {reply: auto, contains: ["လိပ်စာ"]}
+
+- id: contact-address-first-then-phone
+  hand: true
+  tags: [contact]
+  turns:
+    - say: "eros 10ml ယူမယ်"
+      expect: {reply: auto}
+    - say: "အမှတ် 3 ၊ ကျောက်ကုန်းလမ်း ၊ ဗဟန်း ကို ပို့ပေးပါ"
+      expect: {reply: auto, any_of: ["ဖုန်း"]}
+    - say: "09420001616"
+      expect: {reply: auto, contains: ["KPay – 09000000001"], status: waiting_payment}

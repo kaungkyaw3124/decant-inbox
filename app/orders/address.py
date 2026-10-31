@@ -302,7 +302,7 @@ def validate(full_text: str | None, parts: dict | None = None, *, source: str = 
     mandalay = city is not None and city[1] == "Mandalay"
     p.street = p.street or _first(_GRID, text) or (mandalay and _first(_GRID_COMMA, text)) or _first(_STREET, text)
     p.ward_or_quarter = p.ward_or_quarter or _first(_WARD, text)
-    if len(text) < MIN_CHARS:
+    if len(text) < MIN_CHARS and not (mandalay and _GRID.search(text)):  # "73 x 45" is a Mandalay address
         out.status, out.reason = "invalid", "short"
         return out
     if township is not None or (city and p.street):

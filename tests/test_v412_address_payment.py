@@ -260,7 +260,10 @@ def test_p5_unknown_township_goes_to_a_person(auto_ai, shop, db):
     client, token = shop
     cart_for(client, token, db, phone="09777123456")
     auto_ai.answer = lambda _: answer_with(addr("No 7 Shwe Taung Gyar Rd, Zigon", "Zigon", "Shwe Taung Gyar Rd", "No 7"))
-    mid = now_msg(db, "No 7 Shwe Taung Gyar Rd, Zigon")
+    for _ in range(2):  # docs/SPEC-v4.20 A2: the CUSTOMER is asked for the full address first (twice)
+        now_msg(db, "No 7 Shwe Taung Gyar Rd, Zigon")
+        assert [ungreet(t) for t in deliver(db)] == ["အိမ်နံပါတ်၊ လမ်း၊ မြို့နယ် ပါတဲ့ လိပ်စာ အပြည့်အစုံ ပို့ပေးပါနော်။"]
+    mid = now_msg(db, "No 7 Shwe Taung Gyar Rd, Zigon")  # still not clear: a person
     assert deliver(db) == [] and open_order(db)[1] is None
     page = client.get("/").text
     assert f'id="address-{mid}"' in page and "Township not in our list." in page

@@ -1,0 +1,65 @@
+# Complaints, refunds, angry, wrong item: a PERSON handles these (holding reply + Needs you = correct).
+# A reply that promises a refund / replacement is WRONG. hand: true.
+
+- id: person-leaking
+  hand: true
+  tags: [complaint]
+  setup: {state: delivered, items: ["Eros 5ml"], age_min: 3000}
+  turns:
+    - say: "ပစ္စည်းယိုနေတယ်"
+      expect: {reply: person, complaint: true}
+
+- id: person-wrong-item
+  hand: true
+  tags: [complaint]
+  setup: {state: delivered, items: ["Libre 5ml"], age_min: 3000}
+  turns:
+    - say: "မှာတာနဲ့ ရတာ မတူဘူး eros မှာတာ libre ရောက်လာတယ်"
+      expect: {reply: person, complaint: true}
+
+- id: person-refund
+  hand: true
+  tags: [complaint]
+  setup: {state: delivered, items: ["Eros 10ml"], age_min: 3000}
+  turns:
+    - say: "ပိုက်ဆံ ပြန်အမ်းပေးပါ"
+      expect: {reply: person, complaint: true}
+
+- id: person-angry
+  hand: true
+  tags: [complaint]
+  setup: {state: paid, items: ["Eros 10ml"], age_min: 4000}
+  turns:
+    - say: "ဘာလို့ အခုထိ မရောက်သေးတာလဲ စိတ်ညစ်တယ် အရမ်းကြာနေပြီ"
+      expect: {reply: person, complaint: true}
+
+- id: person-fake-smell
+  hand: true
+  tags: [complaint]
+  setup: {state: delivered, items: ["Aventus 5ml"], age_min: 3000}
+  turns:
+    - say: "အနံ့က အတုလိုပဲ မမွှေးဘူး"
+      expect: {reply: person, complaint: true}
+
+- id: person-broken-english
+  hand: true
+  tags: [complaint, english]
+  setup: {state: delivered, items: ["Eros 5ml"], age_min: 3000}
+  turns:
+    - say: "the bottle arrived broken"
+      expect: {reply: person, complaint: true}
+
+- id: person-wholesale
+  hand: true
+  tags: [outside]
+  turns:
+    - say: "လက်ကား ယူချင်လို့ 50 ခုလောက် ဈေးလျှော့ပေးလို့ရလား"
+      expect: {reply: person}
+
+- id: person-cancel-paid
+  hand: true
+  tags: [paid]
+  setup: {state: paid, items: ["Eros 10ml"], age_min: 60}
+  turns:
+    - say: "order cancel ချင်တယ်"
+      expect: {reply: person}

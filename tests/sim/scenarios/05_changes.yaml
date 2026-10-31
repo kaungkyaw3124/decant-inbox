@@ -1,0 +1,109 @@
+# Changes: remove, change size / qty, change phone / address, old carts, a new order after a paid one. hand: true.
+
+- id: change-remove-one
+  hand: true
+  tags: [change, remove]
+  turns:
+    - say: "eros 5ml နဲ့ libre 5ml ယူမယ်"
+      expect: {reply: auto, cart: ["Eros 5ml x1", "Libre 5ml x1"]}
+    - say: "libre မယူတော့ဘူး"
+      expect: {reply: auto, contains: ["Eros 5ml – 14,000"], not_contains: ["Libre 5ml –"], cart: ["Eros 5ml x1"]}
+
+- id: change-remove-all
+  hand: true
+  tags: [change, remove]
+  turns:
+    - say: "eros 5ml ယူမယ်"
+      expect: {reply: auto, cart: ["Eros 5ml x1"]}
+    - say: "eros မယူတော့ဘူးနော်"
+      expect: {reply: auto, cart: []}
+
+- id: change-size
+  hand: true
+  tags: [change, size]
+  turns:
+    - say: "aventus 5ml ယူမယ်"
+      expect: {reply: auto, cart: ["Aventus 5ml x1"]}
+    - say: "aventus 10ml ပြောင်းယူမယ်"
+      expect: {reply: auto, contains: ["Aventus 10ml – 125,000"], cart: ["Aventus 10ml x1"]}
+
+- id: change-qty
+  hand: true
+  tags: [change, qty]
+  turns:
+    - say: "eros 10ml ယူမယ်"
+      expect: {reply: auto, cart: ["Eros 10ml x1"]}
+    - say: "eros 10ml ၂ ခုလုပ်ပေး"
+      expect: {reply: auto, contains: ["50,000"], cart: ["Eros 10ml x2"]}
+
+- id: change-add-more
+  hand: true
+  tags: [change, add]
+  turns:
+    - say: "eros 10ml ယူမယ်"
+      expect: {reply: auto, cart: ["Eros 10ml x1"]}
+    - say: "libre 5ml ပါ ထပ်ထည့်ပေး"
+      expect: {reply: auto, contains: ["Eros 10ml – 25,000", "Libre 5ml – 21,000", "46,000"], cart: ["Eros 10ml x1", "Libre 5ml x1"]}
+
+- id: change-phone-waiting-payment
+  hand: true
+  tags: [change, phone]
+  setup: {state: waiting_payment, items: ["Eros 5ml"], age_min: 20}
+  turns:
+    - say: "ဖုန်းနံပါတ် ပြောင်းချင်တယ် 09420002020"
+      expect: {reply: auto, contains: ["09420002020"]}
+
+- id: change-address-waiting-payment
+  hand: true
+  tags: [change, address]
+  setup: {state: waiting_payment, items: ["Eros 5ml"], age_min: 20}
+  turns:
+    - say: "လိပ်စာပြောင်းချင်တယ်"
+      expect: {reply: auto, contains: ["လိပ်စာအသစ်"]}
+    - say: "အမှတ် 18 ၊ ဗိုလ်တထောင်လမ်း ၊ ကမာရွတ်"
+      expect: {reply: auto, contains: ["လိပ်စာ ပြင်ပြီးပါပြီ"]}
+
+- id: change-paid-order-locked
+  hand: true
+  tags: [change, paid, person]
+  setup: {state: paid, items: ["Eros 5ml"], age_min: 30}
+  turns:
+    - say: "Order ရဲ့ လိပ်စာပြောင်းချင်တယ်"
+      expect: {reply: person, contains: ["ပြင်ဆင်လို့ မရတော့ပါဘူး"]}
+
+- id: change-old-cart-new-buy
+  hand: true
+  tags: [change, old-cart]
+  setup: {state: cart, items: ["Libre 5ml"], age_min: 45}
+  turns:
+    - say: "eros 10ml ယူမယ်"
+      expect: {reply: auto, contains: ["Eros 10ml – 25,000", "Libre 5ml – 21,000", "အရင်က ရွေးထားတာလည်း ပါပါတယ်"], cart: ["Libre 5ml x1", "Eros 10ml x1"]}
+    - say: "libre မလိုဘူး"
+      expect: {reply: auto, cart: ["Eros 10ml x1"]}
+
+- id: change-new-order-after-delivered
+  hand: true
+  tags: [change, paid]
+  setup: {state: delivered, items: ["Eros 5ml"], age_min: 5000}
+  turns:
+    - say: "eros 5ml ထပ်ယူမယ်"
+      expect: {reply: auto, contains: ["Eros 5ml – 14,000", "ကိုပဲ ပို့ပေးရမလား"]}
+    - say: "ok"
+      expect: {reply: auto, contains: ["KPay – 09000000001"], status: waiting_payment}
+
+- id: change-add-while-waiting-payment
+  hand: true
+  tags: [change, waiting]
+  setup: {state: waiting_payment, items: ["Eros 5ml"], age_min: 20}
+  turns:
+    - say: "libre 5ml ပါ ထည့်ပေးပါဦး"
+      expect: {reply: auto, contains: ["Libre 5ml – 21,000", "35,000"]}
+
+- id: change-cancel-cart
+  hand: true
+  tags: [change, cancel]
+  turns:
+    - say: "eros 10ml ယူမယ်"
+      expect: {reply: auto}
+    - say: "order cancel လုပ်ပေးပါ"
+      expect: {reply: auto, contains: ["cancel"], cart: []}

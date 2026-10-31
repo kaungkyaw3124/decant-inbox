@@ -10,10 +10,11 @@ Keywords are read from the database every time, so edits work at once.
 import re
 from dataclasses import dataclass
 
-from sqlalchemy import String, select
+from sqlalchemy import String, exists, select
 from sqlalchemy.orm import Session
 
-from app.models import FaqEntry, Message, ParseItem, ParseResult
+from app.models import FaqEntry, Message, Order, ParseItem, ParseResult
+from app.models.orders import OPEN_STATUSES
 from app.parser.normalize import normalize
 
 FAQ_INTENTS = ("other", "unknown", "ask_price", "ask_stock", "ask_delivery")
@@ -28,6 +29,9 @@ SEED = (
     ("Payment", "ဘယ်လိုပေးရ, ငွေဘယ်လိုလွှဲ, cod, kpay ရလား",
      "KPay / AYA Pay နဲ့ ကြိုလွှဲပေးရပါတယ်။ ပို့ခကိုတော့ ပစ္စည်းရောက်မှ ပေးရပါတယ်နော်။"),
     ("Location", "ဘယ်မှာလဲ, ဆိုင်, location, လာယူ", "Online ကနေ ပို့ပေးတာပါနော်။"),
+    # docs/SPEC-v4.20 A2/A6 (migration c5d8e1f2a904): the safe default until the owner writes the fee table here
+    DELIVERY_FEE := ("Delivery fee", "ပို့ခ, ပို့ဆောင်ခ, deli fee, delivery fee, delivery charge, shipping fee, ship fee",
+                     "ပို့ခကို admin က အတည်ပြုပေးပါမယ်နော်။ ပို့ခကိုတော့ ပစ္စည်းရောက်မှ ပေးရပါတယ်။"),
 )
 
 
@@ -54,7 +58,11 @@ def split_keywords(text: str) -> list[str]:
 def _found(keyword: str, text: str) -> bool:
     if re.search(r"[a-z0-9]", keyword):  # Latin words must stand alone ("cod" not in "code")
         return re.search(r"(?<![a-z0-9])" + re.escape(keyword) + r"(?![a-z0-9])", text) is not None
-    return keyword in text
+    # a Burmese keyword ends on a whole syllable: "ပို့ခ" (fee) is not in "ပို့ချင်" (want to send)
+    return re.search(re.escape(keyword) + _MARK_AFTER, text) is not None
+
+
+_MARK_AFTER = "(?![\u102b-\u103e\u1056-\u1059\u105e-\u1060\u1062-\u1064\u1067-\u106d\u1071-\u1074\u1082-\u108d\u108f\u109a-\u109d])"
 
 
 def best(session: Session, normalized_text: str) -> Match | None:
@@ -93,12 +101,19 @@ def for_message(session: Session, message: Message, result: ParseResult | None =
     if message.direction != "in" or message.kind != "text":
         return None
     result = result or _current(session, message)
-    if result is None or result.intent not in FAQ_INTENTS:
+    if result is None or result.intent not in FAQ_INTENTS + ("address",):
         return None
+    if result.intent == "address" and _order_open(session, message.customer_id):
+        return None  # an address for the open order (docs/SPEC-v4.20: "delivery fee to mandalay?" without one)
     match = best(session, message.normalized_text)
     if match is None or _names_something(match, _items(session, result)):
         return None
     return match
+
+
+def _order_open(session: Session, customer_id: int) -> bool:
+    return bool(session.scalar(select(exists().where(Order.customer_id == customer_id,
+                                                     Order.status.in_(OPEN_STATUSES)))))
 
 
 def hint(session: Session, message: Message, result: ParseResult | None = None) -> Match | None:

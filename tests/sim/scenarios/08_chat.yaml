@@ -1,0 +1,115 @@
+# Thanks / ok / emoji, two quick messages, long chatty messages, voice / sticker / photo. hand: true.
+
+- id: chat-thanks-after-payment-info
+  hand: true
+  tags: [thanks]
+  setup: {state: waiting_payment, items: ["Eros 5ml"], age_min: 5}
+  turns:
+    - say: "ကျေးဇူးပါ"
+      expect: {reply: any_auto}
+
+- id: chat-thanks-nothing-pending
+  hand: true
+  tags: [thanks]
+  setup: {state: delivered, items: ["Eros 5ml"], age_min: 5000}
+  turns:
+    - say: "thank you"
+      expect: {reply: any_auto}
+
+- id: chat-thumbs-up
+  hand: true
+  tags: [emoji]
+  setup: {state: paid, items: ["Eros 5ml"], age_min: 10}
+  turns:
+    - say: "👍"
+      expect: {reply: any_auto}
+
+- id: chat-emoji-only-new
+  hand: true
+  tags: [emoji]
+  turns:
+    - say: "😊"
+      expect: {reply: any_auto}
+
+- id: chat-ok-in-cart
+  hand: true
+  tags: [ok]
+  setup: {state: cart, items: ["Eros 5ml"], saved: true, age_min: 5}
+  turns:
+    - say: "ok ပါ"
+      expect: {reply: auto, contains: ["KPay – 09000000001"]}
+
+- id: chat-two-quick-messages
+  hand: true
+  tags: [quick]
+  turns:
+    - say: ["eros 10ml", "ယူမယ်"]
+      expect: {reply: auto, contains: ["Eros 10ml – 25,000"], cart: ["Eros 10ml x1"]}
+
+- id: chat-two-quick-buy-and-phone
+  hand: true
+  tags: [quick, contact]
+  turns:
+    - say: ["libre 5ml ယူမယ်", "09420003030"]
+      expect: {reply: auto, contains: ["Libre 5ml – 21,000"], cart: ["Libre 5ml x1"]}
+
+- id: chat-long-chatty
+  hand: true
+  tags: [long]
+  turns:
+    - say: "အစ်မရေ မနေ့က သူငယ်ချင်းဆီမှာ အနံ့လေးရလို့ သဘောကျသွားတယ် ညီမလည်း eros 10ml လေး တစ်ခု လိုချင်လို့ပါ ရမလားဟင် ပို့ပေးနိုင်မလား"
+      expect: {reply: auto, contains: ["Eros 10ml – 25,000"], cart: ["Eros 10ml x1"]}
+
+- id: chat-voice
+  hand: true
+  tags: [media]
+  turns:
+    - voice: true
+      expect: {reply: auto, contains: ["စာနဲ့ ရေးပေးပါ"]}
+
+- id: chat-sticker
+  hand: true
+  tags: [media]
+  setup: {state: cart, items: ["Eros 5ml"], age_min: 5}
+  turns:
+    - sticker: true
+      expect: {reply: any_auto}
+
+- id: chat-photo-of-perfume
+  hand: true
+  tags: [media]
+  turns:
+    - photo: true
+      expect: {reply: auto, contains: ["နာမည်"]}
+
+- id: chat-what-do-you-have
+  hand: true
+  tags: [browse]
+  turns:
+    - say: "ဘာ perfume တွေ ရှိလဲ"
+      expect: {reply: any_auto}
+
+- id: chat-recommend
+  hand: true
+  tags: [browse, person]
+  turns:
+    - say: "ကောင်မလေးအတွက် လက်ဆောင်ပေးဖို့ ဘာကောင်းမလဲ"
+      expect: {reply: person}  # advice / a recommendation: a person sells better than a template
+
+- id: chat-other-with-open-cart
+  hand: true
+  tags: [resume]
+  setup: {state: cart, items: ["Eros 5ml"], saved: false, age_min: 5}
+  turns:
+    - say: "ခဏနော်"
+      expect: {reply: any_auto}
+
+- id: chat-repeat-after-holding
+  hand: true
+  tags: [repeat]
+  turns:
+    - say: "lattafa asad 5ml ရှိလား"
+      expect: {reply: auto, any_of: ["နာမည်", "မရှိသေးပါဘူး", "ဘယ် perfume"]}
+    - say: "lattafa asad 5ml ရှိလား"
+      gap_min: 10
+      expect: {reply: auto, any_of: ["နာမည်", "မရှိသေးပါဘူး", "ဘယ် perfume"]}

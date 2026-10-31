@@ -119,9 +119,12 @@ class CassetteProvider:
     def read_image(self, *args, **kwargs):
         raise providers.AIError("other", "screenshots are not simulated")
 
-    def save(self) -> None:
-        if self.recorded:
-            self.path.write_text(json.dumps(self.tapes, ensure_ascii=False, indent=0, sort_keys=True))
+    def save(self, prune: bool = False) -> None:
+        """prune (a run of ALL scenarios): answers no scenario asked for any more are dropped."""
+        unused = set(self.tapes) - self.used if prune else set()
+        if self.recorded or unused:
+            self.path.write_text(json.dumps({k: v for k, v in self.tapes.items() if k not in unused},
+                                            ensure_ascii=False, indent=0, sort_keys=True))
 
 
 def _spent_today() -> float:
@@ -166,7 +169,27 @@ def prepare_shop() -> None:
     with SessionLocal.begin() as s:  # messages of the last day count (setup history is older than "now")
         s.execute(text("UPDATE app_settings SET value = jsonb_set(value, '{since}', to_jsonb(CAST(:s AS text))) "
                        "WHERE key = 'auto_reply'"), {"s": (datetime.now(UTC) - timedelta(hours=20)).isoformat()})
-    auto.DAILY_CAP = 100_000  # shortcut: the simulator sends far more than a real day; the cap is not tested here
+
+
+def reset_database() -> None:
+    """Every table empty, every id back to its start, the FAQ seed back (as tests/conftest.py does), then the
+    shop. Each scenario FILE starts here, so its recorded AI answers match in pytest and in this script."""
+    from app.replies.faq import SEED
+
+    with SessionLocal.begin() as s:
+        tables = s.scalars(text("SELECT tablename FROM pg_tables WHERE schemaname = 'public' "
+                                "AND tablename <> 'alembic_version'")).all()
+        sequences = s.scalars(text("SELECT sequencename FROM pg_sequences WHERE schemaname = 'public'")).all()
+        s.execute(text("SET LOCAL session_replication_role = replica"))
+        s.execute(text("; ".join(f'DELETE FROM "{t}"' for t in tables)))
+        s.execute(text("; ".join(f'ALTER SEQUENCE "{q}" RESTART' for q in sequences)))
+        s.execute(text("SET LOCAL session_replication_role = DEFAULT"))
+        s.execute(text("ALTER SEQUENCE order_no_seq RESTART WITH 1001"))
+        for n, (title, keywords, answer) in enumerate(SEED, start=1):
+            s.execute(text("INSERT INTO faq_entries (title, keywords, answer, sort_order) VALUES (:t, :k, :a, :n)"),
+                      {"t": title, "k": keywords, "a": answer, "n": n})
+    ai_service._not_needed.clear()
+    prepare_shop()
 
 
 def load_scenarios(only: set[str] | None = None, tag: str | None = None) -> list[dict]:
@@ -321,7 +344,9 @@ class Chat:
     def say(self, body: str, kind: str = "text") -> int:
         self.n += 1
         ext = f"sim-{self.n}"
-        self.phones_given += [re.sub(r"\D", "", p) for p in PHONE.findall(body)]
+        found = _phones(body)
+        if found:
+            self.phones_given = found  # the latest phone(s) the customer gave
         with SessionLocal.begin() as s:
             save_message(s, ChatMessage(self.user, ext, self.user, None, "Sim Customer", body,
                                         datetime.now(UTC), direction="in", kind=kind,
@@ -388,8 +413,24 @@ def run_turn(chat: Chat, turn: Turn, fake: FakeTelegram, kind: str) -> None:
             boxes = s.execute(text("SELECT reply_kind, text FROM outbox WHERE customer_id = :c AND id > :b "
                                    "AND status = 'sent' ORDER BY id"), {"c": chat.customer_id, "b": before}).all()
     turn.replies = [b.text for b in boxes]
-    kinds = {b.reply_kind for b in boxes}
-    turn.got = "auto" if kinds - {"hold", "holding"} else ("person" if kinds else "none")
+    with SessionLocal() as s:
+        texts = replies.load(s)
+        asked_person = s.scalar(text(  # a "Needs you" item made from this turn: a request (locked order, photo
+            "SELECT (SELECT count(*) FROM order_events WHERE kind = 'request' "  # being checked) or a payment check
+            "AND (previous->>'message_id')::int = ANY(:ids)) + (SELECT count(*) FROM payment_checks "
+            "WHERE message_id = ANY(:ids))"), {"ids": turn.message_ids})
+        # nothing sent because a holding reply went out < 10 min ago (one per 10 min, holding.ONCE_PER)
+        held = s.scalar(text("SELECT count(*) FROM outbox WHERE customer_id = :c AND id <= :b AND status = 'sent' "
+                             "AND (reply_kind = 'holding' OR text LIKE '%' || :w) AND created_at >= now() - :p"),
+                        {"c": chat.customer_id, "b": before, "w": texts["hold_check"], "p": holding.ONCE_PER})
+    waiting = {texts["holding_reply"], texts["hold_check"]}
+    if not boxes:
+        turn.got = "person" if held or asked_person else "none"
+    elif asked_person or all(b.reply_kind == "holding" or b.text.strip() in waiting
+                             or b.text.strip().endswith(texts["hold_check"]) for b in boxes):
+        turn.got = "person"
+    else:
+        turn.got = "auto"
     with SessionLocal() as s:
         reasons = s.execute(text(
             "SELECT m.id, r.reason, r.status, p.intent, a.decision, a.error FROM messages m "
@@ -406,8 +447,18 @@ def run_turn(chat: Chat, turn: Turn, fake: FakeTelegram, kind: str) -> None:
 
 # ---------- A4 the judge ----------
 
+_MY_DIGITS = str.maketrans("၀၁၂၃၄၅၆၇၈၉", "0123456789")
+
+
+def _phones(textval: str) -> list[str]:
+    """Phones in a text as 09xxxxxxxx (spaces / dashes / +95 / Burmese digits allowed)."""
+    flat = re.sub(r"(?<=\d)[\s-](?=\d)", "", textval.translate(_MY_DIGITS))
+    return [re.sub(r"^\+?95", "0", p) for p in PHONE.findall(flat)]
+
+
 def _amounts(textval: str) -> set[int]:
-    return {int(n.replace(",", "")) for n in NUMBER.findall(textval)}
+    textval = textval.translate(_MY_DIGITS)
+    return {int(n.replace(",", "")) for n in NUMBER.findall(textval)} | {int(p) for p in _phones(textval)}
 
 
 def _allowed_numbers(s, chat: Chat, said: list[str]) -> set[int]:
@@ -429,6 +480,9 @@ def _allowed_numbers(s, chat: Chat, said: list[str]) -> set[int]:
         allowed |= _amounts(t)
     for t in said:
         allowed |= _amounts(t)
+    for t in [*s.scalars(select(Product.name)), *s.scalars(text(
+            "SELECT phone FROM customer_phones WHERE customer_id = :c"), {"c": chat.customer_id})]:
+        allowed |= _amounts(t)  # "Baccarat Rouge 540"; the saved phone (judged by the phone rule below)
     return allowed
 
 
@@ -457,6 +511,8 @@ def judge(chat: Chat, turn: Turn, said_so_far: list[str]) -> None:
     elif want == "none":
         if turn.got != "none":
             p.append(f"not expected to reply, got {turn.got}")
+    elif want == "any":  # live replay: no expected facts, only the strict checks below
+        pass
     elif want == "any_auto":
         if turn.got == "person":
             p.append("needs a person (expected automatic or nothing)")
@@ -500,7 +556,8 @@ def judge(chat: Chat, turn: Turn, said_so_far: list[str]) -> None:
             "JOIN products p ON p.id = coalesce(i.product_id, i.candidate_product_id) WHERE r.message_id = ANY(:m)"),
             {"m": turn.message_ids}))
         if newest is not None:
-            allowed |= {n for n in names if n in "\n".join(_cart_lines(s, chat) or [])}
+            in_cart = "\n".join(_cart_lines(s, chat))
+            allowed |= {n for n in names if n in in_cart}
             for o in s.scalars(select(Order).where(Order.customer_id == chat.customer_id)):
                 allowed |= {n for (n,) in s.execute(text(
                     "SELECT p.name FROM order_items i JOIN products p ON p.id = i.product_id WHERE i.order_id = :o"),
@@ -512,13 +569,10 @@ def judge(chat: Chat, turn: Turn, said_so_far: list[str]) -> None:
                 rest = rest.replace(name, "")
                 if name not in allowed and not choice:
                     p.append(f"WRONG product named: {name}")
-        given = chat.phones_given
-        for phone in {re.sub(r"\D", "", x) for x in PHONE.findall(reply)}:
-            ok = phone == given[-1] if given else phone in {re.sub(r"\D", "", x) for x in [
-                *(s.scalars(text("SELECT phone FROM customer_phones WHERE customer_id = :c"),
-                            {"c": chat.customer_id})), *s.scalars(text("SELECT account_number FROM payment_methods"))]}
-            if not ok and phone not in {re.sub(r"\D", "", x) for x in s.scalars(text(
-                    "SELECT account_number FROM payment_methods"))}:
+        shop = set(s.scalars(text("SELECT account_number FROM payment_methods")))
+        saved = set(s.scalars(text("SELECT phone FROM customer_phones WHERE customer_id = :c"), {"c": chat.customer_id}))
+        for phone in set(_phones(reply)) - shop:
+            if phone not in (chat.phones_given or saved):  # the latest the customer gave, else the saved one
                 p.append(f"WRONG phone shown {phone}")
         ours = {str(n) for n in s.scalars(text("SELECT order_no FROM orders WHERE customer_id = :c AND order_no "
                                                 "IS NOT NULL"), {"c": chat.customer_id})}
@@ -602,12 +656,19 @@ def score(results: list[tuple[dict, list[Turn]]]) -> Score:
 
 
 def run(scenarios: list[dict], provider: providers.Provider | None, verbose: bool = False) -> Score:
+    """Scenario files one after the other, each on a reset database (reset_database)."""
     providers.use(provider)
-    ai_service._not_needed.clear()
     fake = FakeTelegram()
     results = []
+    cap = auto.DAILY_CAP
+    auto.DAILY_CAP = 100_000  # shortcut: the simulator sends far more than a real day; the cap is not tested here
     try:
-        for number, sc in enumerate(scenarios, start=1):
+        number, file = 0, None
+        for sc in scenarios:
+            if sc["file"] != file:
+                file, number = sc["file"], 0
+                reset_database()
+            number += 1
             turns = run_scenario(number, sc, fake)
             results.append((sc, turns))
             if verbose:
@@ -619,6 +680,7 @@ def run(scenarios: list[dict], provider: providers.Provider | None, verbose: boo
                             print("     > " + r.replace("\n", "\n     > "))
     finally:
         providers.use(None)
+        auto.DAILY_CAP = cap
     return score(results)
 
 
@@ -654,7 +716,6 @@ def main() -> int:
     logging.basicConfig(level=logging.ERROR)
     scenarios = load_scenarios(set(args.only.split(",")) if args.only else None, args.tag)
     fresh_database()
-    prepare_shop()
     cassette = None
     if args.ai != "off":
         real = None
@@ -670,7 +731,7 @@ def main() -> int:
         cassette = CassetteProvider(real=real)
     result = run(scenarios, cassette, args.verbose)
     if cassette:
-        cassette.save()
+        cassette.save(prune=not (args.only or args.tag))
         _add_spent(cassette.spent)
     print(f"{len(scenarios)} scenarios, {result.line()}")
     if cassette:

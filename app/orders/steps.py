@@ -105,8 +105,8 @@ def with_resume(session: Session, kind: str, text: str | None, customer_id: int,
     if not text or kind in NO_RESUME_KINDS:
         return text, False
     line = resume_text(session, step(session, customer_id), texts)
-    if not line or line.strip() in text:
-        return text, False  # nothing pending, or the reply asks for it already
+    if not line or line.strip() in text or (texts["address_invalid_note"] in text and "လိပ်စာ" in line):
+        return text, False  # nothing pending, or the reply asks for it already (4.20: "the full address")
     if session.scalar(select(exists().where(ChoicePrompt.customer_id == customer_id, ChoicePrompt.kind == "size",
                                             ChoicePrompt.answered_message_id.is_(None), ChoicePrompt.expires_at > now))):
         return text, False  # docs/SPEC-v4.17 P4: one question at a time, the size first

@@ -64,8 +64,8 @@ def test_r3_watchdog_holding_reply_once_and_needs_you(shop, db, caplog):
     client, token = shop
     auto_on(db)
     cart_for(client, token, db)  # an open cart
-    mid = stuck(db, 1, "ဒီအနံ့က ဘယ်လိုမျိုးလဲ", seconds_ago=30)  # a question: no automatic answer
-    assert holding.run_once() == {} and deliver(db) == []  # not 60 s yet
+    mid = stuck(db, 1, "ဒီအနံ့က ဘယ်လိုမျိုးလဲ", seconds_ago=5)  # a question: no automatic answer
+    assert holding.run_once() == {} and deliver(db) == []  # not 10 s yet (docs/SPEC-v4.20 G3; 4.13 had 60 s)
     with db.begin() as c:
         c.execute(text("UPDATE messages SET received_at = now() - interval '90 seconds' WHERE id = :m"), {"m": mid})
     logging.getLogger("holding").disabled = False  # alembic's fileConfig (test DB setup) disables older loggers

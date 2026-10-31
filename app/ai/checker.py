@@ -112,3 +112,16 @@ def address_items(result: AIResult) -> tuple[AIResult, list[str]]:
     if not dropped:
         return result, []
     return replace(result, items=tuple(kept)), dropped
+
+
+def said_size(result: AIResult, normalized_message: str) -> AIResult:
+    """docs/SPEC-v4.20 A2: the AI leaves `size` empty when the customer's size is not a listed one ("15ml");
+    with ONE product item and ONE size in the message, the item gets that size, so the shop can answer
+    "15ml မရှိပါဘူး… ဘယ် size ယူမလဲ?" instead of waiting for a person."""
+    from app.parser.rules import find_sizes  # late import: rules -> service -> ai
+
+    sizes = find_sizes(normalized_message or "")
+    items = [i for i in result.items if i.product_id is not None]
+    if len(sizes) != 1 or len(items) != 1 or items[0].size is not None or len(result.items) != 1:
+        return result
+    return replace(result, items=(replace(items[0], size=f"{sizes[0]}ml"),))

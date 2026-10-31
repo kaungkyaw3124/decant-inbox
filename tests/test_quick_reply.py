@@ -36,12 +36,13 @@ def test_when_the_button_is_offered(client, db):  # noqa: F811
     log_in(client)
     setup_messages(db)
     page = client.get("/?intent=all").text
-    for ext in ("101", "102", "105"):  # 105 = buy: "Add to cart + send list"
+    # docs/SPEC-v4.20 A2: 103 (3ml is not sold) asks which size, 104 (out of stock) gets the out-of-stock line
+    for ext in ("101", "102", "103", "104", "105"):  # 105 = buy: "Add to cart + send list"
         assert button(page, msg_id(db, ext)), ext
     assert "🛒 Add to cart + send list" in page
-    # 103: 3ml has no price, 104: out of stock, 3: unknown "aventus",
-    # 1: a buy message older than 24 h (cart actions only for recent messages)
-    for ext in ("103", "104", "3", "1"):
+    assert "Stronger With You Intensely က 3ml မရှိပါဘူးနော်။" in page and "လောလောဆယ် ကုန်နေပါတယ်နော်။" in page
+    # 3: unknown "aventus", 1: a buy message older than 24 h (cart actions only for recent messages)
+    for ext in ("3", "1"):
         assert button(page, msg_id(db, ext)) is None, ext
     assert 'title="မင်္ဂလာပါ။\nStronger With You Intensely 5ml က 18,000 ကျပ်ပါ။' in page  # full text on hover
     assert "မင်္ဂလာပါ။ · Stronger With You Intensely 5ml က 18,000" in page  # one-line preview

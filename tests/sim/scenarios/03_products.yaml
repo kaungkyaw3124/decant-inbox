@@ -1,0 +1,118 @@
+# Sizes not sold, unknown products, similar names. hand: true.
+
+- id: size-20ml-not-sold
+  hand: true
+  tags: [size]
+  turns:
+    - say: "eros 20ml ယူမယ်"
+      expect: {reply: auto, contains: ["20ml မရှိပါဘူး", "10ml – 25,000", "ဘယ် size ယူမလဲ"], cart: []}
+    - say: "10ml ပဲယူမယ်"
+      expect: {reply: auto, contains: ["Eros 10ml – 25,000"], cart: ["Eros 10ml x1"]}
+
+- id: size-3ml-not-sold
+  hand: true
+  tags: [size]
+  turns:
+    - say: "libre 3ml ရလား"
+      expect: {reply: auto, contains: ["3ml", "5ml – 21,000"]}
+
+- id: size-2ml-missing-for-luna
+  hand: true
+  tags: [size]
+  turns:
+    - say: "prada carbon 2ml ယူမယ်"
+      expect: {reply: auto, contains: ["2ml မရှိပါဘူး", "5ml – 15,000"], cart: []}
+    - say: "5"
+      expect: {reply: auto, contains: ["Luna Rossa Carbon 5ml – 15,000"], cart: ["Luna Rossa Carbon 5ml x1"]}
+
+- id: size-answer-ordinal
+  hand: true
+  tags: [size]
+  turns:
+    - say: "aventus 15ml ယူမယ်"
+      expect: {reply: auto, contains: ["15ml မရှိပါဘူး"]}
+    - say: "ဒုတိယ"
+      expect: {reply: auto, contains: ["Aventus 5ml – 65,000"], cart: ["Aventus 5ml x1"]}
+
+- id: unknown-product
+  hand: true
+  tags: [unknown]
+  turns:
+    - say: "hawas for him 10ml ရှိလား"
+      expect: {reply: auto, any_of: ["နာမည်", "မရှိသေးပါဘူး", "ဘယ် perfume"]}
+
+- id: unknown-product-buy
+  hand: true
+  tags: [unknown]
+  turns:
+    - say: "lattafa khamrah 5ml ယူမယ်"
+      expect: {reply: auto, any_of: ["နာမည်", "မရှိသေးပါဘူး", "ဘယ် perfume"], cart: []}
+
+- id: unclear-dior-something
+  hand: true
+  tags: [unclear, choice]
+  turns:
+    - say: "dior ဟိုဟာလေး ရှိလား"
+      expect: {reply: auto, contains: ["1", "2"], any_of: ["Sauvage Eau de Parfum", "Miss Dior"], products: ["Sauvage Eau de Parfum", "Sauvage Elixir", "Miss Dior"]}
+    - say: "2"
+      expect: {reply: auto, any_of: ["ကျပ်"], products: ["Sauvage Eau de Parfum", "Sauvage Elixir", "Miss Dior"]}
+
+- id: unclear-ysl-10ml
+  hand: true
+  tags: [unclear, choice]
+  turns:
+    - say: "ysl 10ml ယူမယ်"
+      expect: {reply: auto, contains: ["Y Eau de Parfum", "Libre"], cart: []}
+    - say: "1"
+      expect: {reply: auto, any_of: ["Y Eau de Parfum 10ml – 34,000", "Libre 10ml – 40,000"], products: ["Y Eau de Parfum", "Libre"]}
+
+- id: similar-stw-vs-intensely
+  hand: true
+  tags: [similar]
+  turns:
+    - say: "stronger with you 10ml ယူမယ်"
+      expect: {reply: auto, contains: ["Stronger With You 10ml – 30,000"], cart: ["Stronger With You 10ml x1"]}
+
+- id: similar-sauvage-elixir
+  hand: true
+  tags: [similar]
+  turns:
+    - say: "sauvage elixir 5ml ယူမယ်"
+      expect: {reply: auto, contains: ["Sauvage Elixir 5ml – 28,000"], cart: ["Sauvage Elixir 5ml x1"]}
+
+- id: similar-le-male-elixir-vs-ultra
+  hand: true
+  tags: [similar]
+  turns:
+    - say: "jpg ultra male 10ml နဲ့ le male elixir 5ml"
+      expect: {reply: auto, contains: ["28,000", "17,000"]}
+
+- id: product-then-size-later
+  hand: true
+  tags: [size]
+  turns:
+    - say: "ombre leather ရှိလား"
+      expect: {reply: auto, contains: ["Ombre Leather", "5ml – 32,000"]}
+    - say: "10ml ယူမယ်"
+      expect: {reply: auto, contains: ["Ombre Leather 10ml – 60,000"], cart: ["Ombre Leather 10ml x1"]}
+
+- id: brand-only-tom-ford
+  hand: true
+  tags: [unclear]
+  turns:
+    - say: "tom ford 5ml ဘယ်လောက်လဲ"
+      expect: {reply: auto, contains: ["32,000"], products: ["Ombre Leather"]}
+
+- id: many-with-one-unknown
+  hand: true
+  tags: [unknown, many]
+  turns:
+    - say: "eros 5ml နဲ့ hawas 5ml ယူမယ်"
+      expect: {reply: auto, contains: ["Eros 5ml – 14,000"]}
+
+- id: price-all-sizes-english
+  hand: true
+  tags: [price, english]
+  turns:
+    - say: "baccarat rouge price?"
+      expect: {reply: auto, contains: ["35,000", "85,000", "165,000"]}

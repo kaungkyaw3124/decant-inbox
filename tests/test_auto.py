@@ -123,7 +123,7 @@ def test_safety_rules(shop, db, monkeypatch):
     assert r[msg(db, 1)] == ("skipped", "ignored customer")
     assert r[msg(db, 2)] == ("skipped", "auto-reply off for this customer")
     assert r[msg(db, 3)] == ("skipped", "product not named exactly")
-    assert r[msg(db, 4)] == ("skipped", "intent other")
+    assert r[msg(db, 4)] == ("skipped", "small talk: nothing to answer")  # docs/SPEC-v4.20: "thanks" needs no reply
 
     # owner replies by hand -> paused 2 h for that chat; Resume auto -> automatic again
     say(5, "stw intensely 5ml ဘယ်လောက်လဲ", customer="75")
@@ -140,8 +140,9 @@ def test_safety_rules(shop, db, monkeypatch):
     add(2008, "ysl y edp ဘယ်လောက်လဲ", customer="75", when=datetime.now(UTC) - timedelta(seconds=20))
     run_batch()
     auto.run_once()
-    assert len(outbox(db)) == 0  # Y is out of stock: no certain reply...
-    assert runs(db)[msg(db, 8)] == ("skipped", "no certain reply")
+    # docs/SPEC-v4.20 A2: Y is out of stock -> the out-of-stock line goes out by itself
+    assert [o[0] for o in outbox(db)] == ["Y Eau de Parfum လောလောဆယ် ကုန်နေပါတယ်နော်။"]
+    assert runs(db)[msg(db, 8)][0] == "replied"
 
     # daily limit -> one-tap again
     monkeypatch.setattr(auto, "DAILY_CAP", 0)

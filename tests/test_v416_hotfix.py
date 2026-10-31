@@ -177,7 +177,9 @@ def test_r5_str_grid_is_valid(body):
 def test_r5_order_line_is_not_part_of_the_address():
     check = address.from_rules(LIVE_BUY)
     assert check.valid and check.parts.full_text == "66 str 29 str, mandalay"
-    assert address.from_rules("sauvage edp 10ml ယူမယ် ဗဟန်း") is None  # an order line is never an address
+    # an order line is never an address; docs/SPEC-v4.20 A2: what follows the order words is read (too short here)
+    check = address.from_rules("sauvage edp 10ml ယူမယ် ဗဟန်း")
+    assert check is not None and not check.valid and check.parts.full_text == "ဗဟန်း"
 
 
 # ---------- R6 / Q4: the test code too early (testers only) ----------

@@ -22,6 +22,7 @@ parse result (method "ai") is acted on only while the AI mode is AUTO.
 """
 import logging
 import random
+import re
 from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import and_, exists, func, select
@@ -30,7 +31,7 @@ from sqlalchemy.orm import Session
 
 from app.core.db import SessionLocal
 from app.models import (
-    AppSetting, AuditLog, AutoRun, Customer, Message, Outbox, ParseItem, ParseResult, QuickAction, User,
+    AppSetting, AuditLog, AutoRun, Customer, Message, Order, Outbox, ParseItem, ParseResult, QuickAction, User,
 )
 from app.learning import patterns
 from app.orders import actions, cart, testpay
@@ -150,9 +151,13 @@ def decide(session: Session, message: Message, now: datetime, ai_mode: str | Non
     if customer.auto_reply_off:
         return _skip(session, message.id, "auto-reply off for this customer")
     if message.kind != "text":
-        return _skip(session, message.id, "photo / file")
+        return _media_reply(session, message, now)
     if customer.is_tester and testpay.is_code(message.raw_text):
         return _skip(session, message.id, "test payment code")  # handled like a screenshot (testpay.scan)
+    from app.orders import holding  # late import: holding -> auto
+
+    if holding.is_complaint(message.raw_text):
+        return _skip(session, message.id, "complaint: a person handles it")  # the watchdog's holding reply + Needs you
     from app.ai import service as ai, settings as ai_settings  # late import: ai -> orders
 
     if ai_mode is None:
@@ -162,7 +167,9 @@ def decide(session: Session, message: Message, now: datetime, ai_mode: str | Non
     if result.method == "ai" and ai_mode != "auto":
         return _skip(session, message.id, "AI result, AI mode is not auto")
     if result.intent not in AUTO_INTENTS and faq.for_message(session, message, result) is None:
-        return _skip(session, message.id, f"intent {result.intent}")
+        if holding.is_small_talk(message.raw_text):
+            return _skip(session, message.id, "small talk: nothing to answer")
+        return _resume_or_skip(session, message, result, now)
     if answered_by_human(session, message):
         return _skip(session, message.id, "already answered")
     if paused_until(session, customer, now):
@@ -200,6 +207,81 @@ def decide(session: Session, message: Message, now: datetime, ai_mode: str | Non
         return _skip(session, message.id, str(exc)[:120])
     session.add(AutoRun(message_id=message.id, status="replied", quick_action_id=action.id))
     return f"{suggestion.kind}"
+
+
+MEDIA_AGAIN = timedelta(minutes=10)
+MEDIA_FRESH = timedelta(minutes=2)  # an old photo / voice (worker restart, history import): no reply now
+QUESTION_RE = re.compile(r"လား|လဲ|\?|(?<![a-z])(?:how|what|which|when|why|can|could|is|are|do|does)(?![a-z])",
+                         re.IGNORECASE)
+BUSY_ORDER = ("confirmed", "waiting_payment", "photo_received", "paid", "packed", "sent_out")
+
+
+def _send(session: Session, message: Message, body: str, kind: str, now: datetime, why: str) -> str:
+    """A short automatic reply that changes nothing (no quick action, so nothing to undo)."""
+    pace = speed(session)
+    delay = timedelta(seconds=random.uniform(pace["delay_min_s"], pace["delay_max_s"]))
+    session.add(Outbox(customer_id=message.customer_id, text=body, reply_kind=kind, status="queued",
+                       idempotency_key=f"{why}-{message.id}", created_by=None, send_after=now + delay,
+                       source_message_id=message.id))
+    session.add(AutoRun(message_id=message.id, status="replied", reason=why))
+    session.add(AuditLog(user_id=None, action=f"auto.{why}", details={
+        "actor": "auto", "message_id": message.id, "customer_id": message.customer_id}))
+    return why
+
+
+def _media_reply(session: Session, message: Message, now: datetime) -> str | None:
+    """docs/SPEC-v4.20 A2: voice / sticker / video / file -> "please write it"; a photo when no order is in
+    progress -> "which perfume? write the name"; a payment screenshot (in Payments, a person approves it) ->
+    "screenshot received, we'll check" (G3: never silent; once per 10 min, so an album gets one reply)."""
+    if message.kind == "photo":
+        from app.models import PaymentCheck  # late import: keep this module's imports as they were
+
+        if session.scalar(select(exists().where(PaymentCheck.message_id == message.id))):
+            key = "resume_photo_received"  # a payment screenshot (payments.scan ran first): "received, we check"
+        elif session.scalar(select(exists().where(Order.customer_id == message.customer_id,
+                                                  Order.status.in_(BUSY_ORDER)))):
+            return _skip(session, message.id, "photo / file")  # an order a person follows
+        else:
+            key = "ask_perfume_name"
+    else:
+        key = "please_type"
+    if now - message.received_at > MEDIA_FRESH:
+        return _skip(session, message.id, "photo / file")
+    if now - message.received_at < timedelta(seconds=speed(session)["quiet_s"]):
+        return None  # an album / more coming
+    texts = replies.load(session)
+    if session.scalar(select(exists().where(Outbox.customer_id == message.customer_id, Outbox.text == texts[key],
+                                            Outbox.created_at >= now - MEDIA_AGAIN))):
+        return _skip(session, message.id, "photo / file (asked already)")
+    return _send(session, message, texts[key], "custom", now, key)
+
+
+def _resume_or_skip(session: Session, message: Message, result: ParseResult, now: datetime) -> str | None:
+    """docs/SPEC-v4.20 A2: a message we cannot read while an order is open -> the line of what we wait for
+    (payment screenshot, phone, address, ...) instead of silence. Nothing open -> a person (watchdog)."""
+    from app.orders import steps  # late import: steps -> actions -> this module's imports
+
+    if answered_by_human(session, message) or paused_until(session, session.get(Customer, message.customer_id), now):
+        return _skip(session, message.id, f"intent {result.intent}")
+    if now - message.received_at < timedelta(seconds=speed(session)["quiet_s"]):
+        return None
+    if session.scalar(select(exists().where(Outbox.customer_id == message.customer_id,
+                                            Outbox.status.in_(("queued", "sending"))))):
+        return None  # a reply is still going out: decide with the newest state afterwards
+    texts = replies.load(session)
+    current = steps.step(session, message.customer_id)
+    if QUESTION_RE.search(message.normalized_text or "") or session.scalar(select(exists().where(
+            ParseItem.parse_result_id == result.id))):
+        return _skip(session, message.id, f"intent {result.intent}")  # a real question / names a product: a person
+    if current.kind == "photo_received":
+        line = texts["resume_photo_received"]
+    elif current.kind == "waiting_payment":  # "kpay နံပါတ် ပြန်ပို့ပေး", "ညနေ လွှဲမယ်": the payment info again
+        line = cart.payment_text(session, current.order, texts)
+    else:
+        line = steps.resume_text(session, current, texts)
+    if not line:
+        return _skip(session, message.id, f"intent {result.intent}")
+    return _send(session, message, line, "custom", now, "resume")
 
 
 def hold_reply(session: Session, message: Message, now: datetime) -> None:

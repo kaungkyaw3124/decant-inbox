@@ -1,0 +1,68 @@
+# Delivery time / fee / COD / pickup / "where is my order". hand: true.
+
+- id: delivery-time
+  hand: true
+  tags: [delivery, faq]
+  turns:
+    - say: "ဘယ်နှစ်ရက်လောက် ကြာလဲ"
+      expect: {reply: auto, contains: ["ရက်"]}
+
+- id: delivery-fee
+  hand: true
+  tags: [delivery]
+  turns:
+    - say: "ပို့ခ ဘယ်လောက်လဲ"
+      expect: {reply: auto, contains: ["ပို့ခ"]}
+
+- id: delivery-fee-english
+  hand: true
+  tags: [delivery, english]
+  turns:
+    - say: "delivery fee to mandalay?"
+      expect: {reply: auto, contains: ["ပို့ခ"]}
+
+- id: delivery-cod
+  hand: true
+  tags: [delivery]
+  turns:
+    - say: "COD ရလား"
+      expect: {reply: auto, any_of: ["ကြိုလွှဲ", "COD", "ပစ္စည်းရောက်မှ"]}
+
+- id: delivery-pickup
+  hand: true
+  tags: [delivery]
+  turns:
+    - say: "ဆိုင်မှာ လာယူလို့ရလား"
+      expect: {reply: auto, any_of: ["Online", "ပို့ပေး"]}
+
+- id: delivery-where-is-order-paid
+  hand: true
+  tags: [delivery, after]
+  setup: {state: paid, items: ["Eros 5ml"], age_min: 600}
+  turns:
+    - say: "order ဘယ်တော့ရောက်မလဲ"
+      expect: {reply: auto, contains: ["#1"]}
+
+- id: delivery-where-is-order-sent
+  hand: true
+  tags: [delivery, after]
+  setup: {state: sent_out, items: ["Libre 5ml"], age_min: 1500}
+  turns:
+    - say: "ပစ္စည်း ဘယ်ရောက်နေပြီလဲ"
+      expect: {reply: auto, contains: ["ပို့ပြီးပါပြီ"]}
+
+- id: delivery-fee-during-order
+  hand: true
+  tags: [delivery]
+  turns:
+    - say: "eros 10ml ယူမယ်"
+      expect: {reply: auto, cart: ["Eros 10ml x1"]}
+    - say: "ပို့ခ ဘယ်လောက်ကျမလဲ"
+      expect: {reply: auto, contains: ["ပို့ခ"], cart: ["Eros 10ml x1"]}
+
+- id: delivery-authentic
+  hand: true
+  tags: [faq]
+  turns:
+    - say: "original လား"
+      expect: {reply: auto, contains: ["authentic"]}
