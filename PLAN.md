@@ -129,3 +129,8 @@ payments → Viber → reports. Each is a new module with its own tables.
    docs/SPEC-v4.21-ios-messenger-ui.md (mockups docs/mockups/ios-*.dc.html; replaces v4.19, OWNER TEST 4.21). Status: TODO
    (v4.19 NEEDS YOU CARDS: replaced by v4.21, do not build separately)
 6. v4.18 SPEED: first reply within 3 s — docs/SPEC-v4.18-speed.md (S0-S5, T1-T8, OWNER TEST 4.18). Status: TODO
+7. v5.0 GO-LIVE PACK: alert bot, encrypted off-server backup, 2-step login, packing slips — docs/SPEC-v5.0-go-live-pack.md
+   (goal L1-L4; secrets stay OFF until the owner sets them). Status: TODO
+8. v5.1 INVENTORY in ml: bottles, vials, auto out-of-stock, deduct on packed — docs/SPEC-v5.1-inventory.md (goal I1-I4). Status: TODO
+9. v5.2 CUSTOMER CARE: profiles, one-tap reorder list, feedback after delivery — docs/SPEC-v5.2-customer-care.md
+   (goal C1-C3). Status: TODO

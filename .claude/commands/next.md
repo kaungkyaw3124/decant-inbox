@@ -27,7 +27,12 @@ PLAN.md under "## NEXT TASK". Do it now:
    (exact messages to send from the second Telegram account + exact dashboard clicks + expected results).
 6. In PLAN.md: under "## NEXT TASK" change the status line to `Status: DONE <date> — see REPORT.md`,
    update the Status table and "RESUME HERE". Commit + push.
-7. Finish with a short summary for the owner in simple English: what changed, how to test it, and
+7. KEEP GOING (owner 2026-11-03: "do them all"): if the QUEUE still has a TODO item, move it to NEXT TASK and
+   start it right away in this same session — no need to wait for the owner to type /next. Stop only when the
+   QUEUE is empty, when you need the owner (decision, sudo, login code, a secret), or when the usage limit stops you.
+   Features that need an owner secret: build and test them with fakes, leave them OFF, list the missing value in
+   REPORT.md, and continue with the next task.
+8. Finish with a short summary for the owner in simple English: what changed, how to test it, and
    anything the owner must do (e.g. a value to put in .env — never print secrets).
 Stop and ask the owner only if something needs their decision, a sudo command, a login code or a secret.
 Arguments from the owner (optional): $ARGUMENTS
