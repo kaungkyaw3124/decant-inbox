@@ -3,9 +3,9 @@
 Read CLAUDE.md first. This file tracks where we are.
 
 ## NEXT TASK (written by the planning chat; Claude Code runs it with /next)
-Task: v4.20 AUTOMATION GOAL (goal-driven loop until G1-G4 met: ≥90% automatic, 0 wrong, never silent, live replay
-≥85%) — docs/SPEC-v4.20-automation-goal.md (A0-A6, OWNER TEST 4.20).
-Status: DONE 2026-11-02 — see REPORT.md
+Task: v4.21 DASHBOARD REDESIGN: Messenger layout + iOS look — goal-driven loop until U1-U4 met —
+docs/SPEC-v4.21-ios-messenger-ui.md (mockups docs/mockups/ios-*.dc.html; replaces v4.19, OWNER TEST 4.21).
+Status: TODO
 
 ## RESUME HERE (updated 2026-11-02 by Claude Code)
 - v1-v4.12 DONE. AI AUTO, brake ON, ai_address ON, ai_screenshot OFF.
@@ -126,7 +126,7 @@ payments → Viber → reports. Each is a new module with its own tables.
 4. v4.20 AUTOMATION GOAL (goal-driven loop until G1-G4 met: ≥90% automatic, 0 wrong, never silent, live replay
    ≥85%) — docs/SPEC-v4.20-automation-goal.md (A0-A6, OWNER TEST 4.20). Status: moved to NEXT TASK 2026-10-31
 5. v4.21 DASHBOARD REDESIGN: Messenger layout + iOS look — goal-driven loop until U1-U4 met —
-   docs/SPEC-v4.21-ios-messenger-ui.md (mockups docs/mockups/ios-*.dc.html; replaces v4.19, OWNER TEST 4.21). Status: TODO
+   docs/SPEC-v4.21-ios-messenger-ui.md (mockups docs/mockups/ios-*.dc.html; replaces v4.19, OWNER TEST 4.21). Status: moved to NEXT TASK 2026-11-02
    (v4.19 NEEDS YOU CARDS: replaced by v4.21, do not build separately)
 6. v4.18 SPEED: first reply within 3 s — docs/SPEC-v4.18-speed.md (S0-S5, T1-T8, OWNER TEST 4.18). Status: TODO
 7. v5.0 GO-LIVE PACK: alert bot, encrypted off-server backup, 2-step login, packing slips — docs/SPEC-v5.0-go-live-pack.md
