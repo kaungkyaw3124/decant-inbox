@@ -2154,3 +2154,111 @@ From the second account (Auto-reply ON), one by one with a stopwatch:
 4. `ok` → payment info in about 2 s.
 5. `ဟိုတစ်ခါက အနံ့လေး` → a holding reply ("ခဏစောင့်ပေးပါနော်…") within about 3 s, or the AI's answer within 5 s.
 6. Dashboard → More → Health → **⚡ Speed**: p90 per path (goal: rules ≤ 3 s, AI ≤ 5 s, holding ≤ 3 s).
+
+## 2026-11-02 — v5.0 GO-LIVE PACK (docs/SPEC-v5.0-go-live-pack.md)
+
+**Deployed 2026-11-02 20:04 UTC** (migration e2b6c8d4a015; new service decant-alerts). Everything that needs a secret
+is built + tested with fakes and stays **OFF** until you set it.
+
+| Goal | Status |
+|---|---|
+| L1 alerts to your phone within 2 min | ✅ built; **OFF until ALERT_BOT_TOKEN + ALERT_CHAT_ID** (checks every 30 s) |
+| L2 encrypted copy leaves the server daily + restore proven | ✅ built + restore test; **OFF until BACKUP_PASSPHRASE** (and the bot) |
+| L3 owner login needs a 2-step code | ✅ built; **you turn it on** in More → My account |
+| L4 packing = one tap + one slip | ✅ Orders → 🧾 Slip / 🖨 Print all to pack |
+
+**Built**
+- **G1 alert bot** (`app/alerts/`, service `decant-alerts`, official Bot API over HTTPS — never the shop's Telegram
+  session): service down / parse queue (health checks), customer waiting > 5 min, payment to check, AI key / credit,
+  backup failed, disk > 85 %, new tunnel link, login from a new device, daily 21:00 summary (paid orders, to pack,
+  automatic %, AI cost, low stock). Same alert at most once per 30 min, max 20 / hour (the next alert says how many
+  were held back), "✅ resolved" for services / backup / disk / AI. Numbers and names only; message text only with
+  "include message preview". The button in alerts only opens the dashboard. Settings → 🔔 Alerts: on/off per type,
+  preview, **Send a test alert**.
+- **G2 off-server backup:** after the daily dump, gpg AES-256 (symmetric, BACKUP_PASSPHRASE) → sent to the bot chat
+  (split into 49 MB parts if ever needed); failure → alert + exit 1. `scripts/restore_backup.py` restores into a
+  scratch DB (refuses the live DB without --live) and prints row counts; a test does encrypt → decrypt → restore →
+  same row counts.
+- **G3 safer login:** TOTP (authenticator app; QR + key, 10 one-time recovery codes shown once) for any user in
+  **More → My account** (owner: recommended; staff: optional). Sessions end after 12 h; **Log out everywhere**; a
+  login from a new device / IP → alert. Lockout unchanged (wrong codes count). Lost phone, over SSH:
+  `.venv/bin/python -m scripts.create_user OWNERNAME --reset-2fa`.
+- **G4 packing slips:** 80 mm / A6 print page (Order ID big + QR, name, phone, address, items, total, paid, deli-fee
+  line, thank-you in Burmese), opens the print dialog; works from the phone. Per order and "Print all to pack".
+
+**Decisions to check**
+- Everyone was logged out once by this deploy (sessions now carry a start time for the 12 h limit).
+- Feedback / alerts use plain text; no customer text leaves the server unless you switch on the preview.
+
+**Deploy note (honest):** while deploying 5.0 the web + worker restarted with the unfinished 5.1 code in the folder,
+which reads a stock table that did not exist yet. I applied the 5.1 migration (new empty tables, backup taken a minute
+before) right away; prices loaded fine and the logs showed no errors in that window. From now on: no restarts with
+unfinished work in the folder.
+
+### How to switch on (owner)
+1. Telegram → @BotFather → /newbot → copy the token. In `.env`: `ALERT_BOT_TOKEN=<token>`.
+2. Open your new bot, send `/start`. On the server: `.venv/bin/python -m scripts.alert_chat_id` → copy the line into
+   `.env` (`ALERT_CHAT_ID=...`).
+3. `.env`: `BACKUP_PASSPHRASE=<a long passphrase>` — **save it in your password manager**; without it the backup
+   files can't be opened.
+4. `systemctl --user restart decant-alerts decant-web` (the backup timer reads .env by itself).
+Restore steps (scratch first): download the `.dump.gpg` from the bot chat to the server →
+`.venv/bin/python -m scripts.restore_backup FILE.dump.gpg` (asks the passphrase if not in .env) → check the counts.
+Only after that, to replace the live DB: stop the services, add `--db product_requests --live`, start them.
+
+### OWNER TEST SCRIPT 5.0
+1. Set the 3 .env values (above), restart; Settings → 🔔 Alerts → **Send a test alert** → arrives on your phone.
+2. `systemctl --user stop decant-listener`, wait 3 min → "❌ listener" alert; start it → "✅ resolved".
+3. Next morning: the encrypted backup is in the bot chat. Restore it into the scratch DB (steps above).
+4. More → My account → Set up 2-step login → scan → code → save the recovery codes. Log out; log in → code asked.
+5. Orders → To pack → 🖨 Print all to pack → the slips look right on paper / PDF.
+
+## 2026-11-02 — v5.1 INVENTORY in ml (docs/SPEC-v5.1-inventory.md)
+
+**Built** (`app/inventory/`, tables bottles / vials / stock_moves; migration f3c7d9e5b126)
+- **I1** a perfume with bottles in Stock is in stock only when the stock can pour the size: available ml (open
+  bottles' rest + sealed bottles) ≥ size + spill (0.3 ml, setting) and a vial of that size is left (a vial size you
+  never entered is not checked). Full bottle = a sealed bottle. It comes back when stock is added. Perfumes without
+  bottles keep the price list's manual in-stock flag (start gradually). The bot uses the same answer everywhere
+  (price replies, cart, the 4.17 size question offers only pourable sizes).
+- **I2** Packed takes the ml (oldest open bottle first, then opens the next sealed one) and one vial per item; not
+  enough → "Packed" is refused with "Not enough stock: …" (never negative). Undo / Cancel puts it back into the same
+  bottles / vials. Every change is a stock move (who, why, order) → History.
+- **I3** Products & prices → **Stock**: ml left per perfume (bar), bottles (open / adjust with reason), sellable
+  sizes, low badge, vials, **Reorder** list (below threshold, most sold first), **stock value at cost**, history,
+  Excel download / upload with preview (adds stock, never deletes), settings (spill, low thresholds per perfume).
+- **I4** low stock is in the daily 21:00 alert (5.0 bot).
+
+### OWNER TEST SCRIPT 5.1
+1. Products & prices → Stock → add 1 bottle of SWY Intensely 100 ml; Vials: 5 ml, +20.
+2. From the second account order SWY Intensely 5ml, pay with the test code, approve, Orders → 📦 Packed →
+   Stock shows **94.7 ml** and **19** vials.
+3. Adjust that bottle to 3 ml (reason "count") → ask the bot for 5ml/10ml → it offers only 2ml.
+4. Stock → Reorder lists it; tonight's 21:00 alert lists it.
+
+## 2026-11-02 — v5.2 CUSTOMER CARE (docs/SPEC-v5.2-customer-care.md)
+
+**Built** (`app/care/`, tables customer_notes / customer_tags / care_optouts / reorder_sent / order_feedback;
+migration a4d8e0f6c237)
+- **C1** customer box in the chat's right panel + a full profile page: total spent, orders, average, first / last
+  order, top 3 perfumes, usual size, city (paid orders only; test and cancelled not counted), notes (who / when),
+  tags (VIP gold, wholesale blue, problem red, any other grey), "⭐ Suggested: mark as VIP" at ≥ 5 orders or
+  ≥ 200,000 Ks (you confirm). **More → Customers**: search, tag, city, sort by spent / last order; CSV (owner only).
+- **C2** **Reorder list** (Customers → 🔁): last decant 25-45 days ago (setting), suggested message (template,
+  editable) → **one tap = one message** (outbox, rate limits). Max 1 per customer per 30 days; never to ignored /
+  never-auto-reply / opted-out customers; a customer who writes "stop" / "မပို့နဲ့" is opted out.
+- **C3** feedback after delivery (**OFF by default**; Customers → Reorder list → Settings): 2 days after delivered,
+  once per order: "Order #… ပစ္စည်း အဆင်ပြေရဲ့လား? 👍 / 👎 …". 👍 / happy words → thank-you; 👎 / unhappy /
+  complaint words → holding reply at once + Needs you + alert. Owner test button on delivered orders:
+  "💬 Ask feedback now (test)".
+- Simulator: tests/sim/scenarios/10_feedback.yaml (4 scenarios, 2 AI answers recorded, $0.0005).
+
+**Decision to check:** CLAUDE.md says the server sends only on an admin click. Reorder messages follow that exactly.
+The feedback question is automatic like the auto replies, so it is OFF until you switch it on.
+
+### OWNER TEST SCRIPT 5.2
+1. Chats → your second account → right panel: totals, top perfume, add a note and a tag.
+2. More → Customers → 🔁 Reorder list (needs a paid order 25-45 days old — your test account's test orders count
+   here; for a quick test set "Remind after" to 1 day) → edit → Send → it arrives.
+3. Turn on feedback; Orders → Delivered → a test order → "💬 Ask feedback now (test)" → answer 👎 from the second
+   account → "please wait" at once + Needs you + alert (if the bot is on).

@@ -111,8 +111,11 @@ def daily_summary(session: Session, now: datetime) -> str:
     decided = sum(runs.values())
     auto_pct = f"{runs.get('replied', 0) / decided:.0%}" if decided else "—"
     cost = report.period(session, report.today_start(now)).cost
+    from app.inventory import stock  # docs/SPEC-v5.1 I4: what to reorder
+
+    low = stock.low_lines(session)
     return (f"📊 Today: {paid[0]} paid orders, {paid[1]:,} Ks · {to_pack} to pack · automatic {auto_pct}"
-            f" · AI ${cost:.2f}")
+            f" · AI ${cost:.2f}" + ("\n🛒 Low stock: " + "; ".join(low) if low else ""))
 
 
 def tick(now: datetime | None = None, send=None) -> list[str]:

@@ -2,6 +2,10 @@
 {% import "_ui.html" as ui with context %}
 {% block title %}{{ t("Products") }} · Decant Inbox{% endblock %}
 {% block content %}
+<nav class="tabs" aria-label="{{ t('Products & prices') }}">
+  <a href="/products" aria-current="page">{{ t("Products") }}</a>{% if user_role == "owner" %}<a href="/prices">{{ t("Prices") }}</a>{% endif %}
+  <a href="/stock">{{ t("Stock") }}</a>
+</nav>
 <form method="get" action="/products" class="filters">
   <input type="search" name="q" value="{{ q }}" placeholder="{{ t('Search product or alias') }}" aria-label="{{ t('Search') }}">
   <button class="primary">{{ t("Search") }}</button>

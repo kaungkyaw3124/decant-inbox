@@ -66,6 +66,10 @@
     <div class="buttons order-actions"><a class="button primary" href="/payments">💳 {{ t("Check the payment screenshot") }}</a></div>
     {% else %}
     {% with order_back = "/orders?tab=" ~ tab %}{% include "_order_actions.html" %}{% endwith %}
+    {% if o.status == "delivered" and user_role == "owner" %}{# docs/SPEC-v5.2 P3: the owner's test button #}
+    <form method="post" action="/orders/{{ o.id }}/feedback-now" class="inline order-actions">
+      <input type="hidden" name="csrf" value="{{ csrf }}"><button class="quiet">💬 {{ t("Ask feedback now (test)") }}</button></form>
+    {% endif %}
     {% endif %}
   </li>
 {% else %}

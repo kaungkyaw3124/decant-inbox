@@ -114,6 +114,7 @@
         <span class="muted">{{ saved_phones | join(", ") or (("@" ~ c.username) if c.username else "") }}</span>
         <p class="small">{% include "_step.html" %}</p>
       </div>
+      {% with back = "/chats/" ~ c.id %}{% include "_profile.html" %}{% endwith %}
       {% if pending_check %}{# docs/SPEC-v4.21: the payment check of this customer, first in the panel #}
       <p class="group-label">{{ t("Payment") }}</p>
       <div class="group pay-box">

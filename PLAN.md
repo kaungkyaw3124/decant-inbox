@@ -5,7 +5,7 @@ Read CLAUDE.md first. This file tracks where we are.
 ## NEXT TASK (written by the planning chat; Claude Code runs it with /next)
 Task: v5.0 GO-LIVE PACK: alert bot, encrypted off-server backup, 2-step login, packing slips —
 docs/SPEC-v5.0-go-live-pack.md (goal L1-L4; secrets stay OFF until the owner sets them).
-Status: TODO
+Status: DONE 2026-11-02 — see REPORT.md (the queue items v5.1 and v5.2 were done in the same run)
 
 ## RESUME HERE (updated 2026-11-02 evening by Claude Code)
 - v1-v4.12 DONE. AI AUTO, brake ON, ai_address ON, ai_screenshot OFF.
@@ -25,7 +25,12 @@ Status: TODO
   Owner test 4.21 pending (REPORT.md).
 - v4.18 speed DONE + deployed 2026-11-02 (NOTIFY wake-ups, AI pool, 0.7 s / 0.3-0.8 s, instant holding reply).
   Owner test 4.18 pending (REPORT.md): it gives the live "after" numbers on /health → Speed.
-- NEXT: v5.0 go-live pack (in progress), then v5.1, v5.2.
+- v5.0 go-live pack DONE + deployed 2026-11-02: alerts / off-server backup OFF until the owner sets ALERT_BOT_TOKEN,
+  ALERT_CHAT_ID, BACKUP_PASSPHRASE (REPORT.md "How to switch on"); 2-step login: owner turns it on in My account.
+- v5.1 inventory DONE + deployed 2026-11-02 (empty until the owner adds bottles: manual in-stock flags until then).
+- v5.2 customer care DONE + deployed 2026-11-02 (feedback OFF until switched on).
+- Owner tests pending: 4.13-4.21, 5.0, 5.1, 5.2 (REPORT.md).
+- NEXT: the QUEUE is empty — ask the planning chat for the next task.
 - Owner checks: `bash scripts/status.sh`; AI numbers at /ai.
 
 ## Status
@@ -56,6 +61,9 @@ Status: TODO
 | 21 | v4.20 (docs/SPEC-v4.20-automation-goal.md): automation goal — simulator (214 scenarios) + strict judge + live replay; G1-G4 met | ✅ Done, live (owner test pending; fill Delivery fee FAQ) |
 | 22 | v4.21 (docs/SPEC-v4.21-ios-messenger-ui.md): Messenger workspace, iOS look, phone tab bar | ✅ Done, live (owner test pending) |
 | 23 | v4.18 (docs/SPEC-v4.18-speed.md): first reply in ~2 s, AI pool, instant holding reply, Speed on /health | ✅ Done, live (owner test pending) |
+| 24 | v5.0 (docs/SPEC-v5.0-go-live-pack.md): alert bot, encrypted off-server backup, 2-step login, packing slips | ✅ Done, live (secrets OFF until set; owner test pending) |
+| 25 | v5.1 (docs/SPEC-v5.1-inventory.md): stock in ml, auto out-of-stock, deduct on packed, Stock page | ✅ Done, live (owner test pending) |
+| 26 | v5.2 (docs/SPEC-v5.2-customer-care.md): customer profiles, reorder list, feedback after delivery | ✅ Done, live (feedback OFF; owner test pending) |
 
 ## Phase 0 checklist
 - [x] Step 0: rollback safety net scripts in ~/hardening/
@@ -136,7 +144,7 @@ payments → Viber → reports. Each is a new module with its own tables.
    (v4.19 NEEDS YOU CARDS: replaced by v4.21, do not build separately)
 6. v4.18 SPEED: first reply within 3 s — docs/SPEC-v4.18-speed.md (S0-S5, T1-T8, OWNER TEST 4.18). Status: DONE 2026-11-02 (run with the queue; see REPORT.md)
 7. v5.0 GO-LIVE PACK: alert bot, encrypted off-server backup, 2-step login, packing slips — docs/SPEC-v5.0-go-live-pack.md
-   (goal L1-L4; secrets stay OFF until the owner sets them). Status: moved to NEXT TASK 2026-11-02
-8. v5.1 INVENTORY in ml: bottles, vials, auto out-of-stock, deduct on packed — docs/SPEC-v5.1-inventory.md (goal I1-I4). Status: TODO
+   (goal L1-L4; secrets stay OFF until the owner sets them). Status: DONE 2026-11-02
+8. v5.1 INVENTORY in ml: bottles, vials, auto out-of-stock, deduct on packed — docs/SPEC-v5.1-inventory.md (goal I1-I4). Status: DONE 2026-11-02
 9. v5.2 CUSTOMER CARE: profiles, one-tap reorder list, feedback after delivery — docs/SPEC-v5.2-customer-care.md
-   (goal C1-C3). Status: TODO
+   (goal C1-C3). Status: DONE 2026-11-02

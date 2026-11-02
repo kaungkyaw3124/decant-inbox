@@ -23,8 +23,8 @@ from starlette.middleware.sessions import SessionMiddleware
 from app.core.config import get_settings
 from app.models import AuditLog, User
 from app.web import (
-    account, ai as ai_pages, auto as auto_pages, catalog, chats, health, help as help_pages, i18n, inbox, learning, orders, payments, practice,
-    prices, sales, settings as settings_pages, users,
+    account, ai as ai_pages, auto as auto_pages, catalog, chats, customers, health, help as help_pages, i18n, inbox, learning, orders, payments, practice,
+    prices, sales, settings as settings_pages, stock, users,
 )
 from app.alerts import service as alerts
 from app.web import twostep
@@ -63,6 +63,8 @@ app.include_router(health.router)
 app.include_router(help_pages.router)
 app.include_router(practice.router)
 app.include_router(account.router)
+app.include_router(stock.router)
+app.include_router(customers.router)
 
 ERROR_TITLES = {400: "Can't do that", 403: "Not allowed", 404: "Not found", 409: "Already changed"}
 

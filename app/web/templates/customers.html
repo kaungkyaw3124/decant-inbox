@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% import "_ui.html" as ui with context %}
+{% block title %}{{ t("Customers") }} · Decant Inbox{% endblock %}
+{% block content %}
+<h1>{{ t("Customers") }} {{ ui.help("Everyone who paid at least once (test and cancelled orders not counted).") }}</h1>
+<p class="buttons small"><a class="button primary chip" href="/customers/reorder">🔁 {{ t("Reorder list") }}</a>
+  {% if user_role == "owner" %}<a class="button chip" href="/customers/export.csv">⬇ CSV</a>{% endif %}</p>
+<form method="get" action="/customers" class="filters">
+  <input type="search" name="q" value="{{ q }}" placeholder="{{ t('Name') }}" aria-label="{{ t('Search') }}">
+  <input name="tag" value="{{ tag }}" placeholder="{{ t('Tag') }}" aria-label="{{ t('Tag') }}" list="known-tags">
+  <datalist id="known-tags"><option>VIP</option><option>wholesale</option><option>problem</option></datalist>
+  <input name="city" value="{{ city }}" placeholder="{{ t('City') }}" aria-label="{{ t('City') }}">
+  <select name="sort" aria-label="{{ t('Sort') }}"><option value="spent" {% if sort == "spent" %}selected{% endif %}>{{ t("Most spent") }}</option>
+    <option value="last" {% if sort == "last" %}selected{% endif %}>{{ t("Last order") }}</option></select>
+  <button class="primary">{{ t("Filter") }}</button>
+</form>
+<ul class="rows">
+{% for r in rows %}
+  <li class="item"><a class="row-main" href="/customers/{{ r.c.id }}">
+    <div class="meta"><span class="who">{{ r.c.display_name or r.c.username or t("Customer") }}</span>
+      <time>{{ r.last | local_time("%d %b %Y") }}</time></div>
+    <p class="text"><b>{{ format_mmk(r.spent) }}</b> ကျပ် · {{ t("{n} orders", n=r.orders) }}{% if r.city %} · {{ r.city }}{% endif %}</p>
+    {% if r.tags %}<p class="tags">{% for tg in r.tags %}<span class="tag {{ colours.get(tg, '') }}">{{ tg }}</span>{% endfor %}</p>{% endif %}
+  </a></li>
+{% else %}
+  <li class="empty">{{ t("No customers match.") }}</li>
+{% endfor %}
+</ul>
+{% endblock %}

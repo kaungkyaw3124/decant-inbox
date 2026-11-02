@@ -963,6 +963,22 @@
 91
 ]
 },
+"4cbffddf9a6d8bccc1c33c3f": {
+"data": {
+"address": null,
+"confidence": 0.99,
+"draft_answer": null,
+"intent": "other",
+"items": [],
+"learn": [],
+"reason": "A thumbs-down reaction with no text indicates dissatisfaction or chit-chat."
+},
+"tokens": [
+3999,
+0,
+50
+]
+},
 "54b1be30f6c191b02cf66755": {
 "data": {
 "address": null,
@@ -2376,6 +2392,22 @@
 4116,
 3930,
 209
+]
+},
+"d51593328e737304a8cb6324": {
+"data": {
+"address": null,
+"confidence": 0.93,
+"draft_answer": null,
+"intent": "other",
+"items": [],
+"learn": [],
+"reason": "Says the scent is not good; no product or request is stated."
+},
+"tokens": [
+4006,
+3930,
+52
 ]
 },
 "d7dec45a6c5dacedd1555c08": {

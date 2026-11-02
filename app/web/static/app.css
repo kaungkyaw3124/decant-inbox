@@ -262,15 +262,6 @@ details table { margin-top: 10px; }
 .tabs a[aria-current] { color: var(--plum); border-bottom-color: var(--plum); }
 
 /* ---------- chat ---------- */
-.chat-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 12px; }
-.chat-head > * { min-width: 0; }
-.chat-head h1 { margin: 0; overflow-wrap: anywhere; }
-.chat-layout { display: grid; gap: 14px; grid-template-columns: minmax(0, 1fr); }
-@media (min-width: 992px) {
-  .chat-layout { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); align-items: start; }
-  .chat-pane { max-height: calc(100vh - 220px); overflow-y: auto; }
-  .side { position: sticky; top: 72px; }
-}
 .thread { display: flex; flex-direction: column; gap: 8px; }
 .bubble { max-width: 85%; padding: 8px 12px; border-radius: 16px 16px 16px 4px; background: var(--card); border: 1px solid var(--line); min-width: 0; }
 .bubble.in { align-self: flex-start; }
@@ -281,14 +272,9 @@ details table { margin-top: 10px; }
 .bubble-meta { font-size: .75rem; color: var(--muted); text-align: right; margin-top: 2px; }
 .bubble-meta a { display: inline-flex; align-items: center; min-height: 40px; padding: 0 4px; }
 .bubble .buttons { margin-top: 6px; justify-content: flex-end; }
-.chat-pane { background: #f1edf5; }
 .thumb { max-width: 100%; width: 220px; max-height: 260px; object-fit: cover; border-radius: 10px; display: block; }
 .photo { display: grid; gap: 6px; }
 .pick-row { grid-template-columns: 2fr 1fr; }
-.side { display: grid; gap: 14px; align-content: start; min-width: 0; }
-.phone-tabs { display: none; }
-@media (max-width: 991.98px) { .phone-tabs { display: flex; } .phone-hidden { display: none; } }
-.reply-pane .tabs a { min-height: var(--tap); }
 .next-step { margin: 0 0 12px; }
 .cart-items { display: table; }
 .cart-items td, .cart-items th { padding: 6px 4px; }
@@ -393,17 +379,6 @@ main :is(p, td, li, div, h2, span) > a:only-child, main > a, .buttons > a { disp
 @media (max-width: 419.98px) { .brand-name { display: none; } }
 pre.example, pre { font-family: inherit; }
 
-/* chat (U2): thread scrolls inside its card so the reply box is always right under it; cart = sheet on phones */
-@media (max-width: 991.98px) {
-  .chat-pane { max-height: 58vh; overflow-y: auto; }
-  .cart-sheet { --bs-offcanvas-width: min(420px, 100vw); }
-  .cart-sheet .cart-pane { border: 0; padding: 0; margin: 0; }
-}
-@media (min-width: 992px) { .cart-sheet .offcanvas-body { display: block; padding: 0; } }
-.reply-pane .tabs { border-bottom: 0; gap: 8px; padding-bottom: 4px; }
-.reply-pane .tabs a { border: 1px solid #cfc9d6; border-radius: 999px; padding: 6px 14px; background: var(--card); }
-.reply-pane .tabs a[aria-current] { background: var(--plum); color: #fff; border-color: var(--plum); }
-.phone-tabs a[data-bs-toggle] { color: var(--plum); }
 
 /* payments (U2) */
 .compare { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
@@ -647,3 +622,11 @@ button.danger, summary.button.danger, a.button.danger { color: #B80012; }
 .stock-bar::-webkit-progress-bar { background: var(--ios-fill); } .stock-bar::-webkit-progress-value { background: var(--ios-green); }
 .stock-bar::-moz-progress-bar { background: var(--ios-green); }
 .inline-details { display: inline-block; }
+/* docs/SPEC-v5.2: customer profile + tags */
+.care-box .care-stats { font-size: 15px; margin: 0 0 2px; }
+.tags { display: flex; flex-wrap: wrap; gap: 4px; margin: 4px 0; }
+.tag { display: inline-flex; align-items: center; padding: 0 8px; border-radius: 999px; font-size: 12px; font-weight: 600;
+  line-height: 1.8; background: var(--ios-fill); color: var(--ios-label2); }
+.tag.vip { background: #FFF1C2; color: #7A5200; } .tag.wholesale { background: #E1EEFF; color: var(--ios-blue-text); }
+.tag.problem { background: var(--bad-bg); color: var(--danger); }
+.note { margin: 2px 0; }

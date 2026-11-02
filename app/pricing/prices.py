@@ -30,6 +30,21 @@ def latest_prices(session: Session, product_ids: list[int] | None = None) -> dic
     for row in session.scalars(query):
         result.setdefault(row.product_id, {})[row.size_ml] = Price(
             row.size_ml, row.price_mmk, row.in_stock, row.effective_from)
+    return with_stock(session, result)
+
+
+def with_stock(session: Session, result: dict[int, dict[int | None, Price]]) -> dict[int, dict[int | None, Price]]:
+    """docs/SPEC-v5.1 I1: perfumes with bottles in the stock list are in stock only when the stock can fill the
+    size; perfumes without bottles keep the price list's manual in_stock flag."""
+    from app.inventory import stock  # late import: inventory -> models only
+
+    levels = stock.levels(session, list(result))
+    if not levels:
+        return result
+    vials, spill = stock.vials(session), stock.settings(session)["spill_ml"]
+    for pid, level in levels.items():
+        for size, p in result.get(pid, {}).items():
+            result[pid][size] = Price(p.size_ml, p.price_mmk, stock.sellable(level, size, vials, spill), p.effective_from)
     return result
 
 

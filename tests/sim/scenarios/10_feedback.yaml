@@ -1,0 +1,34 @@
+# docs/SPEC-v5.2-customer-care.md P3: answers to "is everything OK?" after delivery. Happy -> thank-you (auto);
+# unhappy -> a person (holding reply + Needs you = correct). hand: true.
+
+- id: feedback-thumbs-up
+  hand: true
+  tags: [feedback]
+  setup: {state: delivered, items: ["Eros 5ml"], age_min: 2900, feedback: true}
+  turns:
+    - say: "👍"
+      expect: {reply: auto, contains: ["ကျေးဇူးတင်ပါတယ်"]}
+
+- id: feedback-happy-words
+  hand: true
+  tags: [feedback]
+  setup: {state: delivered, items: ["Libre 5ml"], age_min: 2900, feedback: true}
+  turns:
+    - say: "အဆင်ပြေပါတယ် ကြိုက်တယ်"
+      expect: {reply: auto, contains: ["ကျေးဇူးတင်ပါတယ်"]}
+
+- id: feedback-thumbs-down
+  hand: true
+  tags: [feedback]
+  setup: {state: delivered, items: ["Eros 10ml"], age_min: 2900, feedback: true}
+  turns:
+    - say: "👎"
+      expect: {reply: person}
+
+- id: feedback-unhappy-words
+  hand: true
+  tags: [feedback]
+  setup: {state: delivered, items: ["Eros 5ml"], age_min: 2900, feedback: true}
+  turns:
+    - say: "အနံ့ မကောင်းဘူး"
+      expect: {reply: person}

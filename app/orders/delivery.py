@@ -156,7 +156,18 @@ def move(session: Session, order: Order, to: str, user: User | None, texts: dict
         order.delivered_at = now
         if user is not None and rules(session)["thank_you"]:
             box = queue(session, order, texts["order_delivered"], user, "delivery", "delivered")
+    _sync_stock(session, order, user)
     return _event(session, order, before, user, box, f"order.{to}")
+
+
+def _sync_stock(session: Session, order: Order, user: User | None) -> None:
+    """docs/SPEC-v5.1 I2: packed takes the ml / vials out; undo or cancel puts them back."""
+    from app.inventory import stock  # late import
+
+    try:
+        stock.sync(session, order, user)
+    except stock.StockError as exc:
+        raise OrderError(str(exc)) from None
 
 
 def cancel(session: Session, order: Order, user: User | None, texts: dict[str, str], note: str = "",
@@ -168,6 +179,7 @@ def cancel(session: Session, order: Order, user: User | None, texts: dict[str, s
     before = _snapshot(order)
     cart.cancel(session, order)
     order.cancel_note = note.strip()[:500] or None
+    _sync_stock(session, order, user)
     box = queue(session, order, texts[message], user, "cancel", "cancel", delay) if message else None
     return _event(session, order, before, user, box, "order.cancel", note=order.cancel_note)
 
@@ -195,6 +207,7 @@ def undo(session: Session, event: OrderEvent, user: User, now: datetime | None =
         setattr(order, field, datetime.fromisoformat(value) if is_time else value)
     order.updated_at = now
     event.undone_at = now
+    _sync_stock(session, order, user)
     session.add(AuditLog(user_id=user.id, action="order.undo", details={"event_id": event.id, "order_id": order.id}))
     return order
 

@@ -104,7 +104,8 @@ def housekeeping() -> None:
 
 
 def follow_up() -> None:
-    """Payment reminders and auto-cancel of unpaid orders (docs/SPEC-v3.md 6.2)."""
+    """Payment reminders and auto-cancel of unpaid orders (docs/SPEC-v3.md 6.2); feedback after delivery
+    (docs/SPEC-v5.2 P3, only when switched on)."""
     try:
         with SessionLocal.begin() as session:
             stats = followups.run(session)
@@ -112,6 +113,14 @@ def follow_up() -> None:
             log.info("payment follow-ups: %s", stats)
     except Exception:
         log.exception("payment follow-ups failed")
+    try:
+        from app import care  # late import
+
+        with SessionLocal.begin() as session:
+            if asked := care.ask_feedback(session):
+                log.info("feedback asked: %d orders", asked)
+    except Exception:
+        log.exception("feedback step failed")
 
 
 def catch_silence() -> None:

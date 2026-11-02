@@ -179,6 +179,13 @@ TEMPLATES: tuple[TemplateDef, ...] = (
                 {"words": "ysl 10ml", "options": "1. Y Eau de Parfum 10ml\n2. Libre 10ml"}),
     TemplateDef("order_cancelled", "Customer cancelled the order",
                 "အော်ဒါ cancel လုပ်ပြီးပါပြီ။ နောက်မှ ပြန်မှာချင်ရင် ပြောပေးပါနော်။", {}),
+    # docs/SPEC-v5.2-customer-care.md: reorder suggestion (admin click only) and feedback after delivery
+    TemplateDef("reorder_suggest", "Reorder: suggested message (an admin sends it with one tap; editable)",
+                "{product} ကုန်ခါနီးပြီလား? ထပ်ယူချင်ရင် ပြောပါနော်။", {"product": "Stronger With You Intensely 10ml"}),
+    TemplateDef("feedback_ask", "Feedback: 2 days after delivered (only if switched on in Customers)",
+                "Order #{order_no} ပစ္စည်း အဆင်ပြေရဲ့လား? 👍 / 👎 သို့မဟုတ် စာနဲ့ ပြောပေးပါနော်။", {"order_no": "1001"}),
+    TemplateDef("feedback_thanks", "Feedback: the customer is happy",
+                "ကျေးဇူးတင်ပါတယ်ရှင့်။ နောက်လည်း အားပေးပါဦးနော် 🙏", {}),
 )
 BY_KEY = {t.key: t for t in TEMPLATES}
 MAX_LENGTH = 2000

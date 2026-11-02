@@ -27,6 +27,7 @@ from app.parser.rules import find_phones
 from app.pricing.prices import current_prices
 from app.replies import compose
 from app.replies import templates as replies
+from app import care
 from app.web import staff
 from app.web.auth import current_user, verify_csrf
 from app.web.deps import get_db, templates
@@ -238,6 +239,7 @@ def chat(request: Request, customer_id: int, db: Session = Depends(get_db), user
         "city": ((customer.address_parts or {}).get("city") or "").split(",")[0],
         "methods": db.scalars(select(PaymentMethod).where(PaymentMethod.active).order_by(PaymentMethod.sort_order)).all(),
         "may_decide": staff.may_decide_payments(db, user),
+        "profile": care.profile(db, customer), "colours": care.TAG_COLOURS,  # docs/SPEC-v5.2 P1
         **thread_context(db, customer), **cart_context(db, customer, texts), "mode": mode, "result": result,
         "greet": greet, "tab": request.query_params.get("tab", "chat"),
         "items": items + [compose.PriceItem(0, "all")] * (compose.MAX_PRICE_ITEMS - len(items)),

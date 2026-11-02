@@ -63,8 +63,12 @@ def _answered(session: Session, message: Message):
 
 
 def _waiting_customer(session: Session, message: Message) -> bool:
-    """Every message waits for an answer (G3), except small talk ("thanks", "ok", 👍) — that needs none."""
-    return not is_small_talk(message.raw_text)
+    """Every message waits for an answer (G3), except small talk ("thanks", "ok", 👍) — that needs none.
+    A 👎 to the feedback question (docs/SPEC-v5.2 P3) is never small talk: a person answers."""
+    from app.models import AutoRun  # late import: keep this module's imports as they were
+
+    return not is_small_talk(message.raw_text) or bool(session.scalar(select(exists().where(
+        AutoRun.message_id == message.id, AutoRun.reason.startswith("feedback: unhappy")))))
 
 
 def silent(session: Session, now: datetime) -> list[Message]:

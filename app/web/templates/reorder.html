@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% import "_ui.html" as ui with context %}
+{% block title %}{{ t("Reorder list") }} · Decant Inbox{% endblock %}
+{% block content %}
+<p><a href="/customers">‹ {{ t("Customers") }}</a></p>
+<h1>🔁 {{ t("Reorder list") }} {{ ui.help("Customers whose last decant was within the days set below. One tap = one message to that customer (edit it first if you like). At most one per customer every 30 days; never to customers who said stop.") }}</h1>
+<p class="small muted">{{ t("Last decant {a}-{b} days ago", a=cfg.reorder_min_days, b=cfg.reorder_max_days) }}</p>
+<ul class="rows">
+{% for r in rows %}
+  <li class="item" id="reorder-{{ r.c.id }}">
+    <div class="row-main">
+      <div class="meta"><a class="who" href="/customers/{{ r.c.id }}">{{ r.c.display_name or r.c.username or t("Customer") }}</a>
+        <span>{{ t("{n} days ago", n=r.days) }} · {{ r.product }}</span></div>
+      <form method="post" action="/customers/{{ r.c.id }}/reorder" class="compose-box">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <label class="compose-field"><span class="visually-hidden">{{ t("Message (you can edit it)") }}</span>
+          <textarea name="text" rows="2" maxlength="4000" required>{{ r.text }}</textarea></label>
+        <button class="primary">{{ t("Send") }}</button>
+      </form>
+    </div>
+  </li>
+{% else %}
+  <li class="empty">{{ t("Nobody to remind right now.") }}</li>
+{% endfor %}
+</ul>
+{% if user_role == "owner" %}
+<form method="post" action="/customers/care-settings" class="card stack" id="care-settings">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <h2>{{ t("Settings") }}</h2>
+  <div class="grid">
+    <label>{{ t("Remind after (days)") }} <input name="reorder_min_days" type="number" min="1" max="365" value="{{ cfg.reorder_min_days }}"></label>
+    <label>{{ t("Until (days)") }} <input name="reorder_max_days" type="number" min="1" max="365" value="{{ cfg.reorder_max_days }}"></label>
+    <label class="check"><input type="checkbox" name="feedback_on" value="1" {% if cfg.feedback_on %}checked{% endif %}> {{ t("Ask for feedback 2 days after delivery (one question per order)") }}</label>
+  </div>
+  <button class="primary">{{ t("Save") }}</button>
+</form>
+{% endif %}
+{% endblock %}

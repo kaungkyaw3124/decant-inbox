@@ -25,11 +25,13 @@
 {% set daily = [("/chats", "bi-chat", "Chats", needs_count, in_chats),
                 ("/orders", "bi-box-seam", "Orders", to_pack, path.startswith("/orders")),
                 ("/payments", "bi-credit-card", "Payments", payments_open, path.startswith("/payments"))] %}
-{% set side = [("/products", "bi-droplet", "Products & prices", path.startswith("/products") or path.startswith("/prices")),
+{% set side = [("/products", "bi-droplet", "Products & prices", path.startswith("/products") or path.startswith("/prices") or path.startswith("/stock")),
                ("/sales", "bi-bar-chart", "Sales", path.startswith("/sales"))] %}
 {% set more_links = [("/products", "bi-droplet", "Products", true, 0),
                ("/prices", "bi-tags", "Prices", user_role == "owner", 0),
+               ("/stock", "bi-box", "Stock", true, 0),
                ("/sales", "bi-graph-up", "Sales", true, 0),
+               ("/customers", "bi-person-vcard", "Customers", true, 0),
                ("/", "bi-inbox", "Inbox", true, 0),
                ("/reports/wanted", "bi-clipboard-data", "Reports", true, 0),
                ("/learning", "bi-mortarboard", "Learning", user_role == "owner", to_learn),

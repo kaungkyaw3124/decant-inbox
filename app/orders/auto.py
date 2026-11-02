@@ -22,6 +22,7 @@ parse result (method "ai") is acted on only while the AI mode is AUTO.
 """
 import logging
 import random
+import threading
 import re
 from datetime import UTC, datetime, timedelta
 
@@ -151,6 +152,8 @@ def decide(session: Session, message: Message, now: datetime, ai_mode: str | Non
         return _skip(session, message.id, "ignored customer")
     if customer.auto_reply_off:
         return _skip(session, message.id, "auto-reply off for this customer")
+    if message.kind == "text" and (answered := _feedback_answer(session, message, now)):
+        return answered
     if message.kind != "text":
         return _media_reply(session, message, now)
     if customer.is_tester and testpay.is_code(message.raw_text):
@@ -211,6 +214,36 @@ def decide(session: Session, message: Message, now: datetime, ai_mode: str | Non
         return _skip(session, message.id, str(exc)[:120])
     session.add(AutoRun(message_id=message.id, status="replied", quick_action_id=action.id))
     return f"{suggestion.kind}"
+
+
+def _feedback_answer(session: Session, message: Message, now: datetime) -> str | None:
+    """docs/SPEC-v5.2 P3: the answer to "is everything OK?" after delivery. Happy -> thank-you; unhappy ->
+    a person (the holding reply goes at once, Needs you, and the owner's alert bot now); other -> as usual."""
+    from app import care  # late import: care -> orders
+
+    feedback = care.open_feedback(session, message)
+    if feedback is None:
+        return None
+    kind = care.classify(message.raw_text)
+    feedback.answer, feedback.message_id, feedback.answered_at = kind, message.id, now
+    if kind == "good":
+        return _send(session, message, replies.load(session)["feedback_thanks"], "custom", now, "feedback_thanks")
+    if kind == "bad":
+        customer = session.get(Customer, message.customer_id)
+        threading.Thread(target=_alert_unhappy, daemon=True, args=(
+            customer.display_name or customer.username or f"customer {customer.id}", feedback.order_id)).start()
+        return _skip(session, message.id, "feedback: unhappy customer (a person answers)")
+    return None
+
+
+def _alert_unhappy(name: str, order_id: int) -> None:
+    from app.alerts import bot
+
+    try:
+        if bot.configured():
+            bot.send(f"👎 {name} is not happy with their order (feedback). Open Needs you.")
+    except Exception:
+        log.warning("unhappy-customer alert not sent")
 
 
 MEDIA_AGAIN = timedelta(minutes=10)

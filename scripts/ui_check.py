@@ -39,7 +39,7 @@ PORT = 8765
 WIDTHS = (360, 768, 1280)
 DAILY = ("inbox", "chats", "chat", "payments", "payment", "payment-test", "orders", "orders-test")
 SKIP = {"/healthz", "/media/{message_id}", "/payments/{check_id}/shot", "/sales/export.xlsx",
-        "/prices/export.xlsx", "/login"}  # files / JSON, not pages
+        "/prices/export.xlsx", "/login", "/stock/export.xlsx", "/customers/export.csv"}  # files / JSON, not pages
 PARTIALS = {"/messages/{message_id}/row", "/chats/{customer_id}/thread"}
 
 

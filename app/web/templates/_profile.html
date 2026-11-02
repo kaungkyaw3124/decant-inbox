@@ -1,0 +1,26 @@
+{# docs/SPEC-v5.2 P1: who this customer is, at a glance. Needs: c, profile, colours; back (where forms return) #}
+<div class="group care-box" id="profile">
+  <p class="care-stats"><b>{{ format_mmk(profile.spent) }}</b> ကျပ် · {{ t("{n} orders", n=profile.orders) }}{% if profile.orders %} · {{ t("average") }} {{ format_mmk(profile.average) }}{% endif %}</p>
+  {% if profile.last %}<p class="small muted">{{ t("Last order") }} {{ profile.last | local_time("%d %b %Y") }}{% if profile.first and profile.orders > 1 %} · {{ t("first") }} {{ profile.first | local_time("%d %b %Y") }}{% endif %}{% if profile.city %} · {{ profile.city }}{% endif %}</p>{% endif %}
+  {% if profile.top %}<p class="small">⭐ {% for name, n in profile.top %}{{ name }} ×{{ n }}{% if not loop.last %} · {% endif %}{% endfor %}{% if profile.usual_size %} · {{ t("usually {n} ml", n=profile.usual_size) }}{% endif %}</p>{% endif %}
+  <p class="tags">{% for tg in profile.tags %}<span class="tag {{ colours.get(tg, '') }}">{{ tg }}</span>{% endfor %}
+    {% if profile.opted_out %}<span class="tag">{{ t("no reorder / feedback messages") }}</span>{% endif %}</p>
+  {% if profile.vip_suggested %}
+  <form method="post" action="/customers/{{ c.id }}/tags" class="inline"><input type="hidden" name="csrf" value="{{ csrf }}">
+    <input type="hidden" name="tag" value="VIP"><input type="hidden" name="back" value="{{ back }}">
+    <button class="quiet">⭐ {{ t("Suggested: mark as VIP") }}</button></form>
+  {% endif %}
+  <form method="post" action="/customers/{{ c.id }}/tags" class="inline-form">
+    <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="back" value="{{ back }}">
+    <input name="tag" list="known-tags" maxlength="24" placeholder="{{ t('Tag (VIP, wholesale, problem…)') }}" aria-label="{{ t('Tag') }}" required>
+    <datalist id="known-tags"><option>VIP</option><option>wholesale</option><option>problem</option></datalist>
+    <button>{{ t("Add tag") }}</button>
+  </form>
+  {% for n, who in profile.notes[:3] %}<p class="small note">📝 {{ n.text }} <span class="muted">— {{ who or t("system") }}, {{ n.created_at | local_time("%d %b") }}</span></p>{% endfor %}
+  <form method="post" action="/customers/{{ c.id }}/notes" class="inline-form">
+    <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="back" value="{{ back }}">
+    <input name="text" maxlength="500" placeholder="{{ t('Note about this customer') }}" aria-label="{{ t('Note') }}" required>
+    <button>{{ t("Add note") }}</button>
+  </form>
+  <p class="small"><a href="/customers/{{ c.id }}">{{ t("Full profile") }} ›</a></p>
+</div>

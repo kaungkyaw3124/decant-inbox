@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+{% import "_ui.html" as ui with context %}
+{% block title %}{{ t("Stock") }} · Decant Inbox{% endblock %}
+{% block content %}
+{# docs/SPEC-v5.1-inventory.md I3: ml left, bottles, vials, reorder, stock value at cost, history #}
+<nav class="tabs" aria-label="{{ t('Products & prices') }}">
+  <a href="/products">{{ t("Products") }}</a>{% if user_role == "owner" %}<a href="/prices">{{ t("Prices") }}</a>{% endif %}
+  <a href="/stock" aria-current="page">{{ t("Stock") }}</a>
+</nav>
+<h1>{{ t("Stock") }} {{ ui.help("Perfumes with bottles here are in stock only when a size can be poured. Perfumes without bottles use the price list's in-stock flag. Packing an order takes the ml and one vial out; Undo or Cancel puts them back.") }}</h1>
+<div class="tiles">
+  <div class="tile"><span>{{ t("Stock value at cost") }}</span><b>{{ format_mmk(value) }}</b><small>ကျပ်</small></div>
+  <div class="tile"><span>{{ t("To reorder") }}</span><b>{{ reorder | length + low_vials | length }}</b></div>
+  <div class="tile"><span>{{ t("Perfumes with stock") }}</span><b>{{ rows | length }}</b></div>
+</div>
+
+{% if reorder or low_vials %}
+<section class="card notice" id="reorder">
+  <h2>🛒 {{ t("Reorder") }}</h2>
+  <ul class="feed">
+    {% for r in reorder %}<li><b>{{ r.product.name }}</b> · {{ "%.0f" | format(r.level.available_ml) }} ml {{ t("left") }} <span class="small muted">({{ t("sold {n} ml in 30 days", n="%.0f" | format(r.sold_30d)) }})</span></li>{% endfor %}
+    {% for v in low_vials %}<li><b>{{ v.size_ml }} ml {{ t("vials") }}</b> · {{ v.count }} {{ t("left") }}</li>{% endfor %}
+  </ul>
+</section>
+{% endif %}
+
+<section class="card" id="perfumes">
+  <h2>{{ t("Perfumes") }}</h2>
+  {% for r in rows %}
+  <details class="stock-row" id="stock-{{ r.product.id }}">
+    <summary>
+      <span class="stock-name"><b>{{ r.product.name }}</b> <span class="small muted">{{ r.product.brand }}</span></span>
+      <progress class="stock-bar" max="100" value="{{ r.percent }}" aria-label="{{ '%.0f' | format(r.level.available_ml) }} ml"></progress>
+      <span class="small">{{ "%.1f" | format(r.level.available_ml) }} ml{% if r.low %} <span class="badge bad">{{ t("low") }}</span>{% endif %}</span>
+    </summary>
+    <p class="small">{{ t("Sellable now") }}: {% for p in r.sizes %}{{ (p.size_ml ~ "ml") if p.size_ml else t("full bottle") }}{% if not loop.last %} · {% endif %}{% else %}<span class="problem-text">{{ t("nothing") }}</span>{% endfor %}</p>
+    <table class="cart-items">
+      {% for b in r.bottles %}
+      <tr><td>{{ b.size_ml }} ml · {{ t(b.status) }}{% if b.cost_mmk %} · {{ format_mmk(b.cost_mmk) }} ကျပ်{% endif %}</td>
+        <td class="num">{{ "%.1f" | format(b.remaining_ml) }} ml</td>
+        <td>{% if user_role == "owner" %}
+          {% if b.status == "sealed" %}<form method="post" action="/stock/bottles/{{ b.id }}/open" class="inline"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="link">{{ t("Open") }}</button></form>{% endif %}
+          <details class="inline-details"><summary class="button link">{{ t("Adjust") }}</summary>
+            <form method="post" action="/stock/bottles/{{ b.id }}/adjust" class="stack">
+              <input type="hidden" name="csrf" value="{{ csrf }}">
+              <label>{{ t("ml left now") }} <input name="remaining_ml" inputmode="decimal" value="{{ '%.1f' | format(b.remaining_ml) }}" required></label>
+              <label>{{ t("Why (count, spill, gift…)") }} <input name="reason" maxlength="200" required></label>
+              <button class="primary">{{ t("Save") }}</button>
+            </form></details>{% endif %}</td></tr>
+      {% endfor %}
+    </table>
+  </details>
+  {% else %}
+  <p class="empty">{{ t("No bottles yet. Add one below, or import your first count.") }}</p>
+  {% endfor %}
+</section>
+
+{% if user_role == "owner" %}
+<form method="post" action="/stock/bottles" class="card stack" id="add-bottle">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <h2>➕ {{ t("Add bottles (purchase)") }}</h2>
+  <div class="grid">
+    <label>{{ t("Product") }} <select name="product_id" required>{% for p in products %}<option value="{{ p.id }}">{{ p.name }} · {{ p.brand }}</option>{% endfor %}</select></label>
+    <label>{{ t("Bottle size (ml)") }} <input name="size_ml" inputmode="numeric" required></label>
+    <label>{{ t("How many") }} <input name="count" inputmode="numeric" value="1"></label>
+    <label>{{ t("Cost per bottle (ကျပ်)") }} <input name="cost_mmk" inputmode="numeric"></label>
+    <label>{{ t("ml left (empty = sealed, full)") }} <input name="remaining_ml" inputmode="decimal"></label>
+  </div>
+  <button class="primary">{{ t("Add") }}</button>
+</form>
+{% endif %}
+
+<section class="card stack" id="vials">
+  <h2>🧪 {{ t("Vials") }}</h2>
+  <table class="cart-items">{% for v in vials %}<tr><td>{{ v.size_ml }} ml</td><td class="num">{{ v.count }}</td><td class="num small muted">{% if v.cost_each_mmk %}{{ format_mmk(v.cost_each_mmk) }} ကျပ်{% endif %}</td></tr>{% else %}<tr><td class="muted">{{ t("No vials entered: vials are not checked.") }}</td></tr>{% endfor %}</table>
+  {% if user_role == "owner" %}
+  <form method="post" action="/stock/vials" class="grid">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <label>{{ t("Vial size (ml)") }} <input name="size_ml" inputmode="numeric" required></label>
+    <label>{{ t("Add (+) or remove (−)") }} <input name="change" inputmode="numeric" required></label>
+    <label>{{ t("Cost each (ကျပ်)") }} <input name="cost_each_mmk" inputmode="numeric"></label>
+    <button>{{ t("Save vials") }}</button>
+  </form>
+  {% endif %}
+</section>
+
+{% if user_role == "owner" %}
+<section class="card stack" id="stock-excel">
+  <h2>📄 {{ t("Excel (first count)") }}</h2>
+  <p class="small muted">{{ t("Download, fill the Bottles and Vials sheets, upload: you see a preview first. Importing adds stock; it never deletes.") }}</p>
+  <p><a class="button" href="/stock/export.xlsx">⬇ {{ t("Download stock") }}</a></p>
+  <form method="post" action="/stock/import" enctype="multipart/form-data" class="inline-form">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <input type="file" name="file" accept=".xlsx" required aria-label="{{ t('Excel file') }}">
+    <button>{{ t("Upload + preview") }}</button>
+  </form>
+</section>
+
+<form method="post" action="/stock/settings" class="card stack" id="stock-settings">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <h2>⚙️ {{ t("Stock settings") }}</h2>
+  <div class="grid">
+    <label>{{ t("Spill per decant (ml)") }} <input name="spill_ml" inputmode="decimal" value="{{ cfg.spill_ml }}"></label>
+    <label>{{ t("Low stock below (ml)") }} <input name="low_ml" inputmode="numeric" value="{{ cfg.low_ml }}"></label>
+    <label>{{ t("Low vials below") }} <input name="low_vials" inputmode="numeric" value="{{ cfg.low_vials }}"></label>
+    {% for r in rows %}<label>{{ r.product.name }}: {{ t("low below (ml)") }} <input name="low_{{ r.product.id }}" inputmode="numeric" value="{{ cfg.get('low_ml_products', {}).get(r.product.id | string, '') }}" placeholder="{{ cfg.low_ml }}"></label>{% endfor %}
+  </div>
+  <button class="primary">{{ t("Save") }}</button>
+</form>
+{% endif %}
+
+<details class="card" id="history">
+  <summary>{{ t("History (last 50)") }}</summary>
+  <ul class="feed small">
+  {% for m, p, u in history %}
+    <li>{{ m.created_at | local_time }} · {{ t(m.kind) }} · {% if p %}{{ p.name }} {% endif %}{% if m.vial_size %}{{ m.vial_size }} ml {{ t("vials") }} {% endif %}
+      {% if m.ml_change %}{{ "%+.1f" | format(m.ml_change) }} ml{% endif %}{% if m.count_change %} {{ "%+d" | format(m.count_change) }}{% endif %}
+      · {{ m.reason or "" }} · {{ u.username if u else t("system") }}</li>
+  {% else %}<li class="muted">{{ t("Nothing yet.") }}</li>{% endfor %}
+  </ul>
+</details>
+{% endblock %}

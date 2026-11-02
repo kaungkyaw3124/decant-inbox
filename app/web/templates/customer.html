@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}{{ c.display_name or t("Customer") }} · Decant Inbox{% endblock %}
+{% block content %}
+<p><a href="/customers">‹ {{ t("Customers") }}</a> · <a href="/chats/{{ c.id }}">{{ t("Open chat") }}</a></p>
+<h1>{{ c.display_name or ("@" ~ c.username if c.username else t("Customer")) }}</h1>
+{% with back = "/customers/" ~ c.id %}{% include "_profile.html" %}{% endwith %}
+<section class="card">
+  <h2>{{ t("Notes") }}</h2>
+  {% for n, who in profile.notes %}<p class="small note">📝 {{ n.text }} <span class="muted">— {{ who or t("system") }}, {{ n.created_at | local_time }}</span></p>{% else %}<p class="muted small">{{ t("No notes yet.") }}</p>{% endfor %}
+  <h2>{{ t("Tags") }}</h2>
+  <p>{% for tg in profile.tags %}
+    <form method="post" action="/customers/{{ c.id }}/tags" class="inline"><input type="hidden" name="csrf" value="{{ csrf }}">
+      <input type="hidden" name="tag" value="{{ tg }}"><input type="hidden" name="on" value="0">
+      <button class="quiet" aria-label="{{ t('Remove') }} {{ tg }}"><span class="tag {{ colours.get(tg, '') }}">{{ tg }} ✕</span></button></form>
+  {% else %}<span class="muted small">{{ t("No tags.") }}</span>{% endfor %}</p>
+  <form method="post" action="/customers/{{ c.id }}/optout" class="inline"><input type="hidden" name="csrf" value="{{ csrf }}">
+    <button name="on" value="{{ 0 if profile.opted_out else 1 }}" class="quiet">{{ t("Allow reorder / feedback messages") if profile.opted_out else t("No reorder / feedback messages") }}</button></form>
+</section>
+<section class="card">
+  <h2>{{ t("Orders") }}</h2>
+  <table class="cart-items">{% for o in orders %}<tr><td>#{{ order_label(o) }} · {{ code(o.status) }}</td><td class="num">{{ format_mmk(o.total_mmk) }}</td><td class="num small muted">{{ (o.paid_at or o.created_at) | local_time("%d %b %Y") }}</td></tr>{% else %}<tr><td class="muted">{{ t("No orders yet.") }}</td></tr>{% endfor %}</table>
+</section>
+{% endblock %}
