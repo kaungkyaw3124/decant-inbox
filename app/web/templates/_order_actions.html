@@ -1,0 +1,46 @@
+{# Next-status buttons of a paid order (orders page + the chat's customer panel, docs/SPEC-v4.21).
+   Needs: o, ev (undo event or none), order_back. #}
+    <div class="buttons order-actions">
+      {% if ev %}
+      <form method="post" action="/orders/events/{{ ev.id }}/undo" class="inline">
+        <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="back" value="{{ order_back }}">
+        <button class="quiet">↩ {{ t("Undo {status}", status=code(ev.to_status)) }}</button>
+      </form>
+      {% endif %}
+      {% if o.status == "paid" %}
+      <form method="post" action="/orders/{{ o.id }}/status" class="inline">
+        <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="back" value="{{ order_back }}">
+        <input type="hidden" name="to" value="packed"><button class="primary">📦 {{ t("Packed") }}</button>
+      </form>
+      {% endif %}
+      {% if o.status in ("paid", "packed") %}
+      <details class="sent-out">
+        <summary class="button {% if o.status == 'packed' %}primary{% endif %}">🚚 {{ t("Sent out") }}</summary>
+        <form method="post" action="/orders/{{ o.id }}/status" class="stack">
+          <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="back" value="{{ order_back }}">
+          <input type="hidden" name="to" value="sent_out">
+          <label>{{ t("Deli name (optional)") }} <input name="deli_name" maxlength="64"></label>
+          <label>{{ t("Deli phone (optional)") }} <input name="deli_phone" maxlength="32" inputmode="tel"></label>
+          <label>{{ t("Note for us (optional)") }} <input name="deli_note" maxlength="500"></label>
+          <button class="primary">🚚 {{ t("Sent out + tell the customer") }}</button>
+        </form>
+      </details>
+      {% endif %}
+      {% if o.status in ("paid", "packed", "sent_out") %}
+      <form method="post" action="/orders/{{ o.id }}/status" class="inline">
+        <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="back" value="{{ order_back }}">
+        <input type="hidden" name="to" value="delivered"><button {% if o.status == "sent_out" %}class="primary"{% endif %}>✅ {{ t("Delivered") }}</button>
+      </form>
+      <details class="cancel-order">
+        <summary class="button link danger">{{ t("Cancel order") }}</summary>
+        <form method="post" action="/orders/{{ o.id }}/cancel" class="stack">
+          <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="back" value="{{ order_back }}">
+          <p class="small problem-text">{{ t("The order is paid: refund the customer outside the system.") }}</p>
+          <label>{{ t("Note (refund, reason)") }} <input name="note" maxlength="500"></label>
+          <label class="check"><input type="radio" name="message" value="order_cancelled" checked> {{ t("Send “order cancelled” to the customer") }}</label>
+          <label class="check"><input type="radio" name="message" value="none"> {{ t("Send nothing") }}</label>
+          <button class="danger" data-confirm="{{ t('Cancel this paid order? Refund the customer outside the system.') }}">{{ t("Cancel order") }}</button>
+        </form>
+      </details>
+      {% endif %}
+    </div>

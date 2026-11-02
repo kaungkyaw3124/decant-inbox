@@ -14,7 +14,8 @@
   {% if ai %}
   <input type="hidden" name="ai_call" value="{{ ai.call_id }}">
   <input type="hidden" name="ai_hint" value="{{ ai.preset_json }}">
-  <p class="ai-hint">🧠 <b>AI suggests</b> · {{ ai.reason }} <small class="muted">({{ ai.percent }}%)</small></p>
+  <p class="ai-hint">🧠 <b>AI suggests</b> · {{ ai.reason }}</p>
+  {% if user_role == "owner" %}<details class="small muted ai-details"><summary>{{ t("Details") }}</summary>AI {{ ai.percent }}%</details>{% endif %}{# docs/SPEC-v4.21 (4.19 N2): no % for staff #}
   {% endif %}
   {% if pv and not card_action %}<input type="hidden" name="expect" value="{{ pv.expect }}">{% endif %}
   {% if pv %}

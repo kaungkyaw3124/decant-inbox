@@ -1,64 +1,48 @@
 {% extends "base.html" %}
 {% import "_ui.html" as ui with context %}
 {% block title %}{{ c.display_name or t("Chat") }} · Decant Inbox{% endblock %}
-{% block main_class %}wide{% endblock %}
+{% block main_class %}ws-main{% endblock %}
+{% block body_class %}in-chat{% endblock %}
 {% block content %}
-<p><a href="/chats">← {{ t("Chats") }}</a></p>
-<header class="chat-head card">
-  <div>
-    <h1>{{ c.display_name or ("@" ~ c.username if c.username else t("Customer")) }}</h1>
-    <p class="muted small">{% if c.username %}@{{ c.username }} · {% endif %}{{ c.channel }} id {{ c.external_user_id }}{% if c.ignored %} · {{ t("ignored") }}{% endif %}</p>
-    <p>{% include "_step.html" %}</p>
-  </div>
-  <div class="buttons">
-    <a class="button" href="{{ tg_link }}">{{ t("Open in Telegram") }}</a>
-    <form method="post" action="/customers/{{ c.id }}/auto" class="inline">
+{# docs/SPEC-v4.21: chat list | conversation | customer panel (laptop); phone: the conversation, panel = sheet #}
+{% set name = c.display_name or ("@" ~ c.username if c.username else t("Customer")) %}
+<div id="ws" class="ws ws-chat">
+  {% include "_chatlist.html" %}
+  <section class="convo" aria-label="{{ t('Conversation') }}">
+    <header class="convo-head">
+      <a class="back" href="/chats" aria-label="{{ t('Back to chats') }}">‹ <span>{{ t("Chats") }}</span></a>
+      <span class="avatar sm" aria-hidden="true">{{ initials }}</span>
+      <div class="convo-title">
+        <h1>{{ name }}</h1>
+        <p class="sub">{% if city %}{{ city }} · {% endif %}{{ t("{n} orders", n=past_orders | length) }}{% if c.ignored %} · {{ t("ignored") }}{% endif %}</p>
+      </div>
+      <a class="cart-pill" href="/chats/{{ c.id }}?tab=cart#cart" data-bs-toggle="offcanvas" data-bs-target="#cart-sheet" aria-controls="cart-sheet">🛒 {{ t("Cart") }}{% if cart and not cart.empty %} {{ format_mmk(cart.total) }}{% endif %}</a>
+      <form method="post" action="/customers/{{ c.id }}/auto" class="inline head-pause">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        {% if c.auto_reply_off %}<button name="off" value="0" class="textbtn">{{ t("Allow auto-reply") }}</button>
+        {% else %}<button name="off" value="1" class="textbtn" title="{{ t('Never auto-reply to this customer') }}">{{ t("Pause auto-reply") }}</button>{% endif %}
+      </form>
+    </header>
+    {% if c.is_tester and user_role == "owner" %}<p class="banner">🧪 {{ t("Test account: the test payment code works in this chat; its orders are test orders (T1, T2, ...).") }}</p>{% endif %}
+    {% if c.auto_reply_off %}<p class="banner">🤖 {{ t("Auto-reply is off for this customer.") }}</p>{% endif %}
+    {% if paused_until %}
+    <form method="post" action="/customers/{{ c.id }}/resume-auto" class="banner paused">
       <input type="hidden" name="csrf" value="{{ csrf }}">
-      {% if c.auto_reply_off %}<button name="off" value="0" class="quiet">{{ t("Allow auto-reply") }}</button>
-      {% else %}<button name="off" value="1" class="quiet">{{ t("Never auto-reply to this customer") }}</button>{% endif %}
-    </form>
-    {% if user_role == "owner" %}
-    <form method="post" action="/customers/{{ c.id }}/tester" class="inline">
-      <input type="hidden" name="csrf" value="{{ csrf }}">
-      <button name="on" value="{{ 0 if c.is_tester else 1 }}" class="quiet">🧪 {{ t("Test account") }}: {{ t("ON") if c.is_tester else t("OFF") }}</button>
+      ⏸ {{ t("Paused — you're replying by hand (until {time}).", time=paused_until | local_time("%H:%M")) }}
+      <button class="textbtn">{{ t("Resume auto") }}</button>
     </form>
     {% endif %}
-  </div>
-</header>
-{% if c.is_tester and user_role == "owner" %}<p class="flash warnbox">🧪 {{ t("Test account: the test payment code works in this chat; its orders are test orders (T1, T2, ...).") }}</p>{% endif %}
-{% if c.auto_reply_off %}<p class="flash warnbox">🤖 {{ t("Auto-reply is off for this customer.") }}</p>{% endif %}
-{% if paused_until %}
-<form method="post" action="/customers/{{ c.id }}/resume-auto" class="flash warnbox paused">
-  <input type="hidden" name="csrf" value="{{ csrf }}">
-  ⏸ {{ t("Paused — you're replying by hand (until {time}).", time=paused_until | local_time("%H:%M")) }}
-  <button>{{ t("Resume auto") }}</button>
-</form>
-{% endif %}
-
-<nav class="tabs phone-tabs" aria-label="{{ t('View') }}">
-  <a href="/chats/{{ c.id }}" {% if tab != "cart" %}aria-current="page"{% endif %}>{{ t("Chat") }}</a>
-  <a href="/chats/{{ c.id }}?tab=cart#cart" data-bs-toggle="offcanvas" data-bs-target="#cart-sheet" aria-controls="cart-sheet" {% if tab == "cart" %}aria-current="page"{% endif %}>🛒 {{ t("Cart") }}{% if cart and not cart.empty %} ({{ cart.lines|length }}){% endif %}</a>
-</nav>
-
-<div class="chat-layout">
-  <section class="card chat-pane {% if tab == 'cart' %}phone-hidden{% endif %}">
-    {% include "_thread.html" %}
-  </section>
-
-  <div class="side">
-  {# phone: a sheet opened by "🛒 Cart" (?tab=cart opens it without JavaScript); laptop: the right column #}
-  <div class="offcanvas-lg offcanvas-end cart-sheet {% if tab == 'cart' %}show{% endif %}" tabindex="-1" id="cart-sheet" aria-labelledby="cart-sheet-title">
-    <div class="offcanvas-header d-lg-none">
-      <h2 class="offcanvas-title" id="cart-sheet-title">🛒 {{ t("Cart") }}</h2>
-      <a class="btn-close" href="/chats/{{ c.id }}" data-bs-dismiss="offcanvas" data-bs-target="#cart-sheet" aria-label="{{ t('Close') }}"></a>
+    <div class="chat-pane">
+      {% include "_thread.html" %}
     </div>
-    <div class="offcanvas-body">
-  {% include "_cart.html" %}
-    </div>
-  </div>
-
-  <section class="card reply-pane {% if tab == 'cart' %}phone-hidden{% endif %}" id="reply">
-    <nav class="tabs" aria-label="{{ t('Reply type') }}">
+    {% if mine.count %}
+    <section class="needs-panel" id="needs-you" aria-label="{{ t('Needs you') }}">
+      <p class="why"><span class="dot-orange" aria-hidden="true"></span>{{ t("Needs you") }}{% if mine.count > 1 %} ({{ mine.count }}){% endif %}</p>
+      {% with needs_you = mine, needs_back = "/chats/" ~ c.id %}{% include "_needs_items.html" %}{% endwith %}
+    </section>
+    {% endif %}
+    <section class="composer" id="reply" aria-label="{{ t('Reply') }}">
+    <nav class="chips" aria-label="{{ t('Reply type') }}">
       <a href="/chats/{{ c.id }}?compose=custom#reply" {% if mode == "custom" %}aria-current="page"{% endif %}>{{ t("Custom") }}</a>
       <a href="/chats/{{ c.id }}?compose=price#reply" {% if mode == "price" %}aria-current="page"{% endif %}>{{ t("Price") }}</a>
       {% if cart and not cart.empty %}
@@ -68,8 +52,6 @@
       <a href="/chats/{{ c.id }}?compose=payment_info#reply" {% if mode == "payment_info" %}aria-current="page"{% endif %}>{{ t("Payment info") }}</a>
       {% endif %}
     </nav>
-    {{ ui.help("Write your own reply, or pick a ready reply (price, cart list, ask phone…). You can edit it before Send.") }}
-
     {% if not can_send %}
     <p class="problem-text">{{ t("This customer has never messaged us, so we can't message them.") }}</p>
     {% else %}
@@ -104,19 +86,88 @@
     {% for n in result.notes %}<p class="flash warnbox">{{ tr(n) }}</p>{% endfor %}
 
     {% if mode == "custom" or (result.text.strip() and not result.problems) %}
-    <form method="post" action="/chats/{{ c.id }}/send" class="stack">
+    <form method="post" action="/chats/{{ c.id }}/send" class="compose-box">
       <input type="hidden" name="csrf" value="{{ csrf }}">
       <input type="hidden" name="key" value="{{ key }}">
       <input type="hidden" name="reply_kind" value="{{ mode }}">
-      <label>{{ t("Message (you can edit it)") }}
-        <textarea name="text" rows="{{ [result.text.count('\n') + 3, 4]|max }}" maxlength="{{ max_text }}" required>{{ result.text }}</textarea>
+      <label class="compose-field"><span class="visually-hidden">{{ t("Message (you can edit it)") }}</span>
+        <textarea name="text" rows="{{ [result.text.count('\n') + 1, 6]|min }}" maxlength="{{ max_text }}" required placeholder="{{ t('Message') }}">{{ result.text }}</textarea>
       </label>
-      {% if greet %}<p class="muted small">{{ t("Starts with the greeting: we haven't messaged them in the last 6 hours.") }}</p>{% endif %}
-      <button class="primary">{{ t("Send") }}</button>
+      <button class="send-round" aria-label="{{ t('Send') }}" title="{{ t('Send') }}"><i class="bi bi-arrow-up" aria-hidden="true"></i></button>
+      {% if greet %}<p class="muted small compose-note">{{ t("Starts with the greeting: we haven't messaged them in the last 6 hours.") }}</p>{% endif %}
     </form>
     {% endif %}
     {% endif %}
+    </section>
   </section>
-  </div>
+
+  {# laptop >= 1280: the right column; smaller: a sheet opened by the Cart pill (?tab=cart opens it without JS) #}
+  <aside class="offcanvas-xl offcanvas-end panel {% if tab == 'cart' %}show{% endif %}" tabindex="-1" id="cart-sheet" aria-labelledby="cart-sheet-title">
+    <div class="offcanvas-header d-xl-none">
+      <h2 class="offcanvas-title" id="cart-sheet-title">{{ name }}</h2>
+      <a class="btn-close" href="/chats/{{ c.id }}" data-bs-dismiss="offcanvas" data-bs-target="#cart-sheet" aria-label="{{ t('Close') }}"></a>
+    </div>
+    <div class="offcanvas-body">
+      <div class="profile">
+        <span class="avatar lg" aria-hidden="true">{{ initials }}</span>
+        <b class="profile-name">{{ name }}</b>
+        <span class="muted">{{ saved_phones | join(", ") or (("@" ~ c.username) if c.username else "") }}</span>
+        <p class="small">{% include "_step.html" %}</p>
+      </div>
+      {% if pending_check %}{# docs/SPEC-v4.21: the payment check of this customer, first in the panel #}
+      <p class="group-label">{{ t("Payment") }}</p>
+      <div class="group pay-box">
+        {% if pending_check.decision == "pending" and pending_check.is_test and may_decide %}
+        <form method="post" action="/payments/{{ pending_check.id }}/approve" class="stack">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <p class="small">🧪 {{ t("TEST PAYMENT — no money") }} · {{ format_mmk(cart.total if cart else 0) }} ကျပ်</p>
+          <div class="buttons">
+            <button class="primary approve">✅ {{ t("Approve") }}</button>
+            <a class="button danger" href="/payments/{{ pending_check.id }}">❌ {{ t("Reject") }}</a>
+          </div>
+        </form>
+        {% else %}
+        {# a real payment is approved on its card: the screenshot is shown (and downloaded) there #}
+        <p class="small">{{ t("Expected total") }}: <b>{{ format_mmk(cart.total if cart else 0) }} ကျပ်</b></p>
+        <a class="button primary" href="/payments/{{ pending_check.id }}">💳 {{ t("Check the payment screenshot") }}</a>
+        {% endif %}
+      </div>
+      {% endif %}
+      {% if shipping %}
+      <p class="group-label">{{ t("Order #{no}", no=order_label(shipping)) }}</p>
+      <div class="group">
+        <p class="small"><span class="badge st-{{ shipping.status }}">{{ tr({"paid": "📦 to pack", "packed": "🚚 to send", "sent_out": "sent out"}[shipping.status]) }}</span>
+          · {{ format_mmk(shipping.total_mmk) }} ကျပ်</p>
+        {% with o = shipping, ev = none, order_back = "/chats/" ~ c.id %}{% include "_order_actions.html" %}{% endwith %}
+      </div>
+      {% endif %}
+      {% include "_cart.html" %}
+      {% if past_orders %}
+      <p class="group-label">{{ t("Past orders") }}</p>
+      <ul class="group links">
+        {% for o in past_orders %}<li><a href="/orders?tab=all#order-{{ o.id }}"><span>#{{ order_label(o) }} · {{ code(o.status) }}</span><span class="muted">{{ format_mmk(o.total_mmk) }} ›</span></a></li>{% endfor %}
+      </ul>
+      {% endif %}
+      <p class="group-label">{{ t("Customer") }}</p>
+      <div class="group switches">
+        <a class="button" href="{{ tg_link }}">{{ t("Open in Telegram") }}</a>
+        <form method="post" action="/customers/{{ c.id }}/auto" class="inline">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          {% if c.auto_reply_off %}<button name="off" value="0" class="quiet">{{ t("Allow auto-reply") }}</button>
+          {% else %}<button name="off" value="1" class="quiet">{{ t("Never auto-reply to this customer") }}</button>{% endif %}
+        </form>
+        {% if user_role == "owner" %}
+        <form method="post" action="/customers/{{ c.id }}/tester" class="inline">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <button name="on" value="{{ 0 if c.is_tester else 1 }}" class="quiet">🧪 {{ t("Test account") }}: {{ t("ON") if c.is_tester else t("OFF") }}</button>
+        </form>
+        {% endif %}
+        <form method="post" action="/customers/{{ c.id }}/ignored" class="inline">
+          <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="back" value="/chats/{{ c.id }}">
+          <button name="ignored" value="{{ 0 if c.ignored else 1 }}" class="quiet">{{ t("Stop ignoring") if c.ignored else t("Ignore customer") }}</button>
+        </form>
+      </div>
+    </div>
+  </aside>
 </div>
 {% endblock %}

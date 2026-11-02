@@ -39,7 +39,7 @@ def test_d1_staff_gets_403_and_no_menu_links(shop, db):
         assert r.status_code == 403 and "Only the owner" in r.text, path  # not the CSRF 403
     home = staff.get("/").text
     assert not any(link in home for link in OWNER_LINKS)
-    assert "🤖 Auto-reply: <b>" in home  # staff still see whether auto-reply is on
+    assert "Auto-reply: <b>" in home  # staff still see whether auto-reply is on (4.21: iOS switch, no 🤖)
     owner_home = owner.get("/").text
     assert all(link in owner_home for link in OWNER_LINKS)
     # what staff CAN do: inbox, chats, orders, payments list, reports, products (read only), sales

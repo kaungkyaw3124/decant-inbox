@@ -1,0 +1,157 @@
+{# docs/SPEC-v4.21: the "Needs you" rows. Needs: needs_you (all, or app.web.auto.for_customer for one chat),
+   needs_back (where forms return; default "/"), customer (fallback name). Used by inbox.html and chat.html. #}
+{% set customer = customer or t("Customer") %}
+  <ul class="feed">
+  {% for c, m, held in needs_you.waiting %}
+    <li class="problem" id="waiting-{{ m.id }}"><a href="/chats/{{ c.id }}#bottom"><b>⏰ {{ c.display_name or c.username or customer }}: {{ t("customer waiting") }}</b></a>
+      <span class="small muted">“{{ m.raw_text | truncate(80) }}” · {{ t("“please wait” sent at {time}", time=held | local_time("%H:%M")) }}</span>
+      <form method="post" action="/needs-you/clear" class="inline"><input type="hidden" name="csrf" value="{{ csrf }}">
+        <input type="hidden" name="message_id" value="{{ m.id }}"><button class="link">{{ t("done") }}</button></form>
+      {% set card = needs_you.waiting_cards.get(m.id) %}
+      {% if card %}<details class="teach-box"><summary class="button primary">👀 စစ်ပြီး ဖြေမယ်</summary>
+        {% with back = needs_back or "/" %}{% include "_card.html" %}{% endwith %}
+      </details>{% endif %}</li>
+  {% endfor %}
+  {% for note, c, at in needs_you.test_notes %}
+    <li class="problem-text"><a href="/chats/{{ c.id }}">{{ tr(note) }}</a> <span class="small muted">{{ c.display_name or c.username or customer }} · {{ at | local_time("%H:%M") }}</span></li>
+  {% endfor %}
+  {% for n in needs_you.ai_notices %}
+    <li class="problem-text">{% if user_role == "owner" %}<a href="/ai">{{ tr(n) }}</a>{% else %}{{ tr(n) }}{% endif %}</li>
+  {% endfor %}
+  {% for ev, o, c in needs_you.requests %}
+    <li><a href="/chats/{{ c.id }}"><b>{% if o.order_no %}🔒 {{ t("customer wants to change paid Order #{no}: {what}", no=order_label(o), what=t(ev.previous.what)) }}{% else %}📷 {{ t("{what} after the payment screenshot — check it", what=t(ev.previous.what)) }}{% endif %}</b></a>
+      <span class="small muted">{{ c.display_name or c.username or customer }}: “{{ ev.previous.text | truncate(80) }}”</span>
+      <form method="post" action="/orders/requests/{{ ev.id }}/done" class="inline"><input type="hidden" name="csrf" value="{{ csrf }}">
+        <button class="link">✅ {{ t("done") }}</button></form></li>
+  {% endfor %}
+  {% for o, c, ev in needs_you.changed_paid %}
+    <li><a href="/chats/{{ c.id }}"><b>📍 {% if o.order_no %}{{ t("Order #{no} address changed after payment — check before packing/sending", no=order_label(o)) }}{% else %}{{ t("Address changed after the payment photo — check before packing/sending") }}{% endif %}</b></a>
+      <span class="small muted">{{ c.display_name or c.username or customer }}: {{ ev.previous.address or "—" }} → {{ o.address or "—" }}{% if ev.previous.phones != ev.previous.new_phones %} · 📞 {{ o.phones | join(", ") }}{% endif %}</span>
+      <form method="post" action="/orders/{{ o.id }}/address-checked" class="inline"><input type="hidden" name="csrf" value="{{ csrf }}">
+        <button class="link">✅ {{ t("checked") }}</button></form></li>
+  {% endfor %}
+  {% for m, c, chk, o in needs_you.address_checks %}
+    <li class="address-check" id="address-{{ m.id }}"><a href="/chats/{{ c.id }}?tab=cart"><b>📍 {{ c.display_name or c.username or customer }}</b>: {{ t("check address") }}</a>
+      <span class="small muted">“{{ m.raw_text | truncate(120) }}”</span>
+      <p class="small problem-text">⚠️ {{ tr(chk.why) }}{% if chk.source == "ai" %} · 🧠 AI {{ "%.0f" | format(chk.confidence * 100) }}%{% endif %}</p>
+      {% set parts = chk.parts.to_json() %}
+      <dl class="address-parts small">
+        {% for key, label in (("house_no", "House no."), ("street", "Street"), ("ward_or_quarter", "Ward"), ("township", "Township"), ("city", "City"), ("landmark", "Landmark")) %}
+          {% if parts.get(key) %}<dt>{{ t(label) }}</dt><dd>{% if key == "township" %}<b>{{ parts[key] }}</b>{% else %}{{ parts[key] }}{% endif %}</dd>{% endif %}
+        {% endfor %}
+      </dl>
+      <form method="post" action="/messages/{{ m.id }}/address" class="stack">
+        <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="back" value="/#needs-you">
+        <label class="small">{{ t("Address (fix it if needed: house no., street, township)") }}
+          <textarea name="full_text" rows="2" maxlength="500">{{ chk.parts.full_text }}</textarea></label>
+        <div class="buttons">
+          <button class="primary">✅ {{ t("Save address & continue") }}</button>
+          <button formaction="/messages/{{ m.id }}/address/ask" class="quiet">💬 {{ t("Ask for the full address") }}</button>
+        </div>
+      </form></li>
+  {% endfor %}
+  {% for m, c, o in needs_you.change_sent %}
+    <li><a href="/chats/{{ c.id }}"><b>📍 {{ c.display_name or c.username or customer }}</b>: {{ t("customer wants to change the address of an order already sent") }}{% if o.order_no %} (#{{ order_label(o) }}){% endif %}</a>
+      <span class="small muted">“{{ m.raw_text | truncate(60) }}”</span>
+      <form method="post" action="/needs-you/clear" class="inline"><input type="hidden" name="csrf" value="{{ csrf }}">
+        <input type="hidden" name="message_id" value="{{ m.id }}"><button class="link">{{ t("done") }}</button></form></li>
+  {% endfor %}
+  {% for check, order, c in needs_you.payments %}
+    <li><a href="/payments/{{ check.id }}"><b>💳 {{ c.display_name or c.username or customer }}</b>:
+      {{ t("several photos — ask for one") if check.decision == "several" else t("payment screenshot to check") }}</a>
+      {% if needs_you.payment_warnings.get(check.id) %}<span class="badge bad">⚠️ {{ t("{n} warnings from the screenshot", n=needs_you.payment_warnings[check.id]) }}</span>{% endif %}
+      <span class="small muted">{{ format_mmk(order.total_mmk) }} ကျပ်</span></li>
+  {% endfor %}
+  {% for m, c, o in needs_you.cancels %}
+    <li><a href="/chats/{{ c.id }}"><b>🚫 {{ c.display_name or c.username or customer }}</b>: {{ t("wants to cancel a paid order") }}
+      {% if o.order_no %}#{{ order_label(o) }}{% else %}({{ t("payment photo sent") }}){% endif %}</a>
+      <span class="small muted">“{{ m.raw_text | truncate(50) }}” · {{ format_mmk(o.total_mmk) }} ကျပ်</span>
+      <details class="cancel-order"><summary class="button link danger">{{ t("Cancel order") }}</summary>
+        <form method="post" action="/orders/{{ o.id }}/cancel" class="stack">
+          <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="back" value="/">
+          <p class="small problem-text">{{ t("Money may be involved: refund outside the system.") }}</p>
+          <label>{{ t("Note") }} <input name="note" maxlength="500"></label>
+          <label class="check"><input type="radio" name="message" value="order_cancelled" checked> {{ t("Send “order cancelled”") }}</label>
+          <label class="check"><input type="radio" name="message" value="none"> {{ t("Send nothing") }}</label>
+          <button class="danger" data-confirm="{{ t('Cancel this paid order? Refund the customer outside the system.') }}">{{ t("Cancel order") }}</button>
+        </form></details>
+      <form method="post" action="/needs-you/clear" class="inline"><input type="hidden" name="csrf" value="{{ csrf }}">
+        <input type="hidden" name="message_id" value="{{ m.id }}"><button class="link">{{ t("keep order (done)") }}</button></form></li>
+  {% endfor %}
+  {% for d, why in needs_you.unpaid %}
+    <li><a href="/chats/{{ d.customer.id }}"><b>💳 {{ d.customer.display_name or d.customer.username or customer }}</b>:
+      {{ t("no payment for {hours} h", hours=d.hours) }}</a> <span class="small muted">({{ tr(why) }})</span>
+      {% if d.what == "reminder" %}
+      <form method="post" action="/orders/{{ d.order.id }}/remind" class="inline"><input type="hidden" name="csrf" value="{{ csrf }}">
+        <button class="quiet">{{ t("Send payment reminder") }}</button></form>
+      {% else %}
+      <form method="post" action="/orders/{{ d.order.id }}/cancel" class="inline"><input type="hidden" name="csrf" value="{{ csrf }}">
+        <input type="hidden" name="back" value="/"><input type="hidden" name="message" value="order_auto_cancelled">
+        <input type="hidden" name="note" value="not paid in {{ d.hours }} h"><button class="quiet">{{ t("Cancel order + tell them") }}</button></form>
+      {% endif %}</li>
+  {% endfor %}
+  {% for m, c, card in needs_you.teach %}
+    <li class="teach-row"><a href="/messages/{{ m.id }}"><b>{{ "🧠" if card.ai else "❓" }} {{ c.display_name or c.username or customer }}</b>: {{ m.raw_text | truncate(70) }}</a>
+      {% if card.products %}<span class="badge warn">❓ {{ card.products | map(attribute="words") | join(", ") }}</span>{% endif %}
+      <span class="small muted">{{ m.received_at | age }}</span>
+      <details class="teach-box" open><summary class="button primary">👀 စစ်ပြီး ဖြေမယ်</summary>
+        {% with back = needs_back or "/" %}{% include "_card.html" %}{% endwith %}
+      </details></li>
+  {% endfor %}
+  {% for row, product, m in needs_you.price_needed %}
+    <li><b>💲 {{ product.name }}</b>: {{ t("price needed") }} · {{ t("full bottle") if row.is_full_bottle else (row.size_ml ~ "ml" if row.size_ml else "") }}
+      <span class="small muted">“{{ m.raw_text | truncate(50) }}”</span>
+      {% if user_role == "owner" %}
+      <form method="post" action="/learning/price/{{ row.id }}" class="inline-form">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <input name="price" inputmode="numeric" placeholder="{{ t('Price (ကျပ်)') }}" aria-label="{{ t('Price') }}" required>
+        <input name="full_size_ml" inputmode="numeric" placeholder="{{ t('Bottle ml') }}" aria-label="{{ t('Bottle size') }}">
+        <button class="primary">{{ t("Save + send list") }}</button>
+      </form>
+      {% else %}<span class="small muted">— {{ t("When the owner adds the price, the list goes out by itself.") }}</span>{% endif %}</li>
+  {% endfor %}
+  {% if needs_you.to_approve and user_role == "owner" %}
+    <li><a href="/learning"><b>📘 {{ t("{n} pattern to approve" if needs_you.to_approve == 1 else "{n} patterns to approve", n=needs_you.to_approve) }}</b></a></li>
+  {% endif %}
+  {% for conflict in needs_you.conflicts if user_role == "owner" %}
+    <li><a href="/learning#conflicts"><b>⚠️ “{{ conflict.details.text }}”</b>: {{ t("taught differently — decide on the Learning page") }}</a></li>
+  {% endfor %}
+  {% for m, c, items in needs_you.unknown %}
+    <li><a href="/messages/{{ m.id }}"><b>{{ c.display_name or c.username or customer }}</b>: {{ m.raw_text | truncate(70) }}</a>
+      <span class="badge warn">❓ {{ items | map(attribute="text") | join(", ") }}</span>
+      <a class="small" href="/messages/{{ m.id }}#unknown">{{ t("resolve") }}</a></li>
+  {% endfor %}
+  {% for u in needs_you.unanswered %}
+    <li><a href="/chats/{{ u.customer.id }}#bottom"><b>💬 {{ u.customer.display_name or u.customer.username or customer }}</b>: {{ u.last_text | truncate(60) }}</a>
+      <span class="small muted">{{ t("unanswered") }}{% if u.message_ids | length > 1 %} ({{ u.message_ids | length }}){% endif %} · {{ u.last_at | age }}</span>
+      <form method="post" action="/needs-you/clear" class="inline"><input type="hidden" name="csrf" value="{{ csrf }}">
+        {% for mid in u.message_ids %}<input type="hidden" name="message_id" value="{{ mid }}">{% endfor %}
+        <button class="link" name="status" value="done">{{ t("done") }}</button> <button class="link" name="status" value="ignored">{{ t("ignore") }}</button></form>
+      {% if u.card %}{% set m, card = u.card %}
+      <details class="teach-box" open><summary class="button primary">👀 စစ်ပြီး ဖြေမယ်</summary>
+        {% with back = needs_back or "/" %}{% include "_card.html" %}{% endwith %}
+      </details>{% endif %}
+      {% if u.faq %}{% set mid, match = u.faq %}
+      <form method="post" action="/messages/{{ mid }}/faq/{{ match.entry.id }}" class="inline"><input type="hidden" name="csrf" value="{{ csrf }}">
+        <button class="quiet" title="{{ match.entry.answer }}">💬 {{ t("Send FAQ") }}: {{ match.entry.title }}</button></form>{% endif %}</li>
+  {% endfor %}
+  {% for m, c, match in needs_you.faq_hints %}
+    <li><a href="/chats/{{ c.id }}#bottom"><b>💬 {{ c.display_name or c.username or customer }}</b>: {{ m.raw_text | truncate(60) }}</a>
+      <span class="small muted">{{ t("also asks") }}: FAQ “{{ match.entry.title }}”</span>
+      <form method="post" action="/messages/{{ m.id }}/faq/{{ match.entry.id }}" class="inline"><input type="hidden" name="csrf" value="{{ csrf }}">
+        <button class="quiet" title="{{ match.entry.answer }}">💬 {{ t("Send FAQ") }}: {{ match.entry.title }}</button></form>
+      <form method="post" action="/messages/{{ m.id }}/faq-hint-done" class="inline"><input type="hidden" name="csrf" value="{{ csrf }}">
+        <button class="link">{{ t("done") }}</button></form></li>
+  {% endfor %}
+  {% for o, c in needs_you.failed %}
+    <li><a href="/chats/{{ c.id }}#bottom"><b>{{ c.display_name or c.username or customer }}</b>: {{ t("reply not sent") }}</a>
+      <span class="small error">{{ tr(o.error) }}</span></li>
+  {% endfor %}
+  {% for c, until in needs_you.paused %}
+    <li><a href="/chats/{{ c.id }}"><b>{{ c.display_name or c.username or customer }}</b>: {{ t("new message while paused") }}</a>
+      <span class="small muted">({{ t("you replied by hand; auto off until {time}", time=until | local_time("%H:%M")) }})</span></li>
+  {% endfor %}
+  {% for o, c in needs_you.auto_cancelled %}
+    <li class="muted"><a href="/chats/{{ c.id }}">ℹ️ {{ c.display_name or c.username or customer }}</a>: {{ t("order cancelled automatically (not paid)") }}{% if o.cancel_note %} · {{ tr(o.cancel_note) }}{% endif %}</li>
+  {% endfor %}
+  </ul>

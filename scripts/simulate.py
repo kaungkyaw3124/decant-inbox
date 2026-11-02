@@ -505,25 +505,10 @@ def _cart_lines(s, chat: Chat) -> list[str] | None:
 
 def needs_you_items(customer_id: int) -> int:
     """G3: how many "Needs you" rows (dashboard home) are about this customer."""
-    from app.web.auto import needs_you  # late import: the web module is heavy
-
-    from sqlalchemy.engine import Row
-
-    def about(row) -> bool:
-        parts = tuple(row) if isinstance(row, (tuple, Row)) else (row,)
-        for x in parts:
-            if isinstance(x, Customer) and x.id == customer_id:
-                return True
-            if isinstance(x, (Message, Order)) and x.customer_id == customer_id:
-                return True
-            if getattr(x, "customer", None) is not None and getattr(x.customer, "id", None) == customer_id:
-                return True
-        return False
+    from app.web.auto import customers_needing, needs_you  # late import: the web module is heavy
 
     with SessionLocal() as s:
-        found = needs_you(s, datetime.now(UTC) + timedelta(minutes=3))
-    lists = [v for k, v in found.items() if isinstance(v, list) and k not in ("older", "older_ids", "dismissed")]
-    return sum(1 for rows in lists for row in rows if about(row))
+        return customers_needing(needs_you(s, datetime.now(UTC) + timedelta(minutes=3))).get(customer_id, 0)
 
 
 def judge(chat: Chat, turn: Turn, said_so_far: list[str]) -> None:

@@ -87,7 +87,7 @@ def test_a1_packed_sent_out_delivered(shop, db, tmp_path, monkeypatch):
     second = paid_order(client, token, db, tmp_path, monkeypatch, "92", 2)
     page = client.get("/orders").text
     assert "#1001" in page and "#1002" in page and "📦 Packed" in page and "No. 12, Bahan" in page
-    assert 'Orders <span class="badge">2</span>' in page
+    assert '<span>Orders</span><b class="side-count">2</b>' in page  # 4.21: sidebar
 
     # 📦 Packed, with Undo
     tap(client, token, first, "packed")

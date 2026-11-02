@@ -147,7 +147,10 @@ def inbox(
     needs_you = auto_pages.needs_you(db, owner=user.is_owner) if first_page else None
     if needs_you is not None:  # the menu counter shows the same number as this page
         remember_needs(user.role, needs_you["count"])
+    from app.web.chats import chat_list_context
+
     return templates.TemplateResponse(request, "inbox.html", {
+        **chat_list_context(db, user, "needs", found=needs_you),
         **(card_context(db, [card for _, _, card in needs_you["teach"]]
                         + [r.card[1] for r in needs_you["unanswered"] if r.card], user)
            if needs_you and (needs_you["teach"] or any(r.card for r in needs_you["unanswered"])) else {}),

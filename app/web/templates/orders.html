@@ -27,9 +27,9 @@
   <li class="item order-row" id="order-{{ o.id }}">
     <div class="row-main">
       <div class="meta">
-        <span class="who"><b>{% if o.status in locked_statuses %}🔒 {% endif %}#{{ order_label(o) }}</b>{% if o.is_test %} <span class="badge test">🧪 {{ t("test") }}</span>{% endif %} · <a href="/chats/{{ c.id }}">{{ c.display_name or c.username or t("Customer") }}</a></span>
+        <span class="who"><b>{% if o.status in locked_statuses %}🔒 {% endif %}{% if o.order_no %}#{{ order_label(o) }}{% else %}{{ t("Cart") }}{% endif %}</b>{% if o.is_test %} <span class="badge test">🧪 {{ t("test") }}</span>{% endif %} · <a href="/chats/{{ c.id }}">{{ c.display_name or c.username or t("Customer") }}</a></span>
         <span class="badge st-{{ o.status }}">{{ tr(status_labels.get(o.status, o.status)) }}</span>
-        <time title="{{ t('paid') }} {{ o.paid_at | local_time }}">{{ o.paid_at | age }}</time>
+        <time title="{{ t('paid') }} {{ o.paid_at | local_time }}">{{ (o.paid_at or o.updated_at) | age }}</time>
       </div>
       <p class="text">{% for i, p in v.lines %}{{ item_name(i, p) }}{% if not loop.last %}, {% endif %}{% endfor %}
         · <b>{{ format_mmk(o.total_mmk) }} ကျပ်</b></p>
@@ -56,50 +56,16 @@
         </form></details>
       {% endif %}
     </div>
+    {% if o.status == "waiting_payment" %}
     <div class="buttons order-actions">
-      {% if ev %}
-      <form method="post" action="/orders/events/{{ ev.id }}/undo" class="inline">
-        <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="back" value="/orders?tab={{ tab }}">
-        <button class="quiet">↩ {{ t("Undo {status}", status=code(ev.to_status)) }}</button>
-      </form>
-      {% endif %}
-      {% if o.status == "paid" %}
-      <form method="post" action="/orders/{{ o.id }}/status" class="inline">
-        <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="back" value="/orders?tab={{ tab }}">
-        <input type="hidden" name="to" value="packed"><button class="primary">📦 {{ t("Packed") }}</button>
-      </form>
-      {% endif %}
-      {% if o.status in ("paid", "packed") %}
-      <details class="sent-out">
-        <summary class="button {% if o.status == 'packed' %}primary{% endif %}">🚚 {{ t("Sent out") }}</summary>
-        <form method="post" action="/orders/{{ o.id }}/status" class="stack">
-          <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="back" value="/orders?tab={{ tab }}">
-          <input type="hidden" name="to" value="sent_out">
-          <label>{{ t("Deli name (optional)") }} <input name="deli_name" maxlength="64"></label>
-          <label>{{ t("Deli phone (optional)") }} <input name="deli_phone" maxlength="32" inputmode="tel"></label>
-          <label>{{ t("Note for us (optional)") }} <input name="deli_note" maxlength="500"></label>
-          <button class="primary">🚚 {{ t("Sent out + tell the customer") }}</button>
-        </form>
-      </details>
-      {% endif %}
-      {% if o.status in ("paid", "packed", "sent_out") %}
-      <form method="post" action="/orders/{{ o.id }}/status" class="inline">
-        <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="back" value="/orders?tab={{ tab }}">
-        <input type="hidden" name="to" value="delivered"><button {% if o.status == "sent_out" %}class="primary"{% endif %}>✅ {{ t("Delivered") }}</button>
-      </form>
-      <details class="cancel-order">
-        <summary class="button link danger">{{ t("Cancel order") }}</summary>
-        <form method="post" action="/orders/{{ o.id }}/cancel" class="stack">
-          <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="back" value="/orders?tab={{ tab }}">
-          <p class="small problem-text">{{ t("The order is paid: refund the customer outside the system.") }}</p>
-          <label>{{ t("Note (refund, reason)") }} <input name="note" maxlength="500"></label>
-          <label class="check"><input type="radio" name="message" value="order_cancelled" checked> {{ t("Send “order cancelled” to the customer") }}</label>
-          <label class="check"><input type="radio" name="message" value="none"> {{ t("Send nothing") }}</label>
-          <button class="danger" data-confirm="{{ t('Cancel this paid order? Refund the customer outside the system.') }}">{{ t("Cancel order") }}</button>
-        </form>
-      </details>
-      {% endif %}
+      <form method="post" action="/orders/{{ o.id }}/remind" class="inline"><input type="hidden" name="csrf" value="{{ csrf }}">
+        <input type="hidden" name="back" value="/orders?tab={{ tab }}"><button class="primary">{{ t("Send payment reminder") }}</button></form>
     </div>
+    {% elif o.status == "photo_received" %}
+    <div class="buttons order-actions"><a class="button primary" href="/payments">💳 {{ t("Check the payment screenshot") }}</a></div>
+    {% else %}
+    {% with order_back = "/orders?tab=" ~ tab %}{% include "_order_actions.html" %}{% endwith %}
+    {% endif %}
   </li>
 {% else %}
   <li class="empty">{{ t("No orders here.") }}</li>

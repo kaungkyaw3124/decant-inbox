@@ -1,6 +1,11 @@
 <div id="thread" class="thread" {% if polling %}hx-get="/chats/{{ c.id }}/thread" hx-trigger="every 4s" hx-swap="outerHTML"{% endif %}>
+{% set ns = namespace(day=none) %}
+{% set captions = {"auto": t("Auto-reply") ~ " · " ~ t("Delivered"), "hold": t("Auto · please wait")} %}
 {% for m in messages %}
-  <div class="bubble {{ m.direction }}" id="m{{ m.id }}">
+  {% set day = m.received_at | local_time("%Y-%m-%d") %}
+  {% if day != ns.day %}{% set ns.day = day %}<p class="day-sep"><b>{{ m.received_at | local_time("%d %b") }}</b></p>{% endif %}
+  {% set by = sent.get(m.id, ("you", none)) if m.direction == "out" else none %}
+  <div class="bubble {{ m.direction }}{% if by %} by-{{ by[0] }}{% endif %}" id="m{{ m.id }}">
     {% if m.kind == "photo" %}
       {% set d = downloads.get(m.id) %}
       <div class="photo">
@@ -21,8 +26,10 @@
       <span class="muted small">({{ t("sticker, voice or file — open Telegram to see it") }})</span>
     {% endif %}
     {% if m.raw_text %}<p class="text">{{ m.raw_text }}</p>{% endif %}
+    {% if checks.get(m.id) %}<a class="button primary check-pay" href="/payments/{{ checks[m.id] }}">💳 {{ t("Check payment") }}</a>{% endif %}
     <div class="bubble-meta">
-      {% if m.id in auto_msgs %}<span title="{{ t('Sent by auto-reply') }}">🤖</span> · {% endif %}
+      {% if by %}<span class="by"{% if by[0] in captions %} title="{{ t('Sent by auto-reply') }}"{% endif %}>{{ captions.get(by[0]) or by[1] or t("You") }}</span> · {% endif %}
+      {% if m.id in auto_msgs and not by %}<span title="{{ t('Sent by auto-reply') }}">🤖</span> · {% endif %}
       {% if m.id in ai_reasons %}<span class="ai-mark" title="{{ ai_reasons[m.id] }}">🧠</span> · {% endif %}
       {% if m.direction == "in" %}<a href="/messages/{{ m.id }}?back=/chats/{{ c.id }}">{{ t("details") }}</a> · {% endif %}
       <time>{{ m.received_at | local_time }}</time>
@@ -32,10 +39,11 @@
   <p class="empty">{{ t("No messages.") }}</p>
 {% endfor %}
 {% for o in pending %}
-  <div class="bubble out pending status-{{ o.status }}">
+  {% set by = pending_by.get(o.id, ("person", none)) %}
+  <div class="bubble out pending by-{{ by[0] }} status-{{ o.status }}">
     <p class="text">{{ o.text }}</p>
     <div class="bubble-meta">
-      {% if o.id in auto_box %}🤖 {% endif %}
+      <span class="by"{% if by[0] in captions %} title="{{ t('Sent by auto-reply') }}"{% endif %}>{{ t("Auto-reply") if by[0] == "auto" else t("Auto · please wait") if by[0] == "hold" else by[1] or t("You") }}</span> ·
       {% if o.status == "queued" and o.send_after > now() %}<span data-send-at="{{ o.send_after.isoformat() }}">{{ t("Sending in {n} s", n=((o.send_after - now()).total_seconds()) | round | int) }}</span>
       {% elif o.status == "queued" %}⏳ {{ t("queued") }}{% if o.error %} · {{ tr(o.error) }}{% endif %}
       {% elif o.status == "sending" and o.id in stuck %}<span class="error">⚠ {{ t("unknown: check Telegram whether it arrived") }}</span>

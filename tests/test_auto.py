@@ -46,7 +46,7 @@ def runs(db) -> dict[int, tuple]:
 
 def test_off_by_default(shop, db):
     client, _ = shop
-    assert "Auto-reply: <b>OFF</b>" in client.get("/").text
+    assert 'role="switch" aria-checked="false"' in client.get("/").text  # 4.21: iOS switch
     switch_on(db)
     with SessionLocal.begin() as s:
         auto.set_enabled(s, False, None)
@@ -57,7 +57,7 @@ def test_off_by_default(shop, db):
 def test_auto_reply_after_quiet_once_per_message(shop, db):
     client, token = shop
     client.post("/auto-reply", data={"csrf": token, "on": "1"})
-    assert "Auto-reply: <b>ON</b>" in client.get("/").text
+    assert 'role="switch" aria-checked="true"' in client.get("/").text  # 4.21: iOS switch
     now = datetime.now(UTC)
     add(3001, "stw intensely 5ml ဘယ်လောက်လဲ", customer="91", when=now)
     run_batch()
@@ -203,7 +203,7 @@ def test_cancel_auto_reply_from_chat(shop, db):
     auto.run_once()
     cid = customer_id(db, "91")
     page = client.get(f"/chats/{cid}").text
-    assert "🤖" in page and "Sending in" in page
+    assert "bubble out pending by-auto" in page and "Sending in" in page  # 4.21: caption, no 🤖
     oid = scalar(db, "SELECT id FROM outbox")
     client.post(f"/chats/{cid}/outbox/{oid}/cancel", data={"csrf": token})
     with db.connect() as c:
@@ -212,7 +212,7 @@ def test_cancel_auto_reply_from_chat(shop, db):
         assert c.execute(text("SELECT undone_at IS NOT NULL FROM quick_actions")).scalar() is True
     auto.run_once()
     assert len(outbox(db)) == 1  # cancelled by the admin: auto does not try again
-    assert re.search(r"Auto-reply: <b>(ON|OFF)</b>", page)
+    assert re.search(r'role="switch" aria-checked="(true|false)"', page)  # 4.21: iOS switch
 
 
 def test_step_4d_more_items_returning_customer_and_speed(shop, db):

@@ -62,6 +62,9 @@
     });
   });
 
-  // chat: open at the newest message (the thread scrolls inside its card)
-  document.querySelectorAll(".chat-pane").forEach(function (el) { el.scrollTop = el.scrollHeight; });
+  // chat: open at the newest message (the thread scrolls inside its card); also after a chat-list click
+  // swapped the workspace in without a reload (docs/SPEC-v4.21, hx-boost on the list)
+  function toBottom() { document.querySelectorAll(".chat-pane").forEach(function (el) { el.scrollTop = el.scrollHeight; }); }
+  toBottom();
+  document.addEventListener("htmx:afterSettle", function (e) { if (e.detail && e.detail.boosted) toBottom(); });
 })();

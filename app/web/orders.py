@@ -21,6 +21,8 @@ from app.web.inbox import flash, safe_back
 
 router = APIRouter(dependencies=[Depends(current_user), Depends(verify_csrf)])
 TABS = {  # tab -> (label, statuses, oldest first?)
+    "unpaid": ("💳 Unpaid", ("waiting_payment",), True),  # docs/SPEC-v4.21: before payment (no Order ID yet)
+    "check": ("📷 Check", ("photo_received",), True),
     "to_pack": ("📦 To pack", ("paid",), True),
     "to_send": ("🚚 To send", ("packed",), True),
     "sent": ("Sent", ("sent_out",), False),
@@ -31,6 +33,7 @@ STATUS_LABELS = {"paid": "📦 to pack", "packed": "🚚 to send", "sent_out": "
                  "cancelled": "cancelled", "photo_received": "📷 payment photo", "waiting_payment": "💳 waiting payment",
                  "cart": "🛒 cart", "confirmed": "✅ confirmed", "abandoned": "abandoned"}
 LIST_SIZE = 100
+UNPAID_TABS = ("unpaid", "check")
 
 
 def _order(db: Session, order_id: int, lock: bool = True) -> Order:
@@ -49,13 +52,15 @@ def orders_page(request: Request, tab: str = "to_pack", show_test: str = "", con
     # docs/SPEC-v4.14: test orders only with "Show test orders", and never once cleared
     shown = (Order.is_test.is_(False) | (Order.cancel_note.is_distinct_from(testpay.CLEARED) & Order.is_test)
              if show_test else Order.is_test.is_(False))
+    unpaid = tab in UNPAID_TABS
     query = select(Order, Customer).join(Customer, Customer.id == Order.customer_id).where(
-        Order.status.in_(statuses), Order.order_no.is_not(None), shown)
-    order_by = Order.paid_at.asc() if oldest_first else Order.paid_at.desc()
+        Order.status.in_(statuses), Order.order_no.is_(None) if unpaid else Order.order_no.is_not(None), shown)
+    when = Order.updated_at if unpaid else Order.paid_at
+    order_by = when.asc() if oldest_first else when.desc()
     rows = db.execute(query.order_by(order_by, Order.id).limit(LIST_SIZE)).all()
-    counts = {key: len(db.scalars(select(Order.id).where(Order.status.in_(st), Order.order_no.is_not(None),
-                                                         shown)).all())
-              for key, (_, st, _) in TABS.items() if key in ("to_pack", "to_send", "sent")}
+    counts = {key: len(db.scalars(select(Order.id).where(Order.status.in_(st), shown, Order.order_no.is_(None)
+                                                         if key in UNPAID_TABS else Order.order_no.is_not(None))).all())
+              for key, (_, st, _) in TABS.items() if key in ("unpaid", "check", "to_pack", "to_send", "sent")}
     return templates.TemplateResponse(request, "orders.html", {
         "tab": tab, "tabs": TABS, "counts": counts, "status_labels": STATUS_LABELS, "show_test": bool(show_test),
         "confirm_clear": bool(confirm_clear), "test_open": db.scalar(select(func.count()).select_from(Order).where(

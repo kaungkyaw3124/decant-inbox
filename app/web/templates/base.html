@@ -4,9 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="htmx-config" content='{"includeIndicatorStyles": false}'>
-<meta name="theme-color" content="#5b2d8c">
+<meta name="theme-color" content="#F2F2F7">
 <title>{% block title %}Decant Inbox{% endblock %}</title>
 <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+<link rel="preload" href="/static/vendor/inter-5.1.0/inter-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/static/vendor/noto-sans-myanmar-5.3.0/noto-sans-myanmar-myanmar-400-normal.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/static/vendor/bootstrap-5.3.8/bootstrap.min.css">
 <link rel="stylesheet" href="/static/icons.css">
@@ -17,15 +18,19 @@
 <script src="/static/app.js" defer></script>
 </head>
 <body hx-headers='{"X-CSRF-Token": "{{ csrf }}"}' data-sending-in="{{ t('Sending in {n} s') }}" data-sending="💬 {{ t('sending…') }}"
-      class="{% if request.session.get('user_id') %}signed-in{% endif %}">
+      class="{% if request.session.get('user_id') %}signed-in{% endif %} {% block body_class %}{% endblock %}">
 {% if request.session.get("user_id") %}
-{% set daily = [("/", "bi-inbox", "Inbox", needs_count, path == "/"),
-                ("/chats", "bi-chat-dots", "Chats", 0, path.startswith("/chats")),
-                ("/payments", "bi-wallet2", "Payments", payments_open, path.startswith("/payments")),
-                ("/orders", "bi-box-seam", "Orders", to_pack, path.startswith("/orders"))] %}
-{% set more = [("/products", "bi-droplet", "Products", true, 0),
+{# docs/SPEC-v4.21: laptop = iOS sidebar; phone = tab bar Chats · Orders · Payments · More #}
+{% set in_chats = path == "/" or path.startswith("/chats") or path.startswith("/messages") %}
+{% set daily = [("/chats", "bi-chat", "Chats", needs_count, in_chats),
+                ("/orders", "bi-box-seam", "Orders", to_pack, path.startswith("/orders")),
+                ("/payments", "bi-credit-card", "Payments", payments_open, path.startswith("/payments"))] %}
+{% set side = [("/products", "bi-droplet", "Products & prices", path.startswith("/products") or path.startswith("/prices")),
+               ("/sales", "bi-bar-chart", "Sales", path.startswith("/sales"))] %}
+{% set more_links = [("/products", "bi-droplet", "Products", true, 0),
                ("/prices", "bi-tags", "Prices", user_role == "owner", 0),
                ("/sales", "bi-graph-up", "Sales", true, 0),
+               ("/", "bi-inbox", "Inbox", true, 0),
                ("/reports/wanted", "bi-clipboard-data", "Reports", true, 0),
                ("/learning", "bi-mortarboard", "Learning", user_role == "owner", to_learn),
                ("/ai", "bi-cpu", "AI", user_role == "owner", 0),
@@ -46,36 +51,42 @@
       <button class="link"><i class="bi bi-box-arrow-right"></i> {{ t("Log out") }}</button>
     </form>
 {% endmacro %}
-<header class="top">
-  <a class="brand" href="/"><span class="brand-mark" aria-hidden="true"></span><span class="brand-name">Decant Inbox</span></a>
+{% macro auto_switch() %}
   {% if user_role == "owner" %}
-  <form method="post" action="/auto-reply" class="inline auto-switch {{ 'on' if auto_on else 'off' }}">
+  <form method="post" action="/auto-reply" class="auto-switch {{ 'on' if auto_on else 'off' }}">
     <input type="hidden" name="csrf" value="{{ csrf }}">
     <input type="hidden" name="back" value="{{ request.url.path }}">
     <input type="hidden" name="on" value="{{ '0' if auto_on else '1' }}">
-    <button title="{{ t('Click to turn auto-reply OFF') if auto_on else t('Click to turn auto-reply ON') }}">🤖 {{ t("Auto-reply") }}: <b>{{ t("ON") if auto_on else t("OFF") }}</b></button>
+    <button role="switch" aria-checked="{{ 'true' if auto_on else 'false' }}" title="{{ t('Click to turn auto-reply OFF') if auto_on else t('Click to turn auto-reply ON') }}">
+      <span class="label">{{ t("Auto-reply") }}<b class="visually-hidden">: {{ t("ON") if auto_on else t("OFF") }}</b></span><span class="ios-toggle" aria-hidden="true"></span></button>
   </form>
-  {% else %}<span class="auto-switch {{ 'on' if auto_on else 'off' }} small">🤖 {{ t("Auto-reply") }}: <b>{{ t("ON") if auto_on else t("OFF") }}</b></span>{% endif %}
-  <nav class="desk-nav" aria-label="{{ t('Menu') }}">
-    {% for href, icon, label, count, current in daily %}
-    <a href="{{ href }}" {% if current %}aria-current="page"{% endif %}>{{ t(label) }}{% if count %} <span class="badge{% if href == '/payments' %} warn{% endif %}">{{ count }}</span>{% endif %}</a>
-    {% endfor %}
-    <details class="more-menu">
-      <summary>{{ t("More") }}{% if to_learn and user_role == "owner" %} <span class="badge">{{ to_learn }}</span>{% endif %}</summary>
-      <div class="more-list">
-        {% for href, icon, label, shown, count in more if shown %}
-        <a href="{{ href }}" {% if path.startswith(href) or (href == "/users" and path.startswith("/activity")) %}aria-current="page"{% endif %}><i class="bi {{ icon }}"></i> {{ t(label) }}{% if count %} <span class="badge">{{ count }}</span>{% endif %}</a>
-        {% endfor %}
-        {{ lang_and_logout() }}
-      </div>
-    </details>
-  </nav>
-</header>
+  {% else %}<span class="auto-switch {{ 'on' if auto_on else 'off' }}"><span class="label">{{ t("Auto-reply") }}: <b>{{ t("ON") if auto_on else t("OFF") }}</b></span><span class="ios-toggle" aria-hidden="true"></span></span>{% endif %}
+{% endmacro %}
+<nav class="sidebar" aria-label="{{ t('Menu') }}">
+  <a class="brand" href="/">Decant</a>
+  {% for href, icon, label, count, current in daily %}
+  <a href="{{ href }}" class="side-item" {% if current %}aria-current="page"{% endif %}><i class="bi {{ icon }}"></i><span>{{ t(label) }}</span>{% if count %}<b class="side-count">{{ count }}</b>{% endif %}</a>
+  {% endfor %}
+  {% for href, icon, label, current in side %}
+  <a href="{{ href }}" class="side-item" {% if current %}aria-current="page"{% endif %}><i class="bi {{ icon }}"></i><span>{{ t(label) }}</span></a>
+  {% endfor %}
+  <span class="side-space"></span>
+  {{ auto_switch() }}
+  <details class="more-menu">
+    <summary class="side-item"><i class="bi bi-gear"></i><span>{{ t("Settings") if user_role == "owner" else t("More") }}</span>{% if to_learn and user_role == "owner" %}<b class="side-count">{{ to_learn }}</b>{% endif %}</summary>
+    <div class="more-list">
+      {% for href, icon, label, shown, count in more_links if shown %}
+      <a href="{{ href }}" {% if (href != "/" and path.startswith(href)) or (href == "/users" and path.startswith("/activity")) %}aria-current="page"{% endif %}><i class="bi {{ icon }}"></i> {{ t(label) }}{% if count %} <span class="badge">{{ count }}</span>{% endif %}</a>
+      {% endfor %}
+      {{ lang_and_logout() }}
+    </div>
+  </details>
+</nav>
 <nav class="tabbar" aria-label="{{ t('Menu') }}">
   {% for href, icon, label, count, current in daily %}
   <a href="{{ href }}" {% if current %}aria-current="page"{% endif %}><i class="bi {{ icon }}"></i><span>{{ t(label) }}</span>{% if count %}<b class="count">{{ count }}</b>{% endif %}</a>
   {% endfor %}
-  <a href="#more" data-bs-toggle="offcanvas" data-bs-target="#more" role="button" aria-controls="more"><i class="bi bi-grid"></i><span>{{ t("More") }}</span>{% if to_learn and user_role == "owner" %}<b class="count">{{ to_learn }}</b>{% endif %}</a>
+  <a href="#more" data-bs-toggle="offcanvas" data-bs-target="#more" role="button" aria-controls="more"><i class="bi bi-three-dots"></i><span>{{ t("More") }}</span>{% if to_learn and user_role == "owner" %}<b class="count">{{ to_learn }}</b>{% endif %}</a>
 </nav>
 <aside class="offcanvas offcanvas-bottom more-sheet" tabindex="-1" id="more" aria-labelledby="more-title">
   <div class="offcanvas-header">
@@ -83,8 +94,9 @@
     <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="{{ t('Close') }}"></button>
   </div>
   <div class="offcanvas-body">
+    <div class="sheet-auto">{{ auto_switch() }}</div>
     <div class="sheet-grid">
-      {% for href, icon, label, shown, count in more if shown %}
+      {% for href, icon, label, shown, count in more_links if shown %}
       <a href="{{ href }}"><i class="bi {{ icon }}"></i><span>{{ t(label) }}</span>{% if count %}<b class="count">{{ count }}</b>{% endif %}</a>
       {% endfor %}
     </div>

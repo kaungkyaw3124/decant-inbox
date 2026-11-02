@@ -4,6 +4,7 @@ from datetime import UTC, datetime, timedelta
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import RedirectResponse
 from sqlalchemy import delete, exists, func, select, update
+from sqlalchemy.engine import Row
 from sqlalchemy.orm import Session
 
 from app.models import (
@@ -339,6 +340,47 @@ def needs_you(db: Session, now: datetime | None = None, owner: bool = True) -> d
                      + len(hints) + len(failed) + len(paused) + len(teach) + len(price_needed)
                      + (1 if to_approve else 0) + len(conflicts)}
 
+
+
+# docs/SPEC-v4.21: the chat list and the conversation show the "Needs you" items per customer
+NOT_ITEMS = ("older", "older_ids", "dismissed", "auto_cancelled", "conflicts")  # info rows / counters
+
+
+def _about(row, customer_id: int) -> bool:
+    for x in row if isinstance(row, (tuple, list, Row)) else (row,):
+        if isinstance(x, Customer):
+            if x.id == customer_id:
+                return True
+        elif getattr(x, "customer_id", None) == customer_id:
+            return True
+        elif getattr(getattr(x, "customer", None), "id", None) == customer_id:
+            return True
+    return False
+
+
+def for_customer(found: dict, customer_id: int) -> dict:
+    """The same "Needs you" dict, only the rows about this customer ("count" = their items)."""
+    mine = {k: [r for r in v if _about(r, customer_id)] if isinstance(v, list) and k not in NOT_ITEMS else v
+            for k, v in found.items()}
+    mine["ai_notices"], mine["older"], mine["to_approve"], mine["conflicts"], mine["price_needed"] = [], [], 0, [], []
+    mine["count"] = sum(len(v) for k, v in mine.items() if isinstance(v, list) and k not in NOT_ITEMS)
+    return mine
+
+
+def customers_needing(found: dict) -> dict[int, int]:
+    """customer id -> number of "Needs you" items about them."""
+    counts: dict[int, int] = {}
+    for key, rows in found.items():
+        if not isinstance(rows, list) or key in NOT_ITEMS:
+            continue
+        for row in rows:
+            for x in row if isinstance(row, (tuple, list, Row)) else (row,):
+                cid = (x.id if isinstance(x, Customer) else getattr(x, "customer_id", None)
+                       or getattr(getattr(x, "customer", None), "id", None))
+                if cid:
+                    counts[cid] = counts.get(cid, 0) + 1
+                    break
+    return counts
 
 OLDER_AFTER = timedelta(hours=24)
 DISMISS_UNDO = timedelta(seconds=60)

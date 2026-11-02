@@ -28,7 +28,7 @@ def test_b1_authentic_auto_on(shop, db):
     with db.connect() as c:
         assert c.execute(text("SELECT kind, auto FROM quick_actions")).one() == ("faq", True)
     page = client.get(f"/chats/{customer_id(db, '91')}").text
-    assert 'title="Sent by auto-reply">🤖' in page
+    assert 'title="Sent by auto-reply">Auto-reply' in page
     assert "FAQ answer" in client.get("/").text  # in the 🤖 handled feed
 
 
@@ -48,7 +48,7 @@ def test_b1_authentic_auto_off_one_tap(shop, db):
     assert "💬 Send FAQ: Authentic" in client.get("/").text
     tap(client, token, mid)
     assert deliver(db) == [GREETING + AUTHENTIC]
-    assert 'title="Sent by auto-reply">🤖' in client.get(f"/chats/{customer_id(db, '91')}").text  # every FAQ send
+    assert 'title="Sent by auto-reply">Auto-reply' in client.get(f"/chats/{customer_id(db, '91')}").text  # every FAQ send
 
 
 def test_b2_delivery_time_and_kpay(shop, db):

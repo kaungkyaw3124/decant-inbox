@@ -68,7 +68,7 @@ def test_approve_gives_order_id_and_sends_confirmation(paying, db, tmp_path, mon
     photo(1)
     assert order(db) == ("photo_received", None)
     check = scalar(db, "SELECT id FROM payment_checks")
-    assert "Payments <span class=\"badge warn\">1</span>" in client.get("/").text
+    assert '<span>Payments</span><b class="side-count">1</b>' in client.get("/").text  # 4.21: sidebar
     assert "payment screenshot to check" in client.get("/").text
     assert "💳 Check the payment screenshot" in client.get(f"/chats/{cid}?tab=cart").text
 

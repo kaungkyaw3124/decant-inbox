@@ -788,4 +788,14 @@ MY = {
         "ငွေချေပြီး အော်ဒါကို ပြင်မလား။ ပြင်တာနဲ့ အကြောင်းပြချက်ကို Activity မှာ သိမ်းထားမယ်။",
     "Cancel this paid order? Refund the customer outside the system.":
         "ငွေချေပြီး ဒီအော်ဒါကို ပယ်မလား။ ငွေပြန်အမ်းတာကို စနစ်အပြင်မှာ လုပ်ပါ။",
+    # docs/SPEC-v4.21-ios-messenger-ui.md: Messenger workspace
+    "Auto": "အလိုအလျောက်", "Auto · please wait": "အလိုအလျောက် · ခဏစောင့်", "Back to chats": "စကားပြောများ ကို ပြန်သွားမယ်",
+    "Check payment": "ငွေလွှဲ စစ်မယ်", "Choose a chat on the left.": "ဘယ်ဘက်က chat တစ်ခု ရွေးပါ။",
+    "Conversation": "စကားပြော", "Ignore customer": "ဒီဖောက်သည်ကို လျစ်လျူရှုမယ်",
+    "Name, phone or order #": "နာမည်၊ ဖုန်း (သို့) အော်ဒါ #", "Needs me": "ကိုယ်လုပ်ရမယ်",
+    "Open Needs you ({n})": "လုပ်ရမယ့်စာရင်း ဖွင့်မယ် ({n})", "Open the screenshot": "Screenshot ဖွင့်မယ်",
+    "Past orders": "အရင်အော်ဒါများ", "Pause auto-reply": "Auto-reply ရပ်မယ်", "Payment": "ငွေပေးချေမှု",
+    "Reply": "ပြန်စာ", "needs you": "ကိုယ်လုပ်ရမယ်", "{n} orders": "အော်ဒါ {n} ခု",
+    "Unpaid": "ငွေမချေရသေး", "Check": "စစ်ရန်", "Paid": "ငွေချေပြီး", "Products & prices": "ပစ္စည်းနဲ့ ဈေးနှုန်း",
+    "💳 Unpaid": "💳 ငွေမချေရသေး", "📷 Check": "📷 စစ်ရန်",
 }

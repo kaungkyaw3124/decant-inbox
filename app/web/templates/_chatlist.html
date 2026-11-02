@@ -1,0 +1,45 @@
+{# docs/SPEC-v4.21: the Messenger chat list (laptop: left column; phone: the Chats tab).
+   Needs: list_rows, seg, q, page, more, show_ignored, active, needs_customers (app.web.chats.chat_list_context). #}
+{% set pill_class = {"Cart": "cart", "Unpaid": "unpaid", "Check": "check", "Paid": "paid", "Sent": "sent"} %}
+<section class="chatlist" aria-label="{{ t('Chats') }}">
+  <div class="chatlist-head">
+    <p class="large-title" role="heading" aria-level="1">{{ t("Chats") }}</p>
+    <form method="get" action="/chats" class="search" role="search">
+      {% if seg != "all" %}<input type="hidden" name="seg" value="{{ seg }}">{% endif %}
+      <i class="bi bi-search" aria-hidden="true"></i>
+      <input type="search" name="q" value="{{ q }}" placeholder="{{ t('Name, phone or order #') }}" aria-label="{{ t('Search') }}">
+    </form>
+    <nav class="segmented" aria-label="{{ t('Filter') }}">
+      <a href="/chats{% if q %}?q={{ q | urlencode }}{% endif %}" {% if seg == "all" and path != "/" %}aria-current="page"{% endif %}>{{ t("All") }}</a>
+      <a href="/chats?seg=needs" {% if seg == "needs" or path == "/" %}aria-current="page"{% endif %}>{{ t("Needs me") }}{% if needs_customers %} {{ needs_customers }}{% endif %}</a>
+      <a href="/chats?seg=orders{% if q %}&q={{ q | urlencode }}{% endif %}" {% if seg == "orders" %}aria-current="page"{% endif %}>{{ t("Orders") }}</a>
+    </nav>
+  </div>
+  <ul class="chatrows" hx-boost="true" hx-target="#ws" hx-select="#ws" hx-swap="outerHTML">
+  {% for r in list_rows %}
+    {% set c, m = r.c, r.m %}
+    <li><a class="chatrow{% if r.needs %} needs{% endif %}{% if m.direction == 'in' %} unread{% endif %}" href="/chats/{{ c.id }}" {% if active == c.id %}aria-current="page"{% endif %}>
+      <span class="avatar" aria-hidden="true">{{ r.initials }}</span>
+      <span class="chatrow-body">
+        <span class="chatrow-top"><b class="name">{{ c.display_name or ("@" ~ c.username if c.username else t("Customer") ~ " " ~ c.external_user_id) }}</b>
+          <time datetime="{{ m.received_at.isoformat() }}">{{ m.received_at | age }}</time></span>
+        <span class="chatrow-last">{% if r.by in ("auto", "hold") %}{{ t("Auto") }}: {% elif r.by %}{{ t("You") }}: {% endif %}{% if m.kind == "photo" %}📷 {% endif %}{{ m.raw_text or (t("Photo") if m.kind == "photo" else "(" ~ t("sticker / file") ~ ")") }}</span>
+      </span>
+      {% if m.direction == "in" %}<span class="visually-hidden">{{ t("waiting for reply") }}</span>{% endif %}
+      {% if r.pill %}<span class="pill st-{{ pill_class[r.pill] }}">{{ t(r.pill) }}</span>{% endif %}
+      {% if r.needs %}<span class="dot" role="img" aria-label="{{ t('needs you') }}"></span>{% endif %}
+      {% if c.ignored %}<span class="pill">{{ t("ignored") }}</span>{% endif %}
+    </a></li>
+  {% else %}
+    <li class="empty">{{ t("Nothing waiting for you.") if seg == "needs" else t("No chats yet.") }}</li>
+  {% endfor %}
+  </ul>
+  <nav class="pager small">
+    {% if page > 1 %}<a href="/chats?page={{ page - 1 }}&seg={{ seg }}{% if show_ignored %}&show_ignored=1{% endif %}">← {{ t("Newer") }}</a>{% else %}<span></span>{% endif %}
+    {% if more %}<a href="/chats?page={{ page + 1 }}&seg={{ seg }}{% if show_ignored %}&show_ignored=1{% endif %}">{{ t("Older") }} →</a>{% endif %}
+  </nav>
+  <form method="get" action="/chats" class="filters small chatlist-foot">
+    <label class="check"><input type="checkbox" name="show_ignored" value="1" {% if show_ignored %}checked{% endif %}> {{ t("Show ignored customers") }}</label>
+    <button class="quiet">{{ t("Apply") }}</button>
+  </form>
+</section>

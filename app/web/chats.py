@@ -16,7 +16,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
 from app.models import (
-    AICall, AuditLog, Customer, MediaDownload, Message, Order, OrderItem, Outbox, PaymentCheck, Product, QuickAction, User,
+    AICall, AuditLog, Customer, CustomerPhone, MediaDownload, Message, Order, OrderItem, Outbox, PaymentCheck, PaymentMethod, Product, QuickAction, User,
 )
 from app.models.orders import MAX_PHONES, OPEN_STATUSES
 from app.models.outbox import MAX_TEXT, MEDIA_DIR
@@ -27,6 +27,7 @@ from app.parser.rules import find_phones
 from app.pricing.prices import current_prices
 from app.replies import compose
 from app.replies import templates as replies
+from app.web import staff
 from app.web.auth import current_user, verify_csrf
 from app.web.deps import get_db, templates
 from app.web.inbox import flash
@@ -55,23 +56,85 @@ def has_written(db: Session, customer_id: int) -> bool:
     return bool(db.scalar(select(exists().where(Message.customer_id == customer_id, Message.direction == "in"))))
 
 
-@router.get("/chats", response_class=HTMLResponse)
-def chat_list(request: Request, show_ignored: str = "", page: int = 1, db: Session = Depends(get_db)):
+HOLD_KINDS = ("holding", "hold")
+PILLS = {"cart": "Cart", "confirmed": "Cart", "waiting_payment": "Unpaid", "photo_received": "Check",
+         "paid": "Paid", "packed": "Paid", "sent_out": "Sent"}  # docs/SPEC-v4.21: small status pill per chat
+ORDER_SEG = tuple(PILLS)
+
+
+def who_sent(db: Session, boxes) -> dict[int, tuple[str, str | None]]:
+    """outbox id -> ("auto" | "hold" | "person", staff name): a row without a person is the bot's."""
+    names = dict(db.execute(select(User.id, User.username).where(
+        User.id.in_({b.created_by for b in boxes if b.created_by})).distinct()).all())
+    return {b.id: ("hold" if b.reply_kind in HOLD_KINDS else "auto" if b.created_by is None or b.reply_kind == "faq"
+                   else "person",
+                   names.get(b.created_by)) for b in boxes}
+
+
+def sent_by(db: Session, message_ids: list[int]) -> dict[int, tuple[str, str | None]]:
+    """sent message id -> who_sent(); our messages typed in Telegram itself are not in the outbox (= "You")."""
+    boxes = db.scalars(select(Outbox).where(Outbox.sent_message_id.in_(message_ids))).all()
+    kinds = who_sent(db, boxes)
+    return {b.sent_message_id: kinds[b.id] for b in boxes}
+
+
+def initials(customer: Customer) -> str:
+    name = (customer.display_name or customer.username or "").strip()
+    parts = [p for p in re.split(r"\s+", name) if p]
+    return ("".join(p[0] for p in parts[:2]) or "?").upper()
+
+
+def chat_list_context(db: Session, user: User, seg: str = "all", q: str = "", page: int = 1,
+                      show_ignored: bool = False, active: int | None = None, found: dict | None = None) -> dict:
+    """docs/SPEC-v4.21 chat list: needs-you first (longest waiting first), then the most recent."""
+    from app.web.auto import customers_needing, needs_you  # late import: auto imports this module's neighbours
+
+    seg = seg if seg in ("all", "needs", "orders") else "all"
     page = max(page, 1)
+    # shortcut: needs_you() on every list render; fine for a small shop, cache it if the list gets slow
+    needing = customers_needing(found if found is not None else needs_you(db, owner=user.is_owner))
     last = (select(Message.customer_id, func.max(Message.id).label("last_id"))
             .group_by(Message.customer_id).subquery())
-    query = (select(Customer, Message).join(last, last.c.customer_id == Customer.id)
-             .join(Message, Message.id == last.c.last_id)
-             .order_by(Message.received_at.desc(), Message.id.desc()))
+    query = select(Customer, Message).join(last, last.c.customer_id == Customer.id).join(
+        Message, Message.id == last.c.last_id)
     if not show_ignored:
         query = query.where(Customer.ignored.is_(False))
-    rows = db.execute(query.limit(LIST_SIZE + 1).offset((page - 1) * LIST_SIZE)).all()
-    carts = dict(db.execute(select(Order.customer_id, Order.status).where(
-        Order.status.in_(OPEN_STATUSES), Order.customer_id.in_([c.id for c, _ in rows]))).all())
-    return templates.TemplateResponse(request, "chats.html", {
-        "rows": rows[:LIST_SIZE], "show_ignored": bool(show_ignored), "page": page, "carts": carts,
-        "more": len(rows) > LIST_SIZE,
-    })
+    if q := q.strip():
+        digits = re.sub(r"\D", "", q)
+        found = Customer.display_name.icontains(q, autoescape=True) | Customer.username.icontains(q, autoescape=True)
+        if digits:
+            found |= exists().where(CustomerPhone.customer_id == Customer.id,
+                                    CustomerPhone.phone.contains(digits, autoescape=True))
+            found |= exists().where(Order.customer_id == Customer.id, Order.order_no == int(digits[:9]))
+        query = query.where(found)
+    if seg == "orders":
+        query = query.where(exists().where(Order.customer_id == Customer.id, Order.status.in_(ORDER_SEG)))
+    first = []
+    if page == 1:
+        first = db.execute(query.where(Customer.id.in_(needing)).order_by(Message.received_at, Message.id)).all()
+    rows = [] if seg == "needs" else db.execute(
+        query.where(Customer.id.not_in(needing)).order_by(Message.received_at.desc(), Message.id.desc())
+        .limit(LIST_SIZE + 1).offset((page - 1) * LIST_SIZE)).all()
+    more = len(rows) > LIST_SIZE
+    rows = first + rows[:LIST_SIZE]
+    ids = [c.id for c, _ in rows]
+    status = {}
+    for cid, st in db.execute(select(Order.customer_id, Order.status).where(
+            Order.customer_id.in_(ids), Order.status.in_(ORDER_SEG)).order_by(Order.id)).all():
+        status[cid] = st  # the newest open / paid order wins
+    by = sent_by(db, [m.id for _, m in rows if m.direction == "out"])
+    return {"list_rows": [{"c": c, "m": m, "needs": c.id in needing, "pill": PILLS.get(status.get(c.id)),
+                           "status": status.get(c.id), "by": by.get(m.id, ("you", None))[0] if m.direction == "out"
+                           else None, "initials": initials(c)} for c, m in rows],
+            "seg": seg, "q": q, "page": page, "more": more, "show_ignored": show_ignored, "active": active,
+            "needs_customers": len(needing)}
+
+
+@router.get("/chats", response_class=HTMLResponse)
+def chat_list(request: Request, show_ignored: str = "", page: int = 1, seg: str = "all", q: str = "",
+              db: Session = Depends(get_db), user: User = Depends(current_user)):
+    return templates.TemplateResponse(request, "chats.html", chat_list_context(
+        db, user, seg, q, page, bool(show_ignored)))
 
 
 def thread_context(db: Session, customer: Customer) -> dict:
@@ -103,6 +166,10 @@ def thread_context(db: Session, customer: Customer) -> dict:
                                                                  AICall.ok))}
     return {
         "auto_msgs": auto_msgs, "auto_box": auto_box, "ai_reasons": ai_reasons,
+        "sent": sent_by(db, [m.id for m in messages if m.direction == "out"]), "pending_by": who_sent(db, pending),
+        "checks": dict(db.execute(select(PaymentCheck.message_id, PaymentCheck.id).where(
+            PaymentCheck.message_id.in_([m.id for m in messages if m.kind == "photo"]),
+            PaymentCheck.decision.in_(("pending", "several")))).all()),
         "c": customer, "messages": messages, "downloads": downloads, "pending": pending, "albums": albums,
         "stuck": {o.id for o in pending if o.status == "sending" and now - o.created_at > STUCK_AFTER},
         "polling": any(o.status in ("queued", "sending") for o in pending)
@@ -120,7 +187,7 @@ def _price_items(request: Request) -> list[compose.PriceItem]:
 
 
 @router.get("/chats/{customer_id}", response_class=HTMLResponse)
-def chat(request: Request, customer_id: int, db: Session = Depends(get_db)):
+def chat(request: Request, customer_id: int, db: Session = Depends(get_db), user: User = Depends(current_user)):
     customer = get_customer(db, customer_id)
     mode = request.query_params.get("compose", "custom")
     texts = replies.load(db)
@@ -156,7 +223,21 @@ def chat(request: Request, customer_id: int, db: Session = Depends(get_db)):
             result.text += "\n" + resume
     products = db.scalars(select(Product).where(Product.active).order_by(Product.brand, Product.name)).all()
     sizes = sorted({p.size_ml for ps in current_prices(db).values() for p in ps if p.size_ml})
+    from app.web.auto import for_customer, needs_you  # late import: auto imports this module's neighbours
+    from app.web.learning import card_context
+
+    found = needs_you(db, owner=user.is_owner)
+    mine = for_customer(found, customer_id)
+    shown = ([card for _, _, card in mine["teach"]] + [r.card[1] for r in mine["unanswered"] if r.card]
+             + [mine["waiting_cards"][m.id] for _, m, _ in mine["waiting"] if m.id in mine["waiting_cards"]])
+    past = db.scalars(select(Order).where(Order.customer_id == customer_id, Order.order_no.is_not(None))
+                      .order_by(Order.id.desc()).limit(10)).all()
     return templates.TemplateResponse(request, "chat.html", {
+        **chat_list_context(db, user, request.query_params.get("seg", "all"), active=customer_id, found=found),
+        **card_context(db, shown, user), "mine": mine, "past_orders": past, "initials": initials(customer),
+        "city": ((customer.address_parts or {}).get("city") or "").split(",")[0],
+        "methods": db.scalars(select(PaymentMethod).where(PaymentMethod.active).order_by(PaymentMethod.sort_order)).all(),
+        "may_decide": staff.may_decide_payments(db, user),
         **thread_context(db, customer), **cart_context(db, customer, texts), "mode": mode, "result": result,
         "greet": greet, "tab": request.query_params.get("tab", "chat"),
         "items": items + [compose.PriceItem(0, "all")] * (compose.MAX_PRICE_ITEMS - len(items)),
@@ -194,7 +275,7 @@ def next_step(db: Session, customer: Customer, order, view) -> dict | None:
     if order.status == "waiting_payment":
         return {"label": "Waiting for the payment screenshot", "wait": True}
     if order.status == "photo_received":
-        return {"label": "Check the payment screenshot", "href": "/payments"}
+        return None  # docs/SPEC-v4.21: the panel's Payment box (first) opens the check
     return None
 
 

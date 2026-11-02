@@ -13,7 +13,6 @@
     <p class="small notice-line">📍 {% if old %}{{ t("address changed at {time} (old: {old})", time=ev.created_at | local_time("%H:%M"), old=old) }}{% else %}{{ t("phone changed at {time} (old: {old})", time=ev.created_at | local_time("%H:%M"), old=ev.previous.phones | join(", ")) }}{% endif %}</p>
   {% endfor %}
   {% if shipping %}<p class="small"><a href="/orders?tab=all#order-{{ shipping.id }}">{{ t("Paid order #{no}", no=order_label(shipping)) }}: {{ tr({"paid": "📦 to pack", "packed": "🚚 to send", "sent_out": "sent out"}[shipping.status]) }} →</a></p>{% endif %}
-  {% if pending_check %}<p><a class="button primary" href="/payments/{{ pending_check.id }}">💳 {{ t("Check the payment screenshot") }}</a></p>{% endif %}
   {% if next_step %}
     <div class="next-step">
       {% if next_step.wait %}<p class="muted">⏳ {{ tr(next_step.label) }}</p>

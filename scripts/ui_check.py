@@ -271,6 +271,49 @@ def set_language(page, lang: str) -> None:
 VOLATILE = re.compile(r"(expect=|key=)[^ ]*|[?&]t=\d+")
 
 
+def u4_flows(browser) -> list[str]:
+    """docs/SPEC-v4.21 U4: the owner's daily jobs in <= 3 taps on a phone (390 px), starting from any page.
+    Runs last: it changes the fake shop (sends a reply, approves the test payment, packs an order)."""
+    problems = []
+    context = browser.new_context(viewport={"width": 390, "height": 844})
+    page = context.new_page()
+    log_in(page, "owner")
+    set_language(page, "en")  # the selectors below read English labels
+    base = f"http://127.0.0.1:{PORT}"
+
+    def flow(name: str, taps: list[str], done) -> None:
+        page.goto(f"{base}/help")  # anywhere
+        try:
+            for selector in taps:
+                page.locator(selector).first.click()
+                page.wait_for_load_state()
+            if not done():
+                problems.append(f"U4 {name}: no result after {len(taps)} taps ({page.url})")
+        except Exception as exc:  # a missing button = the flow takes more taps
+            problems.append(f"U4 {name}: {str(exc).splitlines()[0]}")
+
+    from sqlalchemy import create_engine, text
+
+    db = create_engine(get_settings().database_url)
+
+    def count(sql: str) -> int:
+        with db.connect() as c:
+            return c.execute(text(sql)).scalar()
+
+    sent = count("SELECT count(*) FROM outbox")
+    flow("send the suggested reply", [".tabbar a[href='/chats']", ".chatrow.needs:has(.chatrow-last:text('liquid brun'))",
+                                      ".needs-panel form.teach button.primary.big:not([formaction])"],
+         lambda: count("SELECT count(*) FROM outbox") > sent)
+    flow("approve a payment", [".tabbar a[href='/payments']", "a.row-main:has-text('TEST')", "button.approve"],
+         lambda: count("SELECT count(*) FROM payment_checks WHERE is_test AND decision = 'approved'") >= 6)
+    packed = count("SELECT count(*) FROM orders WHERE status = 'packed'")
+    flow("mark an order packed", [".tabbar a[href='/orders']", "form[action$='/status'] button.primary"],
+         lambda: count("SELECT count(*) FROM orders WHERE status = 'packed'") > packed)
+    db.dispose()
+    context.close()
+    return problems
+
+
 def run(quick: bool, save_inventory: bool) -> int:
     from playwright.sync_api import sync_playwright
 
@@ -326,6 +369,10 @@ def run(quick: bool, save_inventory: bool) -> int:
                                 lines.append(f"FAIL {check.upper()} {name} {role} {lang} {width}: "
                                              + "; ".join(problems[:6]) + (f" (+{len(problems) - 6})" if len(problems) > 6 else ""))
             context.close()
+        if not save_inventory:
+            for problem in u4_flows(browser):
+                failures += 1
+                lines.append("FAIL " + problem)
         browser.close()
 
     if save_inventory:
