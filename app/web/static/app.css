@@ -630,3 +630,4 @@ button.danger, summary.button.danger, a.button.danger { color: #B80012; }
 .tag.vip { background: #FFF1C2; color: #7A5200; } .tag.wholesale { background: #E1EEFF; color: var(--ios-blue-text); }
 .tag.problem { background: var(--bad-bg); color: var(--danger); }
 .note { margin: 2px 0; }
+.inline-form input[type=file] { min-width: 0; max-width: 100%; flex: 1 1 100%; }

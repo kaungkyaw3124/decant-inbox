@@ -2262,3 +2262,9 @@ The feedback question is automatic like the auto replies, so it is OFF until you
    here; for a quick test set "Remind after" to 1 day) → edit → Send → it arrives.
 3. Turn on feedback; Orders → Delivered → a test order → "💬 Ask feedback now (test)" → answer 👎 from the second
    account → "please wait" at once + Needs you + alert (if the bot is on).
+
+### Final checks (2026-11-02, after 5.0-5.2)
+Full pytest **846 passed, 1 skipped** (~20 min on 2 CPUs). Full UI gate **384 page views, 0 failed checks**
+(C1-C7 + U4; the Stock page's file picker was too wide at 360 px → fixed). UI inventory baseline re-saved
+(tests/fixtures/ui_inventory.json, 64 pages, now including Stock, Customers, My account, slips).
+
