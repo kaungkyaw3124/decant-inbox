@@ -1983,3 +1983,53 @@ Before (for step 4 only): put a `TEST_PAY_CODE=` (8+ letters/digits) in `.env`, 
 3. Send `ok`. Expect payment info.
 4. Send the test code. Expect: Payments shows the 🧪 test check; approve it → a T-order.
 5. Optional: `10ml မယူတော့ဘူး` removes a line, as before.
+
+## 2026-11-02 — v4.20 AUTOMATION GOAL (docs/SPEC-v4.20-automation-goal.md)
+
+**Result: G1-G4 MET** (deployed 2026-11-02 16:50 UTC, migration c5d8e1f2a904).
+
+| Goal | Need | Result |
+|---|---|---|
+| G1 automatic (simulator, 214 scenarios / 315 turns) | ≥ 90% | **100%** (315/315; 3.5% of turns correctly go to a person) |
+| G2 wrong (strict judge) | 0 | **0** |
+| G3 silent / one Needs you item | 0 / 1 | **0** silent, every person-turn makes exactly **1** Needs you item |
+| G4 live replay, last 30 days on a DB copy, sending off | ≥ 85%, 0 wrong | **87.7%** (57 msgs, 3 customers), 0 wrong, 0 silent; left: 6 × "intent other", 1 × "no certain reply" (message ids in data/exports/replay_20261102_163204.json) |
+
+### 4.20 scoreboard
+- it 1-5 (2026-10-31, commit 6873619): complaints / small talk / media / resume replies, 10 s holding, size
+  questions, no-size price fix, replace size/qty, address in buy line, grid addresses, AI said-size, delivery-fee
+  FAQ → 100% automatic, 0 wrong, 0 silent, needs-person 3.5%.
+- it 6 (2026-10-31/11-02, commit 1fcfd26): judge made stricter (G3: exactly ONE Needs you item) → 99.4%, then fixed:
+  "customer waiting" row is not shown again when the message has its own row (address check, cancel, request,
+  payment); a repeated message gets the resume line; a new order offers only the latest phone; size question also
+  while waiting for payment; payment screenshot gets "received, we'll check" → **100%, 0 wrong, 0 silent,
+  needs-person 3.5%**; replay 87.7%. AI cost this session $0.014 (evals); simulator uses cassettes ($0).
+
+**Built (A0-A5)**: pytest-xdist (one DB per worker); `scripts/simulate.py` + `tests/sim/scenarios/*.yaml`
+(214 scenarios, ≥ 80 by hand, generated ones by `scripts/sim_generate.py`) with the strict judge, run offline in
+pytest from `tests/sim/cassettes.json`; `scripts/replay_live.py` (copy → replay → numbers only → copy deleted).
+
+**Decisions to check**
+- A6 delivery answers are an FAQ entry "Delivery fee" (Settings → FAQ), not a new Settings "Delivery" page.
+  Default answer: "ပို့ခကို admin က အတည်ပြုပေးပါမယ်နော်။ ပို့ခကိုတော့ ပစ္စည်းရောက်မှ ပေးရပါတယ်။" (the second sentence is
+  the shop rule already in the payment/shipped templates).
+- A0 target ≤ 8 min is **not met**: full suite 13.5 min on this server (was ~22). The server has 2 CPUs and the
+  suite needs 12.6 CPU-minutes (simulator 4.5 min, UI gate 2 min); 8 min needs a bigger server or fewer tests.
+  No test was skipped or removed.
+- The live replay is small (57 incoming messages in 30 days). 87.7% is real but has a wide margin of error.
+
+**Tests:** 809 passed, 1 skipped (was 770 + 1). UI gate quick (in pytest) green.
+**Evals (real API):** products PASS (intent 98%, products 100%, $0.007); addresses PASS (township 100%, $0.007).
+
+**Owner inputs (A6, not blocking):** delivery fee per city/township, COD yes/no, delivery days, shop hours →
+write them into Settings → FAQ → "Delivery fee" (and the payment FAQ) in your own words.
+
+### OWNER TEST SCRIPT 4.20 (second Telegram account, Auto-reply ON)
+1. Send one message: `Swy intensely 20ml ယူပါမယ်` / `66 str 28 str ကိုပို့ပေးပါ` / `09xxxxxxxxx` → automatic size
+   question with prices (2ml / 5ml / 10ml). Send `10ml` → list + "ဖုန်း 09…၊ လိပ်စာ 66 str 28 str ကိုပဲ ပို့ပေးရမလား။".
+   Send `ok` → payment info. No Needs you item.
+2. `dior ဟိုဟာလေး ရှိလား` → a numbered choice; send `2` → price + "ယူမလား".
+3. `ပို့ခ ဘယ်လောက်လဲ` → the "Delivery fee" FAQ answer.
+4. A voice message → "စာနဲ့ ရေးပေးပါနော်။". A sticker → the same (once per 10 min).
+5. `ပစ္စည်းယိုနေတယ်` (leaking) → holding reply within ~10 s; dashboard home shows exactly ONE item for you.
+6. Send the same unclear message twice → the 2nd time you get the "what we are waiting for" line, not silence.
