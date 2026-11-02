@@ -59,6 +59,13 @@ def _recent(key: str) -> int:
     return len(_failures[key])
 
 
+def failed(username: str, ip: str) -> None:
+    """A wrong password or 2-step code counts toward the lockout."""
+    now = time.monotonic()
+    _failures[f"ip:{ip}"].append(now)
+    _failures[f"user:{username}"].append(now)
+
+
 def locked_out(username: str, ip: str) -> bool:
     return (_recent(f"ip:{ip}") >= MAX_FAILURES_PER_IP
             or _recent(f"user:{username}") >= MAX_FAILURES_PER_USER)
@@ -72,9 +79,7 @@ def authenticate(db: Session, username: str, password: str, ip: str) -> User | N
     try:
         hasher.verify(user.password_hash if user else _DUMMY_HASH, password)
     except (VerifyMismatchError, InvalidHashError):
-        now = time.monotonic()
-        _failures[f"ip:{ip}"].append(now)
-        _failures[f"user:{username}"].append(now)
+        failed(username, ip)
         return None
     if user is None or user.disabled:
         return None  # a disabled user can't log in (same message as a wrong password)
@@ -82,16 +87,23 @@ def authenticate(db: Session, username: str, password: str, ip: str) -> User | N
     return user
 
 
+SESSION_HOURS = 12  # docs/SPEC-v5.0 G3: log in again after 12 h
+
+
 def login(request: Request, user: User) -> None:
     request.session.clear()
     request.session["user_id"] = user.id
     request.session["csrf"] = secrets.token_urlsafe(32)
+    request.session["epoch"] = user.session_epoch  # "log out everywhere" bumps the user's epoch
+    request.session["since"] = int(time.time())
 
 
 def current_user(request: Request, db: Session = Depends(get_db)) -> User:
     user_id = request.session.get("user_id")
     user = db.get(User, user_id) if user_id else None
-    if user is not None and user.disabled:  # disabled while logged in: out at the next click
+    if user is not None and (user.disabled  # disabled while logged in: out at the next click
+                             or request.session.get("epoch", 0) != user.session_epoch
+                             or time.time() - request.session.get("since", 0) > SESSION_HOURS * 3600):
         request.session.clear()
         user = None
     if user is None:

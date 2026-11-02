@@ -1,0 +1,20 @@
+/* docs/SPEC-v5.0 G4: packing slips, 80 mm receipt printers and A6 labels; black on white */
+@font-face { font-family: "Noto Sans Myanmar"; font-weight: 400; src: url(/static/vendor/noto-sans-myanmar-5.3.0/noto-sans-myanmar-myanmar-400-normal.woff2) format("woff2"); }
+@page { size: 80mm auto; margin: 4mm; }
+* { box-sizing: border-box; }
+body { margin: 0 auto; max-width: 80mm; padding: 8px; font: 13px/1.6 -apple-system, "SF Pro Text", Inter, "Noto Sans Myanmar", system-ui, sans-serif; color: #000; background: #fff; }
+.no-print { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 12px; }
+.no-print a { display: inline-flex; align-items: center; min-height: 44px; color: #0062CC; text-decoration: none; }
+.print { min-height: 44px; padding: 0 18px; border: 0; border-radius: 10px; background: #0071E3; color: #fff; font-family: inherit; font-size: 15px; font-weight: 600; cursor: pointer; }
+.slip { border: 1px dashed #999; padding: 8px; margin-bottom: 12px; page-break-after: always; break-after: page; }
+.slip header { display: flex; justify-content: space-between; align-items: center; }
+.order-id { font-size: 30px; font-weight: 800; letter-spacing: -.02em; }
+.qr svg { width: 64px; height: 64px; display: block; }
+.who { margin: 6px 0; overflow-wrap: anywhere; }
+table { width: 100%; border-collapse: collapse; }
+td, th { padding: 3px 0; border-bottom: 1px solid #ddd; text-align: left; vertical-align: top; }
+.num { text-align: right; white-space: nowrap; padding-left: 6px; }
+.total th { border-bottom: 0; font-size: 15px; }
+.paid { margin: 6px 0 2px; font-weight: 600; }
+.thanks { margin: 0; font-size: 12px; }
+@media print { .no-print { display: none; } body { padding: 0; } .slip { border: 0; margin: 0; } }

@@ -126,6 +126,7 @@ def build_database() -> dict[str, int]:
     ids["product"] = stw
     ids["message"] = scalar(engine, "SELECT id FROM messages WHERE external_message_id = '10'")
     ids["practice"] = 1
+    ids["order"] = orders[0]  # a paid test order (packing slip)
     engine.dispose()
     return ids
 
@@ -137,7 +138,7 @@ def pages(ids: dict[str, int]) -> list[tuple[str, str, bool]]:
     from app.web.main import app
 
     fill = {"{message_id}": ids["message"], "{product_id}": ids["product"], "{customer_id}": ids["customer"],
-            "{n}": ids["practice"]}
+            "{n}": ids["practice"], "{order_id}": ids["order"]}
     found = []
     for route in app.routes:
         for r in [route] if hasattr(route, "methods") else getattr(getattr(route, "original_router", None), "routes", []):

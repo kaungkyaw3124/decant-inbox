@@ -806,4 +806,40 @@ MY = {
     "saved": "သိမ်းပြီး", "parsed": "ဖတ်ပြီး", "ai": "AI", "decided": "ဆုံးဖြတ်ပြီး", "queued": "တန်းစီပြီး",
     "sent": "ပို့ပြီး", "-": "-",
     "AI answer time p50 / p90 (last 24 h)": "AI ဖြေချိန် p50 / p90 (နောက်ဆုံး ၂၄ နာရီ)", "Speed": "မြန်နှုန်း",
+    # docs/SPEC-v5.0-go-live-pack.md: alerts, off-server backup, 2-step login, packing slips
+    "Alerts to your phone": "ဖုန်းကို သတိပေးချက်", "Off until ALERT_BOT_TOKEN and ALERT_CHAT_ID are set in .env (see REPORT.md).":
+        "ALERT_BOT_TOKEN နဲ့ ALERT_CHAT_ID ကို .env မှာ မထည့်မချင်း ပိတ်ထားတယ် (REPORT.md ကြည့်ပါ)။",
+    "Service down": "စနစ် ရပ်နေ", "Customer waiting more than 5 min": "ဖောက်သည် ၅ မိနစ်ကျော် စောင့်နေ",
+    "Payment to check": "စစ်ရမယ့် ငွေလွှဲ", "AI key refused / no credit": "AI key မရ / credit ကုန်",
+    "Backup failed": "Backup မအောင်မြင်", "Disk more than 85 % full": "Disk ၈၅ % ကျော် ပြည့်",
+    "New dashboard link": "Dashboard link အသစ်", "Login from a new device": "စက်အသစ်ကနေ ဝင်ရောက်",
+    "Daily summary at 21:00": "ည ၉ နာရီ နေ့စဉ်အကျဉ်း", "Include message preview (customer text)":
+        "ဖောက်သည်စာ အစလေး ထည့်ပြမယ်", "Off-server backup": "ဆာဗာအပြင် backup",
+    "the daily backup is encrypted with BACKUP_PASSPHRASE and sent to the alert bot chat.":
+        "နေ့စဉ် backup ကို BACKUP_PASSPHRASE နဲ့ ဝှက်ပြီး alert bot chat ကို ပို့တယ်။",
+    "Save alerts": "သတိပေးချက် သိမ်းမယ်", "Send a test alert": "စမ်းသပ် သတိပေးချက် ပို့မယ်",
+    "Alert settings saved.": "သတိပေးချက် ဆက်တင် သိမ်းပြီး။", "Test alert sent: check Telegram.":
+        "စမ်းသပ် သတိပေးချက် ပို့ပြီး: Telegram မှာ ကြည့်ပါ။",
+    "My account": "ကိုယ့်အကောင့်", "2-step login": "၂ ဆင့် ဝင်ရောက်ခြင်း",
+    "Recovery codes — save them now (password manager or paper). Each works once. They are not shown again.":
+        "Recovery code တွေကို အခုပဲ သိမ်းပါ (password manager / စာရွက်)။ တစ်ခုကို တစ်ခါပဲ သုံးရတယ်။ နောက်ထပ် မပြတော့ဘူး။",
+    "1. Open Google Authenticator / Authy / 1Password on your phone and scan this code (or type the key).":
+        "၁။ ဖုန်းမှာ Google Authenticator / Authy / 1Password ဖွင့်ပြီး ဒီ code ကို scan ဖတ်ပါ (သို့ key ကို ရိုက်ထည့်ပါ)။",
+    "Key": "Key", "2. Type the 6-digit code it shows": "၂။ ပြနေတဲ့ ဂဏန်း ၆ လုံးကို ရိုက်ထည့်ပါ", "Turn on": "ဖွင့်မယ်",
+    "Logging in needs your password and the code from your phone. Lost the phone? Use a recovery code, or ask for a reset on the server: scripts/create_user.py --reset-2fa NAME":
+        "ဝင်ဖို့ password နဲ့ ဖုန်းက code နှစ်ခုလုံး လိုတယ်။ ဖုန်းပျောက်ရင် recovery code သုံးပါ၊ သို့ ဆာဗာမှာ reset လုပ်ပါ: scripts/create_user.py --reset-2fa NAME",
+    "{n} recovery codes left.": "Recovery code {n} ခု ကျန်တယ်။", "Code from your app": "App ထဲက code",
+    "New recovery codes": "Recovery code အသစ်", "Turn off": "ပိတ်မယ်",
+    "With 2-step login a stolen password alone can't open the dashboard. Recommended for the owner.":
+        "၂ ဆင့် ဝင်ရောက်ခြင်း ဖွင့်ထားရင် password ခိုးခံရရုံနဲ့ dashboard ကို မဖွင့်နိုင်ဘူး။ ပိုင်ရှင်အတွက် အကြံပြုတယ်။",
+    "Set up 2-step login": "၂ ဆင့် ဝင်ရောက်ခြင်း စီစဉ်မယ်", "Sessions": "ဝင်ထားမှုများ",
+    "You are logged out after 12 hours. Lost a phone or used a shared computer? Log out everywhere else:":
+        "၁၂ နာရီကြာရင် အလိုလို ထွက်သွားမယ်။ ဖုန်းပျောက်ရင် / သူများကွန်ပျူတာ သုံးခဲ့ရင် တခြားနေရာအားလုံးက ထွက်ပါ:",
+    "Log out on every other device?": "တခြားစက်အားလုံးကနေ ထွက်မလား?", "Log out everywhere": "နေရာအားလုံးက ထွက်မယ်",
+    "6-digit code from your authenticator app (or a recovery code)": "Authenticator app က ဂဏန်း ၆ လုံး (သို့ recovery code)",
+    "Wrong code.": "Code မှားနေတယ်။", "Wrong code. Check the time on your phone and try the newest code.":
+        "Code မှားနေတယ်။ ဖုန်းအချိန် စစ်ပြီး နောက်ဆုံး code ကို ထည့်ကြည့်ပါ။",
+    "2-step login is off.": "၂ ဆင့် ဝင်ရောက်ခြင်း ပိတ်ပြီး။", "Logged out on every other device.": "တခြားစက်အားလုံးက ထွက်ပြီး။",
+    "Slip": "ပို့စာရွက်", "Print all to pack": "ထုပ်ရမယ့်အားလုံး print", "Packing slip": "ပို့စာရွက်",
+    "Print": "Print", "No orders to pack.": "ထုပ်ရမယ့် အော်ဒါ မရှိဘူး။",
 }

@@ -8,7 +8,8 @@
   <a href="/orders?tab={{ key }}{% if show_test %}&show_test=1{% endif %}" {% if tab == key %}aria-current="page"{% endif %}>{{ tr(label) }}{% if counts.get(key) %} <span class="badge">{{ counts[key] }}</span>{% endif %}</a>
   {% endfor %}
 </nav>
-<p class="buttons small"><a class="button chip{% if show_test %} on{% endif %}" href="/orders?tab={{ tab }}{% if not show_test %}&show_test=1{% endif %}">🧪 {{ t("Show test orders") }}: {{ t("ON") if show_test else t("OFF") }}</a></p>
+<p class="buttons small">{% if tab == "to_pack" and counts.get("to_pack") %}<a class="button primary chip" href="/orders/slips">🖨 {{ t("Print all to pack") }}</a>{% endif %}
+  <a class="button chip{% if show_test %} on{% endif %}" href="/orders?tab={{ tab }}{% if not show_test %}&show_test=1{% endif %}">🧪 {{ t("Show test orders") }}: {{ t("ON") if show_test else t("OFF") }}</a></p>
 {% if user_role == "owner" and test_open %}
   {% if confirm_clear %}
   <form method="post" action="/orders/clear-test" class="card stack problem" id="clear-test">

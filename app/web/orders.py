@@ -74,6 +74,32 @@ def _back(request: Request, back: str, order: Order) -> RedirectResponse:
     return RedirectResponse(safe_back(back, "/orders") + f"#order-{order.id}", status_code=303)
 
 
+# ---------- docs/SPEC-v5.0-go-live-pack.md G4: packing slips ----------
+
+def _slips(request: Request, db: Session, orders: list[Order]):
+    from app.web import twostep  # segno QR (same helper as the 2-step login)
+
+    rows = []
+    for o in orders:
+        if o.order_no is None:
+            raise HTTPException(404, "No Order ID yet: slips are for paid orders")
+        rows.append((o, db.get(Customer, o.customer_id), cart.view(db, o),
+                     twostep.qr_svg(f"#{testpay.order_label(o)}")))
+    return templates.TemplateResponse(request, "slip.html", {"rows": rows, "item_name": cart.item_name})
+
+
+@router.get("/orders/slips", response_class=HTMLResponse)
+def slips_to_pack(request: Request, db: Session = Depends(get_db)):
+    """"Print all to pack": one slip per paid order, oldest first (test orders not included)."""
+    return _slips(request, db, list(db.scalars(select(Order).where(
+        Order.status == "paid", Order.order_no.is_not(None), Order.is_test.is_(False)).order_by(Order.paid_at, Order.id))))
+
+
+@router.get("/orders/{order_id}/slip", response_class=HTMLResponse)
+def slip(request: Request, order_id: int, db: Session = Depends(get_db)):
+    return _slips(request, db, [_order(db, order_id, lock=False)])
+
+
 @router.post("/orders/{order_id}/status")
 def set_status(request: Request, order_id: int, to: str = Form(...), deli_name: str = Form(""),
                deli_phone: str = Form(""), deli_note: str = Form(""), back: str = Form("/orders"),

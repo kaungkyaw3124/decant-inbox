@@ -4,14 +4,19 @@ Each dump is written to a .partial file, checked with `pg_restore --list`, then
 renamed, so a half-written or broken file never counts as a backup.
 Run by the decant-backup.timer systemd unit; safe to run by hand.
 
+docs/SPEC-v5.0-go-live-pack.md G2: when BACKUP_PASSPHRASE and the alert bot are set, the new dump is also
+encrypted (gpg, AES-256, symmetric) and sent to the owner's alert bot chat: a copy that leaves the server.
+A failure is reported to the alert bot and the run exits 1 (the health page shows it too).
+
 Usage: .venv/bin/python -m scripts.backup_db [--keep 14]
-Restore: pg_restore --clean --if-exists -h 127.0.0.1 -U appuser -d product_requests FILE
+Restore: .venv/bin/python -m scripts.restore_backup FILE  (a .dump, or the .dump.gpg from the bot chat)
 """
 import argparse
 import os
 import shutil
 import subprocess
 import sys
+import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -64,13 +69,61 @@ def run_backup(keep: int, backup_dir: Path = BACKUP_DIR) -> Path:
     return final
 
 
+def _gpg(args: list[str], passphrase: str) -> None:
+    """gpg with its own empty home (no keyring needed for a passphrase); the passphrase goes in on stdin."""
+    with tempfile.TemporaryDirectory() as home:
+        run = subprocess.run(["gpg", "--homedir", home, "--batch", "--yes", "--quiet", "--pinentry-mode", "loopback",
+                              "--passphrase-fd", "0", *args], input=passphrase.encode(), capture_output=True)
+    if run.returncode != 0:
+        raise RuntimeError(f"gpg failed ({run.returncode})")  # never echo stderr: it may name files only, but keep it short
+
+
+def encrypt(path: Path, passphrase: str) -> Path:
+    out = path.with_name(path.name + ".gpg")
+    _gpg(["--symmetric", "--cipher-algo", "AES256", "-o", str(out), str(path)], passphrase)
+    out.chmod(0o600)
+    return out
+
+
+def decrypt(path: Path, out: Path, passphrase: str) -> Path:
+    _gpg(["--decrypt", "-o", str(out), str(path)], passphrase)
+    return out
+
+
+def offsite(path: Path) -> str:
+    """Encrypt + send to the alert bot. Returns what happened (no secrets)."""
+    from app.alerts import bot
+
+    s = get_settings()
+    if not (s.backup_passphrase and s.backup_passphrase.get_secret_value()) or not bot.configured():
+        return "off-server copy OFF (BACKUP_PASSPHRASE / alert bot not set)"
+    encrypted = encrypt(path, s.backup_passphrase.get_secret_value())
+    try:
+        n = bot.send_file(encrypted, f"🗄 Backup {path.name} (encrypted; restore: scripts/restore_backup.py)")
+    finally:
+        encrypted.unlink(missing_ok=True)  # the plain dump stays local; the encrypted copy lives in the chat
+    return f"sent to the alert bot ({n} file{'s' if n > 1 else ''})"
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--keep", type=int, default=14)
     args = parser.parse_args()
-    path = run_backup(max(args.keep, 1))
+    try:
+        path = run_backup(max(args.keep, 1))
+        copy = offsite(path)
+    except (Exception, SystemExit) as exc:
+        reason = str(exc) if isinstance(exc, SystemExit) else type(exc).__name__
+        try:
+            from app.alerts import bot
+
+            if bot.configured():
+                bot.send(f"❌ Backup failed: {reason[:200]}")
+        except Exception:
+            pass
+        sys.exit(f"backup failed: {reason}")
     print(f"backup ok: {path.name} ({path.stat().st_size // 1024} KiB); "
-          f"{len(list_backups())} kept in {BACKUP_DIR}")
+          f"{len(list_backups())} kept in {BACKUP_DIR}; {copy}")
 
 
 if __name__ == "__main__":

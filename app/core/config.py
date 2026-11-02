@@ -45,6 +45,12 @@ class Settings(BaseSettings):
     # screenshot. Empty = feature off. Never print or log it.
     test_pay_code: SecretStr | None = None
 
+    # docs/SPEC-v5.0-go-live-pack.md: the owner's alert bot (official Bot API, @BotFather) and the off-server
+    # backup passphrase. Empty = OFF. Never print or log them.
+    alert_bot_token: SecretStr | None = None
+    alert_chat_id: str | None = None
+    backup_passphrase: SecretStr | None = None
+
     @property
     def database_url(self) -> URL:
         return URL.create(

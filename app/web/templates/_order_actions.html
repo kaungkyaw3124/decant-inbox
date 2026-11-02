@@ -7,6 +7,7 @@
         <button class="quiet">↩ {{ t("Undo {status}", status=code(ev.to_status)) }}</button>
       </form>
       {% endif %}
+      {% if o.status in ("paid", "packed") %}<a class="button" href="/orders/{{ o.id }}/slip">🧾 {{ t("Slip") }}</a>{% endif %}{# docs/SPEC-v5.0 G4 #}
       {% if o.status == "paid" %}
       <form method="post" action="/orders/{{ o.id }}/status" class="inline">
         <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="back" value="{{ order_back }}">

@@ -5,7 +5,11 @@ Usage: .venv/bin/uvicorn app.web.main:app --host 127.0.0.1 --port 8080 --no-acce
 (client IP comes from CF-Connecting-IP via auth.client_ip, not from uvicorn's proxy headers)
 (no access log: inbox search terms are customer text and must not be logged)
 """
+import hashlib
+import secrets
 import sys
+import threading
+import time
 from pathlib import Path
 from urllib.parse import urlencode
 
@@ -19,10 +23,14 @@ from starlette.middleware.sessions import SessionMiddleware
 from app.core.config import get_settings
 from app.models import AuditLog, User
 from app.web import (
-    ai as ai_pages, auto as auto_pages, catalog, chats, health, help as help_pages, i18n, inbox, learning, orders, payments, practice,
+    account, ai as ai_pages, auto as auto_pages, catalog, chats, health, help as help_pages, i18n, inbox, learning, orders, payments, practice,
     prices, sales, settings as settings_pages, users,
 )
-from app.web.auth import FormExpired, LoginRequired, authenticate, client_ip, current_user, locked_out, login, verify_csrf
+from app.alerts import service as alerts
+from app.web import twostep
+from app.web.auth import (
+    FormExpired, LoginRequired, authenticate, client_ip, current_user, failed, locked_out, login, verify_csrf,
+)
 from app.web.deps import get_db, templates
 
 settings = get_settings()
@@ -54,6 +62,7 @@ app.include_router(users.router)
 app.include_router(health.router)
 app.include_router(help_pages.router)
 app.include_router(practice.router)
+app.include_router(account.router)
 
 ERROR_TITLES = {400: "Can't do that", 403: "Not allowed", 404: "Not found", 409: "Already changed"}
 
@@ -118,7 +127,55 @@ def login_submit(
                  else "Wrong username or password.")
         return templates.TemplateResponse(request, "login.html",
                                           {"next": inbox.safe_back(next, "/"), "error": error}, status_code=401)
+    if user.totp_secret:  # docs/SPEC-v5.0 G3: the password alone is not enough
+        request.session.clear()
+        request.session.update(pending=user.id, pending_at=int(time.time()), csrf=secrets.token_urlsafe(32))
+        return templates.TemplateResponse(request, "login.html", {"next": inbox.safe_back(next, "/"), "error": None,
+                                                                  "step": "code"})
+    return _finish_login(request, db, user, next)
+
+
+PENDING_SECONDS = 300
+
+
+@app.post("/login/code", dependencies=[Depends(verify_csrf)])
+def login_code(request: Request, code: str = Form(...), next: str = Form("/"), db: Session = Depends(get_db)):
+    """Step 2: the authenticator app's 6 digits, or one recovery code (then it is used up)."""
+    ip = client_ip(request)
+    user = db.get(User, request.session.get("pending") or 0)
+    if user is None or time.time() - request.session.get("pending_at", 0) > PENDING_SECONDS or user.disabled:
+        request.session.clear()
+        return RedirectResponse("/login", status_code=303)
+    if locked_out(user.username, ip):
+        error = "Too many failed attempts. Wait 15 minutes."
+    elif twostep.verify(user.totp_secret, code):
+        return _finish_login(request, db, user, next)
+    elif (left := twostep.use_recovery(user.totp_recovery, code)) is not None:
+        user.totp_recovery = left
+        db.add(AuditLog(user_id=user.id, action="user.recovery_code", details={"left": len(left)}))
+        db.commit()
+        inbox.flash(request, f"Recovery code used: {len(left)} left. Make new ones in My account.")
+        return _finish_login(request, db, user, next)
+    else:
+        failed(user.username, ip)
+        error = "Wrong code."
+    return templates.TemplateResponse(request, "login.html", {"next": inbox.safe_back(next, "/"), "error": error,
+                                                              "step": "code"}, status_code=401)
+
+
+def _finish_login(request: Request, db: Session, user: User, next: str):
+    flash_text = request.session.get("flash")
     login(request, user)
+    if flash_text:
+        request.session["flash"] = flash_text
+    # docs/SPEC-v5.0 G3: a login from a device / IP we have not seen -> the owner's alert bot
+    device = hashlib.sha256(f"{client_ip(request)}|{request.headers.get('user-agent', '')}".encode()).hexdigest()[:16]
+    if device not in user.known_devices:
+        if user.known_devices:  # not the very first login
+            threading.Thread(target=alerts.login_alert, daemon=True, args=(
+                user.username, client_ip(request), request.headers.get("user-agent", ""))).start()
+        user.known_devices = (user.known_devices + [device])[-20:]
+        db.commit()
     return RedirectResponse(inbox.safe_back(next, "/"), status_code=303)
 
 

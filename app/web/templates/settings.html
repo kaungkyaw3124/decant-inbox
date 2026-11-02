@@ -3,6 +3,23 @@
 {% block content %}
 <h1>{{ t("Settings") }}</h1>
 
+<form method="post" action="/settings/alerts" class="card stack" id="alerts">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <h2>🔔 {{ t("Alerts to your phone") }}: {{ t("ON") if alerts_on else t("OFF") }}</h2>
+  {% if not alerts_on %}<p class="small problem-text">{{ t("Off until ALERT_BOT_TOKEN and ALERT_CHAT_ID are set in .env (see REPORT.md).") }}</p>{% endif %}
+  <div class="grid">
+    {% for key, label in alert_types.items() %}
+    <label class="check"><input type="checkbox" name="type_{{ key }}" value="1" {% if alerts.types[key] %}checked{% endif %}> {{ t(label) }}</label>
+    {% endfor %}
+    <label class="check"><input type="checkbox" name="preview" value="1" {% if alerts.preview %}checked{% endif %}> {{ t("Include message preview (customer text)") }}</label>
+  </div>
+  <p class="small muted">{{ t("Off-server backup") }}: {{ t("ON") if backup_offsite and alerts_on else t("OFF") }} — {{ t("the daily backup is encrypted with BACKUP_PASSPHRASE and sent to the alert bot chat.") }}</p>
+  <div class="buttons">
+    <button class="primary">{{ t("Save alerts") }}</button>
+    <button formaction="/settings/alerts/test" formnovalidate {% if not alerts_on %}disabled{% endif %}>{{ t("Send a test alert") }}</button>
+  </div>
+</form>
+
 <form method="post" action="/settings/auto-speed" class="card stack" id="auto-speed">
   <h2>🤖 {{ t("Auto-reply speed") }}</h2>
   <input type="hidden" name="csrf" value="{{ csrf }}">

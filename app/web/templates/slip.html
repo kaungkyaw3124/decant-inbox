@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="{{ lang }}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ t("Packing slip") }} · Decant Inbox</title>
+<link rel="stylesheet" href="/static/slip.css">
+<script src="/static/slip.js" defer></script>
+</head>
+<body>
+{# docs/SPEC-v5.0-go-live-pack.md G4: 80 mm receipt / A6 friendly; one slip per page #}
+<nav class="no-print">
+  <a href="/orders">‹ {{ t("Orders") }}</a>
+  <button id="print" class="print">🖨 {{ t("Print") }} ({{ rows | length }})</button>
+</nav>
+{% for o, c, v, qr in rows %}
+<article class="slip">
+  <header><span class="order-id">#{{ order_label(o) }}</span><span class="qr">{{ qr | safe }}</span></header>
+  <p class="who"><b>{{ c.display_name or c.username or t("Customer") }}</b><br>
+    📞 {{ (o.phones or []) | join(", ") or "—" }}<br>
+    📍 {{ o.address or "—" }}</p>
+  <table>
+    {% for i, p in v.lines %}<tr><td>{{ item_name(i, p) }}</td><td class="num">{{ format_mmk((i.unit_price_mmk or 0) * i.quantity) }}</td></tr>{% endfor %}
+    <tr class="total"><th>{{ t("Total") }}</th><th class="num">{{ format_mmk(o.total_mmk) }} ကျပ်</th></tr>
+  </table>
+  <p class="paid">✅ {{ t("Paid") }}{% if o.is_test %} (🧪 {{ t("test") }}){% endif %} · ပို့ခကို ပစ္စည်းရောက်မှ ပေးချေပေးပါ</p>
+  <p class="thanks">ဝယ်ယူအားပေးတဲ့အတွက် ကျေးဇူးတင်ပါတယ် 🙏</p>
+</article>
+{% else %}
+<p>{{ t("No orders to pack.") }}</p>
+{% endfor %}
+</body>
+</html>

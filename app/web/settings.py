@@ -11,6 +11,8 @@ from app.pricing import costs
 from app.pricing.prices import DEFAULT_SIZES, current_prices
 from app.replies import faq
 from app.replies import templates as replies
+from app.alerts import bot, service as alerts
+from app.core.config import get_settings
 from app.web.auth import current_user, owner_only, verify_csrf
 from app.web.deps import get_db, templates
 from app.web.inbox import flash
@@ -39,7 +41,10 @@ def _page(request: Request, db: Session, errors: dict[str, str] | None = None,
         "faq_error": (errors or {}).get("faq"), "faq_error_id": (errors or {}).get("faq_id"),
         "test_code_set": testpay.code() is not None, "test_auto_approve": testpay.auto_approve(db),
         "testers": db.scalars(select(Customer).where(Customer.is_tester).order_by(Customer.id)).all(),
-        "vials": costs.vial_costs(db), "vial_sizes": _decant_sizes(db), "vial_error": (errors or {}).get("vial")}, status_code=status_code)
+        "vials": costs.vial_costs(db), "vial_sizes": _decant_sizes(db), "vial_error": (errors or {}).get("vial"),
+        "alerts": alerts.settings(db), "alert_types": alerts.TYPES, "alerts_on": bot.configured(),
+        "backup_offsite": bool(get_settings().backup_passphrase and get_settings().backup_passphrase.get_secret_value())},
+        status_code=status_code)
 
 
 def _method_fields(name: str, account_number: str, account_name: str) -> dict[str, str]:
@@ -53,6 +58,31 @@ def _method_fields(name: str, account_number: str, account_name: str) -> dict[st
 
 def _log(db: Session, user: User, action: str, **details) -> None:
     db.add(AuditLog(user_id=user.id, action=action, details=details))
+
+
+# ---------- docs/SPEC-v5.0-go-live-pack.md G1: alerts ----------
+
+@router.post("/alerts")
+async def save_alerts(request: Request, db: Session = Depends(get_db), user: User = Depends(current_user)):
+    form = await request.form()
+    alerts.save_settings(db, {k: form.get(f"type_{k}") == "1" for k in alerts.TYPES}, form.get("preview") == "1",
+                         user.id)
+    _log(db, user, "alerts.settings")
+    db.commit()
+    flash(request, "Alert settings saved.")
+    return RedirectResponse("/settings#alerts", status_code=303)
+
+
+@router.post("/alerts/test")
+def test_alert(request: Request, db: Session = Depends(get_db), user: User = Depends(current_user)):
+    try:
+        bot.send("🔔 Test alert from Decant Inbox: alerts reach your phone.", ("Open dashboard", alerts.dashboard_url() or ""))
+        flash(request, "Test alert sent: check Telegram.")
+    except bot.BotError as exc:
+        flash(request, f"Test alert NOT sent: {exc}")
+    _log(db, user, "alerts.test")
+    db.commit()
+    return RedirectResponse("/settings#alerts", status_code=303)
 
 
 @router.get("", response_class=HTMLResponse)

@@ -1,6 +1,9 @@
 from datetime import datetime
 
-from sqlalchemy import Boolean, CheckConstraint, String, false
+from typing import Any
+
+from sqlalchemy import Boolean, CheckConstraint, Integer, String, false
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.base import Base, created_at_column
@@ -21,6 +24,11 @@ class User(Base):
     disabled: Mapped[bool] = mapped_column(Boolean, server_default=false(), default=False)  # can't log in
     language: Mapped[str] = mapped_column(String(2), server_default="en", default="en")
     created_at: Mapped[datetime] = created_at_column()
+    # docs/SPEC-v5.0-go-live-pack.md G3: 2-step login (NULL = off), recovery code hashes, "log out everywhere"
+    totp_secret: Mapped[str | None] = mapped_column(String(64))
+    totp_recovery: Mapped[list[Any]] = mapped_column(JSONB, server_default="[]", default=list)
+    session_epoch: Mapped[int] = mapped_column(Integer, server_default="0", default=0)
+    known_devices: Mapped[list[Any]] = mapped_column(JSONB, server_default="[]", default=list)
 
     @property
     def is_owner(self) -> bool:
