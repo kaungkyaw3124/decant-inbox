@@ -197,6 +197,9 @@ def decide(session: Session, message: Message, now: datetime, ai_mode: str | Non
     texts = replies.load(session)
     suggestion = actions.suggest(session, message, result, texts, now)
     if suggestion is None:
+        read = actions.contact_in(session, message)[1] if _repeated(session, message) else None
+        if _repeated(session, message) and (read is None or read.sure):  # docs/SPEC-v4.20 A2: the same message
+            return _resume_or_skip(session, message, result, now, reason="no certain reply")  # again -> the step
         return _skip(session, message.id, "no certain reply")
     if suggestion.text and sent_today(session, now) >= DAILY_CAP:
         return _skip(session, message.id, f"daily limit of {DAILY_CAP} auto replies")
@@ -236,8 +239,11 @@ def _media_reply(session: Session, message: Message, now: datetime) -> str | Non
     if message.kind == "photo":
         from app.models import PaymentCheck  # late import: keep this module's imports as they were
 
-        if session.scalar(select(exists().where(PaymentCheck.message_id == message.id))):
+        if session.scalar(select(exists().where(PaymentCheck.message_id == message.id,
+                                                PaymentCheck.decision == "pending"))):
             key = "resume_photo_received"  # a payment screenshot (payments.scan ran first): "received, we check"
+        elif session.scalar(select(exists().where(PaymentCheck.message_id == message.id))):
+            return _skip(session, message.id, "photo / file")  # already decided: the confirmation answered it
         elif session.scalar(select(exists().where(Order.customer_id == message.customer_id,
                                                   Order.status.in_(BUSY_ORDER)))):
             return _skip(session, message.id, "photo / file")  # an order a person follows
@@ -256,13 +262,27 @@ def _media_reply(session: Session, message: Message, now: datetime) -> str | Non
     return _send(session, message, texts[key], "custom", now, key)
 
 
-def _resume_or_skip(session: Session, message: Message, result: ParseResult, now: datetime) -> str | None:
+REPEAT_WINDOW = timedelta(hours=2)
+
+
+def _repeated(session: Session, message: Message) -> bool:
+    """The customer's previous message (2 h) said exactly the same."""
+    before = session.scalar(select(Message.normalized_text).where(
+        Message.customer_id == message.customer_id, Message.direction == "in", Message.id != message.id,
+        Message.received_at <= message.received_at, Message.received_at >= message.received_at - REPEAT_WINDOW)
+        .order_by(Message.received_at.desc(), Message.id.desc()).limit(1))
+    return bool(before) and before == message.normalized_text
+
+
+def _resume_or_skip(session: Session, message: Message, result: ParseResult, now: datetime,
+                    reason: str | None = None) -> str | None:
     """docs/SPEC-v4.20 A2: a message we cannot read while an order is open -> the line of what we wait for
     (payment screenshot, phone, address, ...) instead of silence. Nothing open -> a person (watchdog)."""
     from app.orders import steps  # late import: steps -> actions -> this module's imports
 
+    reason = reason or f"intent {result.intent}"
     if answered_by_human(session, message) or paused_until(session, session.get(Customer, message.customer_id), now):
-        return _skip(session, message.id, f"intent {result.intent}")
+        return _skip(session, message.id, reason)
     if now - message.received_at < timedelta(seconds=speed(session)["quiet_s"]):
         return None
     if session.scalar(select(exists().where(Outbox.customer_id == message.customer_id,
@@ -272,7 +292,7 @@ def _resume_or_skip(session: Session, message: Message, result: ParseResult, now
     current = steps.step(session, message.customer_id)
     if QUESTION_RE.search(message.normalized_text or "") or session.scalar(select(exists().where(
             ParseItem.parse_result_id == result.id))):
-        return _skip(session, message.id, f"intent {result.intent}")  # a real question / names a product: a person
+        return _skip(session, message.id, reason)  # a real question / names a product: a person
     if current.kind == "photo_received":
         line = texts["resume_photo_received"]
     elif current.kind == "waiting_payment":  # "kpay နံပါတ် ပြန်ပို့ပေး", "ညနေ လွှဲမယ်": the payment info again
@@ -280,7 +300,7 @@ def _resume_or_skip(session: Session, message: Message, result: ParseResult, now
     else:
         line = steps.resume_text(session, current, texts)
     if not line:
-        return _skip(session, message.id, f"intent {result.intent}")
+        return _skip(session, message.id, reason)
     return _send(session, message, line, "custom", now, "resume")
 
 

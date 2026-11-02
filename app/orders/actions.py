@@ -595,6 +595,11 @@ def _buy(session: Session, message: Message, customer: Customer, order: Order | 
         add.append(w)
     if (not sellable and not no_size) or len(no_size) > 1:
         return None  # nothing we can sell from this message (or several size questions): use the chat
+    if waiting and no_size and not add and not out_of_stock:  # docs/SPEC-v4.20 A2: ask; the answer adds it
+        undo = {"order": _order_state(order)}
+        return Outcome("cart_add", "🛒 Ask the size", _ask_size(session, message, customer, *no_size[0], texts, undo),
+                       "cart", "Size not sold (order waiting for payment): the customer is asked which size; "
+                       "the answer adds it with the new total.", order.id, undo)
     if waiting and (out_of_stock or sellable < len(add) or no_size):
         return None  # no price / out of stock while waiting for payment: a person answers
     phones, read = ([], None) if waiting else contact_in(session, message)

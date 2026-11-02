@@ -106,7 +106,7 @@ OUTCOMES = {
     "asknew": "ask for the new address (4.8)",
     "shot": "“send the screenshot”",
     "check": "“we'll check” (the screenshot is in Payments)",
-    "photo": "no reply; a payment check to do",
+    "photo": "“received, we'll check” (4.20); a payment check to do",
     "name": "“which perfume? write the name” (docs/SPEC-v4.20 A2: a photo when no payment is due)",
     "choose": "numbered list of earlier items",
     "status": "the delivery status of the paid order",
@@ -133,14 +133,15 @@ def check(state: str, message: str, code: str, r) -> None:
                                                                                      "delivered") else "cart")
     paid = state in ("paid", "packed", "sent_out", "delivered")
     one = r.replies[0] if len(r.replies) == 1 else None
-    if code in ("card", "none", "unans", "ask", "keep", "photo"):
+    if code == "photo":  # docs/SPEC-v4.20 G3: the screenshot gets "received, we'll check" (a person approves)
+        assert r.replies == ["ငွေလွှဲ screenshot ရပါပြီ၊ စစ်ပြီး အကြောင်းပြန်ပေးပါမယ်နော်။"]
+        assert r.payment_check and r.open_status == "photo_received" and not r.card and not r.requests
+    elif code in ("card", "none", "unans", "ask", "keep"):
         assert r.replies == []
         assert r.card == (code in ("card", "ask"))
         assert r.unanswered == (code in ("unans", "ask"))
         assert r.requests == 0
-        if code == "photo":
-            assert r.payment_check and r.open_status == "photo_received"
-        elif state != "browsing" and message not in ("photo",):
+        if state != "browsing" and message not in ("photo",):
             assert r.open_status == open_before and r.open_items == (2 if open_before else 0)
     elif code == "name":
         assert r.replies == ["ဘယ် perfume လဲ နာမည်လေး ရေးပေးပါနော်။"] and not r.card and not r.requests

@@ -73,7 +73,7 @@ def step(session: Session, customer_id: int) -> Step:
     if cart.view(session, order).empty:
         return Step("none", order)
     customer = session.get(Customer, customer_id)
-    phones = order.phones or (cart.customer_phones(session, customer_id) if order.status == "cart" else [])
+    phones = order.phones or (cart.saved_phones(session, customer_id) if order.status == "cart" else [])
     address = cart.order_address(order) or (cart.saved_address(customer) if order.status == "cart" else None)
     if not phones:
         return Step("need_phone", order)

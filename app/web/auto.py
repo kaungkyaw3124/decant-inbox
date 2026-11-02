@@ -257,7 +257,9 @@ def needs_you(db: Session, now: datetime | None = None, owner: bool = True) -> d
         if mid is not None:
             row.card = (db.get(Message, mid), cards_by_id[mid])
     on_rows = {row.card[0].id for row in unanswered if row.card}
-    teach = [(m, card) for m, card in teach if m.id not in on_rows]
+    waiting_ids = {m.id for _, m, _ in waiting}  # docs/SPEC-v4.20 G3: one item: the card goes on the waiting row
+    waiting_cards = {m.id: card for m, card in teach if m.id in waiting_ids}
+    teach = [(m, card) for m, card in teach if m.id not in on_rows and m.id not in waiting_ids]
     for row in unanswered:  # an FAQ question nobody answered yet (auto OFF): offer the one-tap answer
         for mid in reversed(row.message_ids):
             if match := faq.for_message(db, db.get(Message, mid)):
@@ -318,6 +320,12 @@ def needs_you(db: Session, now: datetime | None = None, owner: bool = True) -> d
         for mid in r.message_ids:
             older_rows.setdefault(mid, (f"/chats/{r.customer.id}#bottom", r.customer, r.last_text, r.last_at))
     older_ids = sorted(older_rows)
+    # docs/SPEC-v4.20 G3: ONE item per waiting message: when it has its own row (cancel, change request,
+    # address check, unknown item), that row is the item and "customer waiting" is not shown again
+    own = ({m.id for m, *_ in cancels} | {m.id for m, *_ in address_checks} | {m.id for m in unknown_msgs}
+           | {e.previous.get("message_id") for e, *_ in requests})
+    paying = {order.customer_id for _, order, *_ in to_check}  # their payment row is the item
+    waiting = [w for w in waiting if w[1].id not in own and w[0].id not in paying]
     return {"faq_hints": hints, "payments": to_check, "cancels": cancels, "unpaid": unpaid, "unanswered": unanswered,
             "unknown": unknown_rows, "teach": teach_rows,
             "older": [older_rows[i] for i in older_ids], "older_ids": older_ids, "older_count": len(older_ids),
@@ -326,6 +334,7 @@ def needs_you(db: Session, now: datetime | None = None, owner: bool = True) -> d
             "failed": failed, "paused": paused, "auto_cancelled": followups.auto_cancelled(db, now),
             "ai_notices": ai_notices, "test_notes": test_notes, "changed_paid": changed_paid, "change_sent": change_sent, "requests": requests,
             "address_checks": address_checks, "payment_warnings": payment_warnings, "waiting": waiting,
+            "waiting_cards": waiting_cards,
             "count": len(waiting) + len(address_checks) + len(ai_notices) + len(test_notes) + len(changed_paid) + len(change_sent) + len(requests) + len(to_check) + len(cancels) + len(unpaid) + len(unknown_msgs) + len(unanswered)
                      + len(hints) + len(failed) + len(paused) + len(teach) + len(price_needed)
                      + (1 if to_approve else 0) + len(conflicts)}

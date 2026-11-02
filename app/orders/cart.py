@@ -210,6 +210,18 @@ def customer_phones(session: Session, customer_id: int) -> list[str]:
                                 .order_by(CustomerPhone.position, CustomerPhone.id)))
 
 
+def saved_phones(session: Session, customer_id: int) -> list[str]:
+    """The phone(s) to offer on a NEW order: the latest the customer gave (phone 1 and the others from the
+    same message), not numbers they replaced later (docs/SPEC-v4.20 A4: "the latest one the customer gave")."""
+    rows = phone_rows(session, customer_id)
+    latest = []
+    for phone, source in rows:  # phone 1 and the ones given together with it (an admin's list counts as one)
+        if source != rows[0][1]:
+            break
+        latest.append(phone)
+    return latest
+
+
 def phone_rows(session: Session, customer_id: int) -> list[tuple[str, int | None]]:
     return [tuple(r) for r in session.execute(
         select(CustomerPhone.phone, CustomerPhone.source_message_id).where(CustomerPhone.customer_id == customer_id)
@@ -277,7 +289,7 @@ def order_address(order: Order) -> str | None:
 def use_saved_contact(session: Session, order: Order, customer: Customer) -> None:
     """"Same phone & address as last time": fills what the order is missing."""
     if not order.phones:
-        order.phones = customer_phones(session, customer.id)
+        order.phones = saved_phones(session, customer.id)
     if not order_address(order) and saved_address(customer):
         order.address, order.address_parts = customer.address, customer.address_parts
         order.address_invalid = False
@@ -381,7 +393,7 @@ def closing_line(session: Session, order: Order, texts: dict[str, str]) -> str:
         return texts[{"address": "ask_new_address", "phone": "ask_new_phone"}.get(order.change_wanted,
                                                                                  "ask_new_contact")]
     customer = session.get(Customer, order.customer_id)
-    phones = order.phones or customer_phones(session, customer.id)
+    phones = order.phones or saved_phones(session, customer.id)
     known = order_address(order) or saved_address(customer)
     if not phones:
         return texts["cart_ask_phone"]

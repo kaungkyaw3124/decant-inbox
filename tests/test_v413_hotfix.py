@@ -201,8 +201,8 @@ def test_r1_unsure_ai_gets_the_holding_reply_not_silence(auto_ai, shop, db):
         c.execute(text("UPDATE messages SET received_at = now() - interval '61 seconds' WHERE id = :m"), {"m": mid})
     assert holding.run_once() == {"held": 1}
     assert ungreet(deliver(db)[0]) == HOLDING  # ...and the customer hears from us within 60 s
-    page = client.get("/").text
-    assert f'id="waiting-{mid}"' in page and f'id="address-{mid}"' in page
+    page = client.get("/").text  # docs/SPEC-v4.20 G3: ONE item: the address row (no 2nd "customer waiting" row)
+    assert f'id="waiting-{mid}"' not in page and f'id="address-{mid}"' in page
 
 
 # ---------- R2 / Q4: no place word = not an address ----------

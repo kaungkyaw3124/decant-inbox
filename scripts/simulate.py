@@ -415,17 +415,21 @@ def run_turn(chat: Chat, turn: Turn, fake: FakeTelegram, kind: str) -> None:
     turn.replies = [b.text for b in boxes]
     with SessionLocal() as s:
         texts = replies.load(s)
-        asked_person = s.scalar(text(  # a "Needs you" item made from this turn: a request (locked order, photo
-            "SELECT (SELECT count(*) FROM order_events WHERE kind = 'request' "  # being checked) or a payment check
-            "AND (previous->>'message_id')::int = ANY(:ids)) + (SELECT count(*) FROM payment_checks "
-            "WHERE message_id = ANY(:ids))"), {"ids": turn.message_ids})
+        asked_person = s.scalar(text(  # a "Needs you" request made from this turn (locked order, photo being checked)
+            "SELECT count(*) FROM order_events WHERE kind = 'request' "
+            "AND (previous->>'message_id')::int = ANY(:ids)"), {"ids": turn.message_ids})
         # nothing sent because a holding reply went out < 10 min ago (one per 10 min, holding.ONCE_PER)
         held = s.scalar(text("SELECT count(*) FROM outbox WHERE customer_id = :c AND id <= :b AND status = 'sent' "
                              "AND (reply_kind = 'holding' OR text LIKE '%' || :w) AND created_at >= now() - :p"),
                         {"c": chat.customer_id, "b": before, "w": texts["hold_check"], "p": holding.ONCE_PER})
+        # a 2nd screenshot of an album: "received, we check" (or the confirmation) went out < 10 min ago
+        acked = kind == "photo" and s.scalar(text(
+            "SELECT count(*) FROM outbox WHERE customer_id = :c AND id <= :b AND status = 'sent' AND created_at >= "
+            "now() - :p AND (reply_kind = 'payment' OR text LIKE '%' || :w)"),
+            {"c": chat.customer_id, "b": before, "w": texts["resume_photo_received"], "p": auto.MEDIA_AGAIN})
     waiting = {texts["holding_reply"], texts["hold_check"]}
     if not boxes:
-        turn.got = "person" if held or asked_person else "none"
+        turn.got = "auto" if acked else "person" if held or asked_person else "none"
     elif asked_person or all(b.reply_kind == "holding" or b.text.strip() in waiting
                              or b.text.strip().endswith(texts["hold_check"]) for b in boxes):
         turn.got = "person"
@@ -499,10 +503,35 @@ def _cart_lines(s, chat: Chat) -> list[str] | None:
     return lines
 
 
+def needs_you_items(customer_id: int) -> int:
+    """G3: how many "Needs you" rows (dashboard home) are about this customer."""
+    from app.web.auto import needs_you  # late import: the web module is heavy
+
+    from sqlalchemy.engine import Row
+
+    def about(row) -> bool:
+        parts = tuple(row) if isinstance(row, (tuple, Row)) else (row,)
+        for x in parts:
+            if isinstance(x, Customer) and x.id == customer_id:
+                return True
+            if isinstance(x, (Message, Order)) and x.customer_id == customer_id:
+                return True
+            if getattr(x, "customer", None) is not None and getattr(x.customer, "id", None) == customer_id:
+                return True
+        return False
+
+    with SessionLocal() as s:
+        found = needs_you(s, datetime.now(UTC) + timedelta(minutes=3))
+    lists = [v for k, v in found.items() if isinstance(v, list) and k not in ("older", "older_ids", "dismissed")]
+    return sum(1 for rows in lists for row in rows if about(row))
+
+
 def judge(chat: Chat, turn: Turn, said_so_far: list[str]) -> None:
     e, reply = turn.expect, "\n".join(turn.replies)
     p = turn.problems
     want = turn.expected
+    if turn.got == "person" and (n := needs_you_items(chat.customer_id)) != 1:
+        p.append(f"Needs you items for this customer: {n} (G3: exactly one)")
     if want == "person":
         if turn.got == "auto":
             p.append("WRONG: answered automatically, a person must handle this")

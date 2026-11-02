@@ -37,6 +37,7 @@ COMPLAINT_RE = re.compile(
 # needs no answer when nothing else is pending: thanks / ok / yes / emoji only (every word one of these)
 SMALL_TALK_RE = re.compile(
     r"ကျေးဇူး\S*|thank\S*|thx|tq|ty|you|very|so|much|a|lot|ok\S*|okay|ဟုတ်(?:ကဲ့)?\S*|အိုကေ\S*|ရပါပြီ|ရပြီ|"
+    r"yes|yeah|ya|yep|hi|hello|hey|မင်္ဂလာပါ|"  # a greeting / "yes" the auto reply did not answer: nothing pending
     r"good|nice|great|ကောင်းပါတယ်|bye|ဘိုင်|ပါ|နော်|ရှင့်|ရှင်|ဗျ|ဗျာ|ခင်ဗျာ|[^\w]+", re.IGNORECASE)
 
 

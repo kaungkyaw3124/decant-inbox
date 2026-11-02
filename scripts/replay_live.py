@@ -101,7 +101,7 @@ def wipe_conversations() -> None:
 def approve_screenshots(fake) -> None:
     """In the COPY only: what the admin does in Payments (live, real payments are never approved by the
     system). Without it every later message of that customer would meet "screenshot being checked"."""
-    from app.models import Order, PaymentCheck, User
+    from app.models import MediaDownload, Order, PaymentCheck, User
     from app.orders import payments
     from app.replies import templates as replies
 
@@ -113,11 +113,21 @@ def approve_screenshots(fake) -> None:
             order = s.get(Order, check.order_id)
             if user is None or order.status != "photo_received":
                 continue
+            if s.get(MediaDownload, check.message_id) is None:  # the admin opens it (no file in the copy)
+                s.add(MediaDownload(message_id=check.message_id, status="done", requested_by=user.id,
+                                    sha256=f"replay-{check.id}"))
+                s.flush()
+            form = payments.Form(f"REPLAY{check.id}", order.total_mmk, None)
             try:
-                payments.approve(s, check, payments.Form(f"REPLAY{check.id}", order.total_mmk, None), user,
-                                 replies.load(s), confirmed=True)
+                payments.approve(s, check, form, user, replies.load(s), confirmed=True)
             except payments.PaymentError:
-                pass  # e.g. no valid address: stays for a person, as live
+                if not order.change_wanted:
+                    continue  # no valid address at all: stays for a person, as live
+                order.change_wanted = None  # the admin keeps the address the order has, and approves
+                try:
+                    payments.approve(s, check, form, user, replies.load(s), confirmed=True)
+                except payments.PaymentError:
+                    pass
     simulate._deliver(fake)
 
 
