@@ -5,9 +5,9 @@ Read CLAUDE.md first. This file tracks where we are.
 ## NEXT TASK (written by the planning chat; Claude Code runs it with /next)
 Task: v4.21 DASHBOARD REDESIGN: Messenger layout + iOS look — goal-driven loop until U1-U4 met —
 docs/SPEC-v4.21-ios-messenger-ui.md (mockups docs/mockups/ios-*.dc.html; replaces v4.19, OWNER TEST 4.21).
-Status: TODO
+Status: DONE 2026-11-02 — see REPORT.md
 
-## RESUME HERE (updated 2026-11-02 by Claude Code)
+## RESUME HERE (updated 2026-11-02 evening by Claude Code)
 - v1-v4.12 DONE. AI AUTO, brake ON, ai_address ON, ai_screenshot OFF.
 - v4.13 hotfix (docs/SPEC-v4.13-hotfix.md) DONE + deployed 2026-10-17: Q0-Q5, R1-R6, evals PASS. Owner test 4.13
   pending (REPORT.md "OWNER TEST SCRIPT 4.13").
@@ -21,7 +21,11 @@ Status: TODO
   deployed 2026-10-31: 770 tests, both AI evals PASS, UI gate quick PASS. Owner test 4.17 pending (REPORT.md).
 - v4.20 automation goal DONE + deployed 2026-11-02: sim 100% auto / 0 wrong / 0 silent, live replay 87.7%,
   809 tests (13.5 min; 8 min not reachable on 2 CPUs). Owner test 4.20 pending (REPORT.md). Fill the Delivery fee FAQ.
-- NEXT: the next QUEUE item (v4.21) — owner types /next.
+- v4.21 Messenger/iOS dashboard DONE + deployed 2026-11-02: full UI gate 300 views 0 fails, U4 3-tap flows pass.
+  Owner test 4.21 pending (REPORT.md).
+- v4.18 speed DONE + deployed 2026-11-02 (NOTIFY wake-ups, AI pool, 0.7 s / 0.3-0.8 s, instant holding reply).
+  Owner test 4.18 pending (REPORT.md): it gives the live "after" numbers on /health → Speed.
+- NEXT: v5.0 go-live pack (in progress), then v5.1, v5.2.
 - Owner checks: `bash scripts/status.sh`; AI numbers at /ai.
 
 ## Status
@@ -50,6 +54,8 @@ Status: TODO
 | 19 | v4.16 (docs/SPEC-v4.16-hotfix-new-order-after-paid.md): same-message contact wins, open cart gets changes after a paid order, str grid, test code too early | ✅ Done, live (owner test pending; set TEST_PAY_CODE) |
 | 20 | v4.17 (docs/SPEC-v4.17-hotfix-more-automatic.md): size not sold → automatic size question, address/phone never items, grid without city = Mandalay, old-cart line | ✅ Done, live (owner test pending) |
 | 21 | v4.20 (docs/SPEC-v4.20-automation-goal.md): automation goal — simulator (214 scenarios) + strict judge + live replay; G1-G4 met | ✅ Done, live (owner test pending; fill Delivery fee FAQ) |
+| 22 | v4.21 (docs/SPEC-v4.21-ios-messenger-ui.md): Messenger workspace, iOS look, phone tab bar | ✅ Done, live (owner test pending) |
+| 23 | v4.18 (docs/SPEC-v4.18-speed.md): first reply in ~2 s, AI pool, instant holding reply, Speed on /health | ✅ Done, live (owner test pending) |
 
 ## Phase 0 checklist
 - [x] Step 0: rollback safety net scripts in ~/hardening/
@@ -128,7 +134,7 @@ payments → Viber → reports. Each is a new module with its own tables.
 5. v4.21 DASHBOARD REDESIGN: Messenger layout + iOS look — goal-driven loop until U1-U4 met —
    docs/SPEC-v4.21-ios-messenger-ui.md (mockups docs/mockups/ios-*.dc.html; replaces v4.19, OWNER TEST 4.21). Status: moved to NEXT TASK 2026-11-02
    (v4.19 NEEDS YOU CARDS: replaced by v4.21, do not build separately)
-6. v4.18 SPEED: first reply within 3 s — docs/SPEC-v4.18-speed.md (S0-S5, T1-T8, OWNER TEST 4.18). Status: TODO
+6. v4.18 SPEED: first reply within 3 s — docs/SPEC-v4.18-speed.md (S0-S5, T1-T8, OWNER TEST 4.18). Status: DONE 2026-11-02 (run with the queue; see REPORT.md)
 7. v5.0 GO-LIVE PACK: alert bot, encrypted off-server backup, 2-step login, packing slips — docs/SPEC-v5.0-go-live-pack.md
    (goal L1-L4; secrets stay OFF until the owner sets them). Status: TODO
 8. v5.1 INVENTORY in ml: bottles, vials, auto out-of-stock, deduct on packed — docs/SPEC-v5.1-inventory.md (goal I1-I4). Status: TODO

@@ -2033,3 +2033,124 @@ write them into Settings → FAQ → "Delivery fee" (and the payment FAQ) in you
 4. A voice message → "စာနဲ့ ရေးပေးပါနော်။". A sticker → the same (once per 10 min).
 5. `ပစ္စည်းယိုနေတယ်` (leaking) → holding reply within ~10 s; dashboard home shows exactly ONE item for you.
 6. Send the same unclear message twice → the 2nd time you get the "what we are waiting for" line, not silence.
+
+## 2026-11-02 — v4.21 DASHBOARD REDESIGN: Messenger layout + iOS look (docs/SPEC-v4.21-ios-messenger-ui.md)
+
+**Result: U1-U4 met** (deployed 2026-11-02, web only, no migration).
+
+### 4.21 scoreboard
+| loop | tests | ui_check fails | mockup differences left | bugs left |
+|---|---|---|---|---|
+| 1 | 815 passed, 1 skipped | quick 32 views 0 · full 300 views 1 (U4 selector read Burmese labels → fixed) | 3 small (below) | 0 |
+| 2 | 815 passed, 1 skipped | full 300 views **0** | 3 small (below) | 0 |
+
+**Built**
+- **Shell:** laptop (≥ 1024 px) = 220 px iOS sidebar: Chats (count = needs you), Orders (to pack), Payments (to check),
+  Products & prices, Sales, the **Auto-reply iOS switch** (owner switches, staff sees state), Settings/More (Learning,
+  AI, Reports, Users, Health, Practice, Help, Inbox, language, log out). Phone/tablet (< 1024 px) = frosted tab bar
+  **Chats · Orders · Payments · More** with red badges; the More sheet has the Auto-reply switch.
+- **Workspace** (`/`, `/chats`, `/chats/{id}`): chat list | conversation | customer panel. Clicking a customer swaps
+  the workspace with HTMX (hx-boost, URL pushed, no page reload). Phone: list → full-screen chat with "‹" back.
+- **Chat list:** large title, search (name / phone / order #), segmented **All · Needs me N · Orders**, rows with
+  avatar initials, name, time, last message ("Auto: …" when the bot sent it, "You: …"), red time + red dot when it
+  needs you, status pill (Cart / Unpaid / Check / Paid / Sent). Needs-you first (longest waiting first).
+- **Conversation:** header (avatar, name, city · N orders, Cart pill, **Pause auto-reply**), date separators, bubbles:
+  customer grey; **bot blue with "Auto-reply · Delivered"**; holding reply light blue "Auto · please wait"; a
+  person's reply blue with their name (or "You" when typed in Telegram); queued "Sending in N s · Cancel". Payment
+  photos get a **Check payment** button. **Needs you panel** at the bottom with only this customer's items (same
+  rows and actions as the inbox, incl. the suggested reply with ✅ Send / ✏️ Edit). Quick-reply chips + message box
+  with the round blue send button.
+- **Customer panel** (≥ 1200 px right column, else a sheet from the Cart pill): profile, **Payment** (test payment:
+  Approve here; real payment: opens its card, where the screenshot is shown), **Order #… next-status buttons**
+  (Packed / Sent out / Delivered / Cancel, same forms as Orders), cart, phones, address, past orders, Open in
+  Telegram, never auto-reply, test account, ignore customer.
+- **Orders:** new tabs **💳 Unpaid** (with "Send payment reminder") and **📷 Check**, as a segmented control.
+- **Payments:** each card has a "Check payment ›" button. **Inter** self-hosted (OFL, vendor/inter-5.1.0), SF Pro
+  first on Apple devices; Noto Sans Myanmar kept, Burmese line-height 1.75-1.85. iOS colours as CSS variables
+  (dark mode later = redefine them).
+- **U4 in the UI gate** (`scripts/ui_check.py`, runs in pytest): on a 390 px phone, from any page: reply to a
+  customer who needs you = **3 taps** (Chats → customer → ✅ Send); approve a payment = **3 taps** (Payments → card →
+  Approve; a real payment also needs the transaction ID typed); mark packed = **2 taps** (Orders → Packed).
+
+**Decisions to check**
+- Primary buttons use #0071E3 (not #007AFF): white text on #007AFF fails the AA contrast check (4.0 : 1). Bubbles
+  keep exactly #007AFF (as the mockup).
+- Real payments are approved on their card (screenshot visible), not inside the chat panel: the panel shows the
+  expected total + "Check the payment screenshot". Test payments can be approved in the panel.
+- `/` stays the full "Needs you" list (now inside the workspace as "Needs me"); every old URL still works.
+- AI "%" in the suggested-reply card is hidden; owner sees it under "Details" (4.19 N2 rule).
+- Small differences left vs the mockup: a "details" link under customer bubbles (message detail page, kept so
+  nothing is lost); avatar initials of test names look like "U6"; the cart box in the panel is the full cart
+  editor (add item, phones, address), longer than the mockup's 2 lines.
+
+**Tests:** 815 passed, 1 skipped (was 809). New tests/test_v421_ui.py (6). Changed tests (markup selectors only):
+- tests/test_v4_roles.py d1: "🤖 Auto-reply: <b>" → "Auto-reply: <b>" (staff state text).
+- tests/test_auto.py: "Auto-reply: <b>ON/OFF</b>" → the switch's `aria-checked`; "🤖" on a queued auto reply →
+  `bubble out pending by-auto`.
+- tests/test_faq.py: `title="Sent by auto-reply">🤖` → `title="Sent by auto-reply">Auto-reply` (2 places).
+- tests/test_payments.py, tests/test_after_payment.py: the menu badge → the sidebar count `<b class="side-count">`.
+- UI inventory (C7): nothing missing — final full run **300 page views, 0 failed checks** (C1-C7 + U4).
+
+### OWNER TEST SCRIPT 4.21
+Laptop (dashboard link from `bash scripts/status.sh`):
+1. Chats: click two customers in the list → the conversation changes without the page reloading; the URL changes.
+2. A message the bot answered shows a **blue bubble with "Auto-reply · Delivered"** under it.
+3. From the second account send `ပစ္စည်းယိုနေတယ်` → within seconds that customer is at the **top with a red dot**;
+   open it → "Needs you" panel at the bottom; press done (or send the suggested reply).
+4. A customer with a payment screenshot: right panel → Payment → "Check the payment screenshot" → Approve.
+5. A paid order: right panel → **📦 Packed**.
+6. Sidebar switch "Auto-reply" toggles ON/OFF (owner only).
+Phone:
+7. Chats tab → tap a customer → full-screen chat → "‹" back. "🛒 Cart 18,000" pill opens the customer panel.
+8. Orders tab (Unpaid / Check / To pack / …) and Payments tab. More → မြန်မာ → everything in Burmese.
+9. Nothing scrolls sideways.
+
+## 2026-11-02 — v4.18 SPEED: first reply within 3 s (docs/SPEC-v4.18-speed.md)
+
+**Deployed 2026-11-02 19:34 UTC** (migration d7e4a1b9c3f2: NOTIFY triggers; backup taken, down/up tested).
+
+**S0 "before" (live, first bot reply after a customer message; Telegram dates have whole seconds, so "saved" ≈ 0-1 s)**
+| window | rules p50 / p90 / max (n) | AI p50 / p90 / max (n) | holding reply p50 / p90 (n) |
+|---|---|---|---|
+| last 7 days | 6.5 / 6.5 / 6.5 s (2) | 11.2 / 11.2 / 11.2 s (2) | 61.4 / 61.6 s (6) |
+| last 30 days | 5.1 / 23.5 / 31.2 s (16) | 9.3 / 11.2 / 11.2 s (5) | 61.0 / 61.6 s (8) |
+Per stage (30 days, median): saved 0.95 s · parsed 0.7 s · AI 3.2 s · decided 0.1 s · queued 0 s · **sent 3.2 s**
+(the 2-3 s human-like delay + 0.5 s sender poll). The holding reply waited for the 60 s watchdog.
+
+**Built**
+- **S0** `app/orders/speed.py`: stage timings from the tables we already have (messages received/saved, parse_results,
+  ai_calls latency, auto_runs, outbox queued/sent), so there are "before" numbers without a new table. /health →
+  **⚡ Speed** (last 24 h p50 / p90 / max for rules, AI, holding; slowest 5 as message id · seconds · slowest step;
+  numbers only). /ai → AI answer time p50 / p90.
+- **S1** triggers NOTIFY `new_message` (customer message saved) and `outbox` (reply queued). The parser worker LISTENs
+  (`app/core/notify.py`) and also wakes exactly when a customer's quiet window ends; the sender sleeps until the next
+  reply is due or a NOTIFY. Polls stay as the fallback (a lost NOTIFY / restart costs ≤ 1 poll).
+- **S2** AI calls run in a 3-thread pool; a slow AI call no longer holds up other customers; the pool wakes the worker
+  when the answer is in. AI timeout 8 → **6 s** (then: not sure → holding reply + Needs you). Reasoning is already
+  "low" (the lowest), model unchanged.
+- **S3** defaults quiet **0.7 s**, delay **0.3-0.8 s** (owner can still change them in Settings; decimals allowed,
+  minimum 0). Live data: in 30 days no customer sent two messages within 5 s, so 0.7 s is safe. The sender sends a
+  waiting customer's reply before reminders / cancel / delivery notices (1 msg / 3 s and 20 / min unchanged).
+- **S4** the holding reply goes **at once** when auto mode decided "a person answers" (complaint, question it cannot
+  answer, unknown item after the AI, AI timeout); the 10 s watchdog stays as the safety net; 4.13 limits unchanged.
+- **S5** "typing…" indicator: **not built** (optional, default OFF, and it needs the owner to allow a new Telegram
+  action in CLAUDE.md "Hard rules" first).
+
+**Expected now:** rules ≈ 0.7 s quiet + ≤ 0.1 s wake + 0.3-0.8 s delay + ≤ 0.1 s sender ≈ **1.5-2 s** (+ up to 1 s of
+Telegram's rounding); AI ≈ that + 2.5-3.5 s ≈ **4-5 s**; holding ≈ **1-2 s**. Idle CPU: worker 5 %, listener 3 %.
+
+**Tests:** new tests/test_v418_speed.py (T1-T7). Changed (they encoded the old timing the spec replaces):
+tests/test_auto.py (delay 2-3 s → 0.3-0.8 s; settings field shows 0.7 with step 0.1), tests/test_v413_hotfix.py r3
+and tests/test_v420_automation.py watchdog (a message decided for a person is held at once, not after 10 s).
+Full suite: 822 passed, 1 skipped before those 4 updates; then all green.
+
+**"After" numbers:** need real messages — run the owner test below, then /health → Speed shows p50 / p90.
+
+### OWNER TEST SCRIPT 4.18
+From the second account (Auto-reply ON), one by one with a stopwatch:
+1. `hi` → greeting / reply in about 2 s.
+2. `swy intensely 5ml ယူမယ်` → cart reply in about 2 s.
+3. A phone number `09xxxxxxxxx` → next step in about 2 s.
+4. `ok` → payment info in about 2 s.
+5. `ဟိုတစ်ခါက အနံ့လေး` → a holding reply ("ခဏစောင့်ပေးပါနော်…") within about 3 s, or the AI's answer within 5 s.
+6. Dashboard → More → Health → **⚡ Speed**: p90 per path (goal: rules ≤ 3 s, AI ≤ 5 s, holding ≤ 3 s).
