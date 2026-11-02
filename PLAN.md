@@ -122,6 +122,7 @@ payments → Viber → reports. Each is a new module with its own tables.
    OWNER TEST 4.17). Status: moved to NEXT TASK 2026-10-31
 4. v4.20 AUTOMATION GOAL (goal-driven loop until G1-G4 met: ≥90% automatic, 0 wrong, never silent, live replay
    ≥85%) — docs/SPEC-v4.20-automation-goal.md (A0-A6, OWNER TEST 4.20). Status: moved to NEXT TASK 2026-10-31
-5. v4.19 NEEDS YOU CARDS: one customer = one clear card — docs/SPEC-v4.19-needs-you-cards.md (N1-N5, K1-K8,
-   mockup docs/mockups/needs-you-phone.dc.html, OWNER TEST 4.19). Status: TODO
+5. v4.21 DASHBOARD REDESIGN: Messenger layout + iOS look — goal-driven loop until U1-U4 met —
+   docs/SPEC-v4.21-ios-messenger-ui.md (mockups docs/mockups/ios-*.dc.html; replaces v4.19, OWNER TEST 4.21). Status: TODO
+   (v4.19 NEEDS YOU CARDS: replaced by v4.21, do not build separately)
 6. v4.18 SPEED: first reply within 3 s — docs/SPEC-v4.18-speed.md (S0-S5, T1-T8, OWNER TEST 4.18). Status: TODO
