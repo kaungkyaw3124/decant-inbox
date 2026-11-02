@@ -9,9 +9,9 @@
   <p class="muted small">{{ t("Time from the customer's message to an automatic reply ≈ quiet + delay. Shorter = faster, but looks more like a bot.") }}</p>
   {% if speed_error %}<p class="error" role="alert">{{ tr(speed_error) }}</p>{% endif %}
   <div class="grid">
-    <label>{{ t("Wait for the customer to stop typing (s)") }} <input name="quiet_s" type="number" min="{{ speed_limits.quiet_s[0] }}" max="{{ speed_limits.quiet_s[1] }}" value="{{ speed.quiet_s }}" required></label>
-    <label>{{ t("Shortest delay (s)") }} <input name="delay_min_s" type="number" min="{{ speed_limits.delay_min_s[0] }}" max="{{ speed_limits.delay_min_s[1] }}" value="{{ speed.delay_min_s }}" required></label>
-    <label>{{ t("Longest delay (s)") }} <input name="delay_max_s" type="number" min="{{ speed_limits.delay_max_s[0] }}" max="{{ speed_limits.delay_max_s[1] }}" value="{{ speed.delay_max_s }}" required></label>
+    <label>{{ t("Wait for the customer to stop typing (s)") }} <input name="quiet_s" type="number" step="0.1" min="{{ speed_limits.quiet_s[0] }}" max="{{ speed_limits.quiet_s[1] }}" value="{{ speed.quiet_s }}" required></label>
+    <label>{{ t("Shortest delay (s)") }} <input name="delay_min_s" type="number" step="0.1" min="{{ speed_limits.delay_min_s[0] }}" max="{{ speed_limits.delay_min_s[1] }}" value="{{ speed.delay_min_s }}" required></label>
+    <label>{{ t("Longest delay (s)") }} <input name="delay_max_s" type="number" step="0.1" min="{{ speed_limits.delay_max_s[0] }}" max="{{ speed_limits.delay_max_s[1] }}" value="{{ speed.delay_max_s }}" required></label>
   </div>
   <button class="primary">{{ t("Save speed") }}</button>
 </form>

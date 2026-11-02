@@ -14,11 +14,12 @@ from collections import deque
 from datetime import UTC, datetime
 from pathlib import Path
 
-from sqlalchemy import exists, func, select
+from sqlalchemy import case, exists, func, select
 from telethon import errors
 from telethon.tl import types
 
 from app.core.db import SessionLocal
+from app.core.notify import AsyncWaiter
 from app.listener.save import CHANNEL, ChatMessage, insert_message
 from app.models import Customer, MediaDownload, Message, Outbox
 from app.models.outbox import MAX_TEXT, MEDIA_DIR
@@ -28,6 +29,8 @@ MIN_INTERVAL = 3.0  # seconds between two sends, overall
 MAX_PER_MINUTE = 20
 MAX_MEDIA_BYTES = 10 * 1024 * 1024
 MEDIA_EXT = {"image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp"}
+# docs/SPEC-v4.18 S3: a waiting customer's reply goes before reminders / notices (same 1 msg / 3 s limit)
+LATER_KINDS = ("reminder", "cancel", "delivery")
 
 
 class RateLimiter:
@@ -59,7 +62,7 @@ def claim_next() -> tuple[int, int, str, str] | None:
     telegram user id, text), or None. Rows failing the safety checks are marked failed."""
     with SessionLocal.begin() as s:
         row = s.scalar(select(Outbox).where(Outbox.status == "queued", Outbox.send_after <= func.now())
-                       .order_by(Outbox.id)
+                       .order_by(case((Outbox.reply_kind.in_(LATER_KINDS), 1), else_=0), Outbox.id)
                        .limit(1).with_for_update(skip_locked=True))
         if row is None:
             return None
@@ -126,6 +129,13 @@ async def send_next(client, limiter: RateLimiter) -> bool:
     return True
 
 
+def next_due() -> float | None:
+    """Seconds until the next queued reply may go out (its send_after), or None."""
+    with SessionLocal() as s:
+        at = s.scalar(select(func.min(Outbox.send_after)).where(Outbox.status == "queued"))
+    return None if at is None else (at - datetime.now(UTC)).total_seconds()
+
+
 # ---------- photo downloads ----------
 
 def claim_download() -> tuple[int, str, str, str] | None:
@@ -184,8 +194,11 @@ async def download_next(client) -> bool:
 
 
 async def run_forever(client, poll_seconds: float = 0.5) -> None:
-    """Outbox + downloads loop, inside the listener (the one process with the session)."""
+    """Outbox + downloads loop, inside the listener (the one process with the session).
+    docs/SPEC-v4.18 S1: sleeps until the next reply is due, or a NOTIFY on "outbox" (a new reply); the
+    0.5 s poll stays as the fallback."""
     limiter = RateLimiter()
+    waiter = AsyncWaiter("outbox")
     while True:
         try:
             busy = False
@@ -193,7 +206,10 @@ async def run_forever(client, poll_seconds: float = 0.5) -> None:
                 busy = await send_next(client, limiter)
                 busy = await download_next(client) or busy
             if not busy:
-                await asyncio.sleep(poll_seconds)
+                due = await asyncio.to_thread(next_due)
+                # due <= 0 but nothing sent (offline, locked row): the normal poll, never a busy loop
+                wait = min(poll_seconds, due) if due is not None and due > 0 else poll_seconds
+                await waiter.wait(wait)
         except asyncio.CancelledError:
             raise
         except Exception:

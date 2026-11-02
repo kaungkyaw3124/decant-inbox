@@ -798,4 +798,12 @@ MY = {
     "Reply": "ပြန်စာ", "needs you": "ကိုယ်လုပ်ရမယ်", "{n} orders": "အော်ဒါ {n} ခု",
     "Unpaid": "ငွေမချေရသေး", "Check": "စစ်ရန်", "Paid": "ငွေချေပြီး", "Products & prices": "ပစ္စည်းနဲ့ ဈေးနှုန်း",
     "💳 Unpaid": "💳 ငွေမချေရသေး", "📷 Check": "📷 စစ်ရန်",
+    "Seconds, like 0.5 or 2.": "စက္ကန့်နဲ့ ရေးပါ (ဥပမာ 0.5 သို့ 2)",
+    # docs/SPEC-v4.18-speed.md S0
+    "Speed: first reply (last 24 h)": "မြန်နှုန်း: ပထမဆုံး ပြန်စာ (နောက်ဆုံး ၂၄ နာရီ)", "Path": "လမ်းကြောင်း",
+    "Sure without AI": "AI မလိုဘဲ သေချာ", "With the AI": "AI နဲ့", "“Please wait” reply": "“ခဏစောင့်” ပြန်စာ",
+    "goal": "ပန်းတိုင်", "Slowest (message id · seconds · slowest step)": "အနှေးဆုံး (စာ id · စက္ကန့် · နှေးတဲ့အဆင့်)",
+    "saved": "သိမ်းပြီး", "parsed": "ဖတ်ပြီး", "ai": "AI", "decided": "ဆုံးဖြတ်ပြီး", "queued": "တန်းစီပြီး",
+    "sent": "ပို့ပြီး", "-": "-",
+    "AI answer time p50 / p90 (last 24 h)": "AI ဖြေချိန် p50 / p90 (နောက်ဆုံး ၂၄ နာရီ)", "Speed": "မြန်နှုန်း",
 }

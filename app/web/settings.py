@@ -149,12 +149,14 @@ def reset_template(request: Request, key: str, db: Session = Depends(get_db), us
 def save_speed(request: Request, quiet_s: str = Form(""), delay_min_s: str = Form(""), delay_max_s: str = Form(""),
                db: Session = Depends(get_db), user: User = Depends(current_user)):
     try:
-        values = {"quiet_s": int(quiet_s), "delay_min_s": int(delay_min_s), "delay_max_s": int(delay_max_s)}
+        values = {"quiet_s": float(quiet_s), "delay_min_s": float(delay_min_s), "delay_max_s": float(delay_max_s)}
+        if any(v != v or round(v, 1) != v for v in values.values()):  # NaN / more than 0.1 s precision
+            raise ValueError("Seconds, like 0.5 or 2.")
         auto.set_speed(db, values, user)
     except ValueError as exc:
         db.rollback()
         return _page(request, db, errors={"speed": str(exc) if "must" in str(exc) or "longer" in str(exc)
-                                          else "Whole seconds only."}, status_code=400)
+                                          else "Seconds, like 0.5 or 2."}, status_code=400)
     _log(db, user, "auto.speed", **values)
     db.commit()
     flash(request, "Auto-reply speed saved.")

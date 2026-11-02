@@ -40,6 +40,7 @@
       <tr><th>{{ t("AI calls") }}</th><td>{{ today.calls }}</td><td>{{ month.calls }}</td></tr>
       <tr><th>{{ t("Cost (USD)") }}</th><td>${{ "%.4f" | format(today.cost) }}</td><td>${{ "%.4f" | format(month.cost) }} / ${{ "%.2f" | format(cfg.monthly_budget_usd) }}</td></tr>
       <tr><th>{{ t("Average answer time") }}</th><td>{{ (today.latency_ms / 1000) | round(1) }} s</td><td>{{ (month.latency_ms / 1000) | round(1) }} s</td></tr>
+      <tr><th>{{ t("AI answer time p50 / p90 (last 24 h)") }}</th><td colspan="2">{% if ai_speed[0] is not none %}{{ "%.1f" | format(ai_speed[0]) }} s / {{ "%.1f" | format(ai_speed[1]) }} s{% else %}—{% endif %} · <a href="/health#speed">{{ t("Speed") }} →</a></td></tr>
       <tr><th>{{ t("Accepted unchanged") }}</th><td>{{ today.accepted }}</td><td>{{ month.accepted }}</td></tr>
       <tr><th>{{ t("Corrected by a person") }}</th><td>{{ today.corrected }}</td><td>{{ month.corrected }}</td></tr>
       <tr><th>{{ t("Accuracy") }}</th><td>{{ today.accuracy ~ "%" if today.accuracy is not none else "–" }}</td><td>{{ month.accuracy ~ "%" if month.accuracy is not none else "–" }}</td></tr>

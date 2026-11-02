@@ -71,7 +71,7 @@ def silent(session: Session, now: datetime) -> list[Message]:
     """The newest unanswered waiting message per customer (60 s - 30 min old)."""
     rows = session.scalars(
         select(Message).join(Customer, Customer.id == Message.customer_id)
-        .where(Message.direction == "in", Message.kind == "text", Message.received_at <= now - WAIT,
+        .where(Message.direction == "in", Message.kind == "text",
                Message.received_at >= now - LOOKBACK, Customer.ignored.is_(False),
                Customer.auto_reply_off.is_(False))
         .order_by(Message.received_at.desc(), Message.id.desc())).all()
@@ -80,9 +80,24 @@ def silent(session: Session, now: datetime) -> list[Message]:
         if m.customer_id in seen:
             continue
         seen.add(m.customer_id)  # only the newest message of a customer counts
+        if m.received_at > now - WAIT and not for_a_person(session, m):
+            continue  # still being answered automatically (quiet window, AI): the 10 s safety net
         if not _answered(session, m) and _waiting_customer(session, m):
             found.append(m)
     return found
+
+
+def for_a_person(session: Session, message: Message) -> bool:
+    """docs/SPEC-v4.18 S4: auto mode decided that a person answers this message (skipped, or an unknown item
+    waits for the admin): the holding reply goes now, not after WAIT."""
+    from app.ai import service as ai  # late imports: ai -> orders; keep this module's imports as they were
+    from app.models import AutoRun, ParseResult
+    from app.orders import unknown
+
+    if session.scalar(select(exists().where(AutoRun.message_id == message.id, AutoRun.status == "skipped"))):
+        return True
+    result = session.scalar(select(ParseResult).where(ParseResult.message_id == message.id, ParseResult.is_current))
+    return bool(result and unknown.open_unknowns(session, message) and not ai.waiting_for_ai(session, message, result))
 
 
 def _held_recently(session: Session, customer_id: int, now: datetime) -> bool:

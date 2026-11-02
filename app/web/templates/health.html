@@ -12,6 +12,23 @@
   </table>
   <p class="muted small">{{ t("Last message received") }}: {{ tr(last_message) }} · {{ t("{n} messages stored.", n=total) }}</p>
 </section>
+<section class="card" id="speed">
+  <h2>⚡ {{ t("Speed: first reply (last 24 h)") }}</h2>
+  <table class="speed">
+    <thead><tr><th>{{ t("Path") }}</th><th class="num">{{ t("Messages") }}</th><th class="num">p50</th><th class="num">p90</th><th class="num">max</th></tr></thead>
+    <tbody>
+    {% for path, label, goal in (("rules", "Sure without AI", 3), ("ai", "With the AI", 5), ("holding", "“Please wait” reply", 3)) %}
+      {% set p = speed.paths[path] %}
+      <tr><th>{{ t(label) }} <span class="muted small">({{ t("goal") }} p90 ≤ {{ goal }} s)</span></th><td class="num">{{ p.n }}</td>
+        {% for key in ("p50", "p90", "max") %}<td class="num">{% if p[key] is not none %}{{ "%.1f" | format(p[key]) }} s{% if key == "p90" %} {{ "✅" if p[key] <= goal else "⚠️" }}{% endif %}{% else %}—{% endif %}</td>{% endfor %}</tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% if speed.slowest %}
+  <p class="small muted">{{ t("Slowest (message id · seconds · slowest step)") }}:
+    {% for r in speed.slowest %}#{{ r.message_id }} · {{ "%.1f" | format(r.total) }} s · {{ t(r.slowest) }}{% if not loop.last %}; {% endif %}{% endfor %}</p>
+  {% endif %}
+</section>
 <section class="card muted small">
   <p>{{ t("Services restart on their own. If one stays red, tell the owner. On the server run:") }}
   <code>systemctl --user status decant-listener decant-parser decant-web</code> ·

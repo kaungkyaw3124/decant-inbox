@@ -276,36 +276,52 @@ def process(message_id: int, now: datetime | None = None) -> str:
         return "shadow"
 
 
-def run_once(now: datetime | None = None) -> dict[str, int]:
+def process_safe(message_id: int, now: datetime | None = None) -> str:
+    """process(), and a failure is recorded as an "error" AI call (so the message goes on without the AI)."""
+    try:
+        return process(message_id, now)
+    except Exception:
+        log.exception("AI step failed for message=%s", message_id)
+        try:
+            with SessionLocal.begin() as session:
+                if not session.scalar(select(exists().where(AICall.message_id == message_id))):
+                    _record(session, message_id, "?", "?", "error", None, "internal error")
+        except Exception:
+            log.exception("could not record the AI failure for message=%s", message_id)
+        return "error"
+
+
+def check_brake(now: datetime, stats: dict[str, int]) -> None:
+    from app.ai import graduation  # late import: graduation imports this module
+
+    try:
+        with SessionLocal.begin() as session:
+            if reason := graduation.check_brake(session, now):
+                stats["brake"] = 1
+                log.warning("AI safety brake: %s", reason)
+    except Exception:
+        log.exception("AI brake check failed")
+
+
+def pending(now: datetime | None = None) -> list[int]:
+    """The messages to ask the AI about now ([] when the AI is off)."""
     now = now or datetime.now(UTC)
     with SessionLocal() as session:
         if ai_settings.mode(session) == "off" or providers.get() is None:
-            return {}
-        ids = candidates(session, now)
+            return []
+        return candidates(session, now)
+
+
+def run_once(now: datetime | None = None) -> dict[str, int]:
+    """One message after the other (scripts, tests); the worker uses a small pool instead (docs/SPEC-v4.18 S2)."""
+    now = now or datetime.now(UTC)
+    ids = pending(now)
     stats: dict[str, int] = {}
     for message_id in ids:
-        try:
-            outcome = process(message_id, now)
-        except Exception:
-            log.exception("AI step failed for message=%s", message_id)
-            try:
-                with SessionLocal.begin() as session:
-                    if not session.scalar(select(exists().where(AICall.message_id == message_id))):
-                        _record(session, message_id, "?", "?", "error", None, "internal error")
-            except Exception:
-                log.exception("could not record the AI failure for message=%s", message_id)
-            outcome = "error"
+        outcome = process_safe(message_id, now)
         stats[outcome] = stats.get(outcome, 0) + 1
     if ids:
-        from app.ai import graduation  # late import: graduation imports this module
-
-        try:
-            with SessionLocal.begin() as session:
-                if reason := graduation.check_brake(session, now):
-                    stats["brake"] = 1
-                    log.warning("AI safety brake: %s", reason)
-        except Exception:
-            log.exception("AI brake check failed")
+        check_brake(now, stats)
     return stats
 
 

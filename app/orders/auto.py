@@ -9,10 +9,10 @@ Runs in the parser worker (database only). Extra rules on top of the one-tap one
   the last 2 h, unless the admin pressed "Resume auto");
 - every product named exactly (alias match), none guessed, fuzzy or unknown;
 - nothing answered after the message already (by hand or otherwise);
-- the customer has been quiet for a moment (Settings "Auto-reply speed", default 1 s; several
+- the customer has been quiet for a moment (Settings "Auto-reply speed", default 0.7 s; several
   quick messages are handled one by one, each seeing the latest state; the "reply still
   queued" rule stops double replies);
-- a random delay in the outbox (default 2-3 s; Cancel in the chat);
+- a random delay in the outbox (default 0.3-0.8 s; Cancel in the chat);
 - at most 300 auto replies a day, then one-tap again;
 - at most one auto decision per incoming message (auto_runs).
 Never automatic: photos, intents other/unknown (except an FAQ answer, Step 7), unknown items
@@ -41,8 +41,9 @@ from app.replies import templates as replies
 log = logging.getLogger("auto")
 SETTING = "auto_reply"
 SPEED_SETTING = "auto_speed"
-DEFAULT_SPEED = {"quiet_s": 1, "delay_min_s": 2, "delay_max_s": 3}  # ~3 s from message to reply
-SPEED_LIMITS = {"quiet_s": (0, 30), "delay_min_s": (1, 60), "delay_max_s": (1, 60)}
+# docs/SPEC-v4.18 S3: first reply within ~3 s (live 30 days: no customer sent 2 messages within 5 s)
+DEFAULT_SPEED = {"quiet_s": 0.7, "delay_min_s": 0.3, "delay_max_s": 0.8}
+SPEED_LIMITS = {"quiet_s": (0, 30), "delay_min_s": (0, 60), "delay_max_s": (0, 60)}
 AUTO_INTENTS = ("ask_price", "ask_stock", "buy", "remove", "done", "confirm", "address", "ask_delivery",
                 "cancel_order", "greeting", "previous_item", "change_info", "payment_sent", "modify_cart",
                 "order_start")  # docs/SPEC-v4.13-hotfix.md Q2
@@ -73,12 +74,12 @@ def set_enabled(session: Session, on: bool, user: User | None) -> None:
         "value": stmt.excluded.value, "updated_by": stmt.excluded.updated_by, "updated_at": func.now()}))
 
 
-def speed(session: Session) -> dict[str, int]:
+def speed(session: Session) -> dict[str, float]:
     row = session.get(AppSetting, SPEED_SETTING)
     return {**DEFAULT_SPEED, **(row.value if row else {})}
 
 
-def set_speed(session: Session, values: dict[str, int], user: User | None) -> None:
+def set_speed(session: Session, values: dict[str, float], user: User | None) -> None:
     """ValueError if outside the allowed ranges or min > max."""
     for key, (low, high) in SPEED_LIMITS.items():
         if not low <= values[key] <= high:
@@ -331,6 +332,21 @@ def candidates(session: Session, now: datetime) -> list[int]:
     return list(session.scalars(select(Message.id).where(
         Message.direction == "in", Message.received_at >= max(start, now - WINDOW), ~decided, ~handled)
         .order_by(Message.received_at, Message.id).limit(50)))
+
+
+def next_due(now: datetime) -> float | None:
+    """docs/SPEC-v4.18 S1: seconds until the earliest quiet window of an undecided message ends (None: none
+    waiting), so the worker decides right then instead of at the next poll."""
+    with SessionLocal() as session:
+        ids = candidates(session, now)
+        if not ids or not enabled(session):
+            return None
+        quiet = timedelta(seconds=speed(session)["quiet_s"])
+        latest = session.scalars(select(func.max(Message.received_at)).where(
+            Message.direction == "in", Message.customer_id.in_(
+                select(Message.customer_id).where(Message.id.in_(ids)))).group_by(Message.customer_id)).all()
+    future = [(at + quiet - now).total_seconds() for at in latest if at + quiet > now]
+    return min(future) if future else None
 
 
 def run_once(now: datetime | None = None) -> dict[str, int]:

@@ -2,7 +2,7 @@
 settings, the last 50 calls, and "Run evaluation" (scripts/ai_eval.py against the real API)."""
 import subprocess
 import sys
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -43,10 +43,20 @@ def _call_rows(db: Session) -> list[dict]:
     return rows
 
 
+def _ai_speed(db: Session, now: datetime) -> tuple[float | None, float | None]:
+    from app.models import AICall
+    from app.orders.speed import percentile
+
+    ms = [m / 1000 for m in db.scalars(select(AICall.latency_ms).where(
+        AICall.ok, AICall.latency_ms.is_not(None), AICall.created_at >= now - timedelta(hours=24)))]
+    return percentile(ms, 50), percentile(ms, 90)
+
+
 @router.get("", response_class=HTMLResponse)
 def ai_page(request: Request, db: Session = Depends(get_db)):
     now = datetime.now(UTC)
     return templates.TemplateResponse(request, "ai.html", {
+        "ai_speed": _ai_speed(db, now),  # docs/SPEC-v4.18 S0: AI answer time p50 / p90, last 24 h
         "cfg": ai_settings.load(db), "modes": MODE_LABELS, "reasonings": ai_settings.REASONING,
         "today": report.period(db, report.today_start(now)), "month": report.period(db, report.month_start(now)),
         "notices": report.notices(db, now), "calls": _call_rows(db), "evaluation": report.latest_eval(),

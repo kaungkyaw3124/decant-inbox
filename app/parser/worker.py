@@ -9,12 +9,15 @@ Logs only ids and counts, never message text.
 import argparse
 import logging
 import time
+from concurrent.futures import ThreadPoolExecutor
+from datetime import UTC, datetime
 
 from sqlalchemy.exc import IntegrityError
 
 from app.ai import graduation, screens, service as ai
 from app.core.db import SessionLocal
 from app.core.heartbeat import beat
+from app.core.notify import Waiter, notify
 from app.models import Message
 from app.learning import patterns
 from app.orders import auto, cart, delivery, followups, holding, payments, testpay
@@ -132,13 +135,33 @@ def read_screenshots() -> None:
         log.exception("screenshot reading failed")
 
 
+AI_POOL = ThreadPoolExecutor(max_workers=3, thread_name_prefix="ai")  # docs/SPEC-v4.18 S2
+_asking: set[int] = set()  # message ids the pool is asking the AI about now (this process)
+
+
+def _ask(message_id: int) -> None:
+    """In a pool thread: one AI call; then wake the main loop so the auto reply goes out at once."""
+    try:
+        stats = {ai.process_safe(message_id): 1}
+        ai.check_brake(datetime.now(UTC), stats)
+        log.info("AI message=%s: %s", message_id, stats)
+    finally:
+        _asking.discard(message_id)
+        try:
+            notify("new_message", "ai")
+        except Exception:
+            log.warning("could not wake the worker after the AI answer")
+
+
 def understand_with_ai() -> None:
-    """docs/SPEC-v4.6-ai.md: messages the rules are not sure about (before auto mode looks at them).
+    """docs/SPEC-v4.6-ai.md: messages the rules are not sure about (before auto mode looks at them), asked in
+    a small pool so a slow AI call never holds up other customers (docs/SPEC-v4.18 S2).
     docs/SPEC-v4.7-graduation.md: daily graduation / brake check and the weekly summary."""
     try:
-        stats = ai.run_once()
-        if stats:
-            log.info("AI: %s", stats)
+        for message_id in ai.pending():
+            if message_id not in _asking:
+                _asking.add(message_id)
+                AI_POOL.submit(_ask, message_id)
     except Exception:
         log.exception("AI step failed")
     try:
@@ -148,14 +171,25 @@ def understand_with_ai() -> None:
         log.exception("AI graduation check failed")
 
 
+def sleep_for(interval: float) -> float:
+    """docs/SPEC-v4.18 S1: until the next poll, or until a waiting customer's quiet window ends."""
+    try:
+        due = auto.next_due(datetime.now(UTC))
+    except Exception:
+        log.exception("next_due failed")
+        due = None
+    return interval if due is None else min(interval, max(due, 0.05))
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--once", action="store_true", help="parse what is pending, then exit")
-    # 1 s: auto replies should go out ~3 s after the customer's message (Step 4d)
+    # 1 s fallback poll; a NOTIFY (new message, AI answer) or the end of a quiet window wakes it earlier
     parser.add_argument("--interval", type=float, default=1.0, help="seconds between polls")
     args = parser.parse_args()
 
     log.info("parser worker started (%s)", PARSER_VERSION)
+    waiter = Waiter("new_message")
     fingerprint = None
     last_beat = last_chores = last_follow_up = 0.0
     while True:
@@ -179,8 +213,9 @@ def main() -> None:
         auto.run_once()  # auto mode (does nothing while it is switched off)
         catch_silence()
         if args.once:
+            AI_POOL.shutdown(wait=True)
             return
-        time.sleep(args.interval)
+        waiter.wait(sleep_for(args.interval))
 
 
 if __name__ == "__main__":

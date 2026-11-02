@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import BASE_DIR
 from app.models import Message, ParseResult, ServiceHeartbeat
+from app.orders import speed
 from app.web.auth import current_user
 from app.web.deps import get_db, local_time, templates
 from scripts.backup_db import list_backups
@@ -95,4 +96,5 @@ def health(request: Request, db: Session = Depends(get_db)):
     return templates.TemplateResponse(request, "health.html", {
         "checks": run_checks(db), "last_message": local_time(last, "%d %b %Y %H:%M") if last else "none yet",
         "total": db.scalar(select(func.count()).select_from(Message)),
+        "speed": speed.summary(db, datetime.now(UTC) - timedelta(hours=24), datetime.now(UTC)),  # docs/SPEC-v4.18 S0
     })

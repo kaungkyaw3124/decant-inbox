@@ -81,7 +81,8 @@ def test_watchdog_10_s_for_every_message_but_small_talk(shop, db):  # noqa: F811
     now = datetime.now(UTC)
     add(9001, "ပစ္စည်းယိုနေတယ်", customer="401", when=now - timedelta(seconds=11))  # no order at all
     add(9002, "thank you", customer="402", when=now - timedelta(seconds=11))
-    add(9003, "ဒီအနံ့က ဘယ်လိုလဲ", customer="403", when=now - timedelta(seconds=5))  # not 10 s yet
+    add(9003, "ဒီအနံ့က ဘယ်လိုလဲ", customer="403", when=now - timedelta(seconds=0.3))  # undecided yet (quiet
+    # window): the 10 s safety net waits; a message decided for a person is held at once (docs/SPEC-v4.18 S4)
     from app.parser.worker import run_batch
 
     run_batch()

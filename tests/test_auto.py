@@ -61,16 +61,17 @@ def test_auto_reply_after_quiet_once_per_message(shop, db):
     now = datetime.now(UTC)
     add(3001, "stw intensely 5ml ဘယ်လောက်လဲ", customer="91", when=now)
     run_batch()
-    assert auto.run_once(now + timedelta(seconds=0.5)) == {}  # customer may still be typing (quiet 1 s)
+    assert auto.run_once(now + timedelta(seconds=0.5)) == {}  # customer may still be typing (quiet 0.7 s, 4.18)
     before = datetime.now(UTC)
     assert auto.run_once(now + timedelta(seconds=1.5)) == {"replied": 1}
     after = datetime.now(UTC)
     (body, status, created_by, _), = outbox(db)
     assert body.startswith("မင်္ဂလာပါ။\nStronger With You Intensely 5ml က 18,000 ကျပ်ပါ။")
-    # send_after = real time of the send decision + 2-3 s (created_at is the transaction start: not exact under load)
+    # send_after = real time of the send decision + 0.3-0.8 s (docs/SPEC-v4.18 S3; created_at is the transaction
+    # start: not exact under load)
     send_after = scalar(db, "SELECT send_after FROM outbox")
     assert status == "queued" and created_by is None
-    assert before + timedelta(seconds=2) <= send_after <= after + timedelta(seconds=3)
+    assert before + timedelta(seconds=0.3) <= send_after <= after + timedelta(seconds=0.8)
     assert auto.run_once(now + timedelta(seconds=60)) == {} and len(outbox(db)) == 1  # one reply per message
     with db.connect() as c:
         assert c.execute(text("SELECT user_id, details->>'actor' FROM audit_log WHERE action = 'auto.price'")).one() \
@@ -253,7 +254,7 @@ def test_step_4d_more_items_returning_customer_and_speed(shop, db):
     assert deliver(db)[0].startswith("• Sauvage Eau de Parfum 5ml – 20,000 ကျပ်\nစုစုပေါင်း 20,000 ကျပ်ပါ။\nKPay")
 
     # speed settings
-    assert 'name="quiet_s" type="number" min="0" max="30" value="1"' in client.get("/settings").text
+    assert 'name="quiet_s" type="number" step="0.1" min="0" max="30" value="0.7"' in client.get("/settings").text
     r = client.post("/settings/auto-speed", data={"csrf": token, "quiet_s": "2", "delay_min_s": "5",
                                                   "delay_max_s": "4"})
     assert r.status_code == 400 and "be longer than the longest" in r.text

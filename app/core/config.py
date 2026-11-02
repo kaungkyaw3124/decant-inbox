@@ -35,7 +35,7 @@ class Settings(BaseSettings):
     ai_provider: str = "openai"  # openai | off
     ai_model: str = "gpt-6-luna"
     ai_reasoning: str = "low"  # low | medium | high
-    ai_timeout_s: float = 8.0
+    ai_timeout_s: float = 6.0  # docs/SPEC-v4.18 S2: a slower answer = "not sure" (holding reply + Needs you)
     # USD per 1M tokens (gpt-6-luna); cost per call = tokens x these prices
     ai_price_in: float = 0.10
     ai_price_cached_in: float = 0.01
