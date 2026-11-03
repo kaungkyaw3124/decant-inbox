@@ -148,3 +148,5 @@ payments → Viber → reports. Each is a new module with its own tables.
 8. v5.1 INVENTORY in ml: bottles, vials, auto out-of-stock, deduct on packed — docs/SPEC-v5.1-inventory.md (goal I1-I4). Status: DONE 2026-11-02
 9. v5.2 CUSTOMER CARE: profiles, one-tap reorder list, feedback after delivery — docs/SPEC-v5.2-customer-care.md
    (goal C1-C3). Status: DONE 2026-11-02
+10. v5.3 PERFORMANCE (PC browser only): static caching + versioned URLs, compression, no full reloads, prefetch, SSE,
+   faster queries, nice-d tests, trusted-device login, keyboard — docs/SPEC-v5.3-performance-pc.md (goal P1-P5). Status: TODO
