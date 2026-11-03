@@ -3,9 +3,9 @@
 Read CLAUDE.md first. This file tracks where we are.
 
 ## NEXT TASK (written by the planning chat; Claude Code runs it with /next)
-Task: v5.0 GO-LIVE PACK: alert bot, encrypted off-server backup, 2-step login, packing slips —
-docs/SPEC-v5.0-go-live-pack.md (goal L1-L4; secrets stay OFF until the owner sets them).
-Status: DONE 2026-11-02 — see REPORT.md (the queue items v5.1 and v5.2 were done in the same run)
+Task: v5.3 PERFORMANCE (PC browser only): static caching + versioned URLs, compression, no full reloads, prefetch,
+SSE, faster queries, nice-d tests, trusted-device login, keyboard — docs/SPEC-v5.3-performance-pc.md (goal P1-P5).
+Status: TODO
 
 ## RESUME HERE (updated 2026-11-02 evening by Claude Code)
 - v1-v4.12 DONE. AI AUTO, brake ON, ai_address ON, ai_screenshot OFF.
@@ -149,4 +149,4 @@ payments → Viber → reports. Each is a new module with its own tables.
 9. v5.2 CUSTOMER CARE: profiles, one-tap reorder list, feedback after delivery — docs/SPEC-v5.2-customer-care.md
    (goal C1-C3). Status: DONE 2026-11-02
 10. v5.3 PERFORMANCE (PC browser only): static caching + versioned URLs, compression, no full reloads, prefetch, SSE,
-   faster queries, nice-d tests, trusted-device login, keyboard — docs/SPEC-v5.3-performance-pc.md (goal P1-P5). Status: TODO
+   faster queries, nice-d tests, trusted-device login, keyboard — docs/SPEC-v5.3-performance-pc.md (goal P1-P5). Status: moved to NEXT TASK 2026-11-03
