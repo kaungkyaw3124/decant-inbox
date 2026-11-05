@@ -150,3 +150,5 @@ payments → Viber → reports. Each is a new module with its own tables.
    (goal C1-C3). Status: DONE 2026-11-02
 10. v5.3 PERFORMANCE (PC browser only): static caching + versioned URLs, compression, no full reloads, prefetch, SSE,
    faster queries, nice-d tests, trusted-device login, keyboard — docs/SPEC-v5.3-performance-pc.md (goal P1-P5). Status: moved to NEXT TASK 2026-11-03
+11. v5.4 UI/UX CLEAN-UP of the whole dashboard (shared page pattern, paging 10/20/50/100 on every long list, Settings by section,
+   simple 7-item menu, plain words EN+MY, empty/error states) — docs/SPEC-v5.4-ui-ux-cleanup.md (goal X1-X8); needs 5.3 first. Status: TODO

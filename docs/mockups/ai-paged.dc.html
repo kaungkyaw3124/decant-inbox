@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>AI settings and calls</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+<style>
+body{margin:0}
+a{color:#0A5BD8;text-decoration:none}a:hover{text-decoration:underline}
+button{font-family:inherit;cursor:pointer}
+</style>
+</helmet>
+<div style="min-height: 1240px; display: flex; flex-wrap: wrap; background: #F2F2F7; color: #000; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', Inter, system-ui, sans-serif; font-size: 15px">
+
+<aside style="width: 220px; flex: none; box-sizing: border-box; padding: 24px 10px 16px; background: #FBFBFD; border-right: 1px solid #E5E5EA; display: flex; flex-direction: column; gap: 4px">
+<div style="font-size: 20px; font-weight: 700; padding: 0 10px 18px">Decant</div>
+<a href="#" style="display: flex; align-items: center; gap: 12px; padding: 9px 10px; border-radius: 10px; color: #1C1C1E"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#007AFF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.4A8 8 0 1 1 21 12z"/></svg><span style="flex: 1">Chats</span></a>
+<a href="#" style="display: flex; align-items: center; gap: 12px; padding: 9px 10px; border-radius: 10px; color: #1C1C1E"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#007AFF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 8l-9-5-9 5v8l9 5 9-5V8z"/><path d="M3 8l9 5 9-5M12 13v8"/></svg><span style="flex: 1">Orders</span><span style="font-size: 12px; font-weight: 600; background: #FF3B30; color: #fff; border-radius: 10px; padding: 1px 7px">3</span></a>
+<a href="#" style="display: flex; align-items: center; gap: 12px; padding: 9px 10px; border-radius: 10px; color: #1C1C1E"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#007AFF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="5" width="19" height="14" rx="2.5"/><path d="M2.5 10h19"/></svg><span style="flex: 1">Payments</span></a>
+<a href="#" style="display: flex; align-items: center; gap: 12px; padding: 9px 10px; border-radius: 10px; color: #1C1C1E"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#007AFF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3s6 6.2 6 10.5A6 6 0 0 1 6 13.5C6 9.2 12 3 12 3z"/></svg><span style="flex: 1">Products &amp; prices</span></a>
+<a href="#" style="display: flex; align-items: center; gap: 12px; padding: 9px 10px; border-radius: 10px; color: #1C1C1E"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#007AFF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 20V11M12 20V4M19 20v-6"/></svg><span style="flex: 1">Sales</span></a>
+<div style="flex: 1"></div>
+<div style="display: flex; align-items: center; justify-content: space-between; background: #fff; border-radius: 12px; padding: 10px 12px; margin-bottom: 6px"><span>Auto-reply</span><span style="width: 48px; height: 28px; border-radius: 14px; background: #34C759; display: flex; align-items: center; justify-content: flex-end; padding: 0 2px; box-sizing: border-box"><span style="width: 24px; height: 24px; border-radius: 12px; background: #fff"></span></span></div>
+<a href="#" style="display: flex; align-items: center; gap: 12px; padding: 9px 10px; border-radius: 10px; background: #007AFF; color: #fff; font-weight: 600"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg><span style="flex: 1">Settings</span></a>
+</aside>
+
+<main style="flex: 999 1 560px; min-width: 0; box-sizing: border-box; padding: 32px 40px 48px">
+<div style="max-width: 1120px; display: flex; flex-direction: column; gap: 20px">
+
+<div>
+<div style="font-size: 13px; color: #6C6C70">Settings ›</div>
+<h1 style="margin: 2px 0 0; font-size: 34px; line-height: 1.15; font-weight: 700; letter-spacing: -0.5px">AI helper</h1>
+</div>
+
+<section style="background: #fff; border: 1px solid #E5E5EA; border-radius: 16px; padding: 20px 22px; display: flex; flex-direction: column; gap: 18px">
+<h2 style="margin: 0; font-size: 17px; font-weight: 600">Settings</h2>
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px 20px">
+<div style="display: flex; flex-direction: column; gap: 6px"><label for="f1" style="font-size: 13px; color: #6C6C70">[Setting name]</label><input id="f1" value="300" style="height: 42px; box-sizing: border-box; border: 1px solid #D1D1D6; border-radius: 10px; padding: 0 12px; font: inherit"></div>
+<div style="display: flex; flex-direction: column; gap: 6px"><label for="f2" style="font-size: 13px; color: #6C6C70">[Setting name]</label><input id="f2" value="5.0" style="height: 42px; box-sizing: border-box; border: 1px solid #D1D1D6; border-radius: 10px; padding: 0 12px; font: inherit"></div>
+<div style="display: flex; flex-direction: column; gap: 6px"><label for="f3" style="font-size: 13px; color: #6C6C70">Only act when sure (0.5–1)</label><input id="f3" value="0.85" style="height: 42px; box-sizing: border-box; border: 1px solid #D1D1D6; border-radius: 10px; padding: 0 12px; font: inherit"></div>
+<div style="display: flex; flex-direction: column; gap: 6px"><label for="f4" style="font-size: 13px; color: #6C6C70">Model</label><input id="f4" value="gpt-6-luna" style="height: 42px; box-sizing: border-box; border: 1px solid #D1D1D6; border-radius: 10px; padding: 0 12px; font: inherit"></div>
+<div style="display: flex; flex-direction: column; gap: 6px"><label for="f5" style="font-size: 13px; color: #6C6C70">Reasoning</label><select id="f5" style="height: 42px; box-sizing: border-box; border: 1px solid #D1D1D6; border-radius: 10px; padding: 0 10px; font: inherit; background: #fff"><option>low</option><option>medium</option><option>high</option></select></div>
+</div>
+
+<div style="border-top: 1px solid #E5E5EA; padding-top: 16px; display: flex; flex-direction: column; gap: 14px">
+<label style="display: flex; align-items: center; gap: 12px; font-size: 15px"><input type="checkbox" style="width: 20px; height: 20px; margin: 0"> <span>Switch from SHADOW to AUTO by itself when the numbers are good</span></label>
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px 20px">
+<div style="display: flex; flex-direction: column; gap: 6px"><label for="g1" style="font-size: 13px; color: #6C6C70">At least this many days in SHADOW</label><input id="g1" value="7" style="height: 42px; box-sizing: border-box; border: 1px solid #D1D1D6; border-radius: 10px; padding: 0 12px; font: inherit"></div>
+<div style="display: flex; flex-direction: column; gap: 6px"><label for="g2" style="font-size: 13px; color: #6C6C70">At least this many checked suggestions</label><input id="g2" value="50" style="height: 42px; box-sizing: border-box; border: 1px solid #D1D1D6; border-radius: 10px; padding: 0 12px; font: inherit"></div>
+<div style="display: flex; flex-direction: column; gap: 6px"><label for="g3" style="font-size: 13px; color: #6C6C70">Accuracy at least (%)</label><input id="g3" value="95" style="height: 42px; box-sizing: border-box; border: 1px solid #D1D1D6; border-radius: 10px; padding: 0 12px; font: inherit"></div>
+</div>
+</div>
+<div><button style="height: 44px; border: 0; border-radius: 12px; background: #007AFF; color: #fff; font-size: 15px; font-weight: 600; padding: 0 28px">Save</button></div>
+</section>
+
+<section style="background: #fff; border: 1px solid #E5E5EA; border-radius: 16px; padding: 20px 22px; display: flex; flex-direction: column; gap: 16px">
+<div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px">
+<div style="display: flex; align-items: center; gap: 10px">
+<h2 style="margin: 0; font-size: 17px; font-weight: 600">Evaluation</h2>
+<span style="font-size: 13px; font-weight: 600; color: #1F7A3A; background: #E3F6E8; border-radius: 8px; padding: 3px 10px">Passed</span>
+</div>
+<div style="display: flex; align-items: center; gap: 14px"><span style="font-size: 13px; color: #6C6C70">2 Nov 2026, 16:34 · gpt-6-luna (low)</span><button style="height: 36px; border: 1px solid #D1D1D6; border-radius: 10px; background: #fff; color: #0A5BD8; font-size: 14px; font-weight: 600; padding: 0 16px">Run evaluation</button></div>
+</div>
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px">
+<div style="background: #F2F2F7; border-radius: 12px; padding: 12px 14px"><div style="font-size: 12px; color: #6C6C70">Messages tested</div><div style="font-size: 22px; font-weight: 700">62</div></div>
+<div style="background: #F2F2F7; border-radius: 12px; padding: 12px 14px"><div style="font-size: 12px; color: #6C6C70">Intent + product right</div><div style="font-size: 22px; font-weight: 700">98%</div></div>
+<div style="background: #F2F2F7; border-radius: 12px; padding: 12px 14px"><div style="font-size: 12px; color: #6C6C70">Wrong products</div><div style="font-size: 22px; font-weight: 700">0</div></div>
+<div style="background: #F2F2F7; border-radius: 12px; padding: 12px 14px"><div style="font-size: 12px; color: #6C6C70">Cost</div><div style="font-size: 22px; font-weight: 700">$0.0071</div></div>
+<div style="background: #F2F2F7; border-radius: 12px; padding: 12px 14px"><div style="font-size: 12px; color: #6C6C70">Average answer time</div><div style="font-size: 22px; font-weight: 700">2.4 s</div></div>
+</div>
+<div style="display: flex; align-items: center; gap: 10px; font-size: 14px; color: #3C3C43; background: #FFF4E5; border-radius: 10px; padding: 10px 14px"><span style="font-weight: 600; color: #B25E00">1 miss</span><span>x02: intent address (want other / question / change_info / confirm)</span></div>
+</section>
+
+<section style="background: #fff; border: 1px solid #E5E5EA; border-radius: 16px; overflow-x: auto">
+<div style="min-width: 860px">
+<div style="display: flex; align-items: center; justify-content: space-between; padding: 18px 22px 12px">
+<h2 style="margin: 0; font-size: 17px; font-weight: 600">AI calls</h2>
+<span style="font-size: 13px; color: #6C6C70">{{rangeText}}</span>
+</div>
+<div style="display: flex; align-items: center; gap: 14px; padding: 10px 22px; font-size: 12px; font-weight: 600; letter-spacing: .4px; text-transform: uppercase; color: #6C6C70; border-top: 1px solid #E5E5EA; border-bottom: 1px solid #E5E5EA">
+<div style="width: 96px">When</div>
+<div style="width: 72px">Mode</div>
+<div style="width: 140px">Result</div>
+<div style="flex: 1 1 320px">Why</div>
+<div style="width: 76px; text-align: right">Cost</div>
+<div style="width: 56px; text-align: right">Time</div>
+</div>
+<sc-for list="{{pageRows}}" as="c" hint-placeholder-count="10">
+<div style="display: flex; align-items: flex-start; gap: 14px; padding: 12px 22px; border-bottom: 1px solid #F0F0F3; font-size: 14px">
+<div style="width: 96px; color: #3C3C43; padding-top: 2px"><a href="#">{{c.when}}</a></div>
+<div style="width: 72px"><span style="display: inline-block; font-size: 12px; font-weight: 600; border-radius: 7px; padding: 2px 8px; background: {{c.badgeBg}}; color: {{c.badgeFg}}">{{c.mode}}</span></div>
+<div style="width: 140px; font-weight: 600">{{c.result}}</div>
+<div style="flex: 1 1 320px; color: #3C3C43; line-height: 1.4">{{c.why}}</div>
+<div style="width: 76px; text-align: right; color: #3C3C43; padding-top: 2px">{{c.cost}}</div>
+<div style="width: 56px; text-align: right; color: #3C3C43; padding-top: 2px">{{c.ms}}</div>
+</div>
+</sc-for>
+<div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 22px">
+<div style="display: flex; align-items: center; gap: 10px; font-size: 14px; color: #3C3C43">
+<span>Show</span>
+<div style="display: flex; background: #E3E3E8; border-radius: 9px; padding: 2px">
+<sc-for list="{{sizes}}" as="s" hint-placeholder-count="4">
+<button onClick="{{s.pick}}" style="border: 0; border-radius: 7px; padding: 5px 12px; font-size: 13px; background: {{s.bg}}; font-weight: {{s.fw}}; color: #1C1C1E">{{s.label}}</button>
+</sc-for>
+</div>
+</div>
+<div style="display: flex; gap: 6px; align-items: center">
+<button aria-label="Previous page" onClick="{{prev}}" style="width: 36px; height: 36px; border-radius: 10px; border: 1px solid #D1D1D6; background: #fff; color: #1C1C1E">‹</button>
+<sc-for list="{{pageBtns}}" as="p" hint-placeholder-count="5">
+<button onClick="{{p.pick}}" style="min-width: 36px; height: 36px; border-radius: 10px; border: {{p.border}}; background: {{p.bg}}; color: {{p.fg}}; font-weight: 600">{{p.label}}</button>
+</sc-for>
+<button aria-label="Next page" onClick="{{next}}" style="width: 36px; height: 36px; border-radius: 10px; border: 1px solid #D1D1D6; background: #fff; color: #1C1C1E">›</button>
+</div>
+</div>
+</div>
+</section>
+
+</div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1240}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const st = this.state || {};
+    const perPage = st.perPage || 10;
+    const base = [
+      { mode: 'Shadow', result: 'other 0.99', why: 'Only a redacted number is provided; it does not identify an intent or product.', cost: '$0.00011', ms: '1.9 s' },
+      { mode: 'Auto', result: 'confirm 0.99', why: '"yes" confirms the proposed order and delivery details.', cost: '$0.00047', ms: '2.8 s' },
+      { mode: 'Shadow', result: 'buy 0.88', why: 'Stronger With You Intensely: wants to buy; 20 ml is not a listed size.', cost: '$0.00034', ms: '6.6 s' },
+      { mode: 'Error', result: 'timeout', why: 'The AI did not answer in time.', cost: '$0.00000', ms: '—' },
+      { mode: 'Auto', result: 'change_info 0.97', why: 'Customer gave a replacement delivery address after being asked to confirm the existing one.', cost: '$0.00013', ms: '2.3 s' }
+    ];
+    const total = 50;
+    const all = [];
+    for (let i = 0; i < total; i++) {
+      const b = base[i % base.length];
+      const day = 31 - Math.floor(i / 8);
+      const mins = (22 * 60 + 11 - i * 47 + 24 * 60 * 10) % (24 * 60);
+      const hh = String(Math.floor(mins / 60)).padStart(2, '0');
+      const mm = String(mins % 60).padStart(2, '0');
+      const m = b.mode;
+      all.push({
+        when: (day > 0 ? day : day + 31) + (day > 0 ? ' Oct ' : ' Sep ') + hh + ':' + mm,
+        mode: m, result: b.result, why: b.why, cost: b.cost, ms: b.ms,
+        badgeBg: m === 'Auto' ? '#E5F0FF' : (m === 'Error' ? '#FFE5E3' : '#EDEDF0'),
+        badgeFg: m === 'Auto' ? '#0A5BD8' : (m === 'Error' ? '#C4251B' : '#48484A')
+      });
+    }
+    const pages = Math.max(1, Math.ceil(total / perPage));
+    const page = Math.min(st.page || 1, pages);
+    const from = (page - 1) * perPage;
+    const to = Math.min(from + perPage, total);
+    const sizes = [10, 20, 50, 100].map((n) => ({
+      label: String(n),
+      bg: n === perPage ? '#fff' : 'transparent',
+      fw: n === perPage ? 600 : 400,
+      pick: () => this.setState({ perPage: n, page: 1 })
+    }));
+    const pageBtns = [];
+    for (let p = 1; p <= pages; p++) {
+      const on = p === page;
+      pageBtns.push({
+        label: String(p),
+        bg: on ? '#007AFF' : '#fff',
+        fg: on ? '#fff' : '#1C1C1E',
+        border: on ? '0' : '1px solid #D1D1D6',
+        pick: () => this.setState({ page: p })
+      });
+    }
+    return {
+      pageRows: all.slice(from, to),
+      rangeText: (from + 1) + '–' + to + ' of ' + total + ' calls · newest first',
+      sizes: sizes,
+      pageBtns: pageBtns,
+      prev: () => this.setState({ page: Math.max(1, page - 1) }),
+      next: () => this.setState({ page: Math.min(pages, page + 1) })
+    };
+  }
+}
+</script>
+</body>
+</html>
