@@ -2,8 +2,10 @@
 {% import "_ui.html" as ui with context %}
 {% block title %}{{ c.display_name or t("Customer") }} · Decant Inbox{% endblock %}
 {% block content %}
-<p><a href="/customers">‹ {{ t("Customers") }}</a> · <a href="/chats/{{ c.id }}">{{ t("Open chat") }}</a></p>
-<h1>{{ c.display_name or ("@" ~ c.username if c.username else t("Customer")) }}</h1>
+<a class="crumb" href="/customers">‹ {{ t("Customers") }}</a>
+{% call ui.page_head(c.display_name or ("@" ~ c.username if c.username else t("Customer")), "@" ~ c.username if c.username and c.display_name else "") %}
+<a class="button" href="/chats/{{ c.id }}">{{ t("Open chat") }}</a>
+{% endcall %}
 {% with back = "/customers/" ~ c.id %}{% include "_profile.html" %}{% endwith %}
 <section class="card">
   <h2>{{ t("Notes") }}</h2>

@@ -33,7 +33,10 @@ Status: TODO
   trusted computer, keyboard; warm pages 0.2-0.5 s / 0 KB (was ~2.2 s / 680 KB), send 0.25 s. NOT met yet: customer
   switch p90 1.27 s (goal 0.5) and server p90 ≤ 200 ms (chat page ~49 queries) -> follow-up for the planning chat.
 - Owner tests pending: 4.13-4.21, 5.0-5.3 (REPORT.md).
-- NEXT: v5.4 UI/UX clean-up (QUEUE item 11).
+- v5.4 UI/UX clean-up IN PROGRESS (deployed step by step, REPORT.md "5.4 scoreboard"): pager everywhere but Learning,
+  Products + AI like the mockups, Settings in sections, page header on every page, menu with Customers, error page,
+  glossary. LEFT: X7 Orders list + detail panel, Learning approved-list paging, X5 jargon pass on the AI page,
+  final full loop (pytest + ui_check + perf_check) + OWNER TEST 5.4. Decision asked: redirect / to /chats?
 - Owner checks: `bash scripts/status.sh`; AI numbers at /ai.
 
 ## Status

@@ -1,8 +1,9 @@
 {% extends "base.html" %}
+{% import "_ui.html" as ui with context %}
 {% block title %}{{ t("Health") }} · Decant Inbox{% endblock %}
 {% block content %}
+{{ ui.page_head(t("Health"), t("Something needs attention") if checks | selectattr("ok", "false") | list else t("All systems OK")) }}
 <section class="card">
-  <h1>{% if checks | selectattr("ok", "false") | list %}{{ t("Something needs attention") }}{% else %}{{ t("All systems OK") }}{% endif %}</h1>
   <table>
     <tbody>
     {% for c in checks %}

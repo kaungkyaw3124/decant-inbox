@@ -2427,3 +2427,4 @@ U4-U5 loop 1, built:
 **Decision to check (planning chat):** "Inbox (/) redirects to Chats" (X4) is not done: `/` IS the Chats workspace's
 "Needs me" view since v4.21 (the menu shows only Chats, highlighted on `/`), so the two doors are already one; a
 redirect would only change the URL and 71 test calls. Say if you still want the redirect.
+| loop 2 | 435 affected pass (full suite in loop 1: 885) | 0 (detail pages at 360 + 1440) | 2 (Help: its own guide title; chat panes = the 4.21 workspace) | 1 (Learning) | page header + crumb on payment, product, customer, account, health |
