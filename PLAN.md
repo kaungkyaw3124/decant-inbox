@@ -3,9 +3,9 @@
 Read CLAUDE.md first. This file tracks where we are.
 
 ## NEXT TASK (written by the planning chat; Claude Code runs it with /next)
-Task: v5.3 PERFORMANCE (PC browser only): static caching + versioned URLs, compression, no full reloads, prefetch,
-SSE, faster queries, nice-d tests, trusted-device login, keyboard — docs/SPEC-v5.3-performance-pc.md (goal P1-P5).
-Status: DONE 2026-11-06 — see REPORT.md
+Task: v5.4 UI/UX CLEAN-UP of the whole dashboard (shared page pattern, paging 10/20/50/100 on every long list, Settings by section,
+simple 7-item menu, plain words EN+MY, empty/error states) — docs/SPEC-v5.4-ui-ux-cleanup.md (goal X1-X8).
+Status: TODO
 
 ## RESUME HERE (updated 2026-11-06 by Claude Code)
 - v1-v4.12 DONE. AI AUTO, brake ON, ai_address ON, ai_screenshot OFF.
@@ -155,4 +155,4 @@ payments → Viber → reports. Each is a new module with its own tables.
 10. v5.3 PERFORMANCE (PC browser only): static caching + versioned URLs, compression, no full reloads, prefetch, SSE,
    faster queries, nice-d tests, trusted-device login, keyboard — docs/SPEC-v5.3-performance-pc.md (goal P1-P5). Status: moved to NEXT TASK 2026-11-03
 11. v5.4 UI/UX CLEAN-UP of the whole dashboard (shared page pattern, paging 10/20/50/100 on every long list, Settings by section,
-   simple 7-item menu, plain words EN+MY, empty/error states) — docs/SPEC-v5.4-ui-ux-cleanup.md (goal X1-X8); needs 5.3 first. Status: TODO
+   simple 7-item menu, plain words EN+MY, empty/error states) — docs/SPEC-v5.4-ui-ux-cleanup.md (goal X1-X8); needs 5.3 first. Status: moved to NEXT TASK 2026-11-06
