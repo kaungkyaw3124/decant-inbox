@@ -413,17 +413,21 @@ def u4_flows(browser) -> list[str]:
     return problems
 
 
-def run(quick: bool, save_inventory: bool) -> int:
+def run(quick: bool, save_inventory: bool, only_widths: tuple[int, ...] = (), shots: Path | None = None) -> int:
     from playwright.sync_api import sync_playwright
+
+    global SHOTS
+    SHOTS = shots or SHOTS
 
     use_check_database()
     ids = build_database()
     serve()
-    SHOTS.mkdir(exist_ok=True)
+    SHOTS.mkdir(parents=True, exist_ok=True)
     targets = pages(ids)
     if quick:
         targets = [t for t in targets if t[0] in DAILY]
     widths, langs = ((360,), ("my", "en")) if quick else (WIDTHS, ("en", "my"))
+    widths = only_widths or widths  # e.g. --widths 1440,390 for screenshots next to the mockups (docs/SPEC-v5.4 U0)
     failures, inventory, lines = 0, {}, []
     with sync_playwright() as p:
         browser = p.chromium.launch(env=libs_env())
@@ -494,5 +498,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--quick", action="store_true")
     parser.add_argument("--save-inventory", action="store_true")
+    parser.add_argument("--widths", default="", help="comma list, e.g. 1440,390 (default 360,768,1280)")
+    parser.add_argument("--shots", type=Path, help="screenshot folder (default ui-shots/)")
     args = parser.parse_args()
-    sys.exit(run(args.quick, args.save_inventory))
+    sys.exit(run(args.quick, args.save_inventory, tuple(int(w) for w in args.widths.split(",") if w), args.shots))

@@ -28,7 +28,7 @@ from app.web import (
     prices, sales, settings as settings_pages, stock, users,
 )
 from app.alerts import service as alerts
-from app.web import live, perf, trust, twostep
+from app.web import live, paging, perf, trust, twostep
 from app.web.auth import (
     FormExpired, LoginRequired, authenticate, client_ip, current_user, failed, locked_out, login, verify_csrf,
 )
@@ -40,6 +40,7 @@ if settings.web_secret_key is None:
 
 app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
 app.middleware("http")(trust.renew)  # inside the session middleware: it needs request.session (docs/SPEC-v5.3 M5)
+app.middleware("http")(paging.remember_per)  # docs/SPEC-v5.4 X2: the chosen list size
 app.add_middleware(
     SessionMiddleware,
     secret_key=settings.web_secret_key.get_secret_value(),

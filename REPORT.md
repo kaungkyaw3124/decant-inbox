@@ -2367,3 +2367,28 @@ runs 1 worker; full suite ~34 min with nice. UI gate full: 384 views, 0 failed.
 6. Close the browser fully; open the dashboard the next day: you are still logged in, no code asked.
 7. My account → **Trusted computers** → your PC is listed → Remove → reload: the login page asks for password + code.
 8. /health → **Speed: dashboard pages**: p90 per page (goal: ≤ 200 ms server time).
+
+## 2026-11-06 — v5.4 UI/UX clean-up (docs/SPEC-v5.4-ui-ux-cleanup.md) — IN PROGRESS
+
+**U0 audit** (`scripts/ui_check.py --widths 1440,390 --shots ui-shots/before`: 256 page views, 218 screenshots,
+owner + staff, en + my; the gate itself passes, the findings are about look and flow):
+- F1 every page except Chats: the content column (~850 px) is centred in the window, leaving ~190 px empty next to
+  the menu at 1440 px (Products, AI, Orders, Settings, Customers, Stock, Sales, Users, Activity, Health, Help).
+- F2 no shared paging: Products (all rows), AI "Last 50 calls", Customers, customer orders (50), price history (50),
+  Orders (fixed LIST_SIZE), Stock moves, Learning; Chats / Inbox / Activity page by hand with "more" links.
+- F3 Settings = ONE page of 19,764 px at 1440 px (~30 cards, each with its own Save), emoji headings, .env names.
+- F4 the menu is already the simple v4.21 one (Chats, Orders, Payments, Products & prices, Sales + Settings);
+  Customers is missing; Inbox (/), Learning, Reports, Health, Help, Practice, Users, AI are only reachable via
+  Settings / links.
+- F5 Products: no page title, links blue + underlined, prices as one text line instead of chips, brand in its own
+  column (mockup: brand above the name), no "?"-style help placement; AI: emoji in every heading, one form with
+  two Save buttons, technical words (SHADOW / AUTO, gpt model name, reasoning).
+- F6 forms: labels above (good) but 4-column grids wrap labels to 2-3 lines (AI settings); no inline "Saved ✓".
+- F7 empty states are bare text ("No AI calls yet."), no next step.
+- F8 jargon on the owner pages: SHADOW, AUTO, intent, alias, p50 / p90, checker.
+- F9 wide screens: tables stay ~850 px wide; Orders has no list + detail layout.
+
+### 5.4 scoreboard
+| step | tests | ui_check fails | pages not on the page pattern | lists without the shared pager | notes |
+|---|---|---|---|---|---|
+| U0 (before) | 862 + 1 skip | 0 | all except Chats | 9 | audit above |
