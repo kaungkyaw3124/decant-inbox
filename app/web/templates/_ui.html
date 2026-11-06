@@ -12,3 +12,34 @@
 {%- if invalid %} <span class="badge bad">⚠️ {{ t("invalid address") }}</span> <span class="small problem-text">{{ tr(address_reason(text)) }}</span>{% elif parts %} <span class="badge ok" title="{{ t('valid address') }}">✅</span>{% endif -%}
 {%- endif -%}
 {%- endmacro %}
+
+{# docs/SPEC-v5.4-ui-ux-cleanup.md X1: page title (34 px) + one-line subtitle; {% call %} adds the right side
+   (segmented control or button) #}
+{% macro page_head(title, sub="") -%}
+<div class="page-head"><div><h1>{{ title }}</h1>{% if sub %}<p class="page-sub">{{ sub }}</p>{% endif %}</div>
+{%- if caller %}{{ caller() }}{% endif %}</div>
+{%- endmacro %}
+
+{# X2: "Show 10 · 20 · 50 · 100", "a–b of N", ‹ 1 … 4 5 6 … 20 ›. target = the id of the element that holds the
+   list and this pager: htmx swaps only that (the links also work without JS, and Back works). #}
+{% macro pager(p, target) -%}
+<nav class="pager" aria-label="{{ t('Pages') }}" hx-boost="true" hx-target="#{{ target }}" hx-select="#{{ target }}"
+     hx-swap="outerHTML" hx-push-url="true">
+  <div class="pager-size"><span>{{ t("Show") }}</span>
+    <span class="tabs">{% for n in (10, 20, 50, 100) %}<a href="{{ p.url(per=n) }}"{% if n == p.per %} aria-current="true"{% endif %}>{{ n }}</a>{% endfor %}</span>
+    <span>{{ t("{a}–{b} of {n}", a=p.first, b=p.last, n=p.total) }}</span></div>
+  {%- if p.pages > 1 %}
+  <div class="pager-pages">
+    <a href="{{ p.url(page=p.page - 1) }}" aria-label="{{ t('Previous page') }}"{% if p.page == 1 %} class="off" aria-disabled="true"{% endif %}>‹</a>
+    {%- for n in p.numbers() %}{% if n %}<a href="{{ p.url(page=n) }}"{% if n == p.page %} aria-current="page"{% endif %}>{{ n }}</a>{% else %}<span>…</span>{% endif %}{% endfor %}
+    <a href="{{ p.url(page=p.page + 1) }}" aria-label="{{ t('Next page') }}"{% if p.page == p.pages %} class="off" aria-disabled="true"{% endif %}>›</a>
+  </div>
+  {%- endif %}
+</nav>
+{%- endmacro %}
+
+{# X6: an empty list says what to do next #}
+{% macro empty(title, hint="", href="", button="") -%}
+<div class="empty-state"><b>{{ title }}</b>{% if hint %}{{ hint }}{% endif %}
+{%- if href %}<br><a class="button" href="{{ href }}">{{ button }}</a>{% endif %}</div>
+{%- endmacro %}

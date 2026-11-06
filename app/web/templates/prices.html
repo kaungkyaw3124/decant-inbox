@@ -1,7 +1,8 @@
 {% extends "base.html" %}
+{% import "_ui.html" as ui with context %}
 {% block title %}{{ t("Prices") }} · Decant Inbox{% endblock %}
 {% block content %}
-<h1>{{ t("Price list") }}</h1>
+{{ ui.page_head(t("Price list")) }}
 {% if error %}<p class="flash bad" role="alert">{{ tr(error) }}</p>{% endif %}
 
 <section class="card stack">

@@ -2,7 +2,7 @@
 {% import "_ui.html" as ui with context %}
 {% block title %}{{ t("Orders") }} · Decant Inbox{% endblock %}
 {% block content %}
-<h1>{{ t("Orders") }} {{ ui.help("Paid orders. Pack them, then press Sent out when the deli takes them, then Delivered.") }}</h1>
+{{ ui.page_head(t("Orders"), t("Paid orders. Pack them, then press Sent out when the deli takes them, then Delivered.")) }}
 <nav class="tabs" aria-label="{{ t('Orders') }}">
   {% for key, (label, _, _) in tabs.items() %}
   <a href="/orders?tab={{ key }}{% if show_test %}&show_test=1{% endif %}" {% if tab == key %}aria-current="page"{% endif %}>{{ tr(label) }}{% if counts.get(key) %} <span class="badge">{{ counts[key] }}</span>{% endif %}</a>

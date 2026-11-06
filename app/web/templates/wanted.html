@@ -2,7 +2,7 @@
 {% import "_ui.html" as ui with context %}
 {% block title %}{{ t("Wanted") }} · Decant Inbox{% endblock %}
 {% block content %}
-<h1>{{ t("Wanted but not stocked") }} {{ ui.help("Perfumes customers asked for that we don't sell or that are out of stock. Tell the owner about the top ones.") }}</h1>
+{{ ui.page_head(t("Wanted but not stocked"), t("Perfumes customers asked for that we don't sell or that are out of stock. Tell the owner about the top ones.")) }}
 <p class="muted small">{{ t("Products customers asked for that you marked “We don't have it”, and sizes that are out of stock now (from the price list). Most asked first.") }}</p>
 <table class="wanted">
   <thead><tr><th>{{ t("Name") }}</th><th class="num">{{ t("Times asked") }}</th><th class="num">{{ t("Customers") }}</th><th>{{ t("Last asked") }}</th></tr></thead>

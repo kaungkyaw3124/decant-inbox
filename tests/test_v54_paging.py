@@ -72,3 +72,22 @@ def test_per_choice_is_remembered_in_a_small_cookie(client):
     assert client.cookies.get("per") == "50"
     client.get("/chats?per=7")  # not a choice: ignored, the old one stays
     assert client.cookies.get("per") == "50"
+
+
+def test_ai_calls_page_shows_10_with_a_working_pager(client, db):
+    from tests.test_messaging import add
+    from tests.test_web import log_in
+
+    for n in range(23):
+        add(9000 + n, f"m{n}")
+    with db.begin() as c:
+        c.execute(text("INSERT INTO ai_calls (message_id, model, mode, ok, decision, latency_ms) "
+                       "SELECT id, 'm', 'shadow', true, 'shadow', 700 + id FROM messages "
+                       "WHERE external_message_id::int >= 9000"))
+    log_in(client)
+    page = client.get("/ai").text
+    assert page.count('<div class="list-row">') == 10 and "1–10 of 23" in page and 'aria-label="Next page"' in page
+    page = client.get("/ai?page=3").text
+    assert page.count('<div class="list-row">') == 3 and "21–23 of 23" in page
+    assert client.get("/products?per=50").status_code == 200 and client.cookies.get("per") == "50"
+    assert "1–20 of 23" not in client.get("/ai").text  # AI calls follow the remembered 50 too

@@ -908,4 +908,13 @@ MY = {
     "Page": "စာမျက်နှာ", "Times": "အကြိမ်", "Goal: p90 ≤ 200 ms. The slowest pages are listed first.":
         "ပန်းတိုင်: p90 ≤ 200 ms။ အနှေးဆုံး စာမျက်နှာတွေ အရင်ပြထားတယ်။",
     "No pages opened since the last restart.": "နောက်ဆုံး restart ကတည်းက စာမျက်နှာ မဖွင့်ရသေးပါ။",
+    # docs/SPEC-v5.4 U1: shared page pattern
+    "Pages": "စာမျက်နှာများ", "Previous page": "ရှေ့စာမျက်နှာ", "Next page": "နောက်စာမျက်နှာ",
+    "{a}–{b} of {n}": "{n} ခုထဲက {a}–{b}",
+    "{n} perfumes · prices in Ks": "ရေမွှေး {n} မျိုး · ဈေးက ကျပ်နဲ့",
+    "Check the spelling, or add the perfume below.": "စာလုံးပေါင်း စစ်ပါ၊ ဒါမှမဟုတ် အောက်မှာ ရေမွှေး ထည့်ပါ။", "Show all": "အားလုံးပြ",
+    "Messages tested": "စမ်းထားတဲ့ စာ", "Result": "ရလဒ်", "Why": "ဘာကြောင့်", "Time": "ကြာချိန်",
+    "They show here when a message needs the AI.": "AI လိုတဲ့ စာ ရောက်လာရင် ဒီမှာ ပြပါမယ်။",
+    "Try another name, tag or city.": "နာမည်၊ tag ဒါမှမဟုတ် မြို့ တခြားဟာ စမ်းကြည့်ပါ။",
+    "Customers show here after their first paid order.": "ပထမဆုံး ငွေချေပြီး order ပြီးရင် ဖောက်သည်တွေ ဒီမှာ ပြပါမယ်။",
 }

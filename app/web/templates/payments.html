@@ -2,7 +2,7 @@
 {% import "_ui.html" as ui with context %}
 {% block title %}{{ t("Payments") }} · Decant Inbox{% endblock %}
 {% block content %}
-<h1>💳 {{ t("Payments to check") }} {{ ui.help("Payment screenshots from customers. Open one, find the same transaction in your KPay / AYA app, type its ID and approve.") }}</h1>
+{{ ui.page_head(t("Payments to check"), t("Payment screenshots from customers. Open one, find the same transaction in your KPay / AYA app, type its ID and approve.")) }}
 <ul class="rows">
 {% for check, order, c in rows %}
   <li class="item">

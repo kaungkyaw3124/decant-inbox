@@ -6,7 +6,7 @@
 {%- endmacro %}
 {% block content %}
 <section class="card practice-head">
-  <h1>🎓 {{ t("Practice") }} {{ ui.help("Practice messages: try the buttons and the check cards. Nothing is saved and nothing is sent to anyone.") }}</h1>
+  {{ ui.page_head(t("Practice"), t("Practice messages: try the buttons and the check cards. Nothing is saved and nothing is sent to anyone.")) }}
   <p class="notice small">{{ t("Practice mode: nothing is saved, nothing is sent.") }}</p>
   <p class="big-line">{{ t("Score") }}: <b>{{ right_count }} / {{ done_count }}</b>{% if step != "home" %} · {{ t("Message {n} of {total}", n=n, total=total) }}{% endif %}</p>
 </section>

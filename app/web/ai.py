@@ -13,8 +13,9 @@ from app.ai import graduation, report, screens  # noqa: F401  (screens: the read
 from app.ai import settings as ai_settings
 from app.ai.types import AIResult
 from app.core.config import BASE_DIR
-from app.models import AuditLog, Product, User
+from app.models import AICall, AuditLog, Product, User
 from app.web.auth import current_user, owner_only, verify_csrf
+from app.web import paging
 from app.web.deps import get_db, templates
 from app.web.inbox import flash
 
@@ -22,10 +23,10 @@ router = APIRouter(prefix="/ai", dependencies=[Depends(owner_only), Depends(veri
 MODE_LABELS = {"off": "OFF", "shadow": "SHADOW: suggests on teaching cards", "auto": "AUTO: acts when sure"}
 
 
-def _call_rows(db: Session) -> list[dict]:
+def _call_rows(db: Session, calls: list) -> list[dict]:
     names = dict(db.execute(select(Product.id, Product.name)).all())
     rows = []
-    for call in report.recent(db):
+    for call in calls:
         summary = ""
         if call.result_json:
             try:
@@ -55,11 +56,12 @@ def _ai_speed(db: Session, now: datetime) -> tuple[float | None, float | None]:
 @router.get("", response_class=HTMLResponse)
 def ai_page(request: Request, db: Session = Depends(get_db)):
     now = datetime.now(UTC)
+    page = paging.paginate(db, select(AICall).order_by(AICall.id.desc()), request, default=10, scalars=True)
     return templates.TemplateResponse(request, "ai.html", {
         "ai_speed": _ai_speed(db, now),  # docs/SPEC-v4.18 S0: AI answer time p50 / p90, last 24 h
         "cfg": ai_settings.load(db), "modes": MODE_LABELS, "reasonings": ai_settings.REASONING,
         "today": report.period(db, report.today_start(now)), "month": report.period(db, report.month_start(now)),
-        "notices": report.notices(db, now), "calls": _call_rows(db), "evaluation": report.latest_eval(),
+        "notices": report.notices(db, now), "page": page, "calls": _call_rows(db, page.items), "evaluation": report.latest_eval(),
         "eval_running": report.eval_running(now), "progress": graduation.progress(db, now),
         "auto_since": _since(ai_settings.load(db).get("auto_since")),
         # docs/SPEC-v4.12-address-payment-ai.md N4: privacy switches + what they did this month

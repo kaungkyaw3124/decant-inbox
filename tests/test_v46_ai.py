@@ -499,7 +499,7 @@ def test_ai_page_mode_settings_and_owner_only(ai, shop, db):
     say(db, 1, YSL)
     service.run_once()
     page = client.get("/ai").text
-    assert "SHADOW: suggests on teaching cards" in page and "Last 50 AI calls" in page
+    assert "SHADOW: suggests on teaching cards" in page and "AI calls" in page
     assert "buy 0.95: Y Eau de Parfum 10ml" in page
     client.post("/ai/mode", data={"csrf": token, "mode": "auto"})
     with SessionLocal() as s:

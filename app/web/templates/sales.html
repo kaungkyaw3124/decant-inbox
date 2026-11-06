@@ -4,7 +4,7 @@
 {% macro money(v) %}{% if v is none %}{{ missing }}{% else %}{{ format_mmk(v) }}{% endif %}{% endmacro %}
 {% macro pct(v) %}{% if v is none %}{{ missing }}{% else %}{{ "%.1f" | format(v) }}%{% endif %}{% endmacro %}
 {% block content %}
-<h1>{{ t("Sales & profit") if user_role == "owner" else t("Sales") }} {{ ui.help("Money from paid orders. Choose a day range at the top.") }}</h1>
+{{ ui.page_head((t("Sales & profit") if user_role == "owner" else t("Sales")), t("Money from paid orders. Choose a day range at the top.")) }}
 <nav class="tabs" aria-label="{{ t('Date range') }}">
   {% for key, label in ranges.items() if key != "custom" %}
   <a href="/sales?range={{ key }}" {% if r.key == key %}aria-current="page"{% endif %}>{{ tr(label) }}</a>

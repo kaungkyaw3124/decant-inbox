@@ -2,8 +2,8 @@
 {% import "_ui.html" as ui with context %}
 {% block title %}{{ t("AI helper") }} · Decant Inbox{% endblock %}
 {% block content %}
-<h1>🧠 {{ t("AI helper") }}</h1>
-<p class="muted small">{{ t("The AI only reads messages the rules are not sure about. It never writes to customers: replies come from your templates and prices.") }}</p>
+<a class="crumb" href="/settings">{{ t("Settings") }} ›</a>
+{{ ui.page_head(t("AI helper"), t("The AI only reads messages the rules are not sure about. It never writes to customers: replies come from your templates and prices.")) }}
 {% for n in notices %}<p class="flash problem-text">{{ tr(n) }}</p>{% endfor %}
 {% if cfg.mode == "auto" %}<p class="flash ai-banner">🧠 {% if auto_since %}{{ t("AUTO since {date}", date=auto_since | local_time) }}{% else %}AUTO{% endif %}{% if cfg.skipped_shadow %} ({{ t("owner skipped shadow") }}){% endif %}; {{ t("safety brake ON") }}</p>{% endif %}
 
@@ -20,7 +20,7 @@
 </section>
 
 <section class="card" id="graduation">
-  <h2>🎓 {{ t("Graduation progress") }} {{ ui.help("In SHADOW, the app switches the AI to AUTO by itself (checked every day at 09:00) when all lines are ✅. In AUTO, a wrong product, low accuracy or many errors switch it back to SHADOW.") }}</h2>
+  <h2>{{ t("Graduation progress") }} {{ ui.help("In SHADOW, the app switches the AI to AUTO by itself (checked every day at 09:00) when all lines are ✅. In AUTO, a wrong product, low accuracy or many errors switch it back to SHADOW.") }}</h2>
   {% if progress.mode == "auto" %}<p class="small">{{ t("The AI is in AUTO. The safety brake watches it.") }}</p>
   {% elif not progress.auto_graduate %}<p class="small muted">{{ t("Auto-graduation is OFF: the mode only changes when you switch it.") }}</p>{% endif %}
   <p class="small muted">{{ t("Window since {date}", date=progress.since | local_time("%d %b %Y %H:%M")) }}</p>
@@ -53,7 +53,7 @@
 </section>
 
 <section class="card" id="privacy">
-  <h2>🔒 {{ t("What the AI may see") }} {{ ui.help("Phone numbers are always masked and customer names are never sent. Both readers use the same daily limit and monthly budget; if the AI fails, the normal manual flow continues.") }}</h2>
+  <h2>{{ t("What the AI may see") }} {{ ui.help("Phone numbers are always masked and customer names are never sent. Both readers use the same daily limit and monthly budget; if the AI fails, the normal manual flow continues.") }}</h2>
   <form method="post" action="/ai/privacy" class="stack">
     <input type="hidden" name="csrf" value="{{ csrf }}">
     <label class="check"><input type="checkbox" name="ai_address" value="1" {% if cfg.ai_address %}checked{% endif %}>
@@ -77,19 +77,19 @@
 
 <section class="card">
   <h2>{{ t("Settings") }}</h2>
-  <form method="post" action="/ai/settings" class="grid">
+  <form method="post" action="/ai/settings" class="field-grid">
     <input type="hidden" name="csrf" value="{{ csrf }}">
     <label>{{ t("Calls per day (limit)") }} <input name="daily_cap" value="{{ cfg.daily_cap }}" inputmode="numeric"></label>
     <label>{{ t("Monthly budget (USD)") }} <input name="monthly_budget_usd" value="{{ cfg.monthly_budget_usd }}" inputmode="decimal"></label>
     <label>{{ t("AUTO: act when at least this sure (0.5-1)") }} <input name="threshold" value="{{ cfg.threshold }}" inputmode="decimal"></label>
     <label>{{ t("Model") }} <input name="model" value="{{ cfg.model }}" maxlength="64"></label>
-    <label class="check"><input type="checkbox" name="auto_graduate" value="1" {% if cfg.auto_graduate %}checked{% endif %}> {{ t("Auto-graduate: switch SHADOW → AUTO by itself when the numbers are good") }}</label>
+    <label>{{ t("Reasoning") }}
+      <select name="reasoning">{% for r in reasonings %}<option value="{{ r }}" {% if r == cfg.reasoning %}selected{% endif %}>{{ r }}</option>{% endfor %}</select></label>
+    <label class="check span-all"><input type="checkbox" name="auto_graduate" value="1" {% if cfg.auto_graduate %}checked{% endif %}> {{ t("Auto-graduate: switch SHADOW → AUTO by itself when the numbers are good") }}</label>
     <label>{{ t("Graduation: at least this many days in SHADOW") }} <input name="min_days" value="{{ cfg.min_days }}" inputmode="numeric"></label>
     <label>{{ t("Graduation: at least this many checked suggestions") }} <input name="min_decisions" value="{{ cfg.min_decisions }}" inputmode="numeric"></label>
     <label>{{ t("Graduation: accuracy at least (%)") }} <input name="min_accuracy" value="{{ (cfg.min_accuracy * 100) | round | int }}" inputmode="numeric"></label>
-    <label>{{ t("Reasoning") }}
-      <select name="reasoning">{% for r in reasonings %}<option value="{{ r }}" {% if r == cfg.reasoning %}selected{% endif %}>{{ r }}</option>{% endfor %}</select></label>
-    <button class="primary">{{ t("Save") }}</button>
+    <div class="span-all"><button class="primary">{{ t("Save") }}</button></div>
   </form>
 </section>
 
@@ -97,10 +97,15 @@
   <h2>{{ t("Evaluation") }} {{ ui.help("Runs the test messages (tests/fixtures/ai_eval.csv) against the real AI: costs about one cent. Pass = intent and products at least 90% right and never a wrong product.") }}</h2>
   {% if evaluation %}
   {% set s = evaluation.summary %}
-  <p>{{ "✅ " ~ t("Passed") if s.passed else "❌ " ~ t("Failed") }} · {{ s.at | replace("T", " ") }} · {{ s.model }} ({{ s.reasoning }})</p>
-  <p class="small">{{ t("{n} messages", n=s.cases) }} · {{ t("intent + products right") }} <b>{{ (s.intent_and_products * 100) | round | int }}%</b> ·
-    {{ t("wrong products") }} <b>{{ s.wrong_product_cases }}</b> · {{ t("cost") }} ${{ "%.4f" | format(s.cost_usd) }} ·
-    {{ t("average answer time") }} {{ (s.avg_latency_ms / 1000) | round(1) }} s</p>
+  <p><span class="badge {{ 'ok' if s.passed else 'bad' }}">{{ "✅ " ~ t("Passed") if s.passed else "❌ " ~ t("Failed") }}</span>
+    <span class="muted">{{ s.at | replace("T", " ") }} · {{ s.model }} ({{ s.reasoning }})</span></p>
+  <div class="tiles">
+    <div><span>{{ t("Messages tested") }}</span><b>{{ s.cases }}</b></div>
+    <div><span>{{ t("intent + products right") }}</span><b>{{ (s.intent_and_products * 100) | round | int }}%</b></div>
+    <div><span>{{ t("wrong products") }}</span><b>{{ s.wrong_product_cases }}</b></div>
+    <div><span>{{ t("cost") }}</span><b>${{ "%.4f" | format(s.cost_usd) }}</b></div>
+    <div><span>{{ t("average answer time") }}</span><b>{{ (s.avg_latency_ms / 1000) | round(1) }} s</b></div>
+  </div>
   {% set bad = evaluation.cases | rejectattr("ok") | list %}
   {% if bad %}<ul class="small">{% for c in bad %}<li>❌ {{ c.id }}: {{ c.notes | join("; ") }}</li>{% endfor %}</ul>{% endif %}
   {% else %}<p class="muted small">{{ t("No evaluation yet.") }}</p>{% endif %}
@@ -110,17 +115,24 @@
   </form>
 </section>
 
-<section class="card">
-  <h2>{{ t("Last 50 AI calls") }}</h2>
-  {% if not calls %}<p class="muted small">{{ t("No AI calls yet.") }}</p>{% endif %}
-  <ul class="feed small">
+<section class="list-card" id="ai-calls">
+  <div class="list-title"><h2>{{ t("AI calls") }}</h2>{% if page.total %}<span class="muted">{{ t("{a}–{b} of {n}", a=page.first, b=page.last, n=page.total) }}</span>{% endif %}</div>
+  {% if calls %}
+  <div class="list-head" aria-hidden="true"><div class="col-when">{{ t("When") }}</div><div class="col-mode">{{ t("Mode") }}</div>
+    <div class="col-main">{{ t("Result") }}</div><div class="col-wide">{{ t("Why") }}</div><div class="col-num">{{ t("cost") }}</div><div class="col-num">{{ t("Time") }}</div></div>
+  {% endif %}
   {% for row in calls %}{% set c = row.call %}
-    <li><a href="/messages/{{ c.message_id }}">{{ c.created_at | local_time }}</a> ·
-      <b>{{ code(c.decision) }}</b>{% if row.summary %} · {{ row.summary }}{% endif %}
-      {% if row.reason %}<br><span class="muted">🧠 {{ row.reason }}</span>{% endif %}
-      {% if c.error %}<br><span class="problem-text">{{ c.error }}</span>{% endif %}
-      <span class="muted"> · ${{ "%.5f" | format(c.cost_usd) }} · {{ c.latency_ms }} ms</span></li>
+  <div class="list-row">
+    <div class="col-when"><a href="/messages/{{ c.message_id }}">{{ c.created_at | local_time }}</a></div>
+    <div class="col-mode"><span class="badge">{{ code(c.decision) }}</span></div>
+    <div class="col-main">{{ row.summary or "—" }}</div>
+    <div class="col-wide small">{% if row.reason %}<span class="muted">{{ row.reason }}</span>{% endif %}{% if c.error %}<br><span class="problem-text">{{ c.error }}</span>{% endif %}</div>
+    <div class="col-num small" title="{{ t('cost') }}">${{ "%.5f" | format(c.cost_usd) }}</div>
+    <div class="col-num small" title="{{ t('Time') }}">{{ c.latency_ms }} ms</div>
+  </div>
+  {% else %}
+  {{ ui.empty(t("No AI calls yet."), t("They show here when a message needs the AI.")) }}
   {% endfor %}
-  </ul>
+  {% if page.total %}{{ ui.pager(page, "ai-calls") }}{% endif %}
 </section>
 {% endblock %}

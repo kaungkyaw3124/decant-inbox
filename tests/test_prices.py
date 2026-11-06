@@ -213,7 +213,8 @@ def test_prices_pages(client, db):  # noqa: F811
         assert c.execute(text("SELECT count(*) FROM product_prices")).scalar() == 4
         assert c.execute(text("SELECT action FROM audit_log")).scalar() == "prices.import"
     page = client.get("/products").text
-    assert "5ml 18,000" in page and "Full 100ml 380,000" in page
+    assert '<span class="k">5ml</span> <b>18,000</b>' in page  # v5.4: price chips
+    assert '<span class="k">Full 100ml</span> <b>380,000</b>' in page
     with db.connect() as c:
         pid = c.execute(text("SELECT id FROM products WHERE name = 'Stronger With You Intensely'")).scalar()
     assert "380,000" in client.get(f"/products/{pid}").text

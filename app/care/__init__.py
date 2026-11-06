@@ -9,7 +9,7 @@ from collections import Counter
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import exists, func, select
+from sqlalchemy import Select, exists, func, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
@@ -106,7 +106,7 @@ def set_tag(session: Session, customer_id: int, tag: str, on: bool, user: User) 
                                                              CustomerTag.tag == tag))
 
 
-def customer_rows(session: Session, q: str = "", tag: str = "", city: str = "", sort: str = "spent") -> list[dict]:
+def customer_query(q: str = "", tag: str = "", city: str = "", sort: str = "spent") -> Select:
     """The Customers page: everyone who ever paid (and anyone matching the search)."""
     paid = _paid().subquery()
     totals = select(paid.c.customer_id, func.count().label("orders"), func.sum(paid.c.total_mmk).label("spent"),
@@ -119,13 +119,23 @@ def customer_rows(session: Session, q: str = "", tag: str = "", city: str = "", 
         query = query.where(exists().where(CustomerTag.customer_id == Customer.id, CustomerTag.tag == tag))
     if city:
         query = query.where(Customer.address_parts["city"].astext.icontains(city, autoescape=True))
-    query = query.order_by(totals.c.last.desc() if sort == "last" else totals.c.spent.desc(), Customer.id)
+    return query.order_by(totals.c.last.desc() if sort == "last" else totals.c.spent.desc(), Customer.id)
+
+
+def as_rows(session: Session, results) -> list[dict]:
+    """Rows of customer_query() with their tags."""
+    results = list(results)
     tags: dict[int, list[str]] = {}
-    for cid, t in session.execute(select(CustomerTag.customer_id, CustomerTag.tag)):
+    for cid, t in session.execute(select(CustomerTag.customer_id, CustomerTag.tag)
+                                  .where(CustomerTag.customer_id.in_([c.id for c, *_ in results]))):
         tags.setdefault(cid, []).append(t)
     return [{"c": c, "orders": n, "spent": int(s or 0), "last": last, "tags": tags.get(c.id, []),
              "city": ((c.address_parts or {}).get("city") or "").split(",")[0]}
-            for c, n, s, last in session.execute(query.limit(500))]
+            for c, n, s, last in results]
+
+
+def customer_rows(session: Session, q: str = "", tag: str = "", city: str = "", sort: str = "spent") -> list[dict]:
+    return as_rows(session, session.execute(customer_query(q, tag, city, sort)))
 
 
 # ---------- opt-out ----------

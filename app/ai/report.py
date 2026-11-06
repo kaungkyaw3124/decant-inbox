@@ -84,10 +84,6 @@ def notices(session: Session, now: datetime) -> list[str]:
     return out
 
 
-def recent(session: Session, limit: int = 50) -> list[AICall]:
-    return list(session.scalars(select(AICall).order_by(AICall.id.desc()).limit(limit)))
-
-
 def latest_eval() -> dict | None:
     try:
         return json.loads(LATEST_EVAL.read_text(encoding="utf-8"))

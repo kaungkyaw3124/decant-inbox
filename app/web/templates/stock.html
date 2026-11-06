@@ -7,7 +7,7 @@
   <a href="/products">{{ t("Products") }}</a>{% if user_role == "owner" %}<a href="/prices">{{ t("Prices") }}</a>{% endif %}
   <a href="/stock" aria-current="page">{{ t("Stock") }}</a>
 </nav>
-<h1>{{ t("Stock") }} {{ ui.help("Perfumes with bottles here are in stock only when a size can be poured. Perfumes without bottles use the price list's in-stock flag. Packing an order takes the ml and one vial out; Undo or Cancel puts them back.") }}</h1>
+{{ ui.page_head(t("Stock"), t("Perfumes with bottles here are in stock only when a size can be poured. Perfumes without bottles use the price list's in-stock flag. Packing an order takes the ml and one vial out; Undo or Cancel puts them back.")) }}
 <div class="tiles">
   <div class="tile"><span>{{ t("Stock value at cost") }}</span><b>{{ format_mmk(value) }}</b><small>ကျပ်</small></div>
   <div class="tile"><span>{{ t("To reorder") }}</span><b>{{ reorder | length + low_vials | length }}</b></div>

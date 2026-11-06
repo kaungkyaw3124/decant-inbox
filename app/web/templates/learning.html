@@ -1,7 +1,8 @@
 {% extends "base.html" %}
+{% import "_ui.html" as ui with context %}
 {% block title %}{{ t("Learning") }} · Decant Inbox{% endblock %}
 {% block content %}
-<h1>📘 {{ t("Learning") }}</h1>
+{{ ui.page_head(t("Learning")) }}
 <p class="muted small">{{ t("What the team taught with teaching cards. Waiting ones are only suggested (one tap, never automatic) until you approve them.") }}{% if settings.auto_approve_after %} {{ t("Or they are approved by themselves after {n} accepts without a correction.", n=settings.auto_approve_after) }}{% endif %}</p>
 <div class="tiles">
   <div class="tile"><span>{{ t("Waiting for approval") }}</span><b>{{ pending.values() | map("length") | sum }}</b></div>

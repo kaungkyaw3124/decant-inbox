@@ -2,34 +2,41 @@
 {% import "_ui.html" as ui with context %}
 {% block title %}{{ t("Products") }} · Decant Inbox{% endblock %}
 {% block content %}
+{% call ui.page_head(t("Products & prices"), t("{n} perfumes · prices in Ks", n=n_products)) %}
 <nav class="tabs" aria-label="{{ t('Products & prices') }}">
   <a href="/products" aria-current="page">{{ t("Products") }}</a>{% if user_role == "owner" %}<a href="/prices">{{ t("Prices") }}</a>{% endif %}
   <a href="/stock">{{ t("Stock") }}</a>
 </nav>
-<form method="get" action="/products" class="filters">
-  <input type="search" name="q" value="{{ q }}" placeholder="{{ t('Search product or alias') }}" aria-label="{{ t('Search') }}">
+{% endcall %}
+<form method="get" action="/products" class="filters toolbar">
+  <input type="search" name="q" value="{{ q }}" class="search" placeholder="{{ t('Search product or alias') }}" aria-label="{{ t('Search') }}">
   <button class="primary">{{ t("Search") }}</button>
   {{ ui.help("Every perfume we sell, with prices and the nicknames customers use for it.") }}
 </form>
 
-<table class="products">
-  <thead><tr><th>{{ t("Brand") }}</th><th>{{ t("Product") }}</th><th>{{ t("Prices (ကျပ်)") }}</th><th>{{ t("Aliases") }}</th><th>{{ t("Messages") }}</th><th></th></tr></thead>
-  <tbody>
+<div class="list-card" id="product-list">
+  <div class="list-head" aria-hidden="true">
+    <div class="col-main">{{ t("Product") }}</div><div class="col-wide">{{ t("Prices (ကျပ်)") }}</div>
+    <div class="col-num">{{ t("Aliases") }}</div><div class="col-num">{{ t("Messages") }}</div>
+  </div>
   {% for p, n_alias, n_msg in rows %}
-    <tr {% if not p.active %}class="inactive"{% endif %}>
-      <td>{{ p.brand }}</td>
-      <td><a href="/products/{{ p.id }}">{{ p.name }}</a></td>
-      <td class="small">{% for pr in prices.get(p.id, []) %}<span class="nowrap">{{ size_label(pr.size_ml, p.full_size_ml) }} {{ format_mmk(pr.price_mmk) }}</span>{% if not loop.last %} · {% endif %}{% else %}<span class="problem-text">{{ t("no prices") }}</span>{% endfor %}
-        {% if prices.get(p.id) and not prices[p.id]|selectattr("in_stock")|list %}<span class="badge warn">{{ t("out of stock") }}</span>{% endif %}</td>
-      <td>{{ n_alias }}</td>
-      <td><a href="/?intent=all&status=all&product={{ p.id }}">{{ n_msg }}</a></td>
-      <td class="muted small">{% if not p.active %}{{ t("inactive") }}{% endif %}{% if p.source == "manual" %} {{ t("added here") }}{% endif %}</td>
-    </tr>
+  <div class="list-row{% if not p.active %} inactive{% endif %}">
+    <div class="col-main"><span class="over">{{ p.brand }}</span>
+      <a class="name" href="/products/{{ p.id }}">{{ p.name }}</a>
+      {%- if p.source == "manual" %}<span class="tag-new">{{ t("added here") }}</span>{% endif %}
+      {%- if not p.active %} <span class="badge">{{ t("inactive") }}</span>{% endif %}</div>
+    <div class="col-wide chips">
+      {%- for pr in prices.get(p.id, []) %}<span class="chip"><span class="k">{{ size_label(pr.size_ml, p.full_size_ml) }}</span> <b>{{ format_mmk(pr.price_mmk) }}</b></span>
+      {%- else %}<span class="problem-text">{{ t("no prices") }}</span>{% endfor %}
+      {%- if prices.get(p.id) and not prices[p.id]|selectattr("in_stock")|list %} <span class="badge warn">{{ t("out of stock") }}</span>{% endif %}</div>
+    <div class="col-num" title="{{ t('Aliases') }}">{{ n_alias }}</div>
+    <div class="col-num" title="{{ t('Messages') }}"><a href="/?intent=all&status=all&product={{ p.id }}"><b>{{ n_msg }}</b></a></div>
+  </div>
   {% else %}
-    <tr><td colspan="6" class="empty">{{ t("No products.") }}</td></tr>
+  {{ ui.empty(t("No products."), t("Check the spelling, or add the perfume below.") if q else "", "/products" if q else "", t("Show all") if q else "") }}
   {% endfor %}
-  </tbody>
-</table>
+  {{ ui.pager(page, "product-list") }}
+</div>
 
 {% if user_role == "owner" %}
 <form method="post" action="/products" class="card stack">

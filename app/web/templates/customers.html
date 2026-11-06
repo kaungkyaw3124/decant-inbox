@@ -2,10 +2,11 @@
 {% import "_ui.html" as ui with context %}
 {% block title %}{{ t("Customers") }} · Decant Inbox{% endblock %}
 {% block content %}
-<h1>{{ t("Customers") }} {{ ui.help("Everyone who paid at least once (test and cancelled orders not counted).") }}</h1>
+{% call ui.page_head(t("Customers"), t("Everyone who paid at least once (test and cancelled orders not counted).")) %}
 <p class="buttons small"><a class="button primary chip" href="/customers/reorder">🔁 {{ t("Reorder list") }}</a>
   {% if user_role == "owner" %}<a class="button chip" href="/customers/export.csv">⬇ CSV</a>{% endif %}</p>
-<form method="get" action="/customers" class="filters">
+{% endcall %}
+<form method="get" action="/customers" class="filters toolbar">
   <input type="search" name="q" value="{{ q }}" placeholder="{{ t('Name') }}" aria-label="{{ t('Search') }}">
   <input name="tag" value="{{ tag }}" placeholder="{{ t('Tag') }}" aria-label="{{ t('Tag') }}" list="known-tags">
   <datalist id="known-tags"><option>VIP</option><option>wholesale</option><option>problem</option></datalist>
@@ -14,6 +15,7 @@
     <option value="last" {% if sort == "last" %}selected{% endif %}>{{ t("Last order") }}</option></select>
   <button class="primary">{{ t("Filter") }}</button>
 </form>
+<div id="customer-list">
 <ul class="rows">
 {% for r in rows %}
   <li class="item"><a class="row-main" href="/customers/{{ r.c.id }}">
@@ -23,7 +25,9 @@
     {% if r.tags %}<p class="tags">{% for tg in r.tags %}<span class="tag {{ colours.get(tg, '') }}">{{ tg }}</span>{% endfor %}</p>{% endif %}
   </a></li>
 {% else %}
-  <li class="empty">{{ t("No customers match.") }}</li>
+  <li>{{ ui.empty(t("No customers match."), t("Try another name, tag or city.") if q or tag or city else t("Customers show here after their first paid order."), "/customers" if q or tag or city else "", t("Show all") if q or tag or city else "") }}</li>
 {% endfor %}
 </ul>
+{% if page.total %}<div class="list-card">{{ ui.pager(page, "customer-list") }}</div>{% endif %}
+</div>
 {% endblock %}

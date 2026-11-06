@@ -2392,3 +2392,12 @@ owner + staff, en + my; the gate itself passes, the findings are about look and 
 | step | tests | ui_check fails | pages not on the page pattern | lists without the shared pager | notes |
 |---|---|---|---|---|---|
 | U0 (before) | 862 + 1 skip | 0 | all except Chats | 9 | audit above |
+| U1-U3 part 1 | 879 + 1 skip | 0 (after fixing 4 × C3: product links 20 px at 360 → 44 px) | ~10 (detail pages, health, help, account, chat panes) | 6 (Orders, Activity, Stock moves, Learning, price history, customer orders) | Products + AI match the mockups; Customers paged; page header on 15 pages |
+
+U1-U3 part 1, built: shared page pattern in app.css (left-aligned column next to the menu ≥ 1024 px, 34 px title +
+subtitle, list card, price chips, "Added here" tag, pager footer, empty state, no underline outside running text);
+macros `ui.page_head`, `ui.pager`, `ui.empty`; `app/web/paging.py` (`paginate`, `per` cookie) on Products (20),
+AI calls (10), Customers (20; `care.customer_query` + `as_rows`, the CSV export now has every customer, it had a
+500 cap); `scripts/ui_check.py --pages / --widths / --shots`. Removed: `ai.report.recent` (unused).
+**Test changes (markup only):** test_prices `test_prices_pages` checks the price chips instead of "5ml 18,000";
+test_v46_ai checks the heading "AI calls" instead of "Last 50 AI calls".

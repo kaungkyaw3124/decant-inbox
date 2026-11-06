@@ -413,7 +413,8 @@ def u4_flows(browser) -> list[str]:
     return problems
 
 
-def run(quick: bool, save_inventory: bool, only_widths: tuple[int, ...] = (), shots: Path | None = None) -> int:
+def run(quick: bool, save_inventory: bool, only_widths: tuple[int, ...] = (), shots: Path | None = None,
+        only_pages: tuple[str, ...] = ()) -> int:
     from playwright.sync_api import sync_playwright
 
     global SHOTS
@@ -426,6 +427,8 @@ def run(quick: bool, save_inventory: bool, only_widths: tuple[int, ...] = (), sh
     targets = pages(ids)
     if quick:
         targets = [t for t in targets if t[0] in DAILY]
+    if only_pages:
+        targets = [t for t in targets if t[0] in only_pages]
     widths, langs = ((360,), ("my", "en")) if quick else (WIDTHS, ("en", "my"))
     widths = only_widths or widths  # e.g. --widths 1440,390 for screenshots next to the mockups (docs/SPEC-v5.4 U0)
     failures, inventory, lines = 0, {}, []
@@ -472,7 +475,7 @@ def run(quick: bool, save_inventory: bool, only_widths: tuple[int, ...] = (), sh
                                 lines.append(f"FAIL {check.upper()} {name} {role} {lang} {width}: "
                                              + "; ".join(problems[:6]) + (f" (+{len(problems) - 6})" if len(problems) > 6 else ""))
             context.close()
-        if not save_inventory:
+        if not save_inventory and not only_pages:  # the flows need every page
             for problem in pc_flows(browser) + u4_flows(browser):
                 failures += 1
                 lines.append("FAIL " + problem)
@@ -481,7 +484,7 @@ def run(quick: bool, save_inventory: bool, only_widths: tuple[int, ...] = (), sh
     if save_inventory:
         INVENTORY.write_text(json.dumps(inventory, indent=1, ensure_ascii=False) + "\n")
         print(f"saved {INVENTORY.relative_to(ROOT)} ({len(inventory)} pages)")
-    elif INVENTORY.exists():  # C7: nothing that existed before is gone (same role)
+    elif INVENTORY.exists() and not (only_pages or only_widths):  # C7 (needs the full run): nothing that existed before is gone (same role)
         old = json.loads(INVENTORY.read_text())
         for key, items in inventory.items():
             missing = sorted(set(old.get(key, [])) - set(items))
@@ -500,5 +503,7 @@ if __name__ == "__main__":
     parser.add_argument("--save-inventory", action="store_true")
     parser.add_argument("--widths", default="", help="comma list, e.g. 1440,390 (default 360,768,1280)")
     parser.add_argument("--shots", type=Path, help="screenshot folder (default ui-shots/)")
+    parser.add_argument("--pages", default="", help="comma list of page names, e.g. products,ai (quick look)")
     args = parser.parse_args()
-    sys.exit(run(args.quick, args.save_inventory, tuple(int(w) for w in args.widths.split(",") if w), args.shots))
+    sys.exit(run(args.quick, args.save_inventory, tuple(int(w) for w in args.widths.split(",") if w), args.shots,
+                 tuple(p for p in args.pages.split(",") if p)))

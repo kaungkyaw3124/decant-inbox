@@ -3,7 +3,7 @@
 {% block title %}{{ t("Reorder list") }} · Decant Inbox{% endblock %}
 {% block content %}
 <p><a href="/customers">‹ {{ t("Customers") }}</a></p>
-<h1>🔁 {{ t("Reorder list") }} {{ ui.help("Customers whose last decant was within the days set below. One tap = one message to that customer (edit it first if you like). At most one per customer every 30 days; never to customers who said stop.") }}</h1>
+{{ ui.page_head(t("Reorder list"), t("Customers whose last decant was within the days set below. One tap = one message to that customer (edit it first if you like). At most one per customer every 30 days; never to customers who said stop.")) }}
 <p class="small muted">{{ t("Last decant {a}-{b} days ago", a=cfg.reorder_min_days, b=cfg.reorder_max_days) }}</p>
 <ul class="rows">
 {% for r in rows %}

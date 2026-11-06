@@ -1,7 +1,8 @@
 {% extends "base.html" %}
+{% import "_ui.html" as ui with context %}
 {% block title %}{{ t("Users") }} · Decant Inbox{% endblock %}
 {% block content %}
-<h1>👥 {{ t("Users") }}</h1>
+{{ ui.page_head(t("Users")) }}
 <p class="muted small">{{ t("Staff can do the daily work: inbox, Needs you, chats, replies, teaching cards, carts, order statuses, reports (read only).") }}{% if staff_settings.can_approve_payments %} {{ t("Staff may also check payments.") }}{% endif %} {{ t("Only you change prices, products, payment methods, templates, FAQ, settings, auto-reply, users, and approve what the app learned. Staff see sales revenue, not cost or profit.") }}</p>
 <section class="card">
   <table>

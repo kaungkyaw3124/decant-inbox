@@ -13,6 +13,7 @@ from app.pricing.prices import current_prices
 from app.web.auth import current_user, owner_only, verify_csrf
 from app.web.deps import get_db, templates
 from app.web.inbox import flash
+from app.web import paging
 
 router = APIRouter(prefix="/products", dependencies=[Depends(current_user), Depends(verify_csrf)])
 
@@ -44,8 +45,10 @@ def products(request: Request, q: str = "", db: Session = Depends(get_db)):
             | Product.brand.icontains(q.strip(), autoescape=True)
             | Product.id.in_(matching)
         )
+    page = paging.paginate(db, query, request)  # docs/SPEC-v5.4 X2
     return templates.TemplateResponse(request, "products.html", {
-        "rows": db.execute(query).all(), "q": q, "prices": current_prices(db)})
+        "page": page, "rows": page.items, "q": q, "prices": current_prices(db, [p.id for p, _, _ in page.items]),
+        "n_products": db.scalar(select(func.count()).select_from(Product))})
 
 
 @router.post("", dependencies=[Depends(owner_only)])
