@@ -19,6 +19,22 @@ from app.web.inbox import flash
 
 router = APIRouter(prefix="/settings", dependencies=[Depends(owner_only), Depends(verify_csrf)])  # owner only (4.4)
 
+# docs/SPEC-v5.4 X3: Settings shows one section at a time; a save comes back to its section with "Saved ✓"
+SECTIONS = ("orders", "auto-reply", "alerts", "inventory", "test", "shop")
+_SECTION_OF = {"order-rules": "orders", "payment-methods": "orders", "auto-speed": "auto-reply", "faq": "auto-reply",
+               "t-": "auto-reply", "alerts": "alerts", "vial-costs": "inventory", "test-payments": "test"}
+_ERROR_SECTION = {"speed": "auto-reply", "rules": "orders", "faq": "auto-reply", "faq_id": "auto-reply",
+                  "vial": "inventory"}
+
+
+def section_of(anchor: str) -> str:
+    return next((sec for prefix, sec in _SECTION_OF.items() if anchor.startswith(prefix)), "orders")
+
+
+def _to(anchor: str) -> RedirectResponse:
+    return RedirectResponse(f"/settings?section={section_of(anchor)}&saved={anchor}#{anchor}", status_code=303)
+
+
 
 def _page(request: Request, db: Session, errors: dict[str, str] | None = None,
           drafts: dict[str, str] | None = None, status_code: int = 200):
@@ -33,7 +49,11 @@ def _page(request: Request, db: Session, errors: dict[str, str] | None = None,
         rows.append({"def": t, "text": (drafts or {}).get(t.key, texts[t.key]), "example": example,
                      "customized": t.key in customized, "error": (errors or {}).get(t.key)})
     methods = db.scalars(select(PaymentMethod).order_by(PaymentMethod.sort_order, PaymentMethod.id)).all()
+    section = request.query_params.get("section")
+    if errors:
+        section = next((_ERROR_SECTION.get(k, "auto-reply") for k in errors), section)
     return templates.TemplateResponse(request, "settings.html", {
+        "section": section if section in SECTIONS else "orders", "saved": request.query_params.get("saved", ""),
         "methods": methods, "templates": rows, "speed": auto.speed(db), "speed_limits": auto.SPEED_LIMITS,
         "speed_error": (errors or {}).get("speed"), "order_rules": delivery.rules(db),
         "rule_limits": delivery.RULE_LIMITS, "rules_error": (errors or {}).get("rules"),
@@ -70,7 +90,7 @@ async def save_alerts(request: Request, db: Session = Depends(get_db), user: Use
     _log(db, user, "alerts.settings")
     db.commit()
     flash(request, "Alert settings saved.")
-    return RedirectResponse("/settings#alerts", status_code=303)
+    return _to("alerts")
 
 
 @router.post("/alerts/test")
@@ -82,7 +102,7 @@ def test_alert(request: Request, db: Session = Depends(get_db), user: User = Dep
         flash(request, f"Test alert NOT sent: {exc}")
     _log(db, user, "alerts.test")
     db.commit()
-    return RedirectResponse("/settings#alerts", status_code=303)
+    return _to("alerts")
 
 
 @router.get("", response_class=HTMLResponse)
@@ -96,7 +116,7 @@ def test_payments(request: Request, auto_approve: str = Form(""), db: Session = 
     testpay.set_auto_approve(db, auto_approve == "1", user)
     db.commit()
     flash(request, "Saved.")
-    return RedirectResponse("/settings#test-payments", status_code=303)
+    return _to("test-payments")
 
 
 @router.post("/payment-methods")
@@ -110,7 +130,7 @@ def add_method(request: Request, name: str = Form(...), account_number: str = Fo
     _log(db, user, "payment_method.add", id=method.id, **fields)
     db.commit()
     flash(request, f"{method.name} added.")
-    return RedirectResponse("/settings#payment-methods", status_code=303)
+    return _to("payment-methods")
 
 
 @router.post("/payment-methods/{method_id}")
@@ -126,7 +146,7 @@ def update_method(request: Request, method_id: int, name: str = Form(...), accou
     _log(db, user, "payment_method.update", id=method_id, **fields)
     db.commit()
     flash(request, f"{method.name} saved.")
-    return RedirectResponse("/settings#payment-methods", status_code=303)
+    return _to("payment-methods")
 
 
 @router.post("/payment-methods/{method_id}/delete")
@@ -140,7 +160,7 @@ def delete_method(request: Request, method_id: int, db: Session = Depends(get_db
     db.delete(method)
     db.commit()
     flash(request, "Payment method deleted.")
-    return RedirectResponse("/settings#payment-methods", status_code=303)
+    return _to("payment-methods")
 
 
 @router.post("/templates/{key}")
@@ -161,7 +181,7 @@ def save_template(request: Request, key: str, text: str = Form(""), db: Session 
     _log(db, user, "reply_template.update", key=key, text=text)
     db.commit()
     flash(request, "Reply saved.")
-    return RedirectResponse(f"/settings#t-{key}", status_code=303)
+    return _to(f"t-{key}")
 
 
 @router.post("/templates/{key}/reset")
@@ -172,7 +192,7 @@ def reset_template(request: Request, key: str, db: Session = Depends(get_db), us
     _log(db, user, "reply_template.reset", key=key)
     db.commit()
     flash(request, "Reply reset to the default text.")
-    return RedirectResponse(f"/settings#t-{key}", status_code=303)
+    return _to(f"t-{key}")
 
 
 @router.post("/auto-speed")
@@ -190,7 +210,7 @@ def save_speed(request: Request, quiet_s: str = Form(""), delay_min_s: str = For
     _log(db, user, "auto.speed", **values)
     db.commit()
     flash(request, "Auto-reply speed saved.")
-    return RedirectResponse("/settings#auto-speed", status_code=303)
+    return _to("auto-speed")
 
 
 @router.post("/order-rules")
@@ -210,7 +230,7 @@ def save_order_rules(request: Request, reminder_hours: str = Form(""), cancel_ho
     _log(db, user, "order_rules.update", **values)
     db.commit()
     flash(request, "Orders & payments settings saved.")
-    return RedirectResponse("/settings#order-rules", status_code=303)
+    return _to("order-rules")
 
 
 # ---------- FAQ (Step 7) ----------
@@ -236,7 +256,7 @@ def add_faq(request: Request, title: str = Form(""), keywords: str = Form(""), a
     _log(db, user, "faq.add", id=entry.id, **fields)
     db.commit()
     flash(request, f"FAQ “{entry.title}” added.")
-    return RedirectResponse(f"/settings#faq-{entry.id}", status_code=303)
+    return _to(f"faq-{entry.id}")
 
 
 @router.post("/faq/{entry_id}")
@@ -254,7 +274,7 @@ def update_faq(request: Request, entry_id: int, title: str = Form(""), keywords:
     _log(db, user, "faq.update", id=entry_id, active=active == "1", **fields)
     db.commit()
     flash(request, f"FAQ “{entry.title}” saved.")
-    return RedirectResponse(f"/settings#faq-{entry_id}", status_code=303)
+    return _to(f"faq-{entry_id}")
 
 
 @router.post("/faq/{entry_id}/delete")
@@ -264,7 +284,7 @@ def delete_faq(request: Request, entry_id: int, db: Session = Depends(get_db), u
     db.delete(entry)
     db.commit()
     flash(request, "FAQ entry deleted.")
-    return RedirectResponse("/settings#faq", status_code=303)
+    return _to("faq")
 
 
 # ---------- vial cost per decant size (Step 8) ----------
@@ -291,4 +311,4 @@ async def save_vial_costs(request: Request, db: Session = Depends(get_db), user:
     _log(db, user, "vial_costs.update", **{str(k): v for k, v in values.items()})
     db.commit()
     flash(request, "Vial costs saved (used for orders paid from now on).")
-    return RedirectResponse("/settings#vial-costs", status_code=303)
+    return _to("vial-costs")

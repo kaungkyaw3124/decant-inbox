@@ -17,6 +17,7 @@ from app.orders import cart, change, delivery, followups, reports, steps, testpa
 from app.replies import templates as replies
 from app.web.auth import current_user, owner_only, verify_csrf
 from app.web.deps import get_db, templates
+from app.web import paging
 from app.web.inbox import flash, safe_back
 
 router = APIRouter(dependencies=[Depends(current_user), Depends(verify_csrf)])
@@ -32,7 +33,6 @@ TABS = {  # tab -> (label, statuses, oldest first?)
 STATUS_LABELS = {"paid": "📦 to pack", "packed": "🚚 to send", "sent_out": "sent out", "delivered": "✅ delivered",
                  "cancelled": "cancelled", "photo_received": "📷 payment photo", "waiting_payment": "💳 waiting payment",
                  "cart": "🛒 cart", "confirmed": "✅ confirmed", "abandoned": "abandoned"}
-LIST_SIZE = 100
 UNPAID_TABS = ("unpaid", "check")
 
 
@@ -57,12 +57,13 @@ def orders_page(request: Request, tab: str = "to_pack", show_test: str = "", con
         Order.status.in_(statuses), Order.order_no.is_(None) if unpaid else Order.order_no.is_not(None), shown)
     when = Order.updated_at if unpaid else Order.paid_at
     order_by = when.asc() if oldest_first else when.desc()
-    rows = db.execute(query.order_by(order_by, Order.id).limit(LIST_SIZE)).all()
+    page = paging.paginate(db, query.order_by(order_by, Order.id), request)  # docs/SPEC-v5.4 X2
+    rows = page.items
     counts = {key: len(db.scalars(select(Order.id).where(Order.status.in_(st), shown, Order.order_no.is_(None)
                                                          if key in UNPAID_TABS else Order.order_no.is_not(None))).all())
               for key, (_, st, _) in TABS.items() if key in ("unpaid", "check", "to_pack", "to_send", "sent")}
     return templates.TemplateResponse(request, "orders.html", {
-        "tab": tab, "tabs": TABS, "counts": counts, "status_labels": STATUS_LABELS, "show_test": bool(show_test),
+        "page": page, "tab": tab, "tabs": TABS, "counts": counts, "status_labels": STATUS_LABELS, "show_test": bool(show_test),
         "confirm_clear": bool(confirm_clear), "test_open": db.scalar(select(func.count()).select_from(Order).where(
             Order.is_test, Order.status.in_(delivery.CANCELLABLE))),
         "rows": [(o, c, cart.view(db, o)) for o, c in rows], "item_name": cart.item_name,

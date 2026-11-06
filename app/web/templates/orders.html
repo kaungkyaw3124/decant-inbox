@@ -22,6 +22,7 @@
   <form method="post" action="/orders/clear-test" class="inline"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="link danger">🗑 {{ t("Clear test orders") }}</button></form>
   {% endif %}
 {% endif %}
+<div id="order-list">
 <ul class="rows orders">
 {% for o, c, v in rows %}
   {% set ev = undo.get(o.id) %}
@@ -73,8 +74,10 @@
     {% endif %}
   </li>
 {% else %}
-  <li class="empty">{{ t("No orders here.") }}</li>
+  <li>{{ ui.empty(t("No orders here."), t("Paid orders show here; pick another tab above.")) }}</li>
 {% endfor %}
 </ul>
+{% if page.total %}<div class="list-card">{{ ui.pager(page, "order-list") }}</div>{% endif %}
+</div>
 <p class="small muted">{{ t("Sent-out orders become delivered by themselves after the days set in Settings.") }} <a href="/reports/wanted">{{ t("Wanted but not stocked") }} →</a></p>
 {% endblock %}

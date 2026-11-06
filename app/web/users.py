@@ -9,14 +9,13 @@ from sqlalchemy.orm import Session
 
 from app.models import AuditLog, User
 from app.models.users import LANGUAGES, ROLES
-from app.web import staff
+from app.web import paging, staff
 from app.web.auth import hash_password, owner_only, verify_csrf
 from app.web.deps import get_db, templates
 from app.web.inbox import flash
 
 router = APIRouter(dependencies=[Depends(owner_only), Depends(verify_csrf)])
 MIN_PASSWORD = 10
-ACTIVITY_PAGE = 100
 
 
 def _user(db: Session, user_id: int) -> User:
@@ -113,17 +112,15 @@ def summary(details: dict) -> str:
 
 
 @router.get("/activity", response_class=HTMLResponse)
-def activity(request: Request, who: str = "", page: int = 1, db: Session = Depends(get_db)):
-    page = max(page, 1)
+def activity(request: Request, who: str = "", db: Session = Depends(get_db)):
     query = select(AuditLog, User).outerjoin(User, User.id == AuditLog.user_id)
     if who == "auto":
         query = query.where(AuditLog.user_id.is_(None))
     elif who.isdigit():
         query = query.where(AuditLog.user_id == int(who))
-    rows = db.execute(query.order_by(AuditLog.id.desc()).limit(ACTIVITY_PAGE + 1)
-                      .offset((page - 1) * ACTIVITY_PAGE)).all()
+    page = paging.paginate(db, query.order_by(AuditLog.id.desc()), request)  # docs/SPEC-v5.4 X2
     return templates.TemplateResponse(request, "activity.html", {
-        "rows": [(a, u, summary(a.details)) for a, u in rows[:ACTIVITY_PAGE]], "who": who, "page": page,
-        "more": len(rows) > ACTIVITY_PAGE, "users": db.scalars(select(User).order_by(User.username)).all(),
+        "rows": [(a, u, summary(a.details)) for a, u in page.items], "who": who, "page": page,
+        "users": db.scalars(select(User).order_by(User.username)).all(),
         "today": db.scalar(select(func.count()).select_from(AuditLog)
                            .where(AuditLog.created_at >= func.date_trunc("day", func.now())))})

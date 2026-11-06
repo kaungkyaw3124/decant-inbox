@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% import "_ui.html" as ui with context %}
 {% block title %}{{ product.name }} · Decant Inbox{% endblock %}
 {% block content %}
 <p><a href="/products">← {{ t("All products") }}</a></p>
@@ -38,13 +39,13 @@
   <p class="problem-text">{{ t("No prices yet.") }}</p>
   {% endif %}
   <p class="muted small">{{ t("Prices come from the price list (Excel).") }}{% if user_role == "owner" %} <a href="/prices">{{ t("Price list") }} →</a>{% endif %}</p>
-  {% if history %}
-  <details>
+  {% if history.total %}
+  <details id="price-history"{% if request.query_params.get("page") %} open{% endif %}>
     <summary class="small">{{ t("Price history") }}</summary>
     <table>
       <thead><tr><th>{{ t("When") }}</th><th>{{ t("Size") }}</th><th>{{ t("Price") }}</th><th>{{ t("Stock") }}</th></tr></thead>
       <tbody>
-      {% for h in history %}
+      {% for h in history.items %}
         <tr><td class="small">{{ h.effective_from|local_time("%d %b %Y %H:%M") }}</td>
           <td>{{ size_label(h.size_ml, product.full_size_ml) }}</td>
           <td class="num">{{ format_mmk(h.price_mmk) if h.price_mmk else t("not sold") }}</td>
@@ -52,6 +53,7 @@
       {% endfor %}
       </tbody>
     </table>
+    {% if history.pages > 1 %}{{ ui.pager(history, "price-history") }}{% endif %}
   </details>
   {% endif %}
 </section>

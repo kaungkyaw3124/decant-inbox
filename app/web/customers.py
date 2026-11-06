@@ -67,10 +67,11 @@ def save_settings(request: Request, reorder_min_days: int = Form(25), reorder_ma
 @router.get("/customers/{customer_id}", response_class=HTMLResponse)
 def profile_page(request: Request, customer_id: int, db: Session = Depends(get_db)):
     customer = _customer(db, customer_id)
-    orders = db.scalars(select(Order).where(Order.customer_id == customer_id, Order.order_no.is_not(None))
-                        .order_by(Order.id.desc()).limit(50)).all()
+    page = paging.paginate(db, select(Order).where(Order.customer_id == customer_id, Order.order_no.is_not(None))
+                           .order_by(Order.id.desc()), request, scalars=True)  # docs/SPEC-v5.4 X2
     return templates.TemplateResponse(request, "customer.html", {
-        "c": customer, "profile": care.profile(db, customer), "orders": orders, "colours": care.TAG_COLOURS})
+        "c": customer, "profile": care.profile(db, customer), "page": page, "orders": page.items,
+        "colours": care.TAG_COLOURS})
 
 
 @router.post("/customers/{customer_id}/notes")

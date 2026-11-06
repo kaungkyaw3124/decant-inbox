@@ -12,6 +12,7 @@
   <button>{{ t("Show") }}</button>
   <span class="muted small">{{ t("{n} today", n=today) }}</span>
 </form>
+<div id="activity-list">
 <div class="scroll"><table>
   <thead><tr><th>{{ t("When") }}</th><th>{{ t("Who") }}</th><th>{{ t("What") }}</th><th>{{ t("Details") }}</th></tr></thead>
   <tbody>
@@ -19,12 +20,10 @@
     <tr><td class="nowrap">{{ a.created_at | local_time }}</td><td>{{ u.username if u else "🤖 " ~ t("auto") }}</td>
       <td>{% if lang == "my" %}{{ code(a.action.split(".")[0]) }} · <code>{{ a.action }}</code>{% else %}{{ a.action }}{% endif %}</td><td class="small muted"><code>{{ details }}</code></td></tr>
   {% else %}
-    <tr><td colspan="4" class="empty">{{ t("Nothing yet.") }}</td></tr>
+    <tr><td colspan="4">{{ ui.empty(t("Nothing yet."), t("Every change made here or by the auto-reply is listed.")) }}</td></tr>
   {% endfor %}
   </tbody>
 </table></div>
-<nav class="pager">
-  {% if page > 1 %}<a href="?who={{ who }}&page={{ page - 1 }}">← {{ t("Newer") }}</a>{% else %}<span></span>{% endif %}
-  {% if more %}<a href="?who={{ who }}&page={{ page + 1 }}">{{ t("Older") }} →</a>{% endif %}
-</nav>
+<div class="list-card">{{ ui.pager(page, "activity-list") }}</div>
+</div>
 {% endblock %}

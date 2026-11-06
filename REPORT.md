@@ -2401,3 +2401,4 @@ AI calls (10), Customers (20; `care.customer_query` + `as_rows`, the CSV export 
 500 cap); `scripts/ui_check.py --pages / --widths / --shots`. Removed: `ai.report.recent` (unused).
 **Test changes (markup only):** test_prices `test_prices_pages` checks the price chips instead of "5ml 18,000";
 test_v46_ai checks the heading "AI calls" instead of "Last 50 AI calls".
+| U3 part 2 | 430 affected + 92 settings pass; full UI gate 0 fails | 0 | ~10 | 1 (Learning: pending cards must all show; approved lists later) | pager on Orders, Activity, Stock history, price history, customer orders |

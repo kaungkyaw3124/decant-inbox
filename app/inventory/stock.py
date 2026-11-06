@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from decimal import Decimal
 
-from sqlalchemy import case, func, select
+from sqlalchemy import Select, case, func, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
@@ -280,12 +280,15 @@ def overview(session: Session) -> dict:
                                                                                            cfg["low_vials"]))]
     value = sum(float(b.remaining_ml) / b.size_ml * (b.cost_mmk or 0) for bs in bottles.values() for b in bs) + sum(
         v.count * (v.cost_each_mmk or 0) for v in vial_rows)
-    history = session.execute(select(StockMove, Product, User).outerjoin(Product, Product.id == StockMove.product_id)
-                              .outerjoin(User, User.id == StockMove.user_id)
-                              .order_by(StockMove.id.desc()).limit(50)).all()
     return {"rows": rows, "vials": vial_rows, "reorder": sorted([r for r in rows if r["low"]],
                                                                 key=lambda r: -r["sold_30d"]),
-            "low_vials": low_vials, "value": round(value), "history": history, "cfg": cfg}
+            "low_vials": low_vials, "value": round(value), "cfg": cfg}
+
+
+def history_query() -> Select:
+    """Stock moves, newest first (the Stock page pages them)."""
+    return (select(StockMove, Product, User).outerjoin(Product, Product.id == StockMove.product_id)
+            .outerjoin(User, User.id == StockMove.user_id).order_by(StockMove.id.desc()))
 
 
 def low_lines(session: Session) -> list[str]:

@@ -11,6 +11,7 @@ from app.core.config import get_settings
 from app.inventory import excel, stock
 from app.models import AuditLog, Bottle, Product, User
 from app.web.auth import current_user, owner_only, verify_csrf
+from app.web import paging
 from app.web.deps import _TZ, get_db, templates
 from app.web.inbox import flash
 
@@ -45,8 +46,9 @@ def _failed(request: Request, db: Session, text: str):
 
 @router.get("", response_class=HTMLResponse)
 def stock_page(request: Request, db: Session = Depends(get_db)):
+    history = paging.paginate(db, stock.history_query(), request)  # docs/SPEC-v5.4 X2
     return templates.TemplateResponse(request, "stock.html", {
-        **stock.overview(db), "products": db.scalars(select(Product).where(Product.active)
+        **stock.overview(db), "history": history, "products": db.scalars(select(Product).where(Product.active)
                                                     .order_by(Product.brand, Product.name)).all()})
 
 

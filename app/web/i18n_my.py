@@ -860,7 +860,7 @@ MY = {
     "Download stock": "လက်ကျန် ဒေါင်းမယ်", "Excel file": "Excel ဖိုင်", "Upload + preview": "တင်ပြီး ကြည့်မယ်",
     "Stock settings": "လက်ကျန် ဆက်တင်", "Spill per decant (ml)": "ခွဲတိုင်း ဖိတ်တာ (ml)", "Low stock below (ml)": "ဒီ ml အောက်ဆို နည်းနေ",
     "Low vials below": "ဒီအရေအတွက်အောက်ဆို ပုလင်းလွတ် နည်းနေ", "low below (ml)": "နည်းနေ (ml အောက်)",
-    "History (last 50)": "မှတ်တမ်း (နောက်ဆုံး ၅၀)", "purchase": "ဝယ်ယူ", "decant": "ခွဲ", "adjust": "ပြင်",
+    "History": "မှတ်တမ်း", "purchase": "ဝယ်ယူ", "decant": "ခွဲ", "adjust": "ပြင်",
     "return": "ပြန်ထည့်", "waste": "ဖိတ်/ဆုံး", "system": "စနစ်", "Nothing yet.": "ဘာမှ မရှိသေး။",
     "Stock import": "လက်ကျန် ထည့်သွင်း", "Stock import: preview": "လက်ကျန် ထည့်သွင်း: အရင်ကြည့်",
     "Fix these rows and upload again": "ဒီအတန်းတွေ ပြင်ပြီး ပြန်တင်ပါ", "Bottles to add": "ထည့်မယ့် ပုလင်း",
@@ -917,4 +917,6 @@ MY = {
     "They show here when a message needs the AI.": "AI လိုတဲ့ စာ ရောက်လာရင် ဒီမှာ ပြပါမယ်။",
     "Try another name, tag or city.": "နာမည်၊ tag ဒါမှမဟုတ် မြို့ တခြားဟာ စမ်းကြည့်ပါ။",
     "Customers show here after their first paid order.": "ပထမဆုံး ငွေချေပြီး order ပြီးရင် ဖောက်သည်တွေ ဒီမှာ ပြပါမယ်။",
+    "Every change made here or by the auto-reply is listed.": "ဒီမှာ ပြင်တာ၊ auto-reply လုပ်တာ အားလုံး ဒီစာရင်းမှာ ပါပါတယ်။",
+    "Paid orders show here; pick another tab above.": "ငွေချေပြီး order တွေ ဒီမှာ ပြပါမယ်၊ အပေါ်က tab တခြားဟာ ရွေးပါ။",
 }

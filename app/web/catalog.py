@@ -83,8 +83,8 @@ def product_detail(request: Request, product_id: int, db: Session = Depends(get_
             ProductAlias.normalized_alias.in_([a.normalized_alias for a in aliases]),
             ProductAlias.product_id != product_id)
     ))
-    history = db.scalars(select(ProductPrice).where(ProductPrice.product_id == product_id)
-                         .order_by(ProductPrice.effective_from.desc(), ProductPrice.id.desc()).limit(50)).all()
+    history = paging.paginate(db, select(ProductPrice).where(ProductPrice.product_id == product_id).order_by(
+        ProductPrice.effective_from.desc(), ProductPrice.id.desc()), request, scalars=True)  # docs/SPEC-v5.4 X2
     return templates.TemplateResponse(request, "product.html", {
         "product": product, "aliases": aliases, "shared": shared,
         "prices": current_prices(db, [product_id]).get(product_id, []), "history": history,

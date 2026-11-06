@@ -109,14 +109,15 @@
 </form>
 {% endif %}
 
-<details class="card" id="history">
-  <summary>{{ t("History (last 50)") }}</summary>
+<details class="card" id="history"{% if request.query_params.get("page") %} open{% endif %}>
+  <summary>{{ t("History") }}</summary>
   <ul class="feed small">
-  {% for m, p, u in history %}
+  {% for m, p, u in history.items %}
     <li>{{ m.created_at | local_time }} · {{ t(m.kind) }} · {% if p %}{{ p.name }} {% endif %}{% if m.vial_size %}{{ m.vial_size }} ml {{ t("vials") }} {% endif %}
       {% if m.ml_change %}{{ "%+.1f" | format(m.ml_change) }} ml{% endif %}{% if m.count_change %} {{ "%+d" | format(m.count_change) }}{% endif %}
       · {{ m.reason or "" }} · {{ u.username if u else t("system") }}</li>
   {% else %}<li class="muted">{{ t("Nothing yet.") }}</li>{% endfor %}
   </ul>
+  {% if history.pages > 1 %}{{ ui.pager(history, "history") }}{% endif %}
 </details>
 {% endblock %}
