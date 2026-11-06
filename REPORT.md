@@ -2428,3 +2428,10 @@ U4-U5 loop 1, built:
 "Needs me" view since v4.21 (the menu shows only Chats, highlighted on `/`), so the two doors are already one; a
 redirect would only change the URL and 71 test calls. Say if you still want the redirect.
 | loop 2 | 435 affected pass (full suite in loop 1: 885) | 0 (detail pages at 360 + 1440) | 2 (Help: its own guide title; chat panes = the 4.21 workspace) | 1 (Learning) | page header + crumb on payment, product, customer, account, health |
+| loop 3 | 886 + 1 skip | 0 (384 views) | 2 (Help guide, chat panes: by design) | 1 (Learning) | Orders = list + detail panel ≥ 1280 px (X7) |
+
+Loop 3, built: **Orders list + detail panel** (X7) at ≥ 1280 px: the open order (`?open=<id>`, else the first) sits on
+the right with every detail and button; the others are compact rows; clicking an order number swaps only the list
+(htmx, Back works). Same markup as the phone cards (CSS grid), so no control moved.
+**Perf after loop 3:** warm pages 0.17–0.40 s / 0 KB; first page after login p90 2.62 s (5.3: 3.02); switch p90 1.05 s
+(5.3: 1.27); send 0.29 s.

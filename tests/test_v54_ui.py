@@ -60,3 +60,18 @@ def test_menu_has_customers(client, db):
     menu = page[page.index('class="sidebar"'):page.index("</nav>", page.index('class="sidebar"'))]
     assert [m for m in ("/chats", "/orders", "/payments", "/customers", "/products", "/sales", "/settings")
             if f'href="{m}"' not in menu] == []
+
+
+def test_orders_list_and_detail_panel(client, db):
+    from tests.matrix_v410 import make_state
+    from tests.test_cart import shop  # noqa: F401
+    from tests.test_messaging import scalar
+
+    log_in(client)
+    make_state(db, "paid")
+    oid = scalar(db, "SELECT id FROM orders WHERE order_no IS NOT NULL ORDER BY id LIMIT 1")
+    page = client.get("/orders?tab=all").text
+    assert f'class="item order-row is-open" id="order-{oid}"' in page  # the first order is open
+    assert f'href="/orders?tab=all&amp;open={oid}"' in page and 'class="rows orders split"' in page
+    assert f'class="item order-row is-open" id="order-{oid}"' in client.get(f"/orders?tab=all&open={oid}").text
+    assert f'class="item order-row is-open" id="order-{oid}"' in client.get("/orders?tab=all&open=999999").text

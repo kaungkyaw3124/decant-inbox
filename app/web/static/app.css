@@ -714,3 +714,13 @@ details.tech > summary { min-height: 32px; color: var(--muted); }
   .set-layout { grid-template-columns: 240px minmax(0, 1fr); align-items: start; }
   .set-nav { flex-direction: column; flex-wrap: nowrap; position: sticky; top: 16px; }
 }
+/* X7: Orders = list + detail panel on wide screens (same markup; the open order moves to the right column) */
+.open-order { color: inherit; }
+@media (min-width: 1280px) {
+  ul.orders.split { display: grid; grid-template-columns: minmax(320px, 420px) minmax(0, 1fr); gap: 0 20px; align-items: start; }
+  ul.orders.split > li { margin-bottom: 8px; }  /* no row gap: the panel spans many empty rows */
+  ul.orders.split > li { grid-column: 1; }
+  ul.orders.split > li.is-open { grid-column: 2; grid-row: 1 / span 200; position: sticky; top: 16px; box-shadow: 0 0 0 2px var(--ios-blue); }
+  ul.orders.split > li:not(.is-open) :is(.small, details, .order-actions, .buttons, form) { display: none; }
+  ul.orders.split > li:not(.is-open):hover { background: var(--ios-select); }
+}

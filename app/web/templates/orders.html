@@ -23,13 +23,16 @@
   {% endif %}
 {% endif %}
 <div id="order-list">
-<ul class="rows orders">
+{# docs/SPEC-v5.4 X7: ≥ 1280 px = list + detail panel (the open order on the right, the others compact) #}
+{% set want = (request.query_params.get("open") or "") | int %}
+{% set open_id = want if rows | selectattr("0.id", "equalto", want) | list else (rows[0][0].id if rows else 0) %}
+<ul class="rows orders split">
 {% for o, c, v in rows %}
   {% set ev = undo.get(o.id) %}
-  <li class="item order-row" id="order-{{ o.id }}">
+  <li class="item order-row{% if o.id == open_id %} is-open{% endif %}" id="order-{{ o.id }}">
     <div class="row-main">
       <div class="meta">
-        <span class="who"><b>{% if o.status in locked_statuses %}🔒 {% endif %}{% if o.order_no %}#{{ order_label(o) }}{% else %}{{ t("Cart") }}{% endif %}</b>{% if o.is_test %} <span class="badge test">🧪 {{ t("test") }}</span>{% endif %} · <a href="/chats/{{ c.id }}">{{ c.display_name or c.username or t("Customer") }}</a></span>
+        <span class="who"><a class="open-order" href="{{ page.url(open=o.id) }}" hx-boost="true" hx-target="#order-list" hx-select="#order-list" hx-swap="outerHTML" hx-push-url="true"><b>{% if o.status in locked_statuses %}🔒 {% endif %}{% if o.order_no %}#{{ order_label(o) }}{% else %}{{ t("Cart") }}{% endif %}</b></a>{% if o.is_test %} <span class="badge test">🧪 {{ t("test") }}</span>{% endif %} · <a href="/chats/{{ c.id }}">{{ c.display_name or c.username or t("Customer") }}</a></span>
         <span class="badge st-{{ o.status }}">{{ tr(status_labels.get(o.status, o.status)) }}</span>
         <time title="{{ t('paid') }} {{ o.paid_at | local_time }}">{{ (o.paid_at or o.updated_at) | age }}</time>
       </div>
