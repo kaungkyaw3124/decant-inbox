@@ -1,12 +1,15 @@
 """Auto mode switches, unknown-item resolution, and the monitoring data for the inbox."""
+import threading
+import time
 from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import RedirectResponse
-from sqlalchemy import delete, exists, func, select, update
+from sqlalchemy import delete, exists, func, select, text, update
 from sqlalchemy.engine import Row
 from sqlalchemy.orm import Session
 
+from app.core.db import SessionLocal
 from app.models import (
     AuditLog, Customer, FaqEntry, Message, MessageReview, Outbox, ParseResult, Product, QuickAction, User,
 )
@@ -356,6 +359,51 @@ def _about(row, customer_id: int) -> bool:
         elif getattr(getattr(x, "customer", None), "id", None) == customer_id:
             return True
     return False
+
+
+_cache: dict[bool, tuple[float, tuple, dict]] = {}  # owner? -> (monotonic time, data fingerprint, result)
+_cache_lock = threading.Lock()
+_cleared_at = 0.0
+CACHE_SECONDS = 30.0
+# anything that can change the queue writes one of these (new rows or a newer time); max(id) uses the primary key
+_FINGERPRINT = text("""SELECT (SELECT max(id) FROM messages), (SELECT max(id) FROM outbox),
+  (SELECT count(*) FROM outbox WHERE status IN ('failed', 'cancelled')), (SELECT max(id) FROM parse_results),
+  (SELECT max(id) FROM audit_log), (SELECT max(id) FROM order_events), (SELECT max(updated_at) FROM orders),
+  (SELECT max(id) FROM payment_checks), (SELECT count(*) FROM payment_checks WHERE decision IN ('pending', 'several')),
+  (SELECT max(reviewed_at) FROM message_reviews), (SELECT max(id) FROM unknown_requests),
+  (SELECT max(id) FROM quick_actions), (SELECT max(id) FROM learned_patterns), (SELECT max(id) FROM ai_calls)""")
+
+
+def needs_you_cached(owner: bool = True, max_age: float | None = None) -> dict:
+    """docs/SPEC-v5.3 M4: needs_you() takes ~0.3 s and every chat page, the chat list and the menu badge need it.
+    Reused while nothing changed (a 1 ms fingerprint query of the newest rows) and for at most `max_age` s
+    (time-based items such as "unanswered for 2 min"); any POST in this process clears it at once (main.py).
+    Computed in its own session: the cached rows are detached and shared read-only (the models have no lazy
+    relationships, so nothing loads later)."""
+    max_age = CACHE_SECONDS if max_age is None else max_age
+    with SessionLocal() as session:
+        mark = tuple(session.execute(_FINGERPRINT).one())
+
+    def fresh(hit) -> bool:
+        return (hit is not None and hit[1] == mark and hit[0] >= _cleared_at
+                and time.monotonic() - hit[0] < max_age)
+
+    if fresh(hit := _cache.get(owner)):
+        return hit[2]
+    with _cache_lock:  # one computation at a time; the others wait and take its result
+        if fresh(hit := _cache.get(owner)):
+            return hit[2]
+        started = time.monotonic()
+        with SessionLocal() as session:
+            found = needs_you(session, owner=owner)
+        _cache[owner] = (started, mark, found)
+        return found
+
+
+def forget_needs_you() -> None:
+    global _cleared_at
+    _cleared_at = time.monotonic()
+    _cache.clear()
 
 
 def for_customer(found: dict, customer_id: int) -> dict:

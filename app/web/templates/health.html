@@ -29,6 +29,21 @@
     {% for r in speed.slowest %}#{{ r.message_id }} · {{ "%.1f" | format(r.total) }} s · {{ t(r.slowest) }}{% if not loop.last %}; {% endif %}{% endfor %}</p>
   {% endif %}
 </section>
+<section class="card" id="page-speed">{# docs/SPEC-v5.3 M0 #}
+  <h2>⚡ {{ t("Speed: dashboard pages (server time since the last restart)") }}</h2>
+  {% if pages %}
+  <table class="speed">
+    <thead><tr><th>{{ t("Page") }}</th><th class="num">{{ t("Times") }}</th><th class="num">p50</th><th class="num">p90</th><th class="num">max</th></tr></thead>
+    <tbody>
+    {% for r in pages %}
+      <tr><th><code>{{ r.route }}</code></th><td class="num">{{ r.n }}</td><td class="num">{{ "%.0f" | format(r.p50) }} ms</td>
+        <td class="num">{{ "%.0f" | format(r.p90) }} ms {{ "✅" if r.p90 <= page_goal_ms else "⚠️" }}</td><td class="num">{{ "%.0f" | format(r.max) }} ms</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  <p class="small muted">{{ t("Goal: p90 ≤ 200 ms. The slowest pages are listed first.") }}</p>
+  {% else %}<p class="muted small">{{ t("No pages opened since the last restart.") }}</p>{% endif %}
+</section>
 <section class="card muted small">
   <p>{{ t("Services restart on their own. If one stays red, tell the owner. On the server run:") }}
   <code>systemctl --user status decant-listener decant-parser decant-web</code> ·

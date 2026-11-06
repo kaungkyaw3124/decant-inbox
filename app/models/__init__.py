@@ -16,8 +16,8 @@ from app.models.outbox import MediaDownload, Outbox
 from app.models.parsing import ParseItem, ParseResult
 from app.models.pricing import ProductCost, ProductPrice
 from app.models.settings import AppSetting, PaymentMethod, ReplyTemplate
-from app.models.users import User
+from app.models.users import TrustedDevice, User
 
 __all__ = ["AICall", "AppSetting", "AuditLog", "AutoRun", "Bottle", "StockMove", "Vial", "CareOptOut", "CustomerNote",
            "CustomerTag", "Feedback", "ReorderSent", "ChoicePrompt", "Customer", "CustomerPhone", "FaqEntry", "LearnedPattern", "MediaDownload", "Message", "MessageReview", "Order", "OrderEvent", "OrderItem", "Outbox", "ParseItem", "PaymentCheck", "ParseResult", "PaymentMethod", "Product",
-           "ProductAlias", "ProductCost", "ProductPrice", "QuickAction", "ReplyTemplate", "ServiceHeartbeat", "UnknownRequest", "User"]
+           "ProductAlias", "ProductCost", "ProductPrice", "QuickAction", "ReplyTemplate", "ServiceHeartbeat", "TrustedDevice", "UnknownRequest", "User"]

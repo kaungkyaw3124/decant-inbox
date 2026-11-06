@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from app.core.config import BASE_DIR
 from app.models import Message, ParseResult, ServiceHeartbeat
 from app.orders import speed
+from app.web import perf
 from app.web.auth import current_user
 from app.web.deps import get_db, local_time, templates
 from scripts.backup_db import list_backups
@@ -22,6 +23,7 @@ MAX_HEARTBEAT_AGE = {"listener": timedelta(minutes=3), "parser": timedelta(minut
 MAX_UNPARSED_AGE = timedelta(minutes=5)
 MAX_BACKUP_AGE = timedelta(hours=26)
 MIN_FREE_DISK = 0.10
+PAGE_GOAL_MS = 200  # docs/SPEC-v5.3 P3: server time per page p90
 
 
 @dataclass
@@ -97,4 +99,5 @@ def health(request: Request, db: Session = Depends(get_db)):
         "checks": run_checks(db), "last_message": local_time(last, "%d %b %Y %H:%M") if last else "none yet",
         "total": db.scalar(select(func.count()).select_from(Message)),
         "speed": speed.summary(db, datetime.now(UTC) - timedelta(hours=24), datetime.now(UTC)),  # docs/SPEC-v4.18 S0
+        "pages": perf.summary()[:15], "page_goal_ms": PAGE_GOAL_MS,  # docs/SPEC-v5.3 M0
     })

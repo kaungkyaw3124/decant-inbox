@@ -3,21 +3,21 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="htmx-config" content='{"includeIndicatorStyles": false}'>
+<meta name="htmx-config" content='{"includeIndicatorStyles": false, "historyCacheSize": 0, "refreshOnHistoryMiss": true}'>
 <meta name="theme-color" content="#F2F2F7">
 <title>{% block title %}Decant Inbox{% endblock %}</title>
-<link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="{{ static_url("favicon.svg") }}" type="image/svg+xml">
 <link rel="preload" href="/static/vendor/inter-5.1.0/inter-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/static/vendor/noto-sans-myanmar-5.3.0/noto-sans-myanmar-myanmar-400-normal.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/static/vendor/bootstrap-5.3.8/bootstrap.min.css">
-<link rel="stylesheet" href="/static/icons.css">
-<link rel="stylesheet" href="/static/app.css">
-<script src="/static/htmx-2.0.4.min.js" defer></script>
+<link rel="stylesheet" href="{{ static_url("vendor/bootstrap-5.3.8/bootstrap.subset.min.css") }}">
+<link rel="stylesheet" href="{{ static_url("icons.css") }}">
+<link rel="stylesheet" href="{{ static_url("app.css") }}">
+<script src="{{ static_url("htmx-2.0.4.min.js") }}" defer></script>
 <script src="/static/vendor/bootstrap-5.3.8/bootstrap.min.js" defer></script>
-<script src="/static/quick.js" defer></script>
-<script src="/static/app.js" defer></script>
+<script src="{{ static_url("quick.js") }}" defer></script>
+<script src="{{ static_url("app.js") }}" defer></script>
 </head>
-<body hx-headers='{"X-CSRF-Token": "{{ csrf }}"}' data-sending-in="{{ t('Sending in {n} s') }}" data-sending="💬 {{ t('sending…') }}"
+<body hx-headers='{"X-CSRF-Token": "{{ csrf }}"}' data-sending-in="{{ t('Sending in {n} s') }}" data-sending="💬 {{ t('sending…') }}" data-not-sent="{{ t('not sent') }}" data-try-again="{{ t('Try again') }}"
       class="{% if request.session.get('user_id') %}signed-in{% endif %} {% block body_class %}{% endblock %}">
 {% if request.session.get("user_id") %}
 {# docs/SPEC-v4.21: laptop = iOS sidebar; phone = tab bar Chats · Orders · Payments · More #}
@@ -43,20 +43,20 @@
                ("/help", "bi-question-circle", "Help", true, 0),
                ("/account", "bi-shield-lock", "My account", true, 0)] %}
 {% macro lang_and_logout(cls="") %}
-    <form method="post" action="/language" class="inline lang-switch {{ cls }}">
+    <form method="post" action="/language" class="inline lang-switch {{ cls }}" hx-boost="false">
       <input type="hidden" name="csrf" value="{{ csrf }}">
       <input type="hidden" name="back" value="{{ request.url.path }}">
       {% if lang == "my" %}<button class="link" name="language" value="en" lang="en" title="{{ t('Switch the dashboard to English') }}"><i class="bi bi-translate"></i> English</button>
       {% else %}<button class="link" name="language" value="my" lang="my" title="{{ t('Switch the dashboard to Burmese') }}"><i class="bi bi-translate"></i> မြန်မာ</button>{% endif %}
     </form>
-    <form method="post" action="/logout" class="inline {{ cls }}">
+    <form method="post" action="/logout" class="inline {{ cls }}" hx-boost="false">
       <input type="hidden" name="csrf" value="{{ csrf }}">
       <button class="link"><i class="bi bi-box-arrow-right"></i> {{ t("Log out") }}</button>
     </form>
 {% endmacro %}
 {% macro auto_switch() %}
   {% if user_role == "owner" %}
-  <form method="post" action="/auto-reply" class="auto-switch {{ 'on' if auto_on else 'off' }}">
+  <form method="post" action="/auto-reply" class="auto-switch {{ 'on' if auto_on else 'off' }}" hx-boost="false">
     <input type="hidden" name="csrf" value="{{ csrf }}">
     <input type="hidden" name="back" value="{{ request.url.path }}">
     <input type="hidden" name="on" value="{{ '0' if auto_on else '1' }}">
@@ -65,7 +65,7 @@
   </form>
   {% else %}<span class="auto-switch {{ 'on' if auto_on else 'off' }}"><span class="label">{{ t("Auto-reply") }}: <b>{{ t("ON") if auto_on else t("OFF") }}</b></span><span class="ios-toggle" aria-hidden="true"></span></span>{% endif %}
 {% endmacro %}
-<nav class="sidebar" aria-label="{{ t('Menu') }}">
+<nav class="sidebar" aria-label="{{ t('Menu') }}" hx-boost="true">
   <a class="brand" href="/">Decant</a>
   {% for href, icon, label, count, current in daily %}
   <a href="{{ href }}" class="side-item" {% if current %}aria-current="page"{% endif %}><i class="bi {{ icon }}"></i><span>{{ t(label) }}</span>{% if count %}<b class="side-count">{{ count }}</b>{% endif %}</a>
@@ -108,9 +108,25 @@
 </aside>
 {% endif %}
 <main class="{% block main_class %}{% endblock %}">
-{% if flash %}<div class="toast-zone"><div class="flash toast show" role="status" data-autohide><div class="toast-body">{{ tr(flash) }}</div><button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="{{ t('Close') }}"></button></div></div>{% endif %}
+<div id="toasts">{% if flash %}<div class="toast-zone"><div class="flash toast show" role="status" data-autohide><div class="toast-body">{{ tr(flash) }}</div><button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="{{ t('Close') }}"></button></div></div>{% endif %}</div>
 {% block content %}{% endblock %}
 </main>
+{% if request.session.get("user_id") %}
+<div class="modal fade" id="keys" tabindex="-1" aria-labelledby="keys-title" aria-hidden="true">{# docs/SPEC-v5.3 M6 #}
+  <div class="modal-dialog modal-dialog-centered"><div class="modal-content">
+    <div class="modal-header"><h2 class="modal-title h5" id="keys-title">{{ t("Keyboard shortcuts") }}</h2>
+      <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{{ t('Close') }}"></button></div>
+    <div class="modal-body"><dl class="keys">
+      <dt><kbd>↓</kbd> <kbd>J</kbd> / <kbd>↑</kbd> <kbd>K</kbd></dt><dd>{{ t("Next / previous chat") }}</dd>
+      <dt><kbd>Enter</kbd></dt><dd>{{ t("Send the suggested reply (not changed)") }}</dd>
+      <dt><kbd>Ctrl</kbd> + <kbd>Enter</kbd></dt><dd>{{ t("Send what you typed") }}</dd>
+      <dt><kbd>Esc</kbd></dt><dd>{{ t("Close a panel / leave the text box") }}</dd>
+      <dt><kbd>/</kbd></dt><dd>{{ t("Search") }}</dd>
+      <dt><kbd>?</kbd></dt><dd>{{ t("This help") }}</dd>
+    </dl></div>
+  </div></div>
+</div>
+{% endif %}
 <div class="modal fade" id="confirm" tabindex="-1" aria-labelledby="confirm-text" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered"><div class="modal-content">
     <div class="modal-body"><p id="confirm-text" class="big-line"></p></div>

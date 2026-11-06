@@ -890,4 +890,22 @@ MY = {
     "Feedback: 2 days after delivered (only if switched on in Customers)": "Feedback: ရောက်ပြီး ၂ ရက် (Customers မှာ ဖွင့်ထားမှ)",
     "Feedback: the customer is happy": "Feedback: ဖောက်သည် ကျေနပ်",
     "Feedback question queued.": "Feedback မေးခွန်း တန်းစီပြီး။", "Ask feedback now (test)": "Feedback အခု မေးမယ် (စမ်း)",
+    # docs/SPEC-v5.3-performance-pc.md: keyboard help, trusted computers
+    "Keyboard shortcuts": "ကီးဘုတ် အတိုကောက်များ", "Next / previous chat": "နောက် / ရှေ့ chat",
+    "Send the suggested reply (not changed)": "အကြံပြုစာကို ပို့မယ် (မပြင်ထားရင်)",
+    "Send what you typed": "ရိုက်ထားတာ ပို့မယ်", "Close a panel / leave the text box": "အကွက်ပိတ် / စာရိုက်ကွက်က ထွက်",
+    "This help": "ဒီအကူအညီ",
+    "Trust this computer for 30 days (owner only; never on a shared computer)":
+        "ဒီကွန်ပျူတာကို ရက် ၃၀ ယုံမယ် (ပိုင်ရှင်သာ; မျှသုံးကွန်ပျူတာမှာ မလုပ်ပါနဲ့)",
+    "Trusted computers": "ယုံထားတဲ့ ကွန်ပျူတာများ",
+    "These computers stay logged in for 30 days without the 2-step code. Remove one and it asks for the password (and code) again.":
+        "ဒီကွန်ပျူတာတွေမှာ ရက် ၃၀ ကုဒ်မလိုဘဲ ဝင်ထားမယ်။ ဖယ်လိုက်ရင် စကားဝှက် (နဲ့ ကုဒ်) ပြန်တောင်းမယ်။",
+    "This computer": "ဒီကွန်ပျူတာ", "last used": "နောက်ဆုံးသုံး", "until": "အထိ",
+    "None. Tick “Trust this computer” when you log in on your own PC.":
+        "မရှိသေးပါ။ ကိုယ့် PC မှာ ဝင်တဲ့အခါ “ဒီကွန်ပျူတာကို ယုံမယ်” ကို အမှန်ခြစ်ပါ။",
+    "Trusted computer removed.": "ယုံထားတဲ့ ကွန်ပျူတာ ဖယ်ပြီး။",
+    "Speed: dashboard pages (server time since the last restart)": "အမြန်နှုန်း: dashboard စာမျက်နှာများ (နောက်ဆုံး restart ကတည်းက server အချိန်)",
+    "Page": "စာမျက်နှာ", "Times": "အကြိမ်", "Goal: p90 ≤ 200 ms. The slowest pages are listed first.":
+        "ပန်းတိုင်: p90 ≤ 200 ms။ အနှေးဆုံး စာမျက်နှာတွေ အရင်ပြထားတယ်။",
+    "No pages opened since the last restart.": "နောက်ဆုံး restart ကတည်းက စာမျက်နှာ မဖွင့်ရသေးပါ။",
 }

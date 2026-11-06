@@ -4,8 +4,11 @@ from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
-from app.models import AuditLog, User
-from app.web import twostep
+from sqlalchemy import delete, select
+
+from app.core.db import SessionLocal
+from app.models import AuditLog, TrustedDevice, User
+from app.web import trust, twostep
 from app.web.auth import current_user, login, verify_csrf
 from app.web.deps import get_db, templates
 from app.web.inbox import flash
@@ -14,8 +17,13 @@ router = APIRouter(dependencies=[Depends(current_user), Depends(verify_csrf)])
 
 
 def _page(request: Request, user: User, status_code: int = 200, **extra):
+    with SessionLocal() as db:
+        devices = db.scalars(select(TrustedDevice).where(TrustedDevice.user_id == user.id)
+                             .order_by(TrustedDevice.last_used_at.desc())).all()
+        this = trust.device(db, request)
     return templates.TemplateResponse(request, "account.html", {
-        "me": user, "new_secret": None, "codes": None, "error": None, **extra}, status_code=status_code)
+        "me": user, "new_secret": None, "codes": None, "error": None, "devices": devices,
+        "this_device": this.id if this else None, **extra}, status_code=status_code)
 
 
 @router.get("/account", response_class=HTMLResponse)
@@ -69,9 +77,20 @@ def off(request: Request, code: str = Form(...), db: Session = Depends(get_db), 
     return RedirectResponse("/account", status_code=303)
 
 
+@router.post("/account/trusted/{device_id}/remove")
+def remove_trusted(request: Request, device_id: int, db: Session = Depends(get_db), user: User = Depends(current_user)):
+    """docs/SPEC-v5.3 M5: that computer asks for the password (+ code) at its next login."""
+    db.execute(delete(TrustedDevice).where(TrustedDevice.id == device_id, TrustedDevice.user_id == user.id))
+    db.add(AuditLog(user_id=user.id, action="user.untrust_device", details={"device_id": device_id}))
+    db.commit()
+    flash(request, "Trusted computer removed.")
+    return RedirectResponse("/account#trusted", status_code=303)
+
+
 @router.post("/account/logout-everywhere")
 def logout_everywhere(request: Request, db: Session = Depends(get_db), user: User = Depends(current_user)):
     user.session_epoch += 1  # every other browser is logged out at its next click; this one logs in again
+    trust.remove_all(db, user.id)  # docs/SPEC-v5.3 M5: trusted computers too
     db.add(AuditLog(user_id=user.id, action="user.logout_everywhere", details={"user_id": user.id}))
     db.commit()
     login(request, user)

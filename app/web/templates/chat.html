@@ -6,7 +6,7 @@
 {% block content %}
 {# docs/SPEC-v4.21: chat list | conversation | customer panel (laptop); phone: the conversation, panel = sheet #}
 {% set name = c.display_name or ("@" ~ c.username if c.username else t("Customer")) %}
-<div id="ws" class="ws ws-chat">
+<div id="ws" class="ws ws-chat" data-customer="{{ c.id }}">
   {% include "_chatlist.html" %}
   <section class="convo" aria-label="{{ t('Conversation') }}">
     <header class="convo-head">
@@ -86,7 +86,7 @@
     {% for n in result.notes %}<p class="flash warnbox">{{ tr(n) }}</p>{% endfor %}
 
     {% if mode == "custom" or (result.text.strip() and not result.problems) %}
-    <form method="post" action="/chats/{{ c.id }}/send" class="compose-box">
+    <form method="post" action="/chats/{{ c.id }}/send" class="compose-box" hx-boost="true" hx-target="#ws" hx-select="#ws" hx-swap="outerHTML" hx-select-oob="#toasts">
       <input type="hidden" name="csrf" value="{{ csrf }}">
       <input type="hidden" name="key" value="{{ key }}">
       <input type="hidden" name="reply_kind" value="{{ mode }}">

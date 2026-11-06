@@ -45,6 +45,12 @@ def migrated_db():
 @pytest.fixture
 def db(migrated_db):
     from app.core.db import engine
+    from app.web import auto as auto_pages
+
+    auto_pages.forget_needs_you()  # docs/SPEC-v5.3 M4: no queue cached from another test's data
+    # tests move time with UPDATEs the cache fingerprint can't see (live: time-based items show within 30 s);
+    # tests/test_v53_perf.py switches the cache on for its own test
+    auto_pages.CACHE_SECONDS = 0
 
     yield engine
     with engine.begin() as c:

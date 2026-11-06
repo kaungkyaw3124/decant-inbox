@@ -41,4 +41,19 @@
   <form method="post" action="/account/logout-everywhere"><input type="hidden" name="csrf" value="{{ csrf }}">
     <button data-confirm="{{ t('Log out on every other device?') }}">{{ t("Log out everywhere") }}</button></form>
 </section>
+{% if me.is_owner %}
+<section class="card stack" id="trusted">{# docs/SPEC-v5.3 M5 #}
+  <h2>{{ t("Trusted computers") }}</h2>
+  <p class="small">{{ t("These computers stay logged in for 30 days without the 2-step code. Remove one and it asks for the password (and code) again.") }}</p>
+  {% for d in devices %}
+  <form method="post" action="/account/trusted/{{ d.id }}/remove" class="inline-row">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <span class="small">{% if d.id == this_device %}<b>{{ t("This computer") }}</b> · {% endif %}{{ d.user_agent | truncate(70) }} · {{ t("last used") }} {{ d.last_used_at | local_time }} · {{ t("until") }} {{ d.expires_at | local_time("%d %b") }}</span>
+    <button class="link danger">{{ t("Remove") }}</button>
+  </form>
+  {% else %}
+  <p class="muted small">{{ t("None. Tick “Trust this computer” when you log in on your own PC.") }}</p>
+  {% endfor %}
+</section>
+{% endif %}
 {% endblock %}

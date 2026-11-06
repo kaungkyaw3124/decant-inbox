@@ -18,6 +18,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 from starlette.exceptions import HTTPException as StarletteHTTPException
+from starlette.middleware.gzip import GZipMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 
 from app.core.config import get_settings
@@ -27,7 +28,7 @@ from app.web import (
     prices, sales, settings as settings_pages, stock, users,
 )
 from app.alerts import service as alerts
-from app.web import twostep
+from app.web import live, perf, trust, twostep
 from app.web.auth import (
     FormExpired, LoginRequired, authenticate, client_ip, current_user, failed, locked_out, login, verify_csrf,
 )
@@ -38,6 +39,7 @@ if settings.web_secret_key is None:
     sys.exit("WEB_SECRET_KEY is missing in .env (see .env.example)")
 
 app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
+app.middleware("http")(trust.renew)  # inside the session middleware: it needs request.session (docs/SPEC-v5.3 M5)
 app.add_middleware(
     SessionMiddleware,
     secret_key=settings.web_secret_key.get_secret_value(),
@@ -46,6 +48,7 @@ app.add_middleware(
     same_site="lax",
     https_only=settings.web_cookie_secure,
 )
+app.add_middleware(GZipMiddleware, minimum_size=1000)  # docs/SPEC-v5.3 M1 (CSRF tokens are masked: no BREACH)
 app.mount("/static", StaticFiles(directory=Path(__file__).parent / "static"), name="static")
 app.include_router(inbox.router)
 app.include_router(catalog.router)
@@ -65,6 +68,7 @@ app.include_router(practice.router)
 app.include_router(account.router)
 app.include_router(stock.router)
 app.include_router(customers.router)
+app.include_router(live.router)
 
 ERROR_TITLES = {400: "Can't do that", 403: "Not allowed", 404: "Not found", 409: "Already changed"}
 
@@ -102,14 +106,20 @@ def error_page(request: Request, exc: StarletteHTTPException):
 @app.middleware("http")
 async def security_headers(request: Request, call_next):
     response = await call_next(request)
+    if request.method not in ("GET", "HEAD"):
+        auto_pages.forget_needs_you()  # docs/SPEC-v5.3 M4: the admin's own change shows at once
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["Referrer-Policy"] = "same-origin"
     response.headers["Content-Security-Policy"] = (
         "default-src 'self'; style-src 'self'; script-src 'self'; img-src 'self' data:; frame-ancestors 'none'"
     )
-    response.headers["Cache-Control"] = "no-store"
+    # docs/SPEC-v5.3 M1: static files from the browser cache; pages with customer data never stored
+    response.headers["Cache-Control"] = perf.cache_control(request) if response.status_code < 400 else "no-store"
     return response
+
+
+app.middleware("http")(perf.timing)  # outermost: times everything (docs/SPEC-v5.3 M0)
 
 
 @app.get("/login", response_class=HTMLResponse)
@@ -120,7 +130,7 @@ def login_page(request: Request, next: str = "/"):
 @app.post("/login", dependencies=[Depends(verify_csrf)])
 def login_submit(
     request: Request, username: str = Form(...), password: str = Form(...), next: str = Form("/"),
-    db: Session = Depends(get_db),
+    trust_pc: str = Form(""), db: Session = Depends(get_db),
 ):
     ip = client_ip(request)
     user = authenticate(db, username, password, ip)
@@ -129,12 +139,18 @@ def login_submit(
                  else "Wrong username or password.")
         return templates.TemplateResponse(request, "login.html",
                                           {"next": inbox.safe_back(next, "/"), "error": error}, status_code=401)
+    known = trust.device(db, request)
+    if known is not None and known.user_id == user.id:  # docs/SPEC-v5.3 M5: trusted computer, no code
+        response = _finish_login(request, db, user, next)
+        trust.rotate(db, known, response)
+        return response
     if user.totp_secret:  # docs/SPEC-v5.0 G3: the password alone is not enough
         request.session.clear()
-        request.session.update(pending=user.id, pending_at=int(time.time()), csrf=secrets.token_urlsafe(32))
+        request.session.update(pending=user.id, pending_at=int(time.time()), csrf=secrets.token_urlsafe(32),
+                               trust_pc=bool(trust_pc))
         return templates.TemplateResponse(request, "login.html", {"next": inbox.safe_back(next, "/"), "error": None,
                                                                   "step": "code"})
-    return _finish_login(request, db, user, next)
+    return _finish_login(request, db, user, next, trust_pc=bool(trust_pc))
 
 
 PENDING_SECONDS = 300
@@ -151,13 +167,13 @@ def login_code(request: Request, code: str = Form(...), next: str = Form("/"), d
     if locked_out(user.username, ip):
         error = "Too many failed attempts. Wait 15 minutes."
     elif twostep.verify(user.totp_secret, code):
-        return _finish_login(request, db, user, next)
+        return _finish_login(request, db, user, next, trust_pc=request.session.get("trust_pc", False))
     elif (left := twostep.use_recovery(user.totp_recovery, code)) is not None:
         user.totp_recovery = left
         db.add(AuditLog(user_id=user.id, action="user.recovery_code", details={"left": len(left)}))
         db.commit()
         inbox.flash(request, f"Recovery code used: {len(left)} left. Make new ones in My account.")
-        return _finish_login(request, db, user, next)
+        return _finish_login(request, db, user, next, trust_pc=request.session.get("trust_pc", False))
     else:
         failed(user.username, ip)
         error = "Wrong code."
@@ -165,7 +181,7 @@ def login_code(request: Request, code: str = Form(...), next: str = Form("/"), d
                                                               "step": "code"}, status_code=401)
 
 
-def _finish_login(request: Request, db: Session, user: User, next: str):
+def _finish_login(request: Request, db: Session, user: User, next: str, trust_pc: bool = False):
     flash_text = request.session.get("flash")
     login(request, user)
     if flash_text:
@@ -178,7 +194,10 @@ def _finish_login(request: Request, db: Session, user: User, next: str):
                 user.username, client_ip(request), request.headers.get("user-agent", ""))).start()
         user.known_devices = (user.known_devices + [device])[-20:]
         db.commit()
-    return RedirectResponse(inbox.safe_back(next, "/"), status_code=303)
+    response = RedirectResponse(inbox.safe_back(next, "/"), status_code=303)
+    if trust_pc and user.is_owner:  # docs/SPEC-v5.3 M5: staff logins are unchanged
+        trust.trust(db, user, request, response)
+    return response
 
 
 @app.post("/logout", dependencies=[Depends(verify_csrf)])
@@ -187,7 +206,9 @@ def logout(request: Request, db: Session = Depends(get_db)):
     request.session.clear()
     if user is not None:
         request.session["lang"] = user.language  # the login page stays in their language
-    return RedirectResponse("/login", status_code=303)
+    response = RedirectResponse("/login", status_code=303)
+    trust.remove(db, request, response)  # else the trusted-computer cookie would log this browser in again
+    return response
 
 
 @app.post("/language", dependencies=[Depends(verify_csrf)])

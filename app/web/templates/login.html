@@ -20,6 +20,7 @@
   <input type="hidden" name="next" value="{{ next }}">
   <label>{{ t("Username") }} <input name="username" autocomplete="username" autocapitalize="none" required autofocus></label>
   <label>{{ t("Password") }} <input name="password" type="password" autocomplete="current-password" required></label>
+  <label class="check small"><input type="checkbox" name="trust_pc" value="1"> {{ t("Trust this computer for 30 days (owner only; never on a shared computer)") }}</label>
   <button class="primary">{{ t("Log in") }}</button>
 </form>
 {% endif %}

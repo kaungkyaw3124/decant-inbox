@@ -5,9 +5,9 @@ Read CLAUDE.md first. This file tracks where we are.
 ## NEXT TASK (written by the planning chat; Claude Code runs it with /next)
 Task: v5.3 PERFORMANCE (PC browser only): static caching + versioned URLs, compression, no full reloads, prefetch,
 SSE, faster queries, nice-d tests, trusted-device login, keyboard — docs/SPEC-v5.3-performance-pc.md (goal P1-P5).
-Status: TODO
+Status: DONE 2026-11-06 — see REPORT.md
 
-## RESUME HERE (updated 2026-11-02 evening by Claude Code)
+## RESUME HERE (updated 2026-11-06 by Claude Code)
 - v1-v4.12 DONE. AI AUTO, brake ON, ai_address ON, ai_screenshot OFF.
 - v4.13 hotfix (docs/SPEC-v4.13-hotfix.md) DONE + deployed 2026-10-17: Q0-Q5, R1-R6, evals PASS. Owner test 4.13
   pending (REPORT.md "OWNER TEST SCRIPT 4.13").
@@ -29,8 +29,11 @@ Status: TODO
   ALERT_CHAT_ID, BACKUP_PASSPHRASE (REPORT.md "How to switch on"); 2-step login: owner turns it on in My account.
 - v5.1 inventory DONE + deployed 2026-11-02 (empty until the owner adds bottles: manual in-stock flags until then).
 - v5.2 customer care DONE + deployed 2026-11-02 (feedback OFF until switched on).
-- Owner tests pending: 4.13-4.21, 5.0, 5.1, 5.2 (REPORT.md).
-- NEXT: the QUEUE is empty — ask the planning chat for the next task.
+- v5.3 PC speed DONE + deployed 2026-11-06: static cache + versioned URLs, gzip, boosted menu, prefetch, SSE,
+  trusted computer, keyboard; warm pages 0.2-0.5 s / 0 KB (was ~2.2 s / 680 KB), send 0.25 s. NOT met yet: customer
+  switch p90 1.27 s (goal 0.5) and server p90 ≤ 200 ms (chat page ~49 queries) -> follow-up for the planning chat.
+- Owner tests pending: 4.13-4.21, 5.0-5.3 (REPORT.md).
+- NEXT: v5.4 UI/UX clean-up (QUEUE item 11).
 - Owner checks: `bash scripts/status.sh`; AI numbers at /ai.
 
 ## Status
@@ -64,6 +67,7 @@ Status: TODO
 | 24 | v5.0 (docs/SPEC-v5.0-go-live-pack.md): alert bot, encrypted off-server backup, 2-step login, packing slips | ✅ Done, live (secrets OFF until set; owner test pending) |
 | 25 | v5.1 (docs/SPEC-v5.1-inventory.md): stock in ml, auto out-of-stock, deduct on packed, Stock page | ✅ Done, live (owner test pending) |
 | 26 | v5.2 (docs/SPEC-v5.2-customer-care.md): customer profiles, reorder list, feedback after delivery | ✅ Done, live (feedback OFF; owner test pending) |
+| 27 | v5.3 (docs/SPEC-v5.3-performance-pc.md): PC speed: browser cache, gzip, no full reloads, prefetch, live updates, trusted computer, keyboard | ✅ Done, live (P1/P4/send met; switch + server time follow-up; owner test pending) |
 
 ## Phase 0 checklist
 - [x] Step 0: rollback safety net scripts in ~/hardening/

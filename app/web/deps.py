@@ -1,3 +1,4 @@
+import base64
 import secrets
 from collections.abc import Iterator
 from datetime import UTC, datetime
@@ -23,27 +24,31 @@ def csrf_token(request: Request) -> str:
     return request.session["csrf"]
 
 
-_needs: dict[str, tuple[float, int]] = {}  # role -> (monotonic time, Needs you count)
+def mask_csrf(token: str) -> str:
+    """docs/SPEC-v5.3 M1: pages are gzip-compressed, so the token in a page is different every time
+    (random pad + token XOR pad) and can't be guessed byte by byte from compressed sizes (BREACH)."""
+    raw = token.encode()
+    pad = secrets.token_bytes(len(raw))
+    return base64.urlsafe_b64encode(pad + bytes(a ^ b for a, b in zip(raw, pad))).decode()
+
+
+def unmask_csrf(sent: str) -> str:
+    """The session token from a masked one; an unmasked (old) token comes back unchanged."""
+    try:
+        data = base64.urlsafe_b64decode(sent.encode())
+    except (ValueError, UnicodeEncodeError):
+        return sent
+    half = len(data) // 2
+    if len(data) % 2 or not half:
+        return sent
+    return bytes(a ^ b for a, b in zip(data[half:], data[:half])).decode("latin-1")
 
 
 def needs_count(session: Session, role: str) -> int:
-    """The Inbox counter in the menu. shortcut: cached 60 s per process (needs_you takes ~0.7 s), make
-    needs_you cheaper if the counter must be live."""
-    import time
+    """The Chats counter in the menu: may be up to 60 s old (docs/SPEC-v5.3 M4: shared with the pages' cache)."""
+    from app.web.auto import needs_you_cached  # late import: auto imports this module
 
-    from app.web.auto import needs_you  # late import: auto imports this module
-
-    at, count = _needs.get(role, (0.0, 0))
-    if time.monotonic() - at > 60:
-        count = needs_you(session, owner=role == "owner")["count"]
-        _needs[role] = (time.monotonic(), count)
-    return count
-
-
-def remember_needs(role: str, count: int) -> None:
-    import time
-
-    _needs[role] = (time.monotonic(), count)
+    return needs_you_cached(owner=role == "owner", max_age=60)["count"]
 
 
 def _template_context(request: Request) -> dict:
@@ -65,7 +70,7 @@ def _template_context(request: Request) -> dict:
             to_learn = patterns.pending_count(session)
             needs = needs_count(session, role) if role else 0
     t, tr, code = i18n.for_lang(lang)
-    return {"csrf": csrf_token(request), "flash": request.session.pop("flash", None),
+    return {"csrf": mask_csrf(csrf_token(request)), "flash": request.session.pop("flash", None),
             "path": request.url.path, "auto_on": auto_on, "payments_open": payments_open, "to_pack": to_pack,
             "user_role": role, "to_learn": to_learn, "needs_count": needs, "lang": lang, "t": t, "tr": tr, "code": code}
 
@@ -102,7 +107,9 @@ def age(context, value: datetime | None) -> str:
 
 templates.env.filters["local_time"] = local_time
 templates.env.filters["age"] = age
-templates.env.globals.update(format_mmk=format_mmk, size_label=size_label, now=lambda: datetime.now(UTC),
+from app.web.perf import static_url  # noqa: E402 (docs/SPEC-v5.3 M1)
+
+templates.env.globals.update(static_url=static_url, format_mmk=format_mmk, size_label=size_label, now=lambda: datetime.now(UTC),
                              order_label=testpay.order_label)
 
 

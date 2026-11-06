@@ -12,7 +12,8 @@ STATIC = ROOT / "app" / "web" / "static"
 
 def test_page_weight_under_400_kb():
     base = (ROOT / "app/web/templates/base.html").read_text()
-    assets = re.findall(r'(?:href|src)="/static/([^"]+\.(?:css|js))"', base)
+    # docs/SPEC-v5.3 M1: own files go through static_url("..."), vendor folders stay plain /static/ paths
+    assets = re.findall(r'(?:href|src)="(?:/static/|\{\{ static_url\(")([^"]+\.(?:css|js))"', base)
     assert len(assets) >= 6 and not any("cdn" in a for a in assets)  # everything self-hosted
     total = sum((STATIC / a).stat().st_size for a in assets)
     assert total < 400_000, f"{total} bytes of CSS + JS per page"
@@ -45,3 +46,14 @@ def test_ui_check_quick_daily_pages_on_a_phone():
                          text=True, timeout=900)
     assert run.returncode == 0, run.stdout[-3000:] + run.stderr[-2000:]
     assert "PASS:" in run.stdout
+
+
+def test_bootstrap_subset_is_up_to_date():
+    """scripts/vendor_bootstrap_css.py made the CSS every page loads; it still drops only unused components."""
+    from scripts.vendor_bootstrap_css import DIR, subset
+
+    full = (DIR / "bootstrap.min.css").read_text()
+    made = (DIR / "bootstrap.subset.min.css").read_text()
+    assert made.startswith(full[:full.index("*/") + 2])  # the MIT licence header stays
+    assert subset(made[made.index("*/") + 2:]) == made[made.index("*/") + 2:]  # nothing left to drop
+    assert ".btn{" in made and ".modal{" in made and ".offcanvas{" in made and ".carousel" not in made

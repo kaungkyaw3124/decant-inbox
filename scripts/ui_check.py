@@ -39,7 +39,8 @@ PORT = 8765
 WIDTHS = (360, 768, 1280)
 DAILY = ("inbox", "chats", "chat", "payments", "payment", "payment-test", "orders", "orders-test")
 SKIP = {"/healthz", "/media/{message_id}", "/payments/{check_id}/shot", "/sales/export.xlsx",
-        "/prices/export.xlsx", "/login", "/stock/export.xlsx", "/customers/export.csv"}  # files / JSON, not pages
+        "/prices/export.xlsx", "/login", "/stock/export.xlsx", "/customers/export.csv",
+        "/events"}  # files / JSON / the live stream, not pages
 PARTIALS = {"/messages/{message_id}/row", "/chats/{customer_id}/thread"}
 
 
@@ -272,6 +273,103 @@ def set_language(page, lang: str) -> None:
 VOLATILE = re.compile(r"(expect=|key=)[^ ]*|[?&]t=\d+")
 
 
+def pc_flows(browser) -> list[str]:
+    """docs/SPEC-v5.3-performance-pc.md M2/M3/M6 on a PC (1440 px): menu clicks swap the page without a reload,
+    back works, hover prefetches (GET only) and the click uses it, the reply bubble shows at once (and turns red
+    with "Try again" on an error), a new customer message appears live (SSE), arrow keys switch chats,
+    nothing in localStorage. Runs before u4_flows (it sends one reply in the fake shop)."""
+    from sqlalchemy import create_engine, text
+
+    problems = []
+    base = f"http://127.0.0.1:{PORT}"
+    context = browser.new_context(viewport={"width": 1440, "height": 900})
+    page = context.new_page()
+    log_in(page, "owner")
+    set_language(page, "en")
+    requests: list[tuple[str, str]] = []
+    page.on("request", lambda r: requests.append((r.method, r.url.removeprefix(base))))
+
+    def check(name: str, ok) -> None:
+        try:
+            if not ok():
+                problems.append(f"PC {name}: failed ({page.url})")
+        except Exception as exc:
+            problems.append(f"PC {name}: {str(exc).splitlines()[0]}")
+
+    def no_reload_to(href: str) -> bool:
+        page.evaluate("window.stayed = 1")
+        page.locator(f"nav.sidebar a.side-item[href='{href}']").click()
+        page.wait_for_url(f"**{href}")
+        page.wait_for_load_state()
+        return page.evaluate("window.stayed") == 1 and page.locator("main").count() == 1
+
+    page.goto(f"{base}/chats")
+    check("menu click without reload", lambda: no_reload_to("/orders") and no_reload_to("/payments"))
+    check("back button", lambda: (page.go_back(), page.wait_for_selector(
+        "nav.sidebar a[href='/orders'][aria-current=page]"), page.url.endswith("/orders"))[-1])
+    check("no customer pages in localStorage", lambda: page.evaluate("Object.keys(localStorage).length") == 0)
+
+    page.goto(f"{base}/chats")
+    row = page.locator("a.chatrow").nth(1)
+    href = row.get_attribute("href")
+    requests.clear()
+    row.hover()
+    page.wait_for_timeout(600)
+    check("hover prefetches once with GET", lambda: requests.count(("GET", href)) == 1
+          and not any(m != "GET" for m, _ in requests))
+    page.evaluate("window.stayed = 1")
+    row.click()
+    page.wait_for_url(f"**{href}")
+    page.wait_for_selector(f"#ws[data-customer='{href.rsplit('/', 1)[1]}']")
+    check("click uses the prefetched page", lambda: requests.count(("GET", href)) == 1
+          and page.evaluate("window.stayed") == 1)
+
+    db = create_engine(get_settings().database_url)
+    with db.connect() as c:
+        cid = c.execute(text("SELECT customer_id FROM messages WHERE direction = 'in' GROUP BY customer_id "
+                             "ORDER BY max(id) DESC LIMIT 1")).scalar()
+    page.goto(f"{base}/chats/{cid}")
+    for _ in range(50):  # (no wait_for_function: it needs eval, which our CSP blocks)
+        if page.evaluate("window.decantLive === true"):
+            break
+        page.wait_for_timeout(100)
+    with db.begin() as c:
+        c.execute(text("INSERT INTO messages (channel, external_chat_id, external_message_id, customer_id, raw_text, "
+                       "normalized_text, received_at, direction, kind) SELECT channel, external_chat_id, 'live-1', customer_id, "
+                       "'live update check', 'live update check', now(), 'in', 'text' FROM messages "
+                       "WHERE customer_id = :c LIMIT 1"), {"c": cid})
+    check("new message appears live (SSE)", lambda: page.locator("#thread", has_text="live update check")
+          .wait_for(timeout=6000) is None)
+
+    page.route("**/send", lambda route: (page.wait_for_timeout(1500), route.continue_()))
+    page.fill("form.compose-box textarea[name=text]", "optimistic check")
+    page.evaluate("document.querySelector('form.compose-box').dataset.old = '1'")
+    page.locator("form.compose-box button.send-round").click()
+    check("reply bubble at once", lambda: page.locator(".bubble.optimistic", has_text="optimistic check")
+          .wait_for(timeout=300) is None)
+    check("bubble replaced by the real outbox row", lambda: page.locator(".bubble.pending:not(.optimistic)",
+                                                                          has_text="optimistic check").wait_for() is None)
+    page.wait_for_selector("form.compose-box:not([data-old])")  # the workspace swap is done (SSE may be faster)
+    page.unroute("**/send")
+    page.route("**/send", lambda route: route.fulfill(status=500, body="boom"))
+    page.fill("form.compose-box textarea[name=text]", "error check")
+    page.locator("form.compose-box button.send-round").click()
+    check("error -> red bubble with Try again", lambda: page.locator(".bubble.optimistic.status-failed button",
+                                                                     has_text="Try again").wait_for() is None)
+    page.unroute("**/send")
+
+    page.goto(f"{base}/chats/{cid}")
+    page.locator("body").click(position={"x": 700, "y": 5})
+    first = page.url
+    page.keyboard.press("ArrowDown")
+    check("arrow key opens the next chat", lambda: (page.wait_for_url(lambda url: url != first), True)[1])
+    page.keyboard.press("?")
+    check("? shows the shortcuts", lambda: page.locator("#keys.show").wait_for() is None)
+    db.dispose()
+    context.close()
+    return problems
+
+
 def u4_flows(browser) -> list[str]:
     """docs/SPEC-v4.21 U4: the owner's daily jobs in <= 3 taps on a phone (390 px), starting from any page.
     Runs last: it changes the fake shop (sends a reply, approves the test payment, packs an order)."""
@@ -371,7 +469,7 @@ def run(quick: bool, save_inventory: bool) -> int:
                                              + "; ".join(problems[:6]) + (f" (+{len(problems) - 6})" if len(problems) > 6 else ""))
             context.close()
         if not save_inventory:
-            for problem in u4_flows(browser):
+            for problem in pc_flows(browser) + u4_flows(browser):
                 failures += 1
                 lines.append("FAIL " + problem)
         browser.close()

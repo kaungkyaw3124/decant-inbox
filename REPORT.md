@@ -2268,3 +2268,102 @@ Full pytest **846 passed, 1 skipped** (~20 min on 2 CPUs). Full UI gate **384 pa
 (C1-C7 + U4; the Stock page's file picker was too wide at 360 px → fixed). UI inventory baseline re-saved
 (tests/fixtures/ui_inventory.json, 64 pages, now including Stock, Customers, My account, slips).
 
+
+## 2026-11-03 — v5.3 PERFORMANCE on the PC browser (docs/SPEC-v5.3-performance-pc.md)
+
+**The cause (confirmed in M0):** every response, also /static, had `Cache-Control: no-store`, so Chrome downloaded
+Bootstrap, fonts, icons, htmx and our CSS/JS (~680 KB) again on every click, through the tunnel; no compression;
+every click was a full page load; the chat page computed the whole "Needs you" queue (~127 queries) every time.
+
+**Built**
+- **M0 measure** — `Server-Timing` (db / app / total ms) on every response; requests over 300 ms are logged with the
+  ROUTE only (`GET /chats/{customer_id}`, never ids or search words); **/health → "Speed: dashboard pages"** shows
+  p50 / p90 / max per page since the last restart. `scripts/perf_check.py`: Chromium 1440×900 on a COPY of the live
+  database (throw-away login in the copy only, AI off, no listener: nothing reaches Telegram), network slowed like
+  the tunnel (150 ms round trip, 5 Mbit/s); main pages cold + warm, customer switches, one reply.
+- **M1 browser cache** — our own files get versioned URLs (`static_url("app.css")` → `/static/app.css?v=<hash>`,
+  a changed file = a new URL) and vendor folders are versioned by name: both `public, max-age=31536000, immutable`.
+  Pages, partials, JSON, errors: still `no-store` (customer data never stored by the browser or Cloudflare).
+  gzip for everything ≥ 1 KB (not the live stream). Fonts were already woff2 subsets with `font-display: swap`.
+  **Security for compression:** the CSRF token in a page is now masked with a new random pad every time (the real
+  token never appears in a page), so compressed sizes can't leak it (BREACH).
+- **M2 no full reloads** — the sidebar (menu) is htmx-boosted: a click swaps the page body, CSS/JS/fonts stay
+  loaded; back / forward work (they reload from the server: htmx's history copy in localStorage is OFF — customer
+  pages are never stored in the browser). Posting forms in the menu (language, log out, auto-reply) are normal
+  posts. **Prefetch:** hovering a menu link or a chat row for 60 ms loads that page in the background (GET links
+  only, kept in the page's memory 10 s, used once). **Optimistic send:** the reply bubble shows at once as
+  "sending…", the workspace swaps in the real outbox row; an error shows a red bubble with "Try again" (same
+  idempotency key, so never sent twice).
+- **M3 live updates** — `GET /events` (Server-Sent Events, login required; 204 = stop when logged out): says only
+  WHAT changed ("thread", "list", "counts" {needs: n}), never customer text; the browser then fetches that part
+  through the normal routes. Woken at once by the v4.18 Postgres NOTIFY, else every 2 s; a stream ends after 5 min
+  (the browser reconnects, so expired sessions stop it). While connected the thread's own 4 s polling pauses;
+  if the stream drops, polling takes over.
+- **M4 faster server** — the "Needs you" queue is computed once and reused while nothing changed (a 5 ms fingerprint
+  query of the newest rows) and for at most 30 s; any POST clears it at once. Chat page server time ~600 → ~180 ms.
+  Indexes: the live data is tiny (~110 messages), EXPLAIN shows ~3 ms queries — the cost was the NUMBER of queries,
+  so no index migration. **1 web worker kept** (not 2): the login lockout counters are per process, 2 workers would
+  double the brute-force allowance. Postgres memory settings unchanged (the database fits in RAM many times).
+  Test runs: `pytest.ini` now uses 1 worker; `bash scripts/test.sh` = pytest with `nice -n 19 ionice -c3`
+  (also use nice/ionice for ui_check and the simulator while the shop is live).
+- **M5 "Trust this computer for 30 days"** (owner only; staff unchanged) — a tick box on the login page. Cookie
+  `decant_trust` (HttpOnly, Secure, SameSite=Lax, Path=/, until the fixed 30-day end); the database keeps only its
+  sha256 (table trusted_devices, migration b5e9f1a7d348). With it: an expired 12 h session is renewed silently and
+  the 2-step code is skipped **on that computer only** (password still asked at a login). The token changes every
+  time it is used. Ends with: Log out on that PC, "Log out everywhere", **My account → Trusted computers → Remove**,
+  30 days, a disabled user. No customer data in cookies or localStorage.
+- **M6 keyboard** — ↓/J ↑/K next / previous chat, Enter = send the suggested reply in the composer (only when not
+  typing and the text is unchanged), Ctrl+Enter = send what you typed, Esc = close panels / leave the text box,
+  / = search, ? = shortcut help.
+
+**Found on the way:** htmx trigger filters (`every 4s[...]`) need `eval`, which our CSP blocks — the UI gate caught
+it; the CSP stays, the polling pause is done in app.js instead.
+
+**Fixed in review (2026-11-05):** two requests at the same moment with the old trust cookie (one renews + rotates
+it, the other still carries the old token) made the loser delete the cookie, so the PC silently stopped being
+trusted. An unknown token is now left alone (harmless) instead of deleted.
+
+**Fixed while finishing (2026-11-06):**
+- An EXPIRED trust cookie was no longer cleared after the 11-05 fix (the test caught it): now a token whose 30 days
+  are over is deleted with its row and the cookie is cleared; only an UNKNOWN token is left alone (the race case).
+- Page weight was 408 KB (> the 400 KB limit of v4.15; app.js grew 4 → 13 KB). The limit stays: every page now loads
+  `bootstrap.subset.min.css` (167 KB instead of 232 KB): `scripts/vendor_bootstrap_css.py` drops the Bootstrap
+  components no template uses (carousel, dropdown, tooltip, popover, navbar, pagination, list-group, progress,
+  accordion, input-group, form-floating, …); the licence header stays, the original file stays next to it. It is
+  loaded through `static_url()`, so a regenerated file gets a new URL. Now 342 KB per page. Test: the subset is
+  up to date and still has btn / modal / offcanvas. Full UI gate after it: **384 page views, 0 failed checks**.
+
+**Measured** (`scripts/perf_check.py`: copy of the live DB, Chromium 1440×900, 150 ms RTT + 5 Mbit/s, 3 runs; the
+browser, the server and the live shop share the 2 CPUs, run with nice). "Before" = the same script on the old code.
+
+| | before (v5.2) | after (v5.3) | goal |
+|---|---|---|---|
+| page, second visit (p90, 6 pages) | 2.04–2.35 s, 676–741 KB, 15–16 requests | **0.20–0.47 s, 0 KB, 0 requests** | ≤ 1.0 s ✅, ≤ 50 KB ✅ |
+| page, first visit (p90) | 2.07–2.50 s, ~680 KB | 0.58–1.11 s, 3–21 KB | — |
+| first page after login, empty cache (p90) | 3.95 s, 694 KB | 3.02 s, 161 KB | ≤ 2.5 s ❌ (p50 1.93 s) |
+| customer switch (p50 / p90) | 1.00 / 1.18 s | 0.75 / 1.27 s | ≤ 0.5 s ❌ |
+| send reply → bubble shown (p90) | 1.41 s | **0.25 s** | ≤ 0.3 s ✅ |
+| server time p90 (Server-Timing) | — | /chats 194, /sales 194, /settings 266, /stock 338, /orders 439, /chats/{id} 935 ms | ≤ 200 ms ❌ for most |
+
+Server time without the browser on the same CPUs: the chat page is 186–344 ms with **49 queries** (DB ~80 ms; one
+query round trip through Docker's port proxy = 1 ms). **Not met yet: P2 (customer switch) and P3 (server time):** the
+chat page needs fewer queries (one combined load instead of ~49 small ones) — a bigger change, left for a follow-up
+task (planning chat). In daily use the hover prefetch (60 ms on a chat row) hides most of the switch time.
+
+**Migration:** backup `product_requests_2026-11-05T1842Z.dump` first; b5e9f1a7d348 tested down/up on the live
+database (new table trusted_devices only).
+
+**Tests:** 862 passed, 1 skipped (was 846 + 1). New tests/test_v53_perf.py (15) + the subset test. `pytest.ini` now
+runs 1 worker; full suite ~34 min with nice. UI gate full: 384 views, 0 failed.
+
+### OWNER TEST SCRIPT 5.3 (PC browser: Chrome or Edge)
+1. Log out. Log in with password + 2-step code and tick **"Trust this computer for 30 days"**.
+2. Click Chats → Orders → Payments → Stock → back to Chats in the left menu: each page appears almost at once,
+   the menu and fonts do not flash. Browser Back / Forward work.
+3. In Chats press ↓ (or J) ten times: each customer opens well under a second. Press ? → the shortcut help shows.
+4. In your second account's chat type "test 5.3" and press Ctrl+Enter: the bubble shows at once as "sending…",
+   then turns normal; it arrives on the second Telegram account.
+5. From the second Telegram account send "ရှိလား": the chat list row updates by itself within ~2 s (no reload).
+6. Close the browser fully; open the dashboard the next day: you are still logged in, no code asked.
+7. My account → **Trusted computers** → your PC is listed → Remove → reload: the login page asks for password + code.
+8. /health → **Speed: dashboard pages**: p90 per page (goal: ≤ 200 ms server time).

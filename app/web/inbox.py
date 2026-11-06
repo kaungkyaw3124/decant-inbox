@@ -20,7 +20,7 @@ from app.parser.rules import NEEDS_REVIEW_BELOW
 from app.orders import actions, unknown
 from app.replies import templates as replies
 from app.web.auth import current_user, verify_csrf
-from app.web.deps import get_db, remember_needs, templates
+from app.web.deps import get_db, templates
 
 router = APIRouter(dependencies=[Depends(current_user), Depends(verify_csrf)])
 PAGE_SIZE = 50
@@ -144,9 +144,7 @@ def inbox(
     first_page = page == 1 and not f["q"] and not f["product"]
     from app.web.learning import card_context
 
-    needs_you = auto_pages.needs_you(db, owner=user.is_owner) if first_page else None
-    if needs_you is not None:  # the menu counter shows the same number as this page
-        remember_needs(user.role, needs_you["count"])
+    needs_you = auto_pages.needs_you_cached(owner=user.is_owner) if first_page else None
     from app.web.chats import chat_list_context
 
     return templates.TemplateResponse(request, "inbox.html", {

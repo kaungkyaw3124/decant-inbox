@@ -15,7 +15,7 @@ from fastapi import Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from app.models import User
-from app.web.deps import get_db
+from app.web.deps import get_db, unmask_csrf
 
 hasher = PasswordHasher()
 _DUMMY_HASH = hasher.hash("timing-equalizer")
@@ -131,7 +131,8 @@ async def verify_csrf(request: Request) -> None:
     sent = request.headers.get("x-csrf-token") or form.get("csrf")
     if not sent:
         raise HTTPException(403, "Form expired. Go back, reload the page and try again.")
-    if not expected or not secrets.compare_digest(str(sent), expected):
+    if not expected or not (secrets.compare_digest(str(sent), expected)
+                            or secrets.compare_digest(unmask_csrf(str(sent)).encode(), expected.encode())):
         back = str(form.get("back") or "")
         if not back.startswith("/") or back.startswith(("//", "/\\")):
             referer = urlsplit(request.headers.get("referer") or "")

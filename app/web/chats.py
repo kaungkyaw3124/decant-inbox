@@ -88,12 +88,11 @@ def initials(customer: Customer) -> str:
 def chat_list_context(db: Session, user: User, seg: str = "all", q: str = "", page: int = 1,
                       show_ignored: bool = False, active: int | None = None, found: dict | None = None) -> dict:
     """docs/SPEC-v4.21 chat list: needs-you first (longest waiting first), then the most recent."""
-    from app.web.auto import customers_needing, needs_you  # late import: auto imports this module's neighbours
+    from app.web.auto import customers_needing, needs_you_cached  # late import: auto imports this module's neighbours
 
     seg = seg if seg in ("all", "needs", "orders") else "all"
     page = max(page, 1)
-    # shortcut: needs_you() on every list render; fine for a small shop, cache it if the list gets slow
-    needing = customers_needing(found if found is not None else needs_you(db, owner=user.is_owner))
+    needing = customers_needing(found if found is not None else needs_you_cached(owner=user.is_owner))
     last = (select(Message.customer_id, func.max(Message.id).label("last_id"))
             .group_by(Message.customer_id).subquery())
     query = select(Customer, Message).join(last, last.c.customer_id == Customer.id).join(
@@ -224,10 +223,10 @@ def chat(request: Request, customer_id: int, db: Session = Depends(get_db), user
             result.text += "\n" + resume
     products = db.scalars(select(Product).where(Product.active).order_by(Product.brand, Product.name)).all()
     sizes = sorted({p.size_ml for ps in current_prices(db).values() for p in ps if p.size_ml})
-    from app.web.auto import for_customer, needs_you  # late import: auto imports this module's neighbours
+    from app.web.auto import for_customer, needs_you_cached  # late import: auto imports this module's neighbours
     from app.web.learning import card_context
 
-    found = needs_you(db, owner=user.is_owner)
+    found = needs_you_cached(owner=user.is_owner)
     mine = for_customer(found, customer_id)
     shown = ([card for _, _, card in mine["teach"]] + [r.card[1] for r in mine["unanswered"] if r.card]
              + [mine["waiting_cards"][m.id] for _, m, _ in mine["waiting"] if m.id in mine["waiting_cards"]])
