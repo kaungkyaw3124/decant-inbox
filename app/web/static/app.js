@@ -243,3 +243,17 @@
     }
   });
 })();
+
+// docs/SPEC-v5.4-ui-ux-cleanup.md X3: warn before leaving Settings with changes that are not saved
+(() => {
+  const box = document.querySelector('.set-layout[data-unsaved]');
+  if (!box) return;
+  let dirty = false;
+  box.addEventListener('input', () => { dirty = true; });
+  box.addEventListener('submit', () => { dirty = false; });
+  window.addEventListener('beforeunload', e => { if (dirty) { e.preventDefault(); e.returnValue = ''; } });
+  document.addEventListener('click', e => {  // boosted menu links do not fire beforeunload
+    const a = e.target.closest('a[href]');
+    if (dirty && a && !a.closest('form') && !confirm(box.dataset.unsaved)) { e.preventDefault(); e.stopImmediatePropagation(); }
+  }, true);
+})();

@@ -6,12 +6,13 @@ Usage: .venv/bin/uvicorn app.web.main:app --host 127.0.0.1 --port 8080 --no-acce
 (no access log: inbox search terms are customer text and must not be logged)
 """
 import hashlib
+import logging
 import secrets
 import sys
 import threading
 import time
 from pathlib import Path
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlsplit
 
 from fastapi import Depends, FastAPI, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -99,9 +100,16 @@ def error_page(request: Request, exc: StarletteHTTPException):
     """Errors as a page in the user's language (the detail is translated in error.html)."""
     if exc.status_code < 400 or request.headers.get("hx-request"):
         return HTMLResponse(str(exc.detail), status_code=exc.status_code, headers=exc.headers)
+    # docs/SPEC-v5.4 X6: what to do next + a request id the owner can find in the log
+    request_id = secrets.token_hex(4)
+    logging.getLogger("decant.web").warning("error %s: %s %s %s", request_id, exc.status_code, request.method,
+                                            request.scope.get("route").path if request.scope.get("route") else "-")
+    referer = urlsplit(request.headers.get("referer", ""))
+    again = (str(request.url.path) + (f"?{request.url.query}" if request.url.query else "")) if request.method == "GET" \
+        else inbox.safe_back(referer.path if referer.netloc == request.url.netloc else "", "/chats")
     return templates.TemplateResponse(request, "error.html", {
-        "title": ERROR_TITLES.get(exc.status_code, "Something went wrong"), "detail": str(exc.detail)},
-        status_code=exc.status_code, headers=exc.headers)
+        "title": ERROR_TITLES.get(exc.status_code, "Something went wrong"), "detail": str(exc.detail),
+        "request_id": request_id, "again": again}, status_code=exc.status_code, headers=exc.headers)
 
 
 @app.middleware("http")

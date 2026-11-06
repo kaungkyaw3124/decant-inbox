@@ -26,7 +26,7 @@
   <a href="{{ '/learning' if user_role == 'owner' and to_learn else '#needs-you' }}" class="{{ 'hot' if cards_n }}"><b>{{ cards_n }}</b><span>🧠 {{ t("learning cards") }}</span></a>
 </nav>
 <section class="card needs-you {% if needs_you.count %}notice{% endif %}" id="needs-you">
-  <h2>🟡 {{ t("Needs you") }} ({{ needs_you.count }}) {{ ui.help("Messages the app could not answer by itself. Work from top to bottom; each line says what to do.") }}</h2>
+  <h2>{{ t("Needs you") }} ({{ needs_you.count }}) {{ ui.help("Messages the app could not answer by itself. Work from top to bottom; each line says what to do.") }}</h2>
   {% if not needs_you.count %}<p class="muted small">{{ t("Nothing waiting for you.") }}</p>{% endif %}
   {% include "_needs_items.html" %}
   {% if needs_you.dismissed %}

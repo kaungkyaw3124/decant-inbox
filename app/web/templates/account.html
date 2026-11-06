@@ -4,7 +4,7 @@
 <h1>{{ t("My account") }}: {{ me.username }}</h1>
 {% if error %}<p class="flash bad" role="alert">{{ tr(error) }}</p>{% endif %}
 <section class="card stack" id="two-step">
-  <h2>🔐 {{ t("2-step login") }}: {{ t("ON") if me.totp_secret else t("OFF") }}</h2>
+  <h2>{{ t("2-step login") }}: {{ t("ON") if me.totp_secret else t("OFF") }}</h2>
   {% if codes %}
   <div class="flash warnbox">
     <p><b>{{ t("Recovery codes — save them now (password manager or paper). Each works once. They are not shown again.") }}</b></p>

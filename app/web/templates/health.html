@@ -13,7 +13,7 @@
   <p class="muted small">{{ t("Last message received") }}: {{ tr(last_message) }} · {{ t("{n} messages stored.", n=total) }}</p>
 </section>
 <section class="card" id="speed">
-  <h2>⚡ {{ t("Speed: first reply (last 24 h)") }}</h2>
+  <h2>{{ t("Speed: first reply (last 24 h)") }}</h2>
   <table class="speed">
     <thead><tr><th>{{ t("Path") }}</th><th class="num">{{ t("Messages") }}</th><th class="num">p50</th><th class="num">p90</th><th class="num">max</th></tr></thead>
     <tbody>
@@ -30,7 +30,7 @@
   {% endif %}
 </section>
 <section class="card" id="page-speed">{# docs/SPEC-v5.3 M0 #}
-  <h2>⚡ {{ t("Speed: dashboard pages (server time since the last restart)") }}</h2>
+  <h2>{{ t("Speed: dashboard pages (server time since the last restart)") }}</h2>
   {% if pages %}
   <table class="speed">
     <thead><tr><th>{{ t("Page") }}</th><th class="num">{{ t("Times") }}</th><th class="num">p50</th><th class="num">p90</th><th class="num">max</th></tr></thead>

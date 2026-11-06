@@ -2402,3 +2402,28 @@ AI calls (10), Customers (20; `care.customer_query` + `as_rows`, the CSV export 
 **Test changes (markup only):** test_prices `test_prices_pages` checks the price chips instead of "5ml 18,000";
 test_v46_ai checks the heading "AI calls" instead of "Last 50 AI calls".
 | U3 part 2 | 430 affected + 92 settings pass; full UI gate 0 fails | 0 | ~10 | 1 (Learning: pending cards must all show; approved lists later) | pager on Orders, Activity, Stock history, price history, customer orders |
+| U4-U5 loop 1 | 885 + 1 skip | 0 (384 views) | ~8 (payment, product, customer detail, health, help, account, login, chat panes) | 1 (Learning) | Settings in sections, emoji out of headings, error page, Customers in the menu, glossary |
+
+U4-U5 loop 1, built:
+- **Settings like iOS Settings** (X3): a section list (Shop · Orders & payments · Auto-reply · AI helper · Alerts & backup
+  · Inventory · Test mode · Users · My account · Health · Help), one section shown (`/settings?section=…`); every
+  save comes back to its section with "Saved ✓" next to that form; leaving with unsaved changes asks first (also for
+  menu clicks). The page was 19,764 px tall, now one screen per section. .env names (ALERT_BOT_TOKEN, BACKUP_PASSPHRASE,
+  TEST_PAY_CODE) moved into a collapsed "Technical details" line. Shop = links to Learning, Reports, Price list,
+  Practice; Inventory links Stock. All forms, fields and routes unchanged (the other sections are in the page,
+  `hidden`, so nothing is lost and the UI inventory stays complete).
+- **No emoji in h1/h2** on any page (17 headings); test checks 8 main pages.
+- **Menu** (X4): Customers added → Chats · Orders · Payments · Customers · Products & prices · Sales · Settings.
+- **Error page** (X6): "Back to Chats" + "Try again" (same page for GET, previous page for a failed post); the owner
+  sees a request id, also written to the log with status + route.
+- **Words** (X5): docs/GLOSSARY.md (EN + MY, plain words, units, where technical names may appear);
+  "Aliases" → "Nicknames" on the product pages.
+- Empty states with a next step on Products, Customers, Orders, Activity, AI calls.
+**Test changes (markup only):** test_auto "🟡 Needs you (n)" → "Needs you (n)"; test_faq "💬 FAQ answers" →
+"FAQ answers" (emoji removed from headings).
+**Perf after loop 1** (same script as 5.3): warm pages 0.14–0.33 s / 0 KB, send 0.33 s p90, server p90: /chats 143,
+/payments 95, /sales 173, /orders 288, /settings 280, /stock 423, /chats/{id} 802 ms — same as 5.3 (nothing slower).
+
+**Decision to check (planning chat):** "Inbox (/) redirects to Chats" (X4) is not done: `/` IS the Chats workspace's
+"Needs me" view since v4.21 (the menu shows only Chats, highlighted on `/`), so the two doors are already one; a
+redirect would only change the URL and 71 test calls. Say if you still want the redirect.

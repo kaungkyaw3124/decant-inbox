@@ -110,7 +110,7 @@ def test_b5_settings_edit_changes_matching_now(shop, db):
     client, token = shop
     auto_on(db)
     page = client.get("/settings").text
-    assert "💬 FAQ answers" in page and "edit me" in page
+    assert "FAQ answers" in page and "edit me" in page
     entry = faq_id(db, "Location")
     client.post(f"/settings/faq/{entry}", data={"csrf": token, "title": "Location", "keywords": "ဆိုင်ဖွင့်, pick up",
                                                 "answer": "Online shop ပါ။ လာယူလို့မရပါဘူးနော်။", "active": "1"})

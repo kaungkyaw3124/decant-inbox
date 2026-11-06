@@ -1,41 +1,30 @@
 {% extends "base.html" %}
 {% import "_ui.html" as ui with context %}
 {% block title %}{{ t("Settings") }} · Decant Inbox{% endblock %}
+{% macro saved_mark(anchor) %}{% if saved == anchor %} <span class="saved-ok" role="status">{{ t("Saved ✓") }}</span>{% endif %}{% endmacro %}
 {% block content %}
 {{ ui.page_head(t("Settings")) }}
+{# docs/SPEC-v5.4-ui-ux-cleanup.md X3: like iOS Settings, a list of sections on the left, one section on the right #}
+{% set sections = [("shop", "bi-graph-up", "Shop", ""), ("orders", "bi-box-seam", "Orders & payments", ""),
+                   ("auto-reply", "bi-chat", "Auto-reply", ""), ("ai", "bi-cpu", "AI helper", "/ai"),
+                   ("alerts", "bi-shield-lock", "Alerts & backup", ""), ("inventory", "bi-droplet", "Inventory", ""),
+                   ("test", "bi-controller", "Test mode", ""), ("users", "bi-people", "Users", "/users"),
+                   ("account", "bi-person-vcard", "My account", "/account"), ("health", "bi-heart-pulse", "Health", "/health"),
+                   ("help", "bi-question-circle", "Help", "/help")] %}
+<div class="set-layout" data-unsaved="{{ t('You have changes that are not saved. Leave anyway?') }}">
+<nav class="set-nav card" aria-label="{{ t('Settings') }}">
+  {% for key, icon, label, href in sections %}
+  <a href="{{ href or '/settings?section=' ~ key }}"{% if key == section %} aria-current="page"{% endif %}><i class="bi {{ icon }}"></i> {{ t(label) }}</a>
+  {% endfor %}
+</nav>
+<div class="set-body">
+<div class="set-section stack" id="sec-shop"{% if section != "shop" %} hidden{% endif %}>
+<div class="card"><ul class="set-links">{% if true %}<li><a href="/learning"><i class="bi bi-mortarboard"></i> {{ t("Learning") }}<span class="muted">{{ t("Words the shop learned; approve new ones") }}</span></a></li>{% endif %}{% if true %}<li><a href="/reports/wanted"><i class="bi bi-clipboard-data"></i> {{ t("Reports") }}<span class="muted">{{ t("Perfumes customers asked for that we don't sell") }}</span></a></li>{% endif %}{% if true %}<li><a href="/prices"><i class="bi bi-tags"></i> {{ t("Price list") }}<span class="muted">{{ t("Prices and the Excel file") }}</span></a></li>{% endif %}{% if true %}<li><a href="/practice"><i class="bi bi-controller"></i> {{ t("Practice") }}<span class="muted">{{ t("Try the buttons; nothing is sent") }}</span></a></li>{% endif %}</ul></div>
+</div>
 
-<form method="post" action="/settings/alerts" class="card stack" id="alerts">
-  <input type="hidden" name="csrf" value="{{ csrf }}">
-  <h2>🔔 {{ t("Alerts to your phone") }}: {{ t("ON") if alerts_on else t("OFF") }}</h2>
-  {% if not alerts_on %}<p class="small problem-text">{{ t("Off until ALERT_BOT_TOKEN and ALERT_CHAT_ID are set in .env (see REPORT.md).") }}</p>{% endif %}
-  <div class="grid">
-    {% for key, label in alert_types.items() %}
-    <label class="check"><input type="checkbox" name="type_{{ key }}" value="1" {% if alerts.types[key] %}checked{% endif %}> {{ t(label) }}</label>
-    {% endfor %}
-    <label class="check"><input type="checkbox" name="preview" value="1" {% if alerts.preview %}checked{% endif %}> {{ t("Include message preview (customer text)") }}</label>
-  </div>
-  <p class="small muted">{{ t("Off-server backup") }}: {{ t("ON") if backup_offsite and alerts_on else t("OFF") }} — {{ t("the daily backup is encrypted with BACKUP_PASSPHRASE and sent to the alert bot chat.") }}</p>
-  <div class="buttons">
-    <button class="primary">{{ t("Save alerts") }}</button>
-    <button formaction="/settings/alerts/test" formnovalidate {% if not alerts_on %}disabled{% endif %}>{{ t("Send a test alert") }}</button>
-  </div>
-</form>
-
-<form method="post" action="/settings/auto-speed" class="card stack" id="auto-speed">
-  <h2>🤖 {{ t("Auto-reply speed") }}</h2>
-  <input type="hidden" name="csrf" value="{{ csrf }}">
-  <p class="muted small">{{ t("Time from the customer's message to an automatic reply ≈ quiet + delay. Shorter = faster, but looks more like a bot.") }}</p>
-  {% if speed_error %}<p class="error" role="alert">{{ tr(speed_error) }}</p>{% endif %}
-  <div class="grid">
-    <label>{{ t("Wait for the customer to stop typing (s)") }} <input name="quiet_s" type="number" step="0.1" min="{{ speed_limits.quiet_s[0] }}" max="{{ speed_limits.quiet_s[1] }}" value="{{ speed.quiet_s }}" required></label>
-    <label>{{ t("Shortest delay (s)") }} <input name="delay_min_s" type="number" step="0.1" min="{{ speed_limits.delay_min_s[0] }}" max="{{ speed_limits.delay_min_s[1] }}" value="{{ speed.delay_min_s }}" required></label>
-    <label>{{ t("Longest delay (s)") }} <input name="delay_max_s" type="number" step="0.1" min="{{ speed_limits.delay_max_s[0] }}" max="{{ speed_limits.delay_max_s[1] }}" value="{{ speed.delay_max_s }}" required></label>
-  </div>
-  <button class="primary">{{ t("Save speed") }}</button>
-</form>
-
+<div class="set-section stack" id="sec-orders"{% if section != "orders" %} hidden{% endif %}>
 <form method="post" action="/settings/order-rules" class="card stack" id="order-rules">
-  <h2>📦 {{ t("Orders & payments") }}</h2>
+  <h2>{{ t("Order rules") }}</h2>
   <input type="hidden" name="csrf" value="{{ csrf }}">
   <p class="muted small">{{ t("Reminder and cancel are sent only while auto-reply is ON; otherwise the order waits in “Needs you” with a button.") }}</p>
   {% if rules_error %}<p class="error" role="alert">{{ tr(rules_error) }}</p>{% endif %}
@@ -45,59 +34,11 @@
     <label>{{ t("Sent out → delivered after (days)") }} <input name="auto_delivered_days" type="number" min="{{ rule_limits.auto_delivered_days[0] }}" max="{{ rule_limits.auto_delivered_days[1] }}" value="{{ order_rules.auto_delivered_days }}" required></label>
   </div>
   <label class="check"><input type="checkbox" name="thank_you" value="1" {% if order_rules.thank_you %}checked{% endif %}> {{ t("Send thank-you on delivered") }}</label>
-  <button class="primary">{{ t("Save") }}</button>
+  <div class="buttons"><button class="primary">{{ t("Save") }}</button>{{ saved_mark("order-rules") }}</div>
 </form>
-
-<form method="post" action="/settings/test-payments" class="card stack" id="test-payments">
-  <h2>🧪 {{ t("Test payments") }}</h2>
-  <input type="hidden" name="csrf" value="{{ csrf }}">
-  <p class="small">{{ t("Test payment code (TEST_PAY_CODE in .env)") }}: <b>{{ t("set") if test_code_set else t("not set (feature off)") }}</b></p>
-  <p class="small">{{ t("Test accounts") }}: {% for c in testers %}<a href="/chats/{{ c.id }}">{{ c.display_name or c.username or c.id }}</a>{% if not loop.last %}, {% endif %}{% else %}<span class="muted">{{ t("none (turn on “🧪 Test account” on a chat page)") }}</span>{% endfor %}</p>
-  <label class="check"><input type="checkbox" name="auto_approve" value="1" {% if test_auto_approve %}checked{% endif %}> {{ t("Auto-approve test payments (5 s after the code)") }}</label>
-  <button class="primary">{{ t("Save") }}</button>
-</form>
-
-<form method="post" action="/settings/vial-costs" class="card stack" id="vial-costs">
-  <h2>🧪 {{ t("Vial cost per decant size") }}</h2>
-  <input type="hidden" name="csrf" value="{{ csrf }}">
-  <p class="muted small">{{ t("Cost of the empty vial / packaging, added to the perfume cost of each decant (Sales page). Bottle costs come from the price list (bottle_cost column). Saved on each order when it is paid.") }}</p>
-  {% if vial_error %}<p class="error" role="alert">{{ tr(vial_error) }}</p>{% endif %}
-  <div class="grid">
-    {% for size in vial_sizes %}<label>{{ t("{size}ml vial (ကျပ်)", size=size) }} <input name="vial_{{ size }}" inputmode="numeric" value="{{ vials.get(size, 0) }}"></label>{% endfor %}
-  </div>
-  <button class="primary">{{ t("Save vial costs") }}</button>
-</form>
-
-<section class="card stack" id="faq">
-  <h2>💬 {{ t("FAQ answers") }}</h2>
-  <p class="muted small">{{ t("Common questions. A message that names no product and matches keywords gets the answer (automatically when auto-reply is ON, otherwise a one-tap “💬 Send FAQ” button). Keywords: comma separated, Burmese or English. Most keywords found wins.") }}</p>
-  {% for e in faqs %}
-  <form method="post" action="/settings/faq/{{ e.id }}" class="template {% if not e.active %}inactive{% endif %}" id="faq-{{ e.id }}">
-    <input type="hidden" name="csrf" value="{{ csrf }}">
-    {% if faq_error and faq_error_id == e.id %}<p class="error" role="alert">{{ tr(faq_error) }}</p>{% endif %}
-    <label>{{ t("Title") }} {% if not e.edited %}<span class="badge warn">{{ t("edit me") }}</span>{% endif %} <input name="title" value="{{ e.title }}" maxlength="64" required></label>
-    <label>{{ t("Keywords") }} <input name="keywords" value="{{ e.keywords }}" required></label>
-    <label>{{ t("Answer") }} <textarea name="answer" rows="{{ [e.answer.count('\n') + 2, 2]|max }}" maxlength="2000" required>{{ e.answer }}</textarea></label>
-    <div class="buttons">
-      <label class="check"><input type="checkbox" name="active" value="1" {% if e.active %}checked{% endif %}> {{ t("Active") }}</label>
-      <button class="primary">{{ t("Save") }}</button>
-      <button class="link danger" formaction="/settings/faq/{{ e.id }}/delete">{{ t("delete") }}</button>
-    </div>
-  </form>
-  {% endfor %}
-  <form method="post" action="/settings/faq" class="stack add-method">
-    <input type="hidden" name="csrf" value="{{ csrf }}">
-    <h3>{{ t("Add FAQ") }}</h3>
-    {% if faq_error and faq_error_id == "new" %}<p class="error" role="alert">{{ tr(faq_error) }}</p>{% endif %}
-    <label>{{ t("Title") }} <input name="title" maxlength="64" required></label>
-    <label>{{ t("Keywords") }} <input name="keywords" placeholder="ဘယ်နှစ်ရက်, delivery time" required></label>
-    <label>{{ t("Answer") }} <textarea name="answer" rows="2" maxlength="2000" required></textarea></label>
-    <button class="primary">{{ t("Add") }}</button>
-  </form>
-</section>
 
 <section class="card stack" id="payment-methods">
-  <h2>{{ t("Payment methods") }}</h2>
+  <h2>{{ t("Payment methods") }} {{ saved_mark("payment-methods") }}</h2>
   <p class="muted small">{{ t("Active methods are listed in the payment info message to customers.") }}</p>
   {% for m in methods %}
   <form method="post" action="/settings/payment-methods/{{ m.id }}" class="method {% if not m.active %}inactive{% endif %}">
@@ -127,8 +68,51 @@
     <button class="primary">{{ t("Add") }}</button>
   </form>
 </section>
+</div>
 
-<section class="card stack">
+<div class="set-section stack" id="sec-auto-reply"{% if section != "auto-reply" %} hidden{% endif %}>
+<form method="post" action="/settings/auto-speed" class="card stack" id="auto-speed">
+  <h2>{{ t("Auto-reply speed") }}</h2>
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <p class="muted small">{{ t("Time from the customer's message to an automatic reply ≈ quiet + delay. Shorter = faster, but looks more like a bot.") }}</p>
+  {% if speed_error %}<p class="error" role="alert">{{ tr(speed_error) }}</p>{% endif %}
+  <div class="grid">
+    <label>{{ t("Wait for the customer to stop typing (s)") }} <input name="quiet_s" type="number" step="0.1" min="{{ speed_limits.quiet_s[0] }}" max="{{ speed_limits.quiet_s[1] }}" value="{{ speed.quiet_s }}" required></label>
+    <label>{{ t("Shortest delay (s)") }} <input name="delay_min_s" type="number" step="0.1" min="{{ speed_limits.delay_min_s[0] }}" max="{{ speed_limits.delay_min_s[1] }}" value="{{ speed.delay_min_s }}" required></label>
+    <label>{{ t("Longest delay (s)") }} <input name="delay_max_s" type="number" step="0.1" min="{{ speed_limits.delay_max_s[0] }}" max="{{ speed_limits.delay_max_s[1] }}" value="{{ speed.delay_max_s }}" required></label>
+  </div>
+  <div class="buttons"><button class="primary">{{ t("Save speed") }}</button>{{ saved_mark("auto-speed") }}</div>
+</form>
+
+<section class="card stack" id="faq">
+  <h2>{{ t("FAQ answers") }}</h2>
+  <p class="muted small">{{ t("Common questions. A message that names no product and matches keywords gets the answer (automatically when auto-reply is ON, otherwise a one-tap “💬 Send FAQ” button). Keywords: comma separated, Burmese or English. Most keywords found wins.") }}</p>
+  {% for e in faqs %}
+  <form method="post" action="/settings/faq/{{ e.id }}" class="template {% if not e.active %}inactive{% endif %}" id="faq-{{ e.id }}">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    {% if faq_error and faq_error_id == e.id %}<p class="error" role="alert">{{ tr(faq_error) }}</p>{% endif %}
+    <label>{{ t("Title") }} {% if not e.edited %}<span class="badge warn">{{ t("edit me") }}</span>{% endif %} <input name="title" value="{{ e.title }}" maxlength="64" required></label>
+    <label>{{ t("Keywords") }} <input name="keywords" value="{{ e.keywords }}" required></label>
+    <label>{{ t("Answer") }} <textarea name="answer" rows="{{ [e.answer.count('\n') + 2, 2]|max }}" maxlength="2000" required>{{ e.answer }}</textarea></label>
+    <div class="buttons">
+      <label class="check"><input type="checkbox" name="active" value="1" {% if e.active %}checked{% endif %}> {{ t("Active") }}</label>
+      <button class="primary">{{ t("Save") }}</button>{{ saved_mark("faq-" ~ e.id) }}
+      <button class="link danger" formaction="/settings/faq/{{ e.id }}/delete">{{ t("delete") }}</button>
+    </div>
+  </form>
+  {% endfor %}
+  <form method="post" action="/settings/faq" class="stack add-method">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <h3>{{ t("Add FAQ") }}</h3>
+    {% if faq_error and faq_error_id == "new" %}<p class="error" role="alert">{{ tr(faq_error) }}</p>{% endif %}
+    <label>{{ t("Title") }} <input name="title" maxlength="64" required></label>
+    <label>{{ t("Keywords") }} <input name="keywords" placeholder="ဘယ်နှစ်ရက်, delivery time" required></label>
+    <label>{{ t("Answer") }} <textarea name="answer" rows="2" maxlength="2000" required></textarea></label>
+    <button class="primary">{{ t("Add") }}</button>
+  </form>
+</section>
+
+<section class="card stack" id="templates">
   <h2>{{ t("Reply templates") }}</h2>
   <p class="muted small">{{ t("Texts the dashboard suggests when you reply to a customer. You can still edit each message before it is sent. Words in {braces} are filled in automatically.") }}</p>
   {% for tpl in templates %}
@@ -143,10 +127,61 @@
     </p>
     {% if tpl.def.example and tpl.example %}<p class="example small"><samp>{{ tpl.example }}</samp></p>{% endif %}
     <div class="buttons">
-      <button class="primary">{{ t("Save") }}</button>
+      <button class="primary">{{ t("Save") }}</button>{{ saved_mark("t-" ~ tpl.def.key) }}
       {% if tpl.customized %}<button class="link" formaction="/settings/templates/{{ tpl.def.key }}/reset">{{ t("reset to default") }}</button>{% endif %}
     </div>
   </form>
   {% endfor %}
 </section>
+</div>
+
+<div class="set-section stack" id="sec-alerts"{% if section != "alerts" %} hidden{% endif %}>
+<form method="post" action="/settings/alerts" class="card stack" id="alerts">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <h2>{{ t("Alerts to your phone") }}: {{ t("ON") if alerts_on else t("OFF") }}</h2>
+  {% if not alerts_on %}<p class="small problem-text">{{ t("Off: the alert bot is not set up yet.") }}</p>
+  <details class="tech small"><summary>{{ t("Technical details") }}</summary><p>{{ t("Off until ALERT_BOT_TOKEN and ALERT_CHAT_ID are set in .env (see REPORT.md).") }}</p></details>{% endif %}
+  <div class="grid">
+    {% for key, label in alert_types.items() %}
+    <label class="check"><input type="checkbox" name="type_{{ key }}" value="1" {% if alerts.types[key] %}checked{% endif %}> {{ t(label) }}</label>
+    {% endfor %}
+    <label class="check"><input type="checkbox" name="preview" value="1" {% if alerts.preview %}checked{% endif %}> {{ t("Include message preview (customer text)") }}</label>
+  </div>
+  <p class="small muted">{{ t("Off-server backup") }}: {{ t("ON") if backup_offsite and alerts_on else t("OFF") }}</p>
+  <details class="tech small"><summary>{{ t("Technical details") }}</summary><p>{{ t("the daily backup is encrypted with BACKUP_PASSPHRASE and sent to the alert bot chat.") }}</p></details>
+  <div class="buttons">
+    <button class="primary">{{ t("Save alerts") }}</button>{{ saved_mark("alerts") }}
+    <button formaction="/settings/alerts/test" formnovalidate {% if not alerts_on %}disabled{% endif %}>{{ t("Send a test alert") }}</button>
+  </div>
+</form>
+</div>
+
+<div class="set-section stack" id="sec-inventory"{% if section != "inventory" %} hidden{% endif %}>
+<form method="post" action="/settings/vial-costs" class="card stack" id="vial-costs">
+  <h2>{{ t("Vial cost per decant size") }}</h2>
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <p class="muted small">{{ t("Cost of the empty vial / packaging, added to the perfume cost of each decant (Sales page). Bottle costs come from the price list (bottle_cost column). Saved on each order when it is paid.") }}</p>
+  {% if vial_error %}<p class="error" role="alert">{{ tr(vial_error) }}</p>{% endif %}
+  <div class="grid">
+    {% for size in vial_sizes %}<label>{{ t("{size}ml vial (ကျပ်)", size=size) }} <input name="vial_{{ size }}" inputmode="numeric" value="{{ vials.get(size, 0) }}"></label>{% endfor %}
+  </div>
+  <div class="buttons"><button class="primary">{{ t("Save vial costs") }}</button>{{ saved_mark("vial-costs") }}</div>
+</form>
+
+<div class="card"><ul class="set-links">{% if true %}<li><a href="/stock"><i class="bi bi-droplet"></i> {{ t("Stock") }}<span class="muted">{{ t("Bottles, vials and stock moves") }}</span></a></li>{% endif %}</ul></div>
+</div>
+
+<div class="set-section stack" id="sec-test"{% if section != "test" %} hidden{% endif %}>
+<form method="post" action="/settings/test-payments" class="card stack" id="test-payments">
+  <h2>{{ t("Test payments") }}</h2>
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <p class="small">{{ t("Test payment code") }}: <b>{{ t("set") if test_code_set else t("not set (feature off)") }}</b></p>
+  <details class="tech small"><summary>{{ t("Technical details") }}</summary><p>{{ t("Test payment code (TEST_PAY_CODE in .env)") }}</p></details>
+  <p class="small">{{ t("Test accounts") }}: {% for c in testers %}<a href="/chats/{{ c.id }}">{{ c.display_name or c.username or c.id }}</a>{% if not loop.last %}, {% endif %}{% else %}<span class="muted">{{ t("none (turn on “🧪 Test account” on a chat page)") }}</span>{% endfor %}</p>
+  <label class="check"><input type="checkbox" name="auto_approve" value="1" {% if test_auto_approve %}checked{% endif %}> {{ t("Auto-approve test payments (5 s after the code)") }}</label>
+  <div class="buttons"><button class="primary">{{ t("Save") }}</button>{{ saved_mark("test-payments") }}</div>
+</form>
+</div>
+</div>
+</div>
 {% endblock %}

@@ -17,7 +17,7 @@
 <div class="list-card" id="product-list">
   <div class="list-head" aria-hidden="true">
     <div class="col-main">{{ t("Product") }}</div><div class="col-wide">{{ t("Prices (ကျပ်)") }}</div>
-    <div class="col-num">{{ t("Aliases") }}</div><div class="col-num">{{ t("Messages") }}</div>
+    <div class="col-num">{{ t("Nicknames") }}</div><div class="col-num">{{ t("Messages") }}</div>
   </div>
   {% for p, n_alias, n_msg in rows %}
   <div class="list-row{% if not p.active %} inactive{% endif %}">
@@ -29,7 +29,7 @@
       {%- for pr in prices.get(p.id, []) %}<span class="chip"><span class="k">{{ size_label(pr.size_ml, p.full_size_ml) }}</span> <b>{{ format_mmk(pr.price_mmk) }}</b></span>
       {%- else %}<span class="problem-text">{{ t("no prices") }}</span>{% endfor %}
       {%- if prices.get(p.id) and not prices[p.id]|selectattr("in_stock")|list %} <span class="badge warn">{{ t("out of stock") }}</span>{% endif %}</div>
-    <div class="col-num" title="{{ t('Aliases') }}">{{ n_alias }}</div>
+    <div class="col-num" title="{{ t('Nicknames') }}">{{ n_alias }}</div>
     <div class="col-num" title="{{ t('Messages') }}"><a href="/?intent=all&status=all&product={{ p.id }}"><b>{{ n_msg }}</b></a></div>
   </div>
   {% else %}

@@ -16,7 +16,7 @@
 
 {% if reorder or low_vials %}
 <section class="card notice" id="reorder">
-  <h2>🛒 {{ t("Reorder") }}</h2>
+  <h2>{{ t("Reorder") }}</h2>
   <ul class="feed">
     {% for r in reorder %}<li><b>{{ r.product.name }}</b> · {{ "%.0f" | format(r.level.available_ml) }} ml {{ t("left") }} <span class="small muted">({{ t("sold {n} ml in 30 days", n="%.0f" | format(r.sold_30d)) }})</span></li>{% endfor %}
     {% for v in low_vials %}<li><b>{{ v.size_ml }} ml {{ t("vials") }}</b> · {{ v.count }} {{ t("left") }}</li>{% endfor %}
@@ -58,7 +58,7 @@
 {% if user_role == "owner" %}
 <form method="post" action="/stock/bottles" class="card stack" id="add-bottle">
   <input type="hidden" name="csrf" value="{{ csrf }}">
-  <h2>➕ {{ t("Add bottles (purchase)") }}</h2>
+  <h2>{{ t("Add bottles (purchase)") }}</h2>
   <div class="grid">
     <label>{{ t("Product") }} <select name="product_id" required>{% for p in products %}<option value="{{ p.id }}">{{ p.name }} · {{ p.brand }}</option>{% endfor %}</select></label>
     <label>{{ t("Bottle size (ml)") }} <input name="size_ml" inputmode="numeric" required></label>
@@ -71,7 +71,7 @@
 {% endif %}
 
 <section class="card stack" id="vials">
-  <h2>🧪 {{ t("Vials") }}</h2>
+  <h2>{{ t("Vials") }}</h2>
   <table class="cart-items">{% for v in vials %}<tr><td>{{ v.size_ml }} ml</td><td class="num">{{ v.count }}</td><td class="num small muted">{% if v.cost_each_mmk %}{{ format_mmk(v.cost_each_mmk) }} ကျပ်{% endif %}</td></tr>{% else %}<tr><td class="muted">{{ t("No vials entered: vials are not checked.") }}</td></tr>{% endfor %}</table>
   {% if user_role == "owner" %}
   <form method="post" action="/stock/vials" class="grid">
@@ -86,7 +86,7 @@
 
 {% if user_role == "owner" %}
 <section class="card stack" id="stock-excel">
-  <h2>📄 {{ t("Excel (first count)") }}</h2>
+  <h2>{{ t("Excel (first count)") }}</h2>
   <p class="small muted">{{ t("Download, fill the Bottles and Vials sheets, upload: you see a preview first. Importing adds stock; it never deletes.") }}</p>
   <p><a class="button" href="/stock/export.xlsx">⬇ {{ t("Download stock") }}</a></p>
   <form method="post" action="/stock/import" enctype="multipart/form-data" class="inline-form">
@@ -98,7 +98,7 @@
 
 <form method="post" action="/stock/settings" class="card stack" id="stock-settings">
   <input type="hidden" name="csrf" value="{{ csrf }}">
-  <h2>⚙️ {{ t("Stock settings") }}</h2>
+  <h2>{{ t("Stock settings") }}</h2>
   <div class="grid">
     <label>{{ t("Spill per decant (ml)") }} <input name="spill_ml" inputmode="decimal" value="{{ cfg.spill_ml }}"></label>
     <label>{{ t("Low stock below (ml)") }} <input name="low_ml" inputmode="numeric" value="{{ cfg.low_ml }}"></label>

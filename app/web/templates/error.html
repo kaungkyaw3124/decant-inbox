@@ -4,6 +4,8 @@
 <section class="card problem">
   <h1>{{ tr(title) }}</h1>
   <p>{{ tr(detail) }}</p>
-  <p><a href="/" class="button">← {{ t("Inbox") }}</a></p>
+  <p class="buttons"><a href="/chats" class="button primary">{{ t("Back to Chats") }}</a>
+    <a href="{{ again }}" class="button">{{ t("Try again") }}</a></p>
+  {% if user_role == "owner" %}<p class="small muted">{{ t("Request id") }}: <code>{{ request_id }}</code></p>{% endif %}
 </section>
 {% endblock %}
