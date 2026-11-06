@@ -6,13 +6,13 @@
 <p class="muted small">{{ t("What the team taught with teaching cards. Waiting ones are only suggested (one tap, never automatic) until you approve them.") }}{% if settings.auto_approve_after %} {{ t("Or they are approved by themselves after {n} accepts without a correction.", n=settings.auto_approve_after) }}{% endif %}</p>
 <div class="tiles">
   <div class="tile"><span>{{ t("Waiting for approval") }}</span><b>{{ pending.values() | map("length") | sum }}</b></div>
-  <div class="tile"><span>{{ t("Approved") }}</span><b>{{ approved | length }}</b></div>
+  <div class="tile"><span>{{ t("Approved") }}</span><b>{{ approved_page.total }}</b></div>
   <div class="tile"><span>{{ t("Handled by learned patterns this week") }}</span><b>{{ handled_week }}</b></div>
-  <div class="tile"><span>🧠 {{ t("Auto-learned") }}</span><b>{{ auto_learned | length }}</b></div>
+  <div class="tile"><span>🧠 {{ t("Auto-learned") }}</span><b>{{ auto_page.total }}</b></div>
 </div>
 
 <section class="card" id="auto-learned">
-  <h2>{{ t("Auto-learned") }} ({{ auto_learned | length }}) <small class="muted">· {{ t("{n} this week", n=auto_learned_week) }}</small></h2>
+  <h2>{{ t("Auto-learned") }} ({{ auto_page.total }}) <small class="muted">· {{ t("{n} this week", n=auto_learned_week) }}</small></h2>
   <p class="muted small">{{ t("The AI read the same words the same way {n} times with no correction, so the app now understands them by itself. Remove one if it is wrong.", n=settings.auto_approve_after) }}</p>
   {% if not auto_learned %}<p class="muted small">{{ t("Nothing yet.") }}</p>{% endif %}
   <ul class="aliases">
@@ -23,6 +23,7 @@
         <button name="status" value="rejected" class="link">{{ t("remove") }}</button></form></li>
   {% endfor %}
   </ul>
+  {% if auto_page.pages > 1 %}{{ ui.pager(auto_page, "auto-learned") }}{% endif %}
 </section>
 
 {% if conflicts %}
@@ -63,8 +64,8 @@
 </section>
 {% endfor %}
 
-<details class="card">
-  <summary>✅ {{ t("Approved") }} ({{ approved | length }})</summary>
+<details class="card" id="approved"{% if request.query_params.get("approved_page") %} open{% endif %}>
+  <summary>✅ {{ t("Approved") }} ({{ approved_page.total }})</summary>
   <ul class="aliases">
   {% for p, product, teacher, msg in approved %}
     <li><span>“{{ p.text }}” → {% if p.kind == "nickname" %}{{ product.name if product else "?" }}{% elif p.kind == "intent_phrase" %}{{ dict(intents).get(p.intent, p.intent) }}{% else %}{{ t("we don't sell it") }}{% endif %}
@@ -73,6 +74,7 @@
         <button name="status" value="rejected" class="link">{{ t("remove") }}</button></form></li>
   {% endfor %}
   </ul>
+  {% if approved_page.pages > 1 %}{{ ui.pager(approved_page, "approved") }}{% endif %}
 </details>
 
 <section class="card" id="settings">

@@ -19,6 +19,7 @@ from app.orders import actions
 from app.parser.service import current_result
 from app.replies import templates as replies
 from app.web.auth import current_user, owner_only, verify_csrf
+from app.web import paging
 from app.web.deps import get_db, templates
 from app.web.inbox import detail_url, flash, get_message, products_for_select, safe_back
 
@@ -211,19 +212,24 @@ def handled_this_week(db: Session) -> int:
 
 @router.get("/learning", response_class=HTMLResponse, dependencies=[Depends(owner_only)])
 def learning_page(request: Request, db: Session = Depends(get_db)):
-    rows = db.execute(select(LearnedPattern, Product, User, Message)
-                      .outerjoin(Product, Product.id == LearnedPattern.product_id)
-                      .outerjoin(User, User.id == LearnedPattern.taught_by)
-                      .outerjoin(Message, Message.id == LearnedPattern.source_message_id)
-                      .where(LearnedPattern.status.in_(patterns.LIVE))
+    base = (select(LearnedPattern, Product, User, Message)
+            .outerjoin(Product, Product.id == LearnedPattern.product_id)
+            .outerjoin(User, User.id == LearnedPattern.taught_by)
+            .outerjoin(Message, Message.id == LearnedPattern.source_message_id))
+    rows = db.execute(base.where(LearnedPattern.status == "pending")  # every waiting card is shown
                       .order_by(LearnedPattern.kind, LearnedPattern.id.desc())).all()
-    pending = {k: [r for r in rows if r[0].kind == k and r[0].status == "pending"] for k in KIND_TITLES}
-    approved = [r for r in rows if r[0].status == "approved" and not r[0].auto_learned]
-    auto_learned = [r for r in rows if r[0].status == "approved" and r[0].auto_learned]  # 4.11 L4
+    pending = {k: [r for r in rows if r[0].kind == k] for k in KIND_TITLES}
+    approved_q = base.where(LearnedPattern.status == "approved").order_by(LearnedPattern.kind, LearnedPattern.id.desc())
+    # docs/SPEC-v5.4 X2: the two long lists page on their own (two keys in one URL)
+    approved_page = paging.paginate(db, approved_q.where(LearnedPattern.auto_learned.is_(False)), request,
+                                    key="approved_page")
+    auto_page = paging.paginate(db, approved_q.where(LearnedPattern.auto_learned.is_(True)), request, key="auto_page")
+    auto_learned_week = db.scalar(select(func.count()).select_from(LearnedPattern).where(
+        LearnedPattern.status == "approved", LearnedPattern.auto_learned.is_(True),
+        LearnedPattern.approved_at >= datetime.now(UTC) - WEEK))
     return templates.TemplateResponse(request, "learning.html", {
-        "pending": pending, "approved": approved, "auto_learned": auto_learned, "kind_titles": KIND_TITLES,
-        "auto_learned_week": sum(1 for r in auto_learned if r[0].approved_at and
-                                 r[0].approved_at >= datetime.now(UTC) - WEEK),
+        "pending": pending, "approved": approved_page.items, "auto_learned": auto_page.items, "kind_titles": KIND_TITLES,
+        "approved_page": approved_page, "auto_page": auto_page, "auto_learned_week": auto_learned_week,
         "conflicts": patterns.conflicts(db), "handled_week": handled_this_week(db),
         "settings": patterns.settings(db), "products": [p for p in products_for_select(db) if p.active],
         "intents": [(v, label) for v, label in cards.INTENT_CHOICES if v in patterns.LEARNABLE_INTENTS],

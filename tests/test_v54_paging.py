@@ -91,3 +91,13 @@ def test_ai_calls_page_shows_10_with_a_working_pager(client, db):
     assert page.count('<div class="list-row">') == 3 and "21–23 of 23" in page
     assert client.get("/products?per=50").status_code == 200 and client.cookies.get("per") == "50"
     assert "1–20 of 23" not in client.get("/ai").text  # AI calls follow the remembered 50 too
+
+
+def test_two_lists_on_one_page_page_separately(products):
+    query = products(45)
+    with SessionLocal() as s:
+        a = paging.paginate(s, query, request("approved_page=3&auto_page=2"), key="approved_page", scalars=True)
+        b = paging.paginate(s, query, request("approved_page=3&auto_page=2"), key="auto_page", scalars=True)
+    assert (a.page, b.page) == (3, 2)
+    assert a.url(page=1) == "/products?approved_page=1&auto_page=2"
+    assert b.url(per=50) == "/products?approved_page=3&per=50"

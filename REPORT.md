@@ -2435,3 +2435,27 @@ the right with every detail and button; the others are compact rows; clicking an
 (htmx, Back works). Same markup as the phone cards (CSS grid), so no control moved.
 **Perf after loop 3:** warm pages 0.17–0.40 s / 0 KB; first page after login p90 2.62 s (5.3: 3.02); switch p90 1.05 s
 (5.3: 1.27); send 0.29 s.
+| loop 4 (final) | 887 + 1 skip | 0 (384 views) | 2 by design (Help guide, chat panes) | 0 | Learning approved + auto-learned lists paged (two pagers on one page) |
+
+**Goal check:** X1 page pattern on every page (except the Help guide, which has its own title, and the 4.21 chat
+workspace) · X2 every long list paged with the same footer (Learning's waiting cards stay complete on purpose) ·
+X3 Settings in sections · X4 menu of 7 (the `/` redirect is a decision, see above) · X5 glossary + plain labels
+(SHADOW / AUTO stay inside the AI mode buttons with their explanation) · X6 empty states, error page, confirm
+dialogs (4.15) · X7 left-aligned column + Orders list/detail · X8 UI inventory complete (C7 passes; no control was
+removed, so the baseline did not need changes), full pytest + ui_check green, perf same or better.
+**Tests:** 887 passed, 1 skipped (was 862 + 1). New: tests/test_v54_paging.py (19), tests/test_v54_ui.py (7).
+
+### OWNER TEST SCRIPT 5.4 (PC browser: Chrome or Edge)
+1. Products & prices: big title, Products · Prices · Stock at the top right, brand above each name, prices as small
+   chips, "Show 10 · 20 · 50 · 100" at the bottom. Click 10, then a page number; press Back → the same page again.
+2. Settings (menu) → AI helper: title "AI helper" with "Settings ›" above it; evaluation shown as tiles; "AI calls"
+   shows 10 rows with page buttons (when there are calls).
+3. Customers (new in the menu), Orders, Activity, Stock → History: the same footer. Orders on a wide screen: the
+   list on the left, click an order number → its details and buttons on the right.
+4. Settings: the list on the left. Pick "Auto-reply", change "Shortest delay", press Save speed → it stays on
+   Auto-reply and shows "Saved ✓". Change a number again and click "Orders" in the menu → it asks before leaving.
+5. Menu: Chats · Orders · Payments · Customers · Products & prices · Sales · Settings. Old bookmarks (/learning,
+   /reports/wanted, /practice, /prices, /users, /health) still open; Settings → Shop links to them.
+6. Search Products for "zzzz" → "No products." with what to do next and "Show all".
+7. Open a wrong address, e.g. /customers/999999 → "Back to Chats", "Try again" and (owner) a request id.
+8. Switch to မြန်မာ and repeat 1 and 4: titles and buttons in Burmese, nothing cut off.

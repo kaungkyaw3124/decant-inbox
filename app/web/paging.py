@@ -22,6 +22,7 @@ class Page:
     page: int
     per: int
     request: Request
+    key: str = "page"  # the URL parameter (two lists on one page use two keys)
 
     @property
     def pages(self) -> int:
@@ -48,9 +49,11 @@ class Page:
 
     def url(self, **changes) -> str:
         """This list's URL with page / per changed; search, tab and other filters stay."""
+        if "page" in changes:
+            changes[self.key] = changes.pop("page")
         params = dict(self.request.query_params) | {k: str(v) for k, v in changes.items()}
         if "per" in changes:
-            params.pop("page", None)  # a new size starts at page 1
+            params.pop(self.key, None)  # a new size starts at page 1
         return f"{self.request.url.path}?{urlencode(params)}"
 
 
@@ -66,13 +69,14 @@ def per_of(request: Request, default: int = 20) -> int:
     return default
 
 
-def paginate(db: Session, query: Select, request: Request, default: int = 20, scalars: bool = False) -> Page:
+def paginate(db: Session, query: Select, request: Request, default: int = 20, scalars: bool = False,
+             key: str = "page") -> Page:
     """query: the full ordered SELECT. A page number past the end shows the last page."""
     per = per_of(request, default)
     total = db.scalar(select(func.count()).select_from(query.order_by(None).subquery())) or 0
-    page = min(max(_number(request.query_params.get("page")) or 1, 1), max(1, -(-total // per)))
+    page = min(max(_number(request.query_params.get(key)) or 1, 1), max(1, -(-total // per)))
     rows = db.execute(query.limit(per).offset((page - 1) * per))
-    return Page(rows.scalars().all() if scalars else rows.all(), total, page, per, request)
+    return Page(rows.scalars().all() if scalars else rows.all(), total, page, per, request, key)
 
 
 async def remember_per(request: Request, call_next):
