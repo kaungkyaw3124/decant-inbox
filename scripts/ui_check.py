@@ -9,6 +9,7 @@ Chromium needs system libraries: `sudo bash scripts/install_ui_check_deps.sh`, o
 `bash scripts/ui_check_libs.sh` (unpacks them into ~/.cache/ui-check-libs, used automatically).
 """
 import argparse
+from datetime import UTC, datetime
 import json
 import os
 import re
@@ -132,6 +133,9 @@ def build_database() -> dict[str, int]:
         inventory.add_bottles(s, stw, 100, 1, 250000, None, None)
         inventory.add_bottles(s, stw, 100, 1, 250000, 60.5, None)
         inventory.add_bottles(s, sauvage, 100, 1, 300000, 6, None)
+    from scripts.perf_check import seed_long_chat  # docs/SPEC-v5.7 D2/D3: a 600-message chat
+    with SessionLocal.begin() as s:
+        ids["long"] = seed_long_chat(s, "ui-long", end=datetime(2026, 1, 1, tzinfo=UTC))  # older than the other test messages
     ids["low"] = sauvage
     ids["untracked"] = scalar(engine, "SELECT id FROM products WHERE name = 'Y Eau de Parfum'")
     ids["practice"] = 1
@@ -164,6 +168,8 @@ def pages(ids: dict[str, int]) -> list[tuple[str, str, bool]]:
             name = {"chat-list": "chats", "payment-list": "payments", "orders": "orders"}.get(name, name)
             found.append((name, url, r.path in PARTIALS))
     found.append(("orders-test", "/orders?tab=all&show_test=1", False))
+    found.append(("chat-long", f"/chats/{ids['long']}", False))  # docs/SPEC-v5.7: the light chat
+    found.append(("orders-range", "/orders?tab=all&range=7d", False))
     for tab in ("prices", "stock", "nicks"):  # docs/SPEC-v5.6: the side panel and the owner's dialogs
         found.append((f"products-{tab}", f"/products?open={ids['product']}&tab={tab}", False))
     found += [("products-untracked", f"/products?open={ids['untracked']}&tab=stock", False),
@@ -554,6 +560,102 @@ def s1_flows(browser) -> list[str]:
     return problems
 
 
+def chat_flows(browser) -> list[str]:
+    """docs/SPEC-v5.7 D2-D4 on a PC (1440 px): the 600-message chat opens with 20 bubbles; scrolling up 3 times loads
+    20 more each time without moving the bubble being read, no double; a new message appears at the bottom by
+    itself, and while scrolled up it shows "New message ↓" instead of jumping; typed text stays (the thread is not
+    re-drawn); a reply can be sent and cancelled; a link to an old message (#m...) loads until it is there."""
+    from sqlalchemy import create_engine, text
+
+    problems, base = [], f"http://127.0.0.1:{PORT}"
+    db = create_engine(get_settings().database_url)
+    with db.connect() as c:
+        cid = c.execute(text("SELECT id FROM customers WHERE external_user_id = 'ui-long'")).scalar()
+        old = c.execute(text("SELECT id FROM messages WHERE customer_id = :c ORDER BY received_at, id OFFSET 30 LIMIT 1"),
+                        {"c": cid}).scalar()
+    context = browser.new_context(viewport={"width": 1440, "height": 900})
+    page = context.new_page()
+    log_in(page, "owner")
+    set_language(page, "en")
+
+    def check(name: str, ok) -> None:
+        try:
+            if not ok():
+                problems.append(f"CHAT {name}: failed")
+        except Exception as exc:
+            problems.append(f"CHAT {name}: {str(exc).splitlines()[0]}")
+
+    def count() -> int:
+        return page.locator("#thread .bubble:not(.pending)").count()
+
+    def say(n: int, words: str) -> None:
+        with db.begin() as c:
+            c.execute(text("INSERT INTO messages (channel, external_chat_id, external_message_id, customer_id, raw_text, "
+                           "normalized_text, received_at, direction, kind) VALUES ('telegram', 'ui-long', :e, :c, :w, :w, "
+                           "now(), 'in', 'text')"), {"e": f"ui-long-new-{n}", "c": cid, "w": words})
+
+    page.goto(f"{base}/chats/{cid}")
+    page.wait_for_selector("#thread .bubble")
+    check("opens with 20 bubbles", lambda: count() == 20)
+    page.wait_for_timeout(600)  # the top watcher starts after the chat has opened at the bottom
+    for n in range(3):
+        before = count()
+        top = page.evaluate("""() => { const p = document.querySelector('.chat-pane'), b = document.querySelector('#thread .bubble');
+            p.scrollTop = 0; window.readId = b.id; return b.getBoundingClientRect().top; }""")
+        for _ in range(50):  # (no wait_for_function: it needs eval, which our CSP blocks)
+            if count() >= before + 20:
+                break
+            page.wait_for_timeout(100)
+        else:
+            problems.append(f"CHAT scroll up {n + 1}: no older messages")
+            break
+        page.wait_for_timeout(100)
+        moved = page.evaluate("() => document.getElementById(window.readId).getBoundingClientRect().top") - top
+        if abs(moved) > 3:
+            problems.append(f"CHAT scroll up {n + 1}: the bubble being read moved {moved:.0f}px")
+    ids = page.evaluate("() => [...document.querySelectorAll('#thread .bubble[id]')].map(b => b.id)")
+    check("no double bubbles after scrolling up", lambda: len(ids) == len(set(ids)) == 80)
+    check("one separator per day", lambda: page.evaluate("""() => { const d = [...document.querySelectorAll('#thread .day-sep')]
+        .map(s => s.dataset.day); return d.length === new Set(d).size; }"""))
+
+    page.evaluate("() => { const p = document.querySelector('.chat-pane'); p.scrollTop = p.scrollHeight; document.getElementById('thread').dataset.mark = '1'; }")
+    say(1, "new at the bottom")
+    check("new message appears at the bottom", lambda: page.locator("#thread .bubble", has_text="new at the bottom")
+          .wait_for(timeout=7000) is None and page.evaluate(
+              "() => { const p = document.querySelector('.chat-pane'); return p.scrollHeight - p.scrollTop - p.clientHeight < 80; }"))
+    page.fill("form.compose-box textarea[name=text]", "half a reply")
+    up = page.evaluate("() => { const p = document.querySelector('.chat-pane'); p.scrollTop = p.scrollHeight - p.clientHeight - 600; return p.scrollTop; }")
+    say(2, "new while scrolled up")
+    check("scrolled up: pill, no jump", lambda: page.locator("#new-pill:not([hidden])").wait_for(timeout=7000) is None
+          and abs(page.evaluate("() => document.querySelector('.chat-pane').scrollTop") - up) < 3)
+    if page.locator("#new-pill").is_visible():
+        page.locator("#new-pill").click()
+    check("pill goes to the new message", lambda: page.locator("#thread .bubble", has_text="new while scrolled up").is_visible())
+    page.wait_for_timeout(8500)  # two poll rounds
+    check("typed text stays, thread not re-drawn", lambda: page.input_value("form.compose-box textarea[name=text]")
+          == "half a reply" and page.evaluate("() => document.getElementById('thread').dataset.mark") == "1")
+
+    page.fill("form.compose-box textarea[name=text]", "reply to cancel")
+    page.locator("form.compose-box button.send-round").click()
+    check("send shows the reply", lambda: page.locator("#pending .bubble", has_text="reply to cancel").wait_for() is None)
+    cancel = page.locator("#pending .bubble", has_text="reply to cancel").locator("button", has_text="Cancel")
+    if cancel.count():
+        cancel.click()
+        page.wait_for_load_state()
+        with db.connect() as c:
+            check("cancel within the undo window", lambda: c.execute(text(
+                "SELECT status FROM outbox WHERE text = 'reply to cancel'")).scalar() == "cancelled")
+    else:
+        problems.append("CHAT the sent reply has no Cancel button")
+
+    page.goto(f"{base}/help")  # a link from another page (the same page with a new #hash would not reload)
+    page.goto(f"{base}/chats/{cid}#m{old}")
+    check("#m link to an old message loads it", lambda: page.locator(f"#m{old}").wait_for(timeout=15000) is None)
+    context.close()
+    db.dispose()
+    return problems
+
+
 def c8(browser, targets) -> list[str]:
     """C8 at 1440 / 1920 / 2560 px, English, owner + staff, every full page and the login page."""
     problems, shots = [], SHOTS / "5.5"
@@ -648,11 +750,12 @@ def run(quick: bool, save_inventory: bool, only_widths: tuple[int, ...] = (), sh
                 failures += 1
                 lines.append("FAIL C8 " + problem)
         if not save_inventory and not only_pages:  # the flows need every page
-            for problem in pc_flows(browser) + u4_flows(browser) + s1_flows(browser):
+            for problem in pc_flows(browser) + chat_flows(browser) + u4_flows(browser) + s1_flows(browser):
                 failures += 1
                 lines.append("FAIL " + problem)
-        elif not save_inventory and "products" in only_pages:  # a quick look at Products still clicks its jobs
-            for problem in s1_flows(browser):
+        elif not save_inventory and ("products" in only_pages or "chat-long" in only_pages):  # quick looks click too
+            for problem in (s1_flows(browser) if "products" in only_pages else []) + (
+                    chat_flows(browser) if "chat-long" in only_pages else []):
                 failures += 1
                 lines.append("FAIL " + problem)
         browser.close()

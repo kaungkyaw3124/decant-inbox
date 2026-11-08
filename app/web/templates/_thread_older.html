@@ -1,0 +1,4 @@
+{% import "_bubbles.html" as bb with context %}
+{# docs/SPEC-v5.7 B: replaces #older at the top of the thread: the next "Load older" (or the beginning) + 20 bubbles #}
+{{ bb.older(c, has_older, oldest_id) }}
+{{ bb.bubbles(messages) }}

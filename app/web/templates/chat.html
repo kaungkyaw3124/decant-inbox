@@ -34,6 +34,7 @@
     {% endif %}
     <div class="chat-pane">
       {% include "_thread.html" %}
+      <button type="button" class="new-pill" id="new-pill" hidden>{{ t("New message") }} ↓</button>
     </div>
     {% if mine.count %}
     <section class="needs-panel" id="needs-you" aria-label="{{ t('Needs you') }}">

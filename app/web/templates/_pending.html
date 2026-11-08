@@ -1,0 +1,22 @@
+{% set captions = {"auto": t("Auto-reply") ~ " · " ~ t("Delivered"), "hold": t("Auto · please wait")} %}
+{% for o in pending %}
+  {% set by = pending_by.get(o.id, ("person", none)) %}
+  <div class="bubble out pending by-{{ by[0] }} status-{{ o.status }}">
+    <p class="text">{{ o.text }}</p>
+    <div class="bubble-meta">
+      <span class="by"{% if by[0] in captions %} title="{{ t('Sent by auto-reply') }}"{% endif %}>{{ t("Auto-reply") if by[0] == "auto" else t("Auto · please wait") if by[0] == "hold" else by[1] or t("You") }}</span> ·
+      {% if o.status == "queued" and o.send_after > now() %}<span data-send-at="{{ o.send_after.isoformat() }}">{{ t("Sending in {n} s", n=((o.send_after - now()).total_seconds()) | round | int) }}</span>
+      {% elif o.status == "queued" %}⏳ {{ t("queued") }}{% if o.error %} · {{ tr(o.error) }}{% endif %}
+      {% elif o.status == "sending" and o.id in stuck %}<span class="error">⚠ {{ t("unknown: check Telegram whether it arrived") }}</span>
+      {% elif o.status == "sending" %}{{ t("sending…") }}
+      {% elif o.status == "failed" %}<span class="error">✖ {{ t("not sent") }}: {{ tr(o.error) }}</span>{% endif %}
+    </div>
+    {% if o.status == "failed" or o.status == "queued" or o.id in stuck %}
+    <form method="post" class="buttons">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      {% if o.status == "failed" %}<button formaction="/chats/{{ c.id }}/outbox/{{ o.id }}/retry">{{ t("Try again") }}</button>{% endif %}
+      <button class="link danger" formaction="/chats/{{ c.id }}/outbox/{{ o.id }}/cancel">{{ t("Cancel") if o.status == "queued" else t("Dismiss") }}</button>
+    </form>
+    {% endif %}
+  </div>
+{% endfor %}

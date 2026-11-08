@@ -1,0 +1,53 @@
+{# docs/SPEC-v5.7 B: one bubble, shared by the thread, the older-messages page and the poll update.
+   Import with context: {% import "_bubbles.html" as bb with context %} #}
+{% set captions = {"auto": t("Auto-reply") ~ " · " ~ t("Delivered"), "hold": t("Auto · please wait")} %}
+{% macro bubble(m) -%}
+  {% set by = sent.get(m.id, ("you", none)) if m.direction == "out" else none %}
+  <div class="bubble {{ m.direction }}{% if by %} by-{{ by[0] }}{% endif %}" id="m{{ m.id }}">
+    {% if m.kind == "photo" %}
+      {% set d = downloads.get(m.id) %}
+      <div class="photo">
+        {% if m.grouped_id and albums.get(m.grouped_id, 0) > 1 %}<span class="badge warn">{{ t("several photos sent together") }}</span>{% endif %}
+        {% if d and d.status == "done" %}
+          <a href="/media/{{ m.id }}" target="_blank" rel="noopener"><img src="/media/{{ m.id }}" alt="{{ t('Photo from the chat') }}" class="thumb"></a>
+        {% elif d and d.status == "queued" %}
+          <span class="muted small">{{ t("Loading photo…") }}</span>
+        {% else %}
+          {% if d and d.status == "failed" %}<p class="error small">{{ t("Could not load") }}: {{ tr(d.error) }}</p>{% endif %}
+          <form method="post" action="/messages/{{ m.id }}/photo" class="inline">
+            <input type="hidden" name="csrf" value="{{ csrf }}">
+            <button>📷 {{ t("Show photo") }}{% if m.media_size %} ({{ (m.media_size / 1024) | round | int }} KB){% endif %}</button>
+          </form>
+        {% endif %}
+      </div>
+    {% elif m.kind == "other" and not m.raw_text %}
+      <span class="muted small">({{ t("sticker, voice or file — open Telegram to see it") }})</span>
+    {% endif %}
+    {% if m.raw_text %}<p class="text">{{ m.raw_text }}</p>{% endif %}
+    {% if checks.get(m.id) %}<a class="button primary check-pay" href="/payments/{{ checks[m.id] }}">💳 {{ t("Check payment") }}</a>{% endif %}
+    <div class="bubble-meta">
+      {% if by %}<span class="by"{% if by[0] in captions %} title="{{ t('Sent by auto-reply') }}"{% endif %}>{{ captions.get(by[0]) or by[1] or t("You") }}</span> · {% endif %}
+      {% if m.id in auto_msgs and not by %}<span title="{{ t('Sent by auto-reply') }}">🤖</span> · {% endif %}
+      {% if m.id in ai_reasons %}<span class="ai-mark" title="{{ ai_reasons[m.id] }}">🧠</span> · {% endif %}
+      {% if m.direction == "in" %}<a href="/messages/{{ m.id }}?back=/chats/{{ c.id }}">{{ t("details") }}</a> · {% endif %}
+      <time>{{ m.received_at | local_time }}</time>
+    </div>
+  </div>
+{%- endmacro %}
+
+{# messages oldest first; prev_day = the day already shown just above (no second separator at the seam) #}
+{% macro bubbles(messages, prev_day=none) -%}
+{%- set ns = namespace(day=(prev_day | local_time("%Y-%m-%d")) if prev_day else none) -%}
+{%- for m in messages %}
+  {%- set day = m.received_at | local_time("%Y-%m-%d") %}
+  {%- if day != ns.day %}{% set ns.day = day %}<p class="day-sep" data-day="{{ day }}"><b>{{ m.received_at | local_time("%d %b") }}</b></p>{% endif %}
+{{ bubble(m) }}
+{%- endfor %}
+{%- endmacro %}
+
+{% macro older(c, has_older, oldest_id) -%}
+{%- if has_older %}
+<div class="older" id="older"><button type="button" class="link older-btn" hx-get="/chats/{{ c.id }}/thread?before={{ oldest_id }}"
+  hx-target="#older" hx-swap="outerHTML">{{ t("Load older messages") }}</button></div>
+{%- else %}<p class="thread-start" id="older">{{ t("Beginning of the conversation") }}</p>{% endif %}
+{%- endmacro %}

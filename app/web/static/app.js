@@ -40,7 +40,8 @@
     });
 
     // chat: open at the newest message (the thread scrolls inside its card)
-    if (root.querySelector(".chat-pane") || root.closest && root.closest(".chat-pane")) toBottom();
+    // (not for the parts the light chat adds: older messages keep the reading position — docs/SPEC-v5.7 B)
+    if (root.querySelector(".chat-pane") || root.id === "thread") { toBottom(); watchOlder(); }
   });
 
   function toBottom() { document.querySelectorAll(".chat-pane").forEach(function (el) { el.scrollTop = el.scrollHeight; }); }
@@ -158,6 +159,110 @@
     b.lastChild.appendChild(retry);
   });
 
+  // ---- docs/SPEC-v5.7 B light chat: the poll / SSE bring only new bubbles + what changed; older messages load
+  // at the top (scrolling up or the button) without moving the bubble being read; "New message ↓" when scrolled up
+  function pane() { return document.querySelector(".chat-pane"); }
+  function atEnd(p) { return !p || p.scrollHeight - p.scrollTop - p.clientHeight < 80; }
+  function dedupeDays() {  // one day separator per day, also where two parts meet
+    var last = null;
+    document.querySelectorAll("#thread .day-sep").forEach(function (sep) {
+      if (sep.dataset.day === last) sep.remove(); else last = sep.dataset.day;
+    });
+  }
+  function pollVals() {
+    var poll = document.getElementById("thread-poll");
+    return poll ? JSON.parse(poll.getAttribute("hx-vals")) : null;
+  }
+  function applyUpdate(html, after, version) {
+    var tpl = document.createElement("template"), p = pane(), wasAtEnd = atEnd(p), added = 0;
+    var pending = document.getElementById("pending"), poll = document.getElementById("thread-poll");
+    if (!pending || !poll) return;
+    tpl.innerHTML = html;
+    var fresh = tpl.content.querySelector("[data-part=new]");
+    if (fresh) Array.prototype.slice.call(fresh.children).forEach(function (el) {
+      if (el.id && document.getElementById(el.id)) return;  // already shown (two answers crossed)
+      pending.parentNode.insertBefore(el, pending);
+      if (el.classList.contains("bubble")) added++;
+      htmx.process(el);
+    });
+    var part = tpl.content.querySelector("[data-part=pending]");
+    if (part) { pending.innerHTML = part.innerHTML; htmx.process(pending); }
+    var repl = tpl.content.querySelector("[data-part=replace]");
+    if (repl) Array.prototype.slice.call(repl.children).forEach(function (el) {
+      var old = el.id && document.getElementById(el.id);
+      if (old) { old.replaceWith(el); htmx.process(el); }  // only bubbles on the page (older ones may not be)
+    });
+    if (document.querySelector("#thread .empty") && added) document.querySelector("#thread .empty").remove();
+    dedupeDays();
+    if (after) poll.setAttribute("hx-vals", JSON.stringify({after: Number(after), v: version}));
+    var pill = document.getElementById("new-pill");
+    if (added && wasAtEnd) toBottom();
+    else if (added && pill) pill.hidden = false;
+  }
+  document.addEventListener("htmx:beforeSwap", function (e) {
+    var elt = e.detail.elt;
+    if (elt && elt.id === "thread-poll") {  // the 4 s poll (only when the live stream is down)
+      var x = e.detail.xhr;
+      if (x.status === 200) applyUpdate(x.responseText, x.getResponseHeader("X-Thread-After"), x.getResponseHeader("X-Thread-Version"));
+      e.detail.shouldSwap = false;
+    } else if (e.detail.target && e.detail.target.id === "older" && pane()) {
+      var p = pane();
+      window.decantOlder = {fromEnd: p.scrollHeight - p.scrollTop};
+    }
+  });
+  document.addEventListener("htmx:afterSwap", function () {
+    var keep = window.decantOlder, p = pane();
+    if (!keep || !p) return;
+    window.decantOlder = null;
+    dedupeDays();
+    p.scrollTop = p.scrollHeight - keep.fromEnd;  // the bubble being read stays where it was
+    watchOlder();
+    document.dispatchEvent(new CustomEvent("decant:older"));
+  });
+  var polling = false;
+  function pollNow() {
+    var vals = pollVals(), ws = document.getElementById("ws");
+    if (!vals || !ws || polling) return;
+    polling = true;
+    fetch("/chats/" + ws.dataset.customer + "/thread?after=" + vals.after + "&v=" + encodeURIComponent(vals.v),
+          {credentials: "same-origin", headers: {"HX-Request": "true"}})
+      .then(function (r) {
+        if (r.status !== 200) return null;
+        return r.text().then(function (html) { applyUpdate(html, r.headers.get("X-Thread-After"), r.headers.get("X-Thread-Version")); });
+      })
+      .catch(function () {})
+      .then(function () { polling = false; });
+  }
+  var observer = null;
+  function watchOlder() {  // scrolling to the top loads the next 20 (only after the chat has opened at the bottom)
+    var p = pane(), btn = document.querySelector("#older .older-btn");
+    if (observer) observer.disconnect();
+    if (!p || !btn || !window.IntersectionObserver) return;
+    observer = new IntersectionObserver(function (entries) {
+      if (entries[0].isIntersecting && p.dataset.ready && !btn.classList.contains("htmx-request")) btn.click();
+    }, {root: p, rootMargin: "200px 0px 0px 0px"});
+    setTimeout(function () { p.dataset.ready = "1"; if (observer) observer.observe(btn); }, 400);
+  }
+  document.addEventListener("click", function (e) {
+    var pill = e.target.closest && e.target.closest("#new-pill");
+    if (pill) { pill.hidden = true; toBottom(); }
+  });
+  document.addEventListener("scroll", function (e) {
+    var pill = document.getElementById("new-pill");
+    if (pill && !pill.hidden && e.target.classList && e.target.classList.contains("chat-pane") && atEnd(e.target)) pill.hidden = true;
+  }, true);
+  // a link to an old message (#m123, e.g. after "Show photo"): load older pages until it is there
+  function jumpToHash(tries) {
+    var m = /^#m(\d+)$/.exec(location.hash), btn = document.querySelector("#older .older-btn");
+    if (!m || !document.getElementById("thread")) return;
+    var target = document.getElementById("m" + m[1]);
+    if (target) { target.scrollIntoView({block: "center"}); return; }
+    if (!btn || tries > 2) return;
+    document.addEventListener("decant:older", function () { jumpToHash(tries + 1); }, {once: true});
+    htmx.ajax("GET", btn.getAttribute("hx-get") + "&to=" + m[1], {target: "#older", swap: "outerHTML"});
+  }
+  onLoad(function (root) { if (root.querySelector && (root.querySelector("#thread") || root.id === "thread")) setTimeout(function () { jumpToHash(0); }, 0); });
+
   // ---- M3 live updates: the server says what changed; only that part is fetched again. While connected the
   // thread's own 4 s polling pauses (window.decantLive); if the connection drops, polling takes over again.
   var source = null;
@@ -171,18 +276,7 @@
     source = new EventSource(url);
     source.onopen = function () { window.decantLive = true; };
     source.onerror = function () { window.decantLive = false; };
-    source.addEventListener("thread", function () {
-      if (!document.getElementById("thread") || !cid) return;
-      fetch("/chats/" + cid + "/thread", {credentials: "same-origin", headers: {"HX-Request": "true"}})
-        .then(function (r) { return r.ok ? r.text() : null; })
-        .then(function (html) {
-          var thread = document.getElementById("thread"), pane = thread && thread.closest(".chat-pane");
-          if (!html || !thread) return;
-          var atEnd = !pane || pane.scrollHeight - pane.scrollTop - pane.clientHeight < 80;
-          htmx.swap(thread, html, {swapStyle: "outerHTML"});
-          if (atEnd) toBottom();  // keep the reading position when the admin scrolled up
-        });
-    });
+    source.addEventListener("thread", function () { pollNow(); });  // docs/SPEC-v5.7: only what changed
     source.addEventListener("list", function () {
       if (document.querySelector(".chatlist") && !document.querySelector(".chatlist :focus"))
         htmx.ajax("GET", location.pathname + location.search, {target: ".chatlist", select: ".chatlist", swap: "outerHTML"});
@@ -199,7 +293,7 @@
   // while the stream is connected the thread's own 4 s polling is not needed (CSP: no hx-trigger filters)
   document.addEventListener("htmx:beforeRequest", function (e) {
     var t = e.detail.requestConfig && e.detail.requestConfig.triggeringEvent;
-    if (window.decantLive && e.detail.elt.id === "thread" && (!t || t.type !== "click")) e.preventDefault();
+    if (window.decantLive && e.detail.elt.id === "thread-poll" && (!t || t.type !== "click")) e.preventDefault();
   });
   window.addEventListener("pagehide", function () { if (source) source.close(); });
 

@@ -60,7 +60,7 @@ class Net:
 LONG_CHAT = 600
 
 
-def seed_long_chat(session, external: str = "perf-long") -> int:
+def seed_long_chat(session, external: str = "perf-long", end=None) -> int:
     """docs/SPEC-v5.7 D2: a fake customer with 600 messages (every 25th a photo, some albums), never a real chat:
     only in a throw-away database (the perf copy, the ui_check database)."""
     from datetime import UTC, datetime, timedelta
@@ -70,7 +70,7 @@ def seed_long_chat(session, external: str = "perf-long") -> int:
     customer = Customer(channel="telegram", external_user_id=external, display_name="Long chat (test)")
     session.add(customer)
     session.flush()
-    start = datetime.now(UTC) - timedelta(days=40)
+    start = (end or datetime.now(UTC) - timedelta(hours=1)) - timedelta(minutes=97 * LONG_CHAT)  # default: last one an hour ago
     for n in range(LONG_CHAT):
         photo = n % 25 == 0
         session.add(Message(

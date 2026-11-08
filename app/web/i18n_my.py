@@ -985,4 +985,6 @@ MY = {
     "Clear": "ဖယ်မယ်", "Showing {n} orders": "အော်ဒါ {n} ခု ပြနေ", "Showing {n} payments": "ငွေလွှဲ {n} ခု ပြနေ",
     "Showing {n} customers": "ဖောက်သည် {n} ယောက် ပြနေ", "Show all dates": "ရက်အားလုံး ပြမယ်",
     "Those dates could not be read, so all dates are shown.": "ဒီရက်တွေကို မဖတ်နိုင်လို့ ရက်အားလုံး ပြထားတယ်။",
+    "Load older messages": "အရင်စာများ ထပ်ပြမယ်", "Beginning of the conversation": "စကားဝိုင်း အစ",
+    "New message": "စာအသစ်",
 }

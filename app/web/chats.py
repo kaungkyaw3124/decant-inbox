@@ -4,14 +4,16 @@ The dashboard never talks to Telegram: "Send" only adds an outbox row, and the l
 (the one process with the Telegram session) sends it. Photos are downloaded by the
 listener when an admin taps "Show photo".
 """
+import hashlib
+import json
 import re
 import secrets
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
-from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
-from sqlalchemy import exists, func, select
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
+from sqlalchemy import exists, func, select, tuple_
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
@@ -34,7 +36,9 @@ from app.web.deps import get_db, templates
 from app.web.inbox import flash
 
 router = APIRouter(dependencies=[Depends(current_user), Depends(verify_csrf)])
-THREAD_SIZE = 100
+THREAD_SIZE = 20  # docs/SPEC-v5.7 B: a chat opens with the last 20 messages, older on demand
+AFTER_MAX = 200
+JUMP_MAX = 5000
 LIST_SIZE = 50
 STUCK_AFTER = timedelta(minutes=2)
 MEDIA_TYPES = {".jpg": "image/jpeg", ".png": "image/png", ".webp": "image/webp"}
@@ -65,8 +69,8 @@ ORDER_SEG = tuple(PILLS)
 
 def who_sent(db: Session, boxes) -> dict[int, tuple[str, str | None]]:
     """outbox id -> ("auto" | "hold" | "person", staff name): a row without a person is the bot's."""
-    names = dict(db.execute(select(User.id, User.username).where(
-        User.id.in_({b.created_by for b in boxes if b.created_by})).distinct()).all())
+    people = {b.created_by for b in boxes if b.created_by}
+    names = dict(db.execute(select(User.id, User.username).where(User.id.in_(people))).all()) if people else {}
     return {b.id: ("hold" if b.reply_kind in HOLD_KINDS else "auto" if b.created_by is None or b.reply_kind == "faq"
                    else "person",
                    names.get(b.created_by)) for b in boxes}
@@ -137,44 +141,109 @@ def chat_list(request: Request, show_ignored: str = "", page: int = 1, seg: str 
         db, user, seg, q, page, bool(show_ignored)))
 
 
-def thread_context(db: Session, customer: Customer) -> dict:
-    messages = list(reversed(db.scalars(
-        select(Message).where(Message.customer_id == customer.id)
-        .order_by(Message.received_at.desc(), Message.id.desc()).limit(THREAD_SIZE)).all()))
-    downloads = {d.message_id: d for d in db.scalars(select(MediaDownload).where(
-        MediaDownload.message_id.in_([m.id for m in messages if m.kind == "photo"])))}
+def _ordered():
+    return (Message.received_at, Message.id)
+
+
+def _window(db: Session, customer_id: int, before: int | None = None, after: int | None = None,
+            to: int | None = None) -> tuple[list, bool]:
+    """docs/SPEC-v5.7 B: the newest THREAD_SIZE messages, or the THREAD_SIZE before message `before` (older on
+    demand), or every message after `after` (the poll; at most AFTER_MAX). Oldest first; True = there are older ones."""
+    query = select(Message).where(Message.customer_id == customer_id)
+    if after is not None:
+        mark = db.get(Message, after)
+        if mark is not None:
+            query = query.where(tuple_(*_ordered()) > (mark.received_at, mark.id))
+        return list(db.scalars(query.order_by(*_ordered()).limit(AFTER_MAX))), False
+    if before is not None:
+        mark = db.get(Message, before)
+        if mark is None or mark.customer_id != customer_id:
+            return [], False
+        query = query.where(tuple_(*_ordered()) < (mark.received_at, mark.id))
+        target = db.get(Message, to) if to else None
+        if target is not None and target.customer_id == customer_id:  # a link to an old message: down to it at once
+            rows = list(db.scalars(query.where(tuple_(*_ordered()) >= (target.received_at, target.id))
+                                   .order_by(*_ordered()).limit(JUMP_MAX)))
+            older = db.scalar(select(exists().where(Message.customer_id == customer_id,
+                                                    tuple_(*_ordered()) < (target.received_at, target.id))))
+            return rows, bool(older)
+    rows = db.scalars(query.order_by(Message.received_at.desc(), Message.id.desc()).limit(THREAD_SIZE + 1)).all()
+    return list(reversed(rows[:THREAD_SIZE])), len(rows) > THREAD_SIZE
+
+
+def _photo_states(db: Session, customer_id: int) -> tuple[list[int], list]:
+    """Photo bubbles that can still change by themselves (photo loading, payment check): the newest photos and the
+    last downloads of this chat. Returns (message ids, their states)."""
+    loads = db.execute(select(MediaDownload.message_id, MediaDownload.status).join(Message).where(
+        Message.customer_id == customer_id).order_by(MediaDownload.message_id.desc()).limit(10)).all()
+    checks = db.execute(select(PaymentCheck.message_id, PaymentCheck.id, PaymentCheck.decision).join(
+        Message, Message.id == PaymentCheck.message_id).where(Message.customer_id == customer_id)
+        .order_by(PaymentCheck.id.desc()).limit(THREAD_SIZE)).all()
+    ids = sorted({m for m, _ in loads} | {m for m, _, _ in checks})  # a photo with no download and no check is fixed
+    return ids, [list(map(list, loads)), list(map(list, checks))]
+
+
+def thread_state(db: Session, customer_id: int, pending=None, newest: int | None = None) -> tuple[int, str, list[int]]:
+    """(newest message id, a version of everything the open chat shows that can change, photo ids to refresh).
+    The poll answers 204 when the browser already has this version (docs/SPEC-v5.7 D4). pending / newest: pass
+    them when already loaded (fewer queries when a chat opens)."""
+    if newest is None:
+        newest = db.scalar(select(Message.id).where(Message.customer_id == customer_id)
+                           .order_by(Message.received_at.desc(), Message.id.desc()).limit(1)) or 0
+    if pending is None:
+        pending = db.execute(select(Outbox.id, Outbox.status, Outbox.error, Outbox.send_after).where(
+            Outbox.customer_id == customer_id, Outbox.status.not_in(("sent", "cancelled"))).order_by(Outbox.id)).all()
+    else:
+        pending = [(o.id, o.status, o.error, o.send_after) for o in pending]
+    photos, states = _photo_states(db, customer_id)
+    stuck = [o[0] for o in pending if o[1] == "sending"]  # "unknown" shows after STUCK_AFTER: re-check then
+    raw = json.dumps([newest, [list(map(str, o)) for o in pending], states, bool(stuck)], default=str)
+    return newest, hashlib.sha1(raw.encode()).hexdigest()[:12], photos
+
+
+def thread_context(db: Session, customer: Customer, messages: list | None = None, has_older: bool | None = None) -> dict:
+    """What the bubbles need, queried only for the messages shown (no query for an empty list)."""
+    newest = None
+    if messages is None:  # the chat opens: the newest window, so its last message is the newest
+        messages, has_older = _window(db, customer.id)
+        newest = messages[-1].id if messages else 0
+    ids = [m.id for m in messages]
+    photo_ids = [m.id for m in messages if m.kind == "photo"]
+    groups = {m.grouped_id for m in messages if m.grouped_id}
     pending = db.scalars(select(Outbox).where(
         Outbox.customer_id == customer.id, Outbox.status.not_in(("sent", "cancelled")))
         .order_by(Outbox.id)).all()
-    albums = {}
-    for m in messages:
-        if m.grouped_id:
-            albums[m.grouped_id] = albums.get(m.grouped_id, 0) + 1
-    now = datetime.now(UTC)
-    auto_msgs = set(db.scalars(select(Outbox.sent_message_id).join(QuickAction, QuickAction.outbox_id == Outbox.id)
-                               .where(QuickAction.auto, Outbox.customer_id == customer.id)))
-    auto_box = set(db.scalars(select(QuickAction.outbox_id).where(
-        QuickAction.auto, QuickAction.outbox_id.in_([o.id for o in pending]))))
-    # every FAQ answer is marked 🤖 too (Step 7), also when an admin tapped it
-    auto_msgs |= set(db.scalars(select(Outbox.sent_message_id).where(
-        Outbox.customer_id == customer.id, Outbox.reply_kind == "faq", Outbox.sent_message_id.is_not(None))))
-    auto_box |= {o.id for o in pending if o.reply_kind == "faq"}
+    downloads = {d.message_id: d for d in db.scalars(select(MediaDownload).where(
+        MediaDownload.message_id.in_(photo_ids)))} if photo_ids else {}
+    albums = dict(db.execute(select(Message.grouped_id, func.count()).where(  # an album may reach outside the window
+        Message.customer_id == customer.id, Message.grouped_id.in_(groups)).group_by(Message.grouped_id)).all()) if groups else {}
+    quick_auto = exists().where(QuickAction.outbox_id == Outbox.id, QuickAction.auto)
+    boxes = db.execute(select(Outbox, quick_auto).where(Outbox.sent_message_id.in_(ids))).all() if ids else []
+    # 🤖: sent by auto-reply, and every FAQ answer too (Step 7), also when an admin tapped it
+    auto_msgs = {b.sent_message_id for b, auto_quick in boxes if auto_quick or b.reply_kind == "faq"}
+    auto_box = {o.id for o in pending if o.reply_kind == "faq"} | (set(db.scalars(select(QuickAction.outbox_id).where(
+        QuickAction.auto, QuickAction.outbox_id.in_([o.id for o in pending])))) if pending else set())
+    kinds = who_sent(db, [b for b, _ in boxes] + list(pending))  # one users query for both
     # docs/SPEC-v4.6-ai.md S4: 🧠 on messages the AI understood (hover: its reason)
     ai_reasons = {mid: f"{(result or {}).get('reason') or ''} ({decision})".strip()
                   for mid, result, decision in db.execute(select(AICall.message_id, AICall.result_json, AICall.decision)
-                                                          .where(AICall.message_id.in_([m.id for m in messages]),
-                                                                 AICall.ok))}
-    return {
+                                                          .where(AICall.message_id.in_(ids), AICall.ok))} if ids else {}
+    now = datetime.now(UTC)
+    ctx = {
         "auto_msgs": auto_msgs, "auto_box": auto_box, "ai_reasons": ai_reasons,
-        "sent": sent_by(db, [m.id for m in messages if m.direction == "out"]), "pending_by": who_sent(db, pending),
+        "sent": {b.sent_message_id: kinds[b.id] for b, _ in boxes}, "pending_by": {o.id: kinds[o.id] for o in pending},
         "checks": dict(db.execute(select(PaymentCheck.message_id, PaymentCheck.id).where(
-            PaymentCheck.message_id.in_([m.id for m in messages if m.kind == "photo"]),
-            PaymentCheck.decision.in_(("pending", "several")))).all()),
+            PaymentCheck.message_id.in_(photo_ids), PaymentCheck.decision.in_(("pending", "several")))).all())
+                  if photo_ids else {},
         "c": customer, "messages": messages, "downloads": downloads, "pending": pending, "albums": albums,
         "stuck": {o.id for o in pending if o.status == "sending" and now - o.created_at > STUCK_AFTER},
         "polling": any(o.status in ("queued", "sending") for o in pending)
                    or any(d.status == "queued" for d in downloads.values()),
+        "has_older": has_older, "oldest_id": messages[0].id if messages else 0,
     }
+    if newest is not None:  # the full thread carries the poll's starting point
+        ctx["newest_id"], ctx["version"], _ = thread_state(db, customer.id, pending, newest)
+    return ctx
 
 
 def _price_items(request: Request) -> list[compose.PriceItem]:
@@ -189,6 +258,7 @@ def _price_items(request: Request) -> list[compose.PriceItem]:
 @router.get("/chats/{customer_id}", response_class=HTMLResponse)
 def chat(request: Request, customer_id: int, db: Session = Depends(get_db), user: User = Depends(current_user)):
     customer = get_customer(db, customer_id)
+    step = steps.step(db, customer_id)  # once: the resume line and the step badge both need it
     mode = request.query_params.get("compose", "custom")
     texts = replies.load(db)
     greet = compose.needs_greeting(db, customer_id)
@@ -218,7 +288,7 @@ def chat(request: Request, customer_id: int, db: Session = Depends(get_db), user
         mode = "custom"
         result.text = texts["greeting"] + "\n" if greet else ""
         # docs/SPEC-v4.10-interruptions.md: the resume line as a suggestion the admin can delete
-        resume = steps.resume_text(db, steps.step(db, customer_id), texts)
+        resume = steps.resume_text(db, step, texts)
         if resume:
             result.text += "\n" + resume
     products = db.scalars(select(Product).where(Product.active).order_by(Product.brand, Product.name)).all()
@@ -239,7 +309,7 @@ def chat(request: Request, customer_id: int, db: Session = Depends(get_db), user
         "methods": db.scalars(select(PaymentMethod).where(PaymentMethod.active).order_by(PaymentMethod.sort_order)).all(),
         "may_decide": staff.may_decide_payments(db, user),
         "profile": care.profile(db, customer), "colours": care.TAG_COLOURS,  # docs/SPEC-v5.2 P1
-        **thread_context(db, customer), **cart_context(db, customer, texts), "mode": mode, "result": result,
+        **thread_context(db, customer), **cart_context(db, customer, texts, step), "mode": mode, "result": result,
         "greet": greet, "tab": request.query_params.get("tab", "chat"),
         "items": items + [compose.PriceItem(0, "all")] * (compose.MAX_PRICE_ITEMS - len(items)),
         "products": products, "sizes": sizes, "can_send": has_written(db, customer_id),
@@ -280,7 +350,7 @@ def next_step(db: Session, customer: Customer, order, view) -> dict | None:
     return None
 
 
-def cart_context(db: Session, customer: Customer, texts: dict[str, str]) -> dict:
+def cart_context(db: Session, customer: Customer, texts: dict[str, str], step=None) -> dict:
     order = cart.open_cart(db, customer.id)
     view = cart.view(db, order) if order else None
     return {
@@ -293,20 +363,43 @@ def cart_context(db: Session, customer: Customer, texts: dict[str, str]) -> dict
             PaymentCheck.outbox_id.is_(None))) if order else None,
         "item_size": cart.item_size, "shipping": delivery.shipping_order(db, customer.id),
         "contact_changes": change.recent_changes(db, order.id) if order else [],  # docs/SPEC-v4.8-change-info.md
-        **step_context(db, customer.id),
+        **step_context(db, customer.id, step),
     }
 
 
-def step_context(db: Session, customer_id: int) -> dict:
+def step_context(db: Session, customer_id: int, step=None) -> dict:
     """docs/SPEC-v4.10-interruptions.md: the badge "⏳ waiting payment · total changed 02:41" / "🔒 locked"."""
-    step = steps.step(db, customer_id)
+    step = step or steps.step(db, customer_id)
     changes = steps.total_changes(db, step.order.id) if step.kind == "waiting_payment" else []
     return {"step": step, "total_changed_at": changes[-1].created_at if changes else None}
 
 
 @router.get("/chats/{customer_id}/thread", response_class=HTMLResponse)
-def thread(request: Request, customer_id: int, db: Session = Depends(get_db)):
-    return templates.TemplateResponse(request, "_thread.html", thread_context(db, get_customer(db, customer_id)))
+def thread(request: Request, customer_id: int, before: int | None = None, after: int | None = None, v: str = "",
+           to: int | None = None, db: Session = Depends(get_db)):
+    """docs/SPEC-v5.7 B. No parameter: the whole (light) thread. ?before=<id>: the 20 older messages, for the top
+    of the thread (&to=<id>: every message down to that one, for a link to an old message). ?after=<id>&v=<version>: the poll — 204 when nothing changed, else only the new bubbles, the
+    pending replies and the photo bubbles that changed (app.js puts each part in place)."""
+    customer = get_customer(db, customer_id)
+    if before is not None:
+        messages, has_older = _window(db, customer_id, before=before, to=to)
+        return templates.TemplateResponse(request, "_thread_older.html", {
+            **thread_context(db, customer, messages, has_older), "prev_day": None})
+    if after is None:
+        return templates.TemplateResponse(request, "_thread.html", thread_context(db, customer))
+    newest, version, photos = thread_state(db, customer_id)
+    headers = {"X-Thread-After": str(newest), "X-Thread-Version": version}
+    if newest == after and version == v:
+        return Response(status_code=204, headers=headers)
+    mark = db.get(Message, after)
+    new, _ = _window(db, customer_id, after=after if mark is not None and mark.customer_id == customer_id else None)
+    if mark is None or mark.customer_id != customer_id:
+        new = new[-THREAD_SIZE:]
+    refresh = [m for m in db.scalars(select(Message).where(Message.id.in_(photos))) if m.id not in {n.id for n in new}]
+    ctx = thread_context(db, customer, new + refresh, None)
+    return templates.TemplateResponse(request, "_thread_update.html", {
+        **ctx, "new": new, "refresh": refresh,
+        "prev_day": mark.received_at if mark is not None and mark.customer_id == customer_id else None}, headers=headers)
 
 
 @router.post("/chats/{customer_id}/send")

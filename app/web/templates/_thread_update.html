@@ -1,0 +1,5 @@
+{% import "_bubbles.html" as bb with context %}
+{# docs/SPEC-v5.7 B: the poll's answer when something changed; app.js puts each part in place #}
+<div data-part="new">{{ bb.bubbles(new, prev_day) }}</div>
+<div data-part="pending">{% include "_pending.html" %}</div>
+<div data-part="replace">{% for m in refresh %}{{ bb.bubble(m) }}{% endfor %}</div>

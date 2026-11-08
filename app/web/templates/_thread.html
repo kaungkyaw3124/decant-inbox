@@ -1,63 +1,12 @@
-<div id="thread" class="thread" {% if polling %}hx-get="/chats/{{ c.id }}/thread" hx-trigger="every 4s" hx-swap="outerHTML"{% endif %}>
-{% set ns = namespace(day=none) %}
-{% set captions = {"auto": t("Auto-reply") ~ " · " ~ t("Delivered"), "hold": t("Auto · please wait")} %}
-{% for m in messages %}
-  {% set day = m.received_at | local_time("%Y-%m-%d") %}
-  {% if day != ns.day %}{% set ns.day = day %}<p class="day-sep"><b>{{ m.received_at | local_time("%d %b") }}</b></p>{% endif %}
-  {% set by = sent.get(m.id, ("you", none)) if m.direction == "out" else none %}
-  <div class="bubble {{ m.direction }}{% if by %} by-{{ by[0] }}{% endif %}" id="m{{ m.id }}">
-    {% if m.kind == "photo" %}
-      {% set d = downloads.get(m.id) %}
-      <div class="photo">
-        {% if m.grouped_id and albums.get(m.grouped_id, 0) > 1 %}<span class="badge warn">{{ t("several photos sent together") }}</span>{% endif %}
-        {% if d and d.status == "done" %}
-          <a href="/media/{{ m.id }}" target="_blank" rel="noopener"><img src="/media/{{ m.id }}" alt="{{ t('Photo from the chat') }}" class="thumb"></a>
-        {% elif d and d.status == "queued" %}
-          <span class="muted small">{{ t("Loading photo…") }}</span>
-        {% else %}
-          {% if d and d.status == "failed" %}<p class="error small">{{ t("Could not load") }}: {{ tr(d.error) }}</p>{% endif %}
-          <form method="post" action="/messages/{{ m.id }}/photo" class="inline">
-            <input type="hidden" name="csrf" value="{{ csrf }}">
-            <button>📷 {{ t("Show photo") }}{% if m.media_size %} ({{ (m.media_size / 1024) | round | int }} KB){% endif %}</button>
-          </form>
-        {% endif %}
-      </div>
-    {% elif m.kind == "other" and not m.raw_text %}
-      <span class="muted small">({{ t("sticker, voice or file — open Telegram to see it") }})</span>
-    {% endif %}
-    {% if m.raw_text %}<p class="text">{{ m.raw_text }}</p>{% endif %}
-    {% if checks.get(m.id) %}<a class="button primary check-pay" href="/payments/{{ checks[m.id] }}">💳 {{ t("Check payment") }}</a>{% endif %}
-    <div class="bubble-meta">
-      {% if by %}<span class="by"{% if by[0] in captions %} title="{{ t('Sent by auto-reply') }}"{% endif %}>{{ captions.get(by[0]) or by[1] or t("You") }}</span> · {% endif %}
-      {% if m.id in auto_msgs and not by %}<span title="{{ t('Sent by auto-reply') }}">🤖</span> · {% endif %}
-      {% if m.id in ai_reasons %}<span class="ai-mark" title="{{ ai_reasons[m.id] }}">🧠</span> · {% endif %}
-      {% if m.direction == "in" %}<a href="/messages/{{ m.id }}?back=/chats/{{ c.id }}">{{ t("details") }}</a> · {% endif %}
-      <time>{{ m.received_at | local_time }}</time>
-    </div>
-  </div>
-{% else %}
+{% import "_bubbles.html" as bb with context %}
+{# docs/SPEC-v5.7 B: the last 20 messages; older ones load at the top (#older), new ones come from the small poll
+   (#thread-poll: 204 when nothing changed; app.js puts the parts in place, SSE asks it at once) #}
+<div id="thread" class="thread">
+{{ bb.older(c, has_older, oldest_id) }}
+{%- if messages %}{{ bb.bubbles(messages) }}{% else %}
   <p class="empty">{{ t("No messages.") }}</p>
-{% endfor %}
-{% for o in pending %}
-  {% set by = pending_by.get(o.id, ("person", none)) %}
-  <div class="bubble out pending by-{{ by[0] }} status-{{ o.status }}">
-    <p class="text">{{ o.text }}</p>
-    <div class="bubble-meta">
-      <span class="by"{% if by[0] in captions %} title="{{ t('Sent by auto-reply') }}"{% endif %}>{{ t("Auto-reply") if by[0] == "auto" else t("Auto · please wait") if by[0] == "hold" else by[1] or t("You") }}</span> ·
-      {% if o.status == "queued" and o.send_after > now() %}<span data-send-at="{{ o.send_after.isoformat() }}">{{ t("Sending in {n} s", n=((o.send_after - now()).total_seconds()) | round | int) }}</span>
-      {% elif o.status == "queued" %}⏳ {{ t("queued") }}{% if o.error %} · {{ tr(o.error) }}{% endif %}
-      {% elif o.status == "sending" and o.id in stuck %}<span class="error">⚠ {{ t("unknown: check Telegram whether it arrived") }}</span>
-      {% elif o.status == "sending" %}{{ t("sending…") }}
-      {% elif o.status == "failed" %}<span class="error">✖ {{ t("not sent") }}: {{ tr(o.error) }}</span>{% endif %}
-    </div>
-    {% if o.status == "failed" or o.status == "queued" or o.id in stuck %}
-    <form method="post" class="buttons">
-      <input type="hidden" name="csrf" value="{{ csrf }}">
-      {% if o.status == "failed" %}<button formaction="/chats/{{ c.id }}/outbox/{{ o.id }}/retry">{{ t("Try again") }}</button>{% endif %}
-      <button class="link danger" formaction="/chats/{{ c.id }}/outbox/{{ o.id }}/cancel">{{ t("Cancel") if o.status == "queued" else t("Dismiss") }}</button>
-    </form>
-    {% endif %}
-  </div>
-{% endfor %}
+{%- endif %}
+<div id="pending">{% include "_pending.html" %}</div>
+<div id="thread-poll" hidden hx-get="/chats/{{ c.id }}/thread" hx-vals='{"after": {{ newest_id }}, "v": "{{ version }}"}' hx-trigger="every 4s" hx-swap="none"></div>
 <span id="bottom"></span>
 </div>

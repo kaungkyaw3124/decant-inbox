@@ -822,3 +822,12 @@ a.stock-link:hover .small { text-decoration: underline; }
 .date-shown { margin: 0 0 12px; }
 time.when { white-space: nowrap; }
 @media (max-width: 767.98px) { .pick-dates > summary { min-height: 40px; } }
+/* docs/SPEC-v5.7 B: light chat — older messages on demand, "New message ↓" when scrolled up */
+.older, .thread-start { text-align: center; margin: 4px 0 10px; }
+.older-btn { min-height: var(--tap); font-size: 14px; }
+.thread-start { color: var(--muted); font-size: 13px; padding: 10px 0; }
+.new-pill { position: sticky; bottom: 12px; left: 50%; transform: translateX(-50%); display: block; margin: 0 auto;
+  z-index: 5; border: 0; border-radius: 18px; min-height: 36px; padding: 6px 16px; background: var(--ios-blue); color: #fff;
+  font-weight: 600; box-shadow: 0 4px 14px rgba(0, 0, 0, .18); }
+.new-pill[hidden] { display: none; }
+@media (max-width: 767.98px) { .new-pill { min-height: 40px; } }
