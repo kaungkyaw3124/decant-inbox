@@ -2488,3 +2488,67 @@ What changed:
    right edge; the title, search box, table and page buttons line up on both sides.
 3. Make the window narrower (drag) and wider (full screen): nothing sticks to one side, nothing scrolls sideways.
 4. Chats still use the whole screen. On the phone everything looks as before.
+
+## 2026-11-08 — v5.6 ONE simple Products page (docs/SPEC-v5.6-simple-products-page.md)
+What changed (owner: "Don't make complex … too many functions will confuse the user"):
+- **/products is one page.** Title "Products" + one line; top right only **+ Add perfume** and **More ▾**
+  (Download prices, Upload prices, Upload first stock count, Empty vials). No Products / Prices / Stock tabs, no
+  tiles, no search button (Enter searches), no Messages column. Table: Perfume · Prices (Ks) chips · Stock (In stock /
+  Low / Out / Not tracked badge + "94.7 ml left" + thin bar) · Nicknames.
+- **One warning bar, only when needed:** "1 perfume needs more stock: Sauvage (low)" + **Show only these** (?need=1;
+  click again = Show all). Low = below the low line (Settings → Inventory), Out = nothing can be poured.
+- **Side panel** (?open=<id>&tab=prices|stock|nicks; links + Back work, Esc or × closes, tabs switch at once):
+  - Prices: 2 / 5 / 10 ml (+ any other sold size) and Full bottle boxes, ONE "Save prices" (same rules as an Excel
+    row: empty box = not sold; unchanged sizes write nothing). Staff: read-only with "Only the owner can change prices."
+    Price history is folded under the form.
+  - Stock: big "ml left" + bar + "Can pour now: 2 ml ✓ 5 ml ✓ 10 ml ✓ Full bottle: ✓ / none sealed"; **+ Add bottle**
+    (size, how many, what it cost you) and **Fix the amount** (real ml left + why; picks the bottle when there are
+    several; new POST /stock/adjust). "Bottles (n)" (folded) keeps Open. "See what changed (history)" → Settings →
+    Inventory. Not counted: "Stock for this perfume is not counted yet." + **Start counting** + one
+    **Available to sell** switch (the old manual in-stock flag, POST /products/<id>/available).
+  - Nicknames: chips with × (only nicknames added here; seed ones stay), one box + Add, one-sentence explanation,
+    "Customers wrote this perfume N times · See the messages".
+  - "More about this perfume" (folded): active / added here, Deactivate / Activate.
+- **Clicks from the Products page** (ui_check S1 flows, owner, 1440 px): change a price 2 (name → Save); add a
+  bottle 3 (Stock cell → + Add bottle → Add bottle); fix the ml 3; add a nickname 2 (count → Add); see what to reorder
+  0 (the bar) / 1 (Show only these); add a perfume 2. Staff: the panel is read-only (no buttons).
+- **Nothing lost (S3)** — tests/fixtures/ui_inventory.json key "_moved_v5.6" lists every moved control and its new
+  place. Old URLs: /products/<id> → /products?open=<id>; /prices → /products?dialog=prices; /stock → Settings →
+  Inventory (owner) or /products (staff). Settings → Inventory now holds the stock overview: value at cost, reorder
+  list, stock settings (spill + low lines), stock history, "Add bottles for any perfume".
+- "Aliases" wording → "Nicknames" on the message page too ("Save as nickname", "Nickname “X” added").
+
+Decisions:
+- /stock for the owner goes to Settings → Inventory, not /products: the spec moves the reorder list, value, history and
+  thresholds there, and the 5.1 stock tests (which must stay UNCHANGED, S5) open /stock and expect exactly those.
+  Staff (no Settings) go to /products.
+- Forms in the panel / dialogs return to where they were via `?back=` (local paths only); without it the old
+  redirects stay (so the 5.1 tests are unchanged).
+- PC ≥ 1280 px: the open panel never covers the two buttons, the bar or the list — the page content moves left
+  (rows wrap, column titles hidden while it is open). Below 1280 px the panel lies over the list; phone: full-screen sheet.
+- Test changed (contradicted the spec "Nicknames everywhere"): tests/test_web.py now expects "Nickname “Aventus”
+  added" instead of "Alias “Aventus” added". No other test changed; tests/test_v51_inventory.py unchanged.
+
+Checks: pytest 897 passed, 1 skipped (new tests/test_v56_products.py: 8). UI gate 492 views (owner + staff,
+en + my, 360 / 768 / 1280 + C8 at 1440 / 1920 / 2560), C1-C8 + S1 + S2 0 fails; the panel tabs, the not-counted and
+low panels and the 4 dialogs are gate pages now. Stock maths unchanged (5.1 tests pass as they were).
+
+### 5.6 scoreboard
+| loop | S1 jobs over 3 clicks | S2 (buttons) fails | ui_check fails | notes |
+|---|---|---|---|---|
+| 1 | 0 | 12 (closed-details buttons counted) | 52 (C3 tap sizes on phones) | page + panel + dialogs built |
+| 2 | 0 | 0 | 2 (dialog summary 32 px) | S2 skips hidden buttons; Stock cell + summaries 44 px |
+| 3 | 0 | 0 | 50 (C7 moved controls only) | full gate; inventory notes written |
+| 4 | 0 | 0 | 0 (492 views) | inventory saved; panel-open layout at 1280 px; pytest 897 + 1 skip |
+
+### OWNER TEST SCRIPT 5.6 (PC)
+1. Menu → Products & prices: one page, two buttons (More ▾, + Add perfume). Click "Stronger With You Intensely":
+   the panel opens on Prices → change 5 ml → Save prices → the chip in the list shows the new price.
+2. Stock tab → + Add bottle (size 100, cost) → Add bottle → "ml left" goes up. Fix the amount → 90, why "count" →
+   Save → shows 90.0 ml left.
+3. Nicknames tab → type "swy int" → Add. From your second Telegram account send "swy int 5ml": the dashboard knows
+   it is Stronger With You Intensely.
+4. More ▾ → Download prices (Excel); More ▾ → Upload prices → choose the file → Check file → preview → Confirm.
+   Old links /prices and /stock still open the right place.
+5. Fix one perfume's amount to 5 ml: the orange bar appears ("needs more stock"); "Show only these" shows only it.
+6. Esc closes the panel; the Back button reopens it.

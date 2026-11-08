@@ -4,7 +4,7 @@ Read CLAUDE.md first. This file tracks where we are.
 
 ## NEXT TASK (written by the planning chat; Claude Code runs it with /next)
 Task: v5.6 ONE SIMPLE Products page (no tabs; side panel Prices/Stock/Nicknames; 2 buttons; More menu) — docs/SPEC-v5.6-simple-products-page.md (goal S1-S5).
-Status: TODO
+Status: DONE 2026-11-08 — see REPORT.md
 
 ## PREVIOUS TASK
 Task: v5.5 HOTFIX layout: pages and login not centred / not full width on PC — docs/SPEC-v5.5-layout-hotfix.md (goal L1-L6).
@@ -35,13 +35,16 @@ Status: DONE 2026-11-08 — see REPORT.md
 - v5.3 PC speed DONE + deployed 2026-11-06: static cache + versioned URLs, gzip, boosted menu, prefetch, SSE,
   trusted computer, keyboard; warm pages 0.2-0.5 s / 0 KB (was ~2.2 s / 680 KB), send 0.25 s. NOT met yet: customer
   switch p90 1.27 s (goal 0.5) and server p90 ≤ 200 ms (chat page ~49 queries) -> follow-up for the planning chat.
-- Owner tests pending: 4.13-4.21, 5.0-5.4 (REPORT.md).
+- Owner tests pending: 4.13-4.21, 5.0-5.6 (REPORT.md).
 - v5.4 UI/UX clean-up DONE + deployed 2026-11-06: page pattern, pager on every long list, Products + AI like the
   mockups, Settings in sections (Saved ✓, unsaved warning), 7-item menu, Orders list + detail, error page, glossary;
   887 tests, UI gate 384 views 0 fails. Decision asked (REPORT.md): redirect / to /chats? Owner test 5.4 pending.
 - v5.5 layout hotfix DONE + deployed 2026-11-08: one centred `.page` container (1440 / 1680 px), login centred,
   ui_check C8 (centred at 1440/1920/2560); 889 tests, UI gate 384 views 0 fails. Owner test 5.5 pending.
-- NEXT: v5.6 one simple Products page (QUEUE 13).
+- v5.6 one Products page DONE + deployed 2026-11-08: list + side panel (Prices/Stock/Nicknames), 2 buttons, one
+  low-stock bar; /prices /stock /products/<id> redirect; stock overview in Settings > Inventory; ui_check S1/S2;
+  897 tests, UI gate 492 views 0 fails. Owner test 5.6 pending.
+- NEXT: the QUEUE is empty — ask the planning chat for the next task.
 - Owner checks: `bash scripts/status.sh`; AI numbers at /ai.
 
 ## Status
@@ -78,6 +81,7 @@ Status: DONE 2026-11-08 — see REPORT.md
 | 27 | v5.3 (docs/SPEC-v5.3-performance-pc.md): PC speed: browser cache, gzip, no full reloads, prefetch, live updates, trusted computer, keyboard | ✅ Done, live (P1/P4/send met; switch + server time follow-up; owner test pending) |
 | 28 | v5.4 (docs/SPEC-v5.4-ui-ux-cleanup.md): whole-dashboard UI/UX clean-up: page pattern, paging everywhere, Settings in sections, 7-item menu, Orders list + detail | ✅ Done, live (owner test pending; decision: / redirect) |
 | 29 | v5.5 (docs/SPEC-v5.5-layout-hotfix.md): layout hotfix: pages centred + full width on the PC, login centred, ui_check C8 | ✅ Done, live (owner test pending) |
+| 30 | v5.6 (docs/SPEC-v5.6-simple-products-page.md): ONE simple Products page: side panel Prices/Stock/Nicknames, 2 buttons, More menu, low-stock bar | ✅ Done, live (owner test pending) |
 
 ## Phase 0 checklist
 - [x] Step 0: rollback safety net scripts in ~/hardening/
