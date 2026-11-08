@@ -2459,3 +2459,32 @@ removed, so the baseline did not need changes), full pytest + ui_check green, pe
 6. Search Products for "zzzz" → "No products." with what to do next and "Show all".
 7. Open a wrong address, e.g. /customers/999999 → "Back to Chats", "Try again" and (owner) a request id.
 8. Switch to မြန်မာ and repeat 1 and 4: titles and buttons in Burmese, nothing cut off.
+
+## 2026-11-08 — v5.5 HOTFIX layout: pages centred and full width on the PC (docs/SPEC-v5.5-layout-hotfix.md)
+What changed:
+- One page container `.page` on `<main>` (base.html); Chats/Inbox keep `.ws-main` (full width, L5). The old
+  `main { max-width: 880px }`, `main.wide` and the left-glued `main:not(.ws-main) { margin: 0; max-width: 1200px }`
+  are gone. Phone/tablet (< 1024 px): unchanged (880 px, centred). PC (≥ 1024 px): centred in the area next to the
+  220 px menu, `max-width: min(1440px, 100% - 80px)`; ≥ 1900 px: `min(1680px, 100% - 80px)`.
+- Login / 2-step / error page (signed out, no menu): the same centred container, so the card is in the middle of the
+  window, upper third (L1).
+- Products table: the list card, header, search and pager now share the page's edges at every width; the price
+  chips column takes the extra space (L3).
+- scripts/ui_check.py rule **C8** (L6): at 1440 / 1920 / 2560 px, owner + staff, every full page: the page box is
+  centred in the content area (|left gap − right gap| ≤ 2 px), uses ≥ 70 % of it (or its max-width), and
+  `.page-head`, `.toolbar`, `.list-card` share its left/right edges; the login card centre is within 2 px of the window
+  centre and above the middle. Screenshots: ui-shots/5.5/{login,products,customers,orders,settings,ai}-{1440,1920,2560}.png.
+- Tests: tests/test_v55_layout.py (one container, no old per-page widths; C8 run on the list pages + login).
+
+### 5.5 scoreboard
+| loop | pages failing C8 | ui_check fails | notes |
+|---|---|---|---|
+| 0 (before) | all signed-in pages + login (content glued left) | — | owner screenshots 1668 / 1916 px |
+| 1 | 0 | 0 (384 views, C1-C8) | one `.page` rule; pytest 889 passed, 1 skipped |
+
+### OWNER TEST SCRIPT 5.5 (PC browser, maximise the window)
+1. Log out: the Login card is in the middle of the page, near the top.
+2. Open Products & prices, Customers, Orders, Settings, AI helper: the content is centred between the menu and the
+   right edge; the title, search box, table and page buttons line up on both sides.
+3. Make the window narrower (drag) and wider (full screen): nothing sticks to one side, nothing scrolls sideways.
+4. Chats still use the whole screen. On the phone everything looks as before.

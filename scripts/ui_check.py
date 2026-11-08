@@ -4,7 +4,7 @@ Runs ONLY on its own database (<db_name>_uicheck) filled with fake data, never t
   .venv/bin/python -m scripts.ui_check                  # full run, exit 1 on any failed check
   .venv/bin/python -m scripts.ui_check --quick          # 360 px, daily pages (tests/test_ui_check.py)
   .venv/bin/python -m scripts.ui_check --save-inventory # store the feature inventory (C7 baseline)
-Screenshots: ui-shots/<page>-<role>-<lang>-<width>.png (git-ignored).
+Screenshots: ui-shots/<page>-<role>-<lang>-<width>.png, wide-PC ones (C8) in ui-shots/5.5/ (git-ignored).
 Chromium needs system libraries: `sudo bash scripts/install_ui_check_deps.sh`, or without sudo
 `bash scripts/ui_check_libs.sh` (unpacks them into ~/.cache/ui-check-libs, used automatically).
 """
@@ -230,6 +230,39 @@ CHECKS_JS = r"""(args) => {
   return out;
 }"""
 
+# C8 (docs/SPEC-v5.5 L6): on a wide PC the page box is centred in the area next to the menu and uses the width;
+# header, search, list card and pager share its left and right edges. The login card is centred in the window.
+C8_WIDTHS = (1440, 1920, 2560)
+C8_SHOTS = ("products", "customers", "orders", "settings", "ai")
+C8_JS = r"""() => {
+  const out = [];
+  const main = document.querySelector('main');
+  if (!main || main.classList.contains('ws-main')) return out;  // the Chats workspace is full width (L5)
+  const r = main.getBoundingClientRect(), area = main.parentElement.getBoundingClientRect();
+  const ps = getComputedStyle(main.parentElement);
+  const left = area.left + parseFloat(ps.paddingLeft), right = area.right - parseFloat(ps.paddingRight);
+  const gapL = r.left - left, gapR = right - r.right;
+  if (Math.abs(gapL - gapR) > 2) out.push(`not centred: ${Math.round(gapL)}px left, ${Math.round(gapR)}px right`);
+  const max = parseFloat(getComputedStyle(main).maxWidth);
+  if (r.width < 0.7 * (right - left) && Math.abs(r.width - max) > 1)
+    out.push(`only ${Math.round(r.width)}px of ${Math.round(right - left)}px`);
+  const login = document.querySelector('.login');
+  if (login) {
+    const c = login.getBoundingClientRect();
+    if (Math.abs(c.left + c.width / 2 - innerWidth / 2) > 2) out.push(`login card centre ${Math.round(c.left + c.width / 2)} of ${innerWidth}`);
+    if (c.top + c.height / 2 > innerHeight / 2) out.push(`login card too low (${Math.round(c.top)}px)`);
+  } else {
+    const ms = getComputedStyle(main), inL = r.left + parseFloat(ms.paddingLeft), inR = r.right - parseFloat(ms.paddingRight);
+    for (const el of main.querySelectorAll(':scope > .page-head, :scope > .toolbar, :scope > form.toolbar, :scope > .list-card')) {
+      const e = el.getBoundingClientRect();
+      if (e.width && (Math.abs(e.left - inL) > 2 || Math.abs(e.right - inR) > 2))
+        out.push(`${el.className.split(' ')[0]} edges ${Math.round(e.left)}-${Math.round(e.right)}, page ${Math.round(inL)}-${Math.round(inR)}`);
+    }
+  }
+  return out;
+}"""
+
+
 INVENTORY_JS = r"""() => {
   const items = new Set();
   const path = u => { try { const x = new URL(u, location.href); return x.pathname + x.search; } catch { return u; } };
@@ -413,6 +446,33 @@ def u4_flows(browser) -> list[str]:
     return problems
 
 
+def c8(browser, targets) -> list[str]:
+    """C8 at 1440 / 1920 / 2560 px, English, owner + staff, every full page and the login page."""
+    problems, shots = [], SHOTS / "5.5"
+    shots.mkdir(parents=True, exist_ok=True)
+    for role, username in (("owner", "owner"), ("staff", "staff1")):
+        context = browser.new_context()
+        page = context.new_page()
+        if role == "owner":
+            for width in C8_WIDTHS:
+                page.set_viewport_size({"width": width, "height": 1000})
+                page.goto(f"http://127.0.0.1:{PORT}/login")
+                page.screenshot(path=shots / f"login-{width}.png")
+                problems += [f"login {width}: {p}" for p in page.evaluate(C8_JS)]
+        log_in(page, username)
+        set_language(page, "en")
+        for width in C8_WIDTHS:
+            page.set_viewport_size({"width": width, "height": 1000})
+            for name, url, partial in targets:
+                if partial or page.goto(f"http://127.0.0.1:{PORT}{url}").status != 200:
+                    continue  # staff 403 pages are C1/C7's job
+                if role == "owner" and name in C8_SHOTS:
+                    page.screenshot(path=shots / f"{name}-{width}.png", full_page=True)
+                problems += [f"{name} {role} {width}: {p}" for p in page.evaluate(C8_JS)]
+        context.close()
+    return problems
+
+
 def run(quick: bool, save_inventory: bool, only_widths: tuple[int, ...] = (), shots: Path | None = None,
         only_pages: tuple[str, ...] = ()) -> int:
     from playwright.sync_api import sync_playwright
@@ -475,6 +535,10 @@ def run(quick: bool, save_inventory: bool, only_widths: tuple[int, ...] = (), sh
                                 lines.append(f"FAIL {check.upper()} {name} {role} {lang} {width}: "
                                              + "; ".join(problems[:6]) + (f" (+{len(problems) - 6})" if len(problems) > 6 else ""))
             context.close()
+        if not quick and not save_inventory:
+            for problem in c8(browser, targets):
+                failures += 1
+                lines.append("FAIL C8 " + problem)
         if not save_inventory and not only_pages:  # the flows need every page
             for problem in pc_flows(browser) + u4_flows(browser):
                 failures += 1

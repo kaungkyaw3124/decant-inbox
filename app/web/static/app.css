@@ -42,8 +42,8 @@ html { -webkit-text-size-adjust: 100%; }
 body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--font); font-size: 16px; line-height: 1.5; letter-spacing: -.01em; overflow-wrap: break-word; }
 html[lang=my] body, :lang(my) { line-height: 1.85; }
 a { color: var(--accent); text-underline-offset: 2px; }
-main { max-width: 880px; margin: 0 auto; padding: 14px 16px 24px; }
-main.wide { max-width: 1240px; }
+/* docs/SPEC-v5.5 L2/L4: the one page container (Chats use .ws-main instead) */
+.page { max-width: 880px; margin: 0 auto; padding: 14px 16px 24px; }
 h1 { font-size: 1.35rem; font-weight: 700; margin: 0 0 10px; line-height: 1.35; }
 h2 { font-size: 1.08rem; font-weight: 700; margin: 0 0 8px; line-height: 1.45; }
 h3 { font-size: 1rem; font-weight: 700; }
@@ -633,9 +633,10 @@ button.danger, summary.button.danger, a.button.danger { color: #B80012; }
 .inline-form input[type=file] { min-width: 0; max-width: 100%; flex: 1 1 100%; }
 
 /* ---------- docs/SPEC-v5.4-ui-ux-cleanup.md: the shared page pattern (mockups products-clean / ai-paged) ---------- */
-@media (min-width: 1024px) {  /* X7: next to the menu, not centred in the window */
-  main:not(.ws-main) { margin: 0; max-width: 1200px; padding: 32px 40px 48px; }
+@media (min-width: 1024px) {  /* v5.5 L2: centred between the menu and the right edge, using the width */
+  .page { max-width: min(1440px, 100% - 80px); padding: 32px 0 48px; }
 }
+@media (min-width: 1900px) { .page { max-width: min(1680px, 100% - 80px); } }
 main a { text-decoration: none; }  /* X1: links underline only on hover and in running text */
 main a:hover, main :is(p, li) > a:not(:only-child) { text-decoration: underline; }
 .page-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 20px; }

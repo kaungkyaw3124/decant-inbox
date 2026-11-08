@@ -4,14 +4,14 @@ Read CLAUDE.md first. This file tracks where we are.
 
 ## NEXT TASK (written by the planning chat; Claude Code runs it with /next)
 Task: v5.5 HOTFIX layout: pages and login not centred / not full width on PC — docs/SPEC-v5.5-layout-hotfix.md (goal L1-L6).
-Status: TODO
+Status: DONE 2026-11-08 — see REPORT.md
 
 ## PREVIOUS TASK
 Task: v5.4 UI/UX CLEAN-UP of the whole dashboard (shared page pattern, paging 10/20/50/100 on every long list, Settings by section,
 simple 7-item menu, plain words EN+MY, empty/error states) — docs/SPEC-v5.4-ui-ux-cleanup.md (goal X1-X8).
 Status: DONE 2026-11-06 — see REPORT.md
 
-## RESUME HERE (updated 2026-11-06 evening by Claude Code)
+## RESUME HERE (updated 2026-11-08 by Claude Code)
 - v1-v4.12 DONE. AI AUTO, brake ON, ai_address ON, ai_screenshot OFF.
 - v4.13 hotfix (docs/SPEC-v4.13-hotfix.md) DONE + deployed 2026-10-17: Q0-Q5, R1-R6, evals PASS. Owner test 4.13
   pending (REPORT.md "OWNER TEST SCRIPT 4.13").
@@ -40,7 +40,9 @@ Status: DONE 2026-11-06 — see REPORT.md
 - v5.4 UI/UX clean-up DONE + deployed 2026-11-06: page pattern, pager on every long list, Products + AI like the
   mockups, Settings in sections (Saved ✓, unsaved warning), 7-item menu, Orders list + detail, error page, glossary;
   887 tests, UI gate 384 views 0 fails. Decision asked (REPORT.md): redirect / to /chats? Owner test 5.4 pending.
-- NEXT: the QUEUE is empty — ask the planning chat for the next task.
+- v5.5 layout hotfix DONE + deployed 2026-11-08: one centred `.page` container (1440 / 1680 px), login centred,
+  ui_check C8 (centred at 1440/1920/2560); 889 tests, UI gate 384 views 0 fails. Owner test 5.5 pending.
+- NEXT: v5.6 one simple Products page (QUEUE 13).
 - Owner checks: `bash scripts/status.sh`; AI numbers at /ai.
 
 ## Status
@@ -76,6 +78,7 @@ Status: DONE 2026-11-06 — see REPORT.md
 | 26 | v5.2 (docs/SPEC-v5.2-customer-care.md): customer profiles, reorder list, feedback after delivery | ✅ Done, live (feedback OFF; owner test pending) |
 | 27 | v5.3 (docs/SPEC-v5.3-performance-pc.md): PC speed: browser cache, gzip, no full reloads, prefetch, live updates, trusted computer, keyboard | ✅ Done, live (P1/P4/send met; switch + server time follow-up; owner test pending) |
 | 28 | v5.4 (docs/SPEC-v5.4-ui-ux-cleanup.md): whole-dashboard UI/UX clean-up: page pattern, paging everywhere, Settings in sections, 7-item menu, Orders list + detail | ✅ Done, live (owner test pending; decision: / redirect) |
+| 29 | v5.5 (docs/SPEC-v5.5-layout-hotfix.md): layout hotfix: pages centred + full width on the PC, login centred, ui_check C8 | ✅ Done, live (owner test pending) |
 
 ## Phase 0 checklist
 - [x] Step 0: rollback safety net scripts in ~/hardening/

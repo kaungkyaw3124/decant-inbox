@@ -108,7 +108,7 @@
   </div>
 </aside>
 {% endif %}
-<main class="{% block main_class %}{% endblock %}">
+<main class="{% block main_class %}page{% endblock %}">
 <div id="toasts">{% if flash %}<div class="toast-zone"><div class="flash toast show" role="status" data-autohide><div class="toast-body">{{ tr(flash) }}</div><button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="{{ t('Close') }}"></button></div></div>{% endif %}</div>
 {% block content %}{% endblock %}
 </main>
