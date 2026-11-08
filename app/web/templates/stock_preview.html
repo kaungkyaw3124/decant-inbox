@@ -15,7 +15,7 @@
 {% if payload %}
 <form method="post" action="/stock/import/confirm" class="buttons">
   <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="payload" value="{{ payload }}">
-  <button class="primary">✅ {{ t("Add this stock") }}</button> <a class="button" href="/stock">{{ t("Back") }}</a>
+  <button class="primary">✅ {{ t("Add this stock") }}</button> <a class="button" href="/products?dialog=stock-count">{{ t("Back") }}</a>
 </form>
-{% else %}<p><a class="button" href="/stock">{{ t("Back") }}</a></p>{% endif %}
+{% else %}<p><a class="button" href="/products?dialog=stock-count">{{ t("Back") }}</a></p>{% endif %}
 {% endblock %}

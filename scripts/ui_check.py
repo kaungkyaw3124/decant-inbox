@@ -126,6 +126,14 @@ def build_database() -> dict[str, int]:
     ids["check"] = scalar(engine, "SELECT id FROM payment_checks WHERE NOT is_test ORDER BY id LIMIT 1")
     ids["product"] = stw
     ids["message"] = scalar(engine, "SELECT id FROM messages WHERE external_message_id = '10'")
+    from app.inventory import stock as inventory  # docs/SPEC-v5.6: counted perfumes in every stock state
+    sauvage = scalar(engine, "SELECT id FROM products WHERE name = 'Sauvage Eau de Parfum'")
+    with SessionLocal.begin() as s:
+        inventory.add_bottles(s, stw, 100, 1, 250000, None, None)
+        inventory.add_bottles(s, stw, 100, 1, 250000, 60.5, None)
+        inventory.add_bottles(s, sauvage, 100, 1, 300000, 6, None)
+    ids["low"] = sauvage
+    ids["untracked"] = scalar(engine, "SELECT id FROM products WHERE name = 'Y Eau de Parfum'")
     ids["practice"] = 1
     ids["order"] = orders[0]  # a paid test order (packing slip)
     engine.dispose()
@@ -156,6 +164,11 @@ def pages(ids: dict[str, int]) -> list[tuple[str, str, bool]]:
             name = {"chat-list": "chats", "payment-list": "payments", "orders": "orders"}.get(name, name)
             found.append((name, url, r.path in PARTIALS))
     found.append(("orders-test", "/orders?tab=all&show_test=1", False))
+    for tab in ("prices", "stock", "nicks"):  # docs/SPEC-v5.6: the side panel and the owner's dialogs
+        found.append((f"products-{tab}", f"/products?open={ids['product']}&tab={tab}", False))
+    found += [("products-untracked", f"/products?open={ids['untracked']}&tab=stock", False),
+              ("products-low", f"/products?need=1&open={ids['low']}&tab=stock", False)]
+    found += [(f"products-dialog-{d}", f"/products?dialog={d}", False) for d in ("add", "prices", "stock-count", "vials")]
     return found
 
 
@@ -219,6 +232,17 @@ CHECKS_JS = r"""(args) => {
     const a = lum(fg), b = lum(bg(el)); const ratio = (Math.max(a, b) + .05) / (Math.min(a, b) + .05);
     const large = parseFloat(s.fontSize) >= 24 || (parseFloat(s.fontSize) >= 18.6 && +s.fontWeight >= 700);
     if (ratio < (large ? 3 : 4.5)) out.c5.push(`${label(el)} ${ratio.toFixed(2)}`);
+  }
+  // S2 (docs/SPEC-v5.6): Products shows <= 2 buttons above the list and <= 2 per panel tab (nickname × excluded)
+  if (location.pathname === '/products') {
+    out.s2 = [];
+    const buttons = root => [...root.querySelectorAll('button, a.button, summary.button')]
+      .filter(b => vis(b) && !b.matches('.chip-x') && !b.closest('.dialog, .pager, .panel-foot')
+        && !(b.closest('details:not([open])') && !b.matches('details:not([open]) > summary')));  // closed = hidden
+    const head = document.querySelector('main .page-head');
+    if (head && buttons(head).length > 2) out.s2.push(`${buttons(head).length} buttons above the list`);
+    for (const pane of document.querySelectorAll('#panel .pane:not([hidden])'))
+      if (buttons(pane).length > 2) out.s2.push(`${buttons(pane).length} buttons in ${pane.id}`);
   }
   // C6 Burmese: nothing clipped in buttons, badges, nav items
   if (lang === 'my') {
@@ -446,6 +470,90 @@ def u4_flows(browser) -> list[str]:
     return problems
 
 
+def s1_flows(browser) -> list[str]:
+    """docs/SPEC-v5.6 S1: the owner's daily product jobs in <= 3 clicks from the Products page (PC, 1440 px), typing
+    not counted; staff see the panel read-only; Esc closes the panel. Runs after u4_flows (it changes the shop)."""
+    from sqlalchemy import create_engine, text
+
+    problems, base = [], f"http://127.0.0.1:{PORT}"
+    db = create_engine(get_settings().database_url)
+
+    def value(sql: str):
+        with db.connect() as c:
+            return c.execute(text(sql)).scalar()
+
+    stw = value("SELECT id FROM products WHERE name = 'Stronger With You Intensely'")
+    row = f"#product-list .list-row:has(a.name:text-is('Stronger With You Intensely'))"
+    context = browser.new_context(viewport={"width": 1440, "height": 900})
+    page = context.new_page()
+    log_in(page, "owner")
+    set_language(page, "en")
+
+    def flow(name: str, steps: list, done) -> None:
+        """steps: a selector = one click; ("fill", selector, text) = typing (not a click)."""
+        clicks = [s for s in steps if isinstance(s, str)]
+        if len(clicks) > 3:
+            problems.append(f"S1 {name}: {len(clicks)} clicks")
+        page.goto(f"{base}/products")
+        try:
+            for step in steps:
+                if isinstance(step, str):
+                    page.locator(step).first.click()
+                    page.wait_for_load_state()
+                else:
+                    page.locator(step[1]).first.fill(step[2])
+            if not done():
+                problems.append(f"S1 {name}: no result after {len(clicks)} clicks ({page.url})")
+        except Exception as exc:  # a missing button = the job takes more clicks
+            problems.append(f"S1 {name}: {str(exc).splitlines()[0]}")
+
+    flow("change a price", [f"{row} a.name", ("fill", "#pane-prices input[name=price_5]", "19,000"),
+                            "#pane-prices button.primary"],
+         lambda: value(f"SELECT price_mmk FROM product_prices WHERE product_id = {stw} AND size_ml = 5 "
+                       "ORDER BY effective_from DESC, id DESC LIMIT 1") == 19000)
+    bottles = value(f"SELECT count(*) FROM bottles WHERE product_id = {stw}")
+    flow("add a received bottle", [f"{row} a.stock-link", "#pane-stock summary:has-text('Add bottle')",
+                                   ("fill", "#pane-stock details[open] input[name=cost_mmk]", "250000"),
+                                   "#pane-stock details[open] button.primary"],
+         lambda: value(f"SELECT count(*) FROM bottles WHERE product_id = {stw}") == bottles + 1)
+    flow("fix the ml", [f"{row} a.stock-link", "#pane-stock summary:has-text('Fix the amount')",
+                        ("fill", "#pane-stock details[open] input[name=remaining_ml]", "42"),
+                        ("fill", "#pane-stock details[open] input[name=reason]", "count"),
+                        "#pane-stock details[open] button.primary"],
+         lambda: value(f"SELECT count(*) FROM bottles WHERE product_id = {stw} AND remaining_ml = 42") == 1)
+    flow("add a nickname", [f"{row} .col-num a", ("fill", "#pane-nicks input[name=alias]", "swy int"),
+                            "#pane-nicks form.inline-form button.primary"],
+         lambda: value(f"SELECT count(*) FROM product_aliases WHERE product_id = {stw} AND normalized_alias = 'swy int'") == 1)
+    flow("see what to reorder", [".warn-bar a:has-text('Show only these')"],
+         lambda: page.locator("#product-list .list-row").count() >= 1
+         and page.locator("#product-list a.name:text-is('Sauvage Eau de Parfum')").count() == 1
+         and page.locator(f"{row}").count() == 0)
+    flow("add a perfume", [".head-actions a.button.primary", ("fill", ".dialog input[name=brand]", "Creed"),
+                           ("fill", ".dialog input[name=name]", "Aventus"), ("fill", ".dialog input[name=price_5]", "65,000"),
+                           ".dialog button.primary"],
+         lambda: value("SELECT count(*) FROM products WHERE name = 'Aventus'") == 1)
+    page.goto(f"{base}/products?open={stw}")
+    page.locator("body").click(position={"x": 400, "y": 5})
+    page.keyboard.press("Escape")
+    try:
+        page.wait_for_selector("#panel.side-panel", state="detached", timeout=3000)
+    except Exception:
+        problems.append("S1 Esc does not close the panel")
+    context.close()
+
+    context = browser.new_context(viewport={"width": 1440, "height": 900})
+    page = context.new_page()
+    log_in(page, "staff1")
+    set_language(page, "en")
+    page.goto(f"{base}/products?open={stw}")
+    if (page.locator(".head-actions").count() or page.locator("#panel button").count()
+            or page.locator("#pane-prices input[readonly]").count() < 4):
+        problems.append("S1 staff: the Products page is not view-only")
+    context.close()
+    db.dispose()
+    return problems
+
+
 def c8(browser, targets) -> list[str]:
     """C8 at 1440 / 1920 / 2560 px, English, owner + staff, every full page and the login page."""
     problems, shots = [], SHOTS / "5.5"
@@ -540,13 +648,18 @@ def run(quick: bool, save_inventory: bool, only_widths: tuple[int, ...] = (), sh
                 failures += 1
                 lines.append("FAIL C8 " + problem)
         if not save_inventory and not only_pages:  # the flows need every page
-            for problem in pc_flows(browser) + u4_flows(browser):
+            for problem in pc_flows(browser) + u4_flows(browser) + s1_flows(browser):
+                failures += 1
+                lines.append("FAIL " + problem)
+        elif not save_inventory and "products" in only_pages:  # a quick look at Products still clicks its jobs
+            for problem in s1_flows(browser):
                 failures += 1
                 lines.append("FAIL " + problem)
         browser.close()
 
-    if save_inventory:
-        INVENTORY.write_text(json.dumps(inventory, indent=1, ensure_ascii=False) + "\n")
+    if save_inventory:  # "_..." keys are notes (docs/SPEC-v5.6 S3: where moved controls went); they stay
+        notes = {k: v for k, v in json.loads(INVENTORY.read_text()).items() if k.startswith("_")} if INVENTORY.exists() else {}
+        INVENTORY.write_text(json.dumps(notes | inventory, indent=1, ensure_ascii=False) + "\n")
         print(f"saved {INVENTORY.relative_to(ROOT)} ({len(inventory)} pages)")
     elif INVENTORY.exists() and not (only_pages or only_widths):  # C7 (needs the full run): nothing that existed before is gone (same role)
         old = json.loads(INVENTORY.read_text())

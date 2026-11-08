@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}{{ t("Check prices") }} · Decant Inbox{% endblock %}
 {% block content %}
-<p><a href="/prices">← {{ t("Price list") }}</a></p>
+<p><a href="/products?dialog=prices">← {{ t("Price list") }}</a></p>
 <h1>{{ t("Check before saving") }}</h1>
 <p class="muted small">{{ filename }} · {{ t("{n} perfumes. Nothing is saved yet.", n=sheet.rows|length) }}</p>
 {% if error %}<p class="flash bad" role="alert">{{ tr(error) }}</p>{% endif %}
@@ -83,7 +83,7 @@
   {% if payload %}
   <div class="buttons sticky-actions">
     <button class="primary">{{ t("Confirm and save") }}</button>
-    <a class="button" href="/prices">{{ t("Cancel") }}</a>
+    <a class="button" href="/products?dialog=prices">{{ t("Cancel") }}</a>
   </div>
   {% else %}
   <p class="flash bad">{{ t("Can't save: fix the problems above in the file and upload it again.") }}</p>

@@ -114,7 +114,7 @@ MY = {
     "Contains the nickname of {name}, plus other words: is it the same perfume?":
         "{name} ရဲ့ နာမည်ပါပေမယ့် တခြားစာလုံးတွေလည်း ပါတယ် — ဒီရေမွှေးပဲလား?",
     "It's in my list: choose…": "စာရင်းထဲ ရှိတယ် — ရွေးပါ…", "Most similar": "အနီးစပ်ဆုံး", "All products": "ပစ္စည်း အားလုံး",
-    "Save as alias": "နာမည်ပွားအဖြစ် သိမ်းမယ်", "New product": "ပစ္စည်းအသစ်",
+    "Save as nickname": "နာမည်ပွားအဖြစ် သိမ်းမယ်", "New product": "ပစ္စည်းအသစ်",
     "Price for {what} (ကျပ်)": "{what} ဈေး (ကျပ်)", "Bottle size (ml)": "ပုလင်း ဆိုဒ် (ml)", "{size}ml price": "{size}ml ဈေး",
     "Full bottle price": "ပုလင်းလိုက် ဈေး", "In stock": "ပစ္စည်းရှိ", "Add product + price": "ပစ္စည်းနဲ့ ဈေး ထည့်မယ်",
     "We don't have it": "ဒီပစ္စည်း မရှိဘူး", "Resolved": "ဖြေရှင်းပြီး", "alias": "နာမည်ပွား", "new product": "ပစ္စည်းအသစ်",
@@ -124,7 +124,7 @@ MY = {
     "Back to new": "အသစ်ကို ပြန်ထား", "Correct the parse": "App နားလည်တာ ပြင်မယ်", "Size (ml)": "ဆိုဒ် (ml)",
     "This message has {n} items; saving a correction keeps only this one.":
         "ဒီစာထဲ ပစ္စည်း {n} ခု ပါတယ် — ပြင်ပြီး သိမ်းရင် ဒီတစ်ခုပဲ ကျန်မယ်။",
-    "Save as alias (optional): the words in this message that name the product":
+    "Save as nickname (optional): the words in this message that name the product":
         "နာမည်ပွားအဖြစ် သိမ်းမယ် (မထည့်လည်းရ) — ဒီစာထဲက ပစ္စည်းနာမည် စာလုံး",
     "Save correction": "ပြင်တာ သိမ်းမယ်",
     "Ignored: their messages are hidden from the inbox (still saved).":
@@ -236,7 +236,7 @@ MY = {
     "Price history": "ဈေး မှတ်တမ်း", "not sold": "မရောင်း",
     "Words customers use for this product. The parser re-checks all messages within a few seconds after a change; your manual corrections are kept.":
         "ဖောက်သည်တွေ ဒီပစ္စည်းကို ခေါ်တဲ့ စာလုံးတွေ။ ပြင်ပြီး စက္ကန့်အနည်းငယ်အတွင်း စာအားလုံး ပြန်စစ်မယ် — ကိုယ်တိုင်ပြင်ထားတာတွေ မပျောက်ဘူး။",
-    "Also an alias of another product, so the parser cannot decide": "တခြားပစ္စည်းရဲ့ နာမည်ပွားလည်း ဖြစ်နေလို့ App မဆုံးဖြတ်နိုင်ဘူး",
+    "Also a nickname of another product, so the parser cannot decide": "တခြားပစ္စည်းရဲ့ နာမည်ပွားလည်း ဖြစ်နေလို့ App မဆုံးဖြတ်နိုင်ဘူး",
     "shared": "နှစ်ခုသုံး", "Delete alias": "နာမည်ပွား ဖျက်မယ်", "No aliases yet.": "နာမည်ပွား မရှိသေးပါ။",
     "New alias, e.g.": "နာမည်ပွားအသစ်၊ ဥပမာ", "New alias": "နာမည်ပွားအသစ်", "Add alias": "နာမည်ပွား ထည့်မယ်",
     "New nicknames: teach them with the 📘 card on a message (the owner approves).":
@@ -937,4 +937,45 @@ MY = {
     "Back to Chats": "စကားပြောများသို့ ပြန်သွား",
     "Request id": "တောင်းဆိုမှု နံပါတ်",
     "Nicknames": "နာမည်ပွားများ",
+    # docs/SPEC-v5.6: one Products page, side panel, dialogs
+    "1 perfume needs more stock:": "ရေမွှေး ၁ မျိုး လက်ကျန် ထပ်လိုတယ်:",
+    "{n} perfumes need more stock:": "ရေမွှေး {n} မျိုး လက်ကျန် ထပ်လိုတယ်:",
+    "No perfume needs more stock now.": "အခု လက်ကျန် ထပ်လိုတဲ့ ရေမွှေး မရှိပါ။",
+    "Show only these": "ဒါတွေပဲ ပြ",
+    "{n} perfumes · prices in Ks · click a perfume to edit it": "ရေမွှေး {n} မျိုး · ဈေး ကျပ်နဲ့ · ပြင်ဖို့ ရေမွှေးကို နှိပ်ပါ",
+    "Add perfume": "ရေမွှေး ထည့်မယ်", "Add bottle": "ပုလင်း ထည့်မယ်",
+    "Download prices (Excel)": "ဈေးစာရင်း ဒေါင်းမယ် (Excel)", "Upload prices (Excel)": "ဈေးစာရင်း တင်မယ် (Excel)",
+    "Upload first stock count (Excel)": "ပထမ လက်ကျန်စာရင်း တင်မယ် (Excel)",
+    "Empty vials (2 / 5 / 10 ml)": "ပုလင်းငယ် အလွတ်များ (2 / 5 / 10 ml)", "Empty vials": "ပုလင်းငယ် အလွတ်များ",
+    "Search perfume, brand or nickname": "ရေမွှေး၊ အမှတ်တံဆိပ် ဒါမှမဟုတ် နာမည်ပွား ရှာမယ်",
+    "Prices (Ks)": "ဈေးနှုန်း (ကျပ်)",
+    "Low": "နည်းနေ", "Out": "ကုန်ပြီ", "out": "ကုန်ပြီ", "Not tracked": "မရေတွက်ရသေး",
+    "{ml} ml left": "{ml} ml ကျန်", "ml left": "ml ကျန်",
+    "Check the spelling, or add the perfume.": "စာလုံးပေါင်း စစ်ပါ၊ ဒါမှမဟုတ် ရေမွှေးကို ထည့်ပါ။",
+    "{size} ml price (Ks)": "{size} ml ဈေး (ကျပ်)", "Full bottle {size} ml (Ks)": "ပုလင်းလိုက် {size} ml (ကျပ်)",
+    "Full bottle price (Ks)": "ပုလင်းလိုက် ဈေး (ကျပ်)",
+    "Empty box = that size is not sold.": "အကွက် အလွတ် = အဲဒီ ပမာဏ မရောင်းပါ။",
+    "Save prices": "ဈေးနှုန်း သိမ်းမယ်", "Only the owner can change prices.": "ဆိုင်ရှင်ပဲ ဈေးနှုန်း ပြင်လို့ရတယ်။",
+    "Last changed {date}": "နောက်ဆုံး ပြင်ခဲ့တာ {date}",
+    "Can pour now:": "အခု ခွဲထည့်လို့ရ:", "none sealed": "မဖောက်ရသေးတဲ့ ပုလင်း မရှိ",
+    "Fix the amount": "ပမာဏ ပြင်မယ်", "Bottle": "ပုလင်း", "Real ml left now": "အခု တကယ် ကျန်တဲ့ ml",
+    "Bottles ({n})": "ပုလင်းများ ({n})", "See what changed (history)": "ဘာပြောင်းခဲ့လဲ ကြည့်မယ် (မှတ်တမ်း)",
+    "Stock for this perfume is not counted yet.": "ဒီရေမွှေးရဲ့ လက်ကျန်ကို မရေတွက်ရသေးပါ။",
+    "Start counting": "စရေတွက်မယ်", "Available to sell": "ရောင်းလို့ရ",
+    "What it cost you, per bottle (Ks)": "တစ်ပုလင်း ဝယ်ဈေး (ကျပ်)",
+    "Other names customers use for this perfume. The auto-reply uses them to know which perfume a message is about.":
+        "ဖောက်သည်တွေ ဒီရေမွှေးကို ခေါ်တဲ့ တခြားနာမည်များ။ အလိုအလျောက်ဖြေစနစ်က ဘယ်ရေမွှေးအကြောင်းလဲ သိဖို့ သုံးတယ်။",
+    "Remove nickname": "နာမည်ပွား ဖျက်မယ်", "No nicknames yet.": "နာမည်ပွား မရှိသေးပါ။",
+    "Add a nickname, e.g.": "နာမည်ပွား ထည့်ပါ၊ ဥပမာ", "New nickname": "နာမည်ပွား အသစ်",
+    "Customers wrote this perfume {n} times.": "ဖောက်သည်တွေ ဒီရေမွှေးကို {n} ကြိမ် ရေးခဲ့တယ်။",
+    "See the messages": "စာတွေ ကြည့်မယ်", "More about this perfume": "ဒီရေမွှေး အကြောင်း ထပ်ကြည့်",
+    "Nicknames (optional, comma between them)": "နာမည်ပွားများ (မထည့်လည်းရ၊ ကော်မာ ခံပါ)",
+    "Add bottles for any perfume": "ဘယ်ရေမွှေးအတွက်မဆို ပုလင်း ထည့်မယ်", "Stock history": "လက်ကျန် မှတ်တမ်း",
+    "Each perfume's ml, bottles and fixes: Products → click a perfume → Stock. Packing an order takes the ml and one vial out; Undo or Cancel puts them back.":
+        "ရေမွှေးတစ်ခုချင်းရဲ့ ml၊ ပုလင်းနဲ့ ပြင်ဆင်မှု: ပစ္စည်းများ → ရေမွှေးကို နှိပ် → လက်ကျန်။ ထုပ်ပိုးရင် ml နဲ့ ပုလင်းငယ် ၁ ခု နုတ်တယ်၊ ပြန်ဖျက် ဒါမှမဟုတ် ပယ်ရင် ပြန်ထည့်တယ်။",
+    "Prices saved.": "ဈေးနှုန်း သိမ်းပြီး။", "No change.": "ပြောင်းစရာ မရှိပါ။",
+    "Saved: available to sell.": "သိမ်းပြီး: ရောင်းလို့ရ။", "Saved: not available to sell.": "သိမ်းပြီး: မရောင်းရ။",
+    "Nickname added.": "နာမည်ပွား ထည့်ပြီး။", "That nickname already exists.": "ဒီနာမည်ပွား ရှိပြီးသား။",
+    "Nickname too short.": "နာမည်ပွား တိုလွန်းတယ်။", "Nickname removed.": "နာမည်ပွား ဖျက်ပြီး။",
+    "Prices: whole Ks only, more than 0.": "ဈေးနှုန်း: ကျပ် ဂဏန်းပြည့်ပဲ၊ 0 ထက်များရမယ်။", "Unknown size": "မသိတဲ့ ပမာဏ",
 }

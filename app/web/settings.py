@@ -5,7 +5,8 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
-from app.models import AuditLog, Customer, FaqEntry, PaymentMethod, ReplyTemplate, User
+from app.inventory import stock
+from app.models import AuditLog, Customer, FaqEntry, PaymentMethod, Product, ReplyTemplate, User
 from app.orders import auto, delivery, testpay
 from app.pricing import costs
 from app.pricing.prices import DEFAULT_SIZES, current_prices
@@ -15,6 +16,7 @@ from app.alerts import bot, service as alerts
 from app.core.config import get_settings
 from app.web.auth import current_user, owner_only, verify_csrf
 from app.web.deps import get_db, templates
+from app.web import paging
 from app.web.inbox import flash
 
 router = APIRouter(prefix="/settings", dependencies=[Depends(owner_only), Depends(verify_csrf)])  # owner only (4.4)
@@ -63,6 +65,9 @@ def _page(request: Request, db: Session, errors: dict[str, str] | None = None,
         "testers": db.scalars(select(Customer).where(Customer.is_tester).order_by(Customer.id)).all(),
         "vials": costs.vial_costs(db), "vial_sizes": _decant_sizes(db), "vial_error": (errors or {}).get("vial"),
         "alerts": alerts.settings(db), "alert_types": alerts.TYPES, "alerts_on": bot.configured(),
+        # docs/SPEC-v5.6: the stock overview (reorder list, value, thresholds, history) lives in Inventory
+        "stock": stock.overview(db), "stock_history": paging.paginate(db, stock.history_query(), request),
+        "stock_products": db.scalars(select(Product).where(Product.active).order_by(Product.brand, Product.name)).all(),
         "backup_offsite": bool(get_settings().backup_passphrase and get_settings().backup_passphrase.get_secret_value())},
         status_code=status_code)
 

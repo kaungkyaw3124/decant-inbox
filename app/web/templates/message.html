@@ -71,7 +71,7 @@
         <optgroup label="{{ t('Most similar') }}">{% for p in sugg %}<option value="{{ p.id }}" {% if u.partial and loop.first %}selected{% endif %}>{{ p.name }} · {{ p.brand }}</option>{% endfor %}</optgroup>
         <optgroup label="{{ t('All products') }}">{% for p in all_products if p.active %}<option value="{{ p.id }}">{{ p.name }} · {{ p.brand }}</option>{% endfor %}</optgroup>
       </select>
-      <button class="primary">{{ t("Save as alias") }}</button>
+      <button class="primary">{{ t("Save as nickname") }}</button>
     </form>
     <details>
       <summary class="small">{{ t("New product") }}</summary>
@@ -153,7 +153,7 @@
     </div>
     <label class="check"><input type="checkbox" name="full_bottle" value="1" {% if items and items[0][0].is_full_bottle %}checked{% endif %}> {{ t("Full bottle") }}</label>
     {% if items|length > 1 %}<p class="muted small">{{ t("This message has {n} items; saving a correction keeps only this one.", n=items|length) }}</p>{% endif %}
-    <label>{{ t("Save as alias (optional): the words in this message that name the product") }}
+    <label>{{ t("Save as nickname (optional): the words in this message that name the product") }}
       <input name="alias" placeholder="{{ t('e.g.') }} ဆော်ဗေ့">
     </label>
     <button class="primary">{{ t("Save correction") }}</button>

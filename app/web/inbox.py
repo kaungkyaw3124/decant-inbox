@@ -281,14 +281,14 @@ def edit_parse(
                 "known": "Saved. That nickname was already known."}.get(taught.status, f"Saved. {taught.note}")
     elif alias_norm and pid is not None:
         if len(alias_norm) < 2:
-            note = "Saved. Alias too short, not added."
+            note = "Saved. Nickname too short, not added."
         else:
             added = db.execute(insert(ProductAlias).values(
                 product_id=pid, alias_text=alias.strip(), normalized_alias=alias_norm, source="learned",
             ).on_conflict_do_nothing()).rowcount
-            note = f"Saved. Alias “{alias.strip()}” added." if added else "Saved. Alias already existed."
+            note = f"Saved. Nickname “{alias.strip()}” added." if added else "Saved. That nickname already existed."
     elif alias_norm:
-        note = "Saved. Alias not added: choose a product first."
+        note = "Saved. Nickname not added: choose a product first."
     audit.record(db, user, "message.correct", message_id=message_id, intent=intent, product_id=pid, size_ml=size)
     if ai_call is not None:
         from app.ai import graduation

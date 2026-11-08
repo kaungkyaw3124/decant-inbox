@@ -437,6 +437,19 @@ def apply_import(session: Session, plan: Plan, choices: dict[int, str], user_id:
     return stats
 
 
+def set_prices(session: Session, product: Product, prices: dict[str, int | None], in_stock: bool | None,
+               user_id: int | None) -> int:
+    """docs/SPEC-v5.6: the Products side panel, the same rules as one Excel row ("5" / "full" -> price, None = not
+    sold; in_stock None = unchanged). Returns the number of price rows written."""
+    row = SheetRow(0, product.brand, product.name, product.full_size_ml, prices, in_stock)
+    now = datetime.now(UTC)
+    changes = _desired(row, latest_prices(session, [product.id]).get(product.id, {}))
+    for size, (price, stock) in changes.items():
+        session.add(ProductPrice(product_id=product.id, size_ml=size, is_full_bottle=size is None,
+                                 price_mmk=price, in_stock=stock, effective_from=now, created_by=user_id))
+    return len(changes)
+
+
 # ---------- writing ----------
 
 def write_workbook(rows: list[dict[str, Any]], sizes: list[int]) -> bytes:

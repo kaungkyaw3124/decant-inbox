@@ -29,8 +29,7 @@
                ("/products", "bi-droplet", "Products & prices", path.startswith("/products") or path.startswith("/prices") or path.startswith("/stock")),
                ("/sales", "bi-bar-chart", "Sales", path.startswith("/sales"))] %}
 {% set more_links = [("/products", "bi-droplet", "Products", true, 0),
-               ("/prices", "bi-tags", "Prices", user_role == "owner", 0),
-               ("/stock", "bi-box", "Stock", true, 0),
+               ("/prices", "bi-tags", "Price list", user_role == "owner", 0),
                ("/sales", "bi-graph-up", "Sales", true, 0),
                ("/customers", "bi-person-vcard", "Customers", true, 0),
                ("/", "bi-inbox", "Inbox", true, 0),

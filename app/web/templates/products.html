@@ -1,53 +1,297 @@
 {% extends "base.html" %}
 {% import "_ui.html" as ui with context %}
+{# docs/SPEC-v5.6-simple-products-page.md: ONE page — list, side panel (?open=<id>&tab=), owner dialogs (?dialog=) #}
 {% block title %}{{ t("Products") }} · Decant Inbox{% endblock %}
+{% macro stock_cell(p) -%}
+{%- set lv = levels.get(p.id) -%}
+{%- if lv -%}
+{%- set st = need_status.get(p.id, "ok") -%}
+<span class="stock-line"><span class="badge st-{{ st }}">{{ t({"ok": "In stock", "low": "Low", "out": "Out"}[st]) }}</span>
+<span class="small">{{ t("{ml} ml left", ml="%.1f" | format(lv.available_ml)) }}</span></span>
+<progress class="stock-bar st-{{ st }}" max="100" value="{{ [100, (100 * lv.available_ml / (capacity.get(p.id) or 1)) | round] | min }}" aria-hidden="true"></progress>
+{%- else -%}
+<span class="stock-line"><span class="badge st-none">{{ t("Not tracked") }}</span>
+{%- if prices.get(p.id) and not prices[p.id] | selectattr("in_stock") | list %} <span class="badge warn">{{ t("out of stock") }}</span>{% endif %}</span>
+{%- endif -%}
+{%- endmacro %}
+{% macro add_bottle_form(pp, back) -%}
+<form method="post" action="/stock/bottles?back={{ (back ~ '&tab=stock') | urlencode }}" class="stack">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <input type="hidden" name="product_id" value="{{ pp.id }}">
+  <div class="field-grid two">
+    <label>{{ t("Bottle size (ml)") }} <input name="size_ml" inputmode="numeric" value="{{ pp.full_size_ml or '' }}" required></label>
+    <label>{{ t("How many") }} <input name="count" inputmode="numeric" value="1"></label>
+    <label class="span-all">{{ t("What it cost you, per bottle (Ks)") }} <input name="cost_mmk" inputmode="numeric"></label>
+  </div>
+  <div class="buttons"><button class="primary">{{ t("Add bottle") }}</button></div>
+</form>
+{%- endmacro %}
 {% block content %}
-{% call ui.page_head(t("Products & prices"), t("{n} perfumes · prices in Ks", n=n_products)) %}
-<nav class="tabs" aria-label="{{ t('Products & prices') }}">
-  <a href="/products" aria-current="page">{{ t("Products") }}</a>{% if user_role == "owner" %}<a href="/prices">{{ t("Prices") }}</a>{% endif %}
-  <a href="/stock">{{ t("Stock") }}</a>
-</nav>
+{% call ui.page_head(t("Products"), t("{n} perfumes · prices in Ks · click a perfume to edit it", n=n_products)) %}
+{% if user_role == "owner" %}
+<div class="head-actions">
+  <details class="more-menu">
+    <summary class="button">{{ t("More") }} ▾</summary>
+    <div class="menu">
+      <a href="/prices/export.xlsx">{{ t("Download prices (Excel)") }}</a>
+      <a href="{{ here(dialog='prices') }}">{{ t("Upload prices (Excel)") }}</a>
+      <a href="{{ here(dialog='stock-count') }}">{{ t("Upload first stock count (Excel)") }}</a>
+      <a href="{{ here(dialog='vials') }}">{{ t("Empty vials (2 / 5 / 10 ml)") }}</a>
+    </div>
+  </details>
+  <a class="button primary" href="{{ here(dialog='add') }}">+ {{ t("Add perfume") }}</a>
+</div>
+{% endif %}
 {% endcall %}
-<form method="get" action="/products" class="filters toolbar">
-  <input type="search" name="q" value="{{ q }}" class="search" placeholder="{{ t('Search product or alias') }}" aria-label="{{ t('Search') }}">
-  <button class="primary">{{ t("Search") }}</button>
-  {{ ui.help("Every perfume we sell, with prices and the nicknames customers use for it.") }}
+
+{% if need or only_need %}
+<div class="warn-bar" role="status">
+  <span>{% if need %}{{ t("1 perfume needs more stock:") if need | length == 1 else t("{n} perfumes need more stock:", n=need | length) }}
+    {% for p, st in need %}<b>{{ p.name }}</b> ({{ t("low") if st == "low" else t("out") }}){% if not loop.last %}, {% endif %}{% endfor %}
+    {%- else %}{{ t("No perfume needs more stock now.") }}{% endif %}</span>
+  {% if only_need %}<a href="{{ here(need=None, page=None) }}">{{ t("Show all") }}</a>{% else %}<a href="{{ here(need=1, page=None) }}">{{ t("Show only these") }}</a>{% endif %}
+</div>
+{% endif %}
+
+<form method="get" action="/products" class="toolbar" role="search">
+  {% if only_need %}<input type="hidden" name="need" value="1">{% endif %}
+  <input type="search" name="q" value="{{ q }}" class="search" placeholder="{{ t('Search perfume, brand or nickname') }}" aria-label="{{ t('Search perfume, brand or nickname') }}">
 </form>
 
 <div class="list-card" id="product-list">
   <div class="list-head" aria-hidden="true">
-    <div class="col-main">{{ t("Product") }}</div><div class="col-wide">{{ t("Prices (ကျပ်)") }}</div>
-    <div class="col-num">{{ t("Nicknames") }}</div><div class="col-num">{{ t("Messages") }}</div>
+    <div class="col-main">{{ t("Perfume") }}</div><div class="col-wide">{{ t("Prices (Ks)") }}</div>
+    <div class="col-stock">{{ t("Stock") }}</div><div class="col-num">{{ t("Nicknames") }}</div>
   </div>
-  {% for p, n_alias, n_msg in rows %}
-  <div class="list-row{% if not p.active %} inactive{% endif %}">
+  <div hx-boost="true" hx-target="#panel" hx-select="#panel" hx-swap="outerHTML" hx-push-url="true">
+  {% for p, n_alias in rows %}
+  <div class="list-row{% if not p.active %} inactive{% endif %}{% if panel and panel.product.id == p.id %} selected{% endif %}">
     <div class="col-main"><span class="over">{{ p.brand }}</span>
-      <a class="name" href="/products/{{ p.id }}">{{ p.name }}</a>
+      <a class="name" href="{{ here(open=p.id, tab=None, dialog=None, hist=None) }}">{{ p.name }}</a>
       {%- if p.source == "manual" %}<span class="tag-new">{{ t("added here") }}</span>{% endif %}
       {%- if not p.active %} <span class="badge">{{ t("inactive") }}</span>{% endif %}</div>
     <div class="col-wide chips">
       {%- for pr in prices.get(p.id, []) %}<span class="chip"><span class="k">{{ size_label(pr.size_ml, p.full_size_ml) }}</span> <b>{{ format_mmk(pr.price_mmk) }}</b></span>
-      {%- else %}<span class="problem-text">{{ t("no prices") }}</span>{% endfor %}
-      {%- if prices.get(p.id) and not prices[p.id]|selectattr("in_stock")|list %} <span class="badge warn">{{ t("out of stock") }}</span>{% endif %}</div>
-    <div class="col-num" title="{{ t('Nicknames') }}">{{ n_alias }}</div>
-    <div class="col-num" title="{{ t('Messages') }}"><a href="/?intent=all&status=all&product={{ p.id }}"><b>{{ n_msg }}</b></a></div>
+      {%- else %}<span class="problem-text">{{ t("no prices") }}</span>{% endfor %}</div>
+    <a class="col-stock stock-link" href="{{ here(open=p.id, tab='stock', dialog=None, hist=None) }}" title="{{ t('Stock') }}">{{ stock_cell(p) }}</a>
+    <div class="col-num" title="{{ t('Nicknames') }}"><a href="{{ here(open=p.id, tab='nicks', dialog=None, hist=None) }}">{{ n_alias }}</a></div>
   </div>
   {% else %}
-  {{ ui.empty(t("No products."), t("Check the spelling, or add the perfume below.") if q else "", "/products" if q else "", t("Show all") if q else "") }}
+  {{ ui.empty(t("No products."), t("Check the spelling, or add the perfume.") if q else "", "/products" if q else "", t("Show all") if q else "") }}
   {% endfor %}
+  </div>
   {{ ui.pager(page, "product-list") }}
 </div>
 
-{% if user_role == "owner" %}
-<form method="post" action="/products" class="card stack">
-  <h2>{{ t("Add product") }}</h2>
-  <input type="hidden" name="csrf" value="{{ csrf }}">
-  <div class="grid">
-    <label>{{ t("Brand") }} <input name="brand" required></label>
-    <label>{{ t("Name") }} <input name="name" required></label>
+{% if panel %}{% set pp = panel.product %}{% set back = here(open=pp.id, tab=None, dialog=None) %}
+<aside id="panel" class="side-panel" aria-label="{{ pp.name }}">
+  <div class="panel-head">
+    <div><span class="over">{{ pp.brand }}</span><h2>{{ pp.name }}</h2></div>
+    <a class="panel-close" href="{{ here(open=None, tab=None, hist=None) }}" data-close aria-label="{{ t('Close') }}">×</a>
   </div>
-  <button class="primary">{{ t("Add") }}</button>
-  <p class="muted small">{{ t("The main list is the price list (Excel); a new row there also adds a product. Products added here are included in the Excel download.") }} <a href="/prices">{{ t("Price list") }} →</a></p>
-</form>
+  <nav class="tabs panel-tabs" aria-label="{{ pp.name }}">
+    {% for key, label in (("prices", "Prices"), ("stock", "Stock"), ("nicks", "Nicknames")) %}
+    <a href="{{ here(open=pp.id, tab=key, dialog=None) }}" data-tab="{{ key }}"{% if panel.tab == key %} aria-current="page"{% endif %}>{{ t(label) }}</a>
+    {% endfor %}
+  </nav>
+
+  <section class="pane stack" id="pane-prices"{% if panel.tab != "prices" %} hidden{% endif %}>
+    <form method="post" action="/products/{{ pp.id }}/prices" class="stack">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <div class="field-grid two">
+        {% for size in panel.sizes %}
+        <label>{{ t("{size} ml price (Ks)", size=size) }}
+          <input name="price_{{ size }}" inputmode="numeric" value="{{ format_mmk(panel.sold[size].price_mmk) if size in panel.sold else '' }}"{% if user_role != "owner" %} readonly{% endif %}></label>
+        {% endfor %}
+        <label>{{ t("Full bottle {size} ml (Ks)", size=pp.full_size_ml or "?") }}
+          <input name="price_full" inputmode="numeric" value="{{ format_mmk(panel.sold[None].price_mmk) if None in panel.sold else '' }}"{% if user_role != "owner" %} readonly{% endif %}></label>
+      </div>
+      <p class="muted small">{{ t("Empty box = that size is not sold.") }}</p>
+      <div class="buttons">
+        {% if user_role == "owner" %}<button class="primary">{{ t("Save prices") }}</button>{% else %}<span class="muted small"><i class="bi bi-lock"></i> {{ t("Only the owner can change prices.") }}</span>{% endif %}
+        {% if panel.changed %}<span class="muted small">{{ t("Last changed {date}", date=panel.changed | local_time("%d %b")) }}</span>{% endif %}
+      </div>
+    </form>
+    {% if panel.history.total %}
+    <details id="price-history"{% if request.query_params.get("hist") %} open{% endif %}>
+      <summary class="small">{{ t("Price history") }}</summary>
+      <table>
+        <thead><tr><th>{{ t("When") }}</th><th>{{ t("Size") }}</th><th>{{ t("Price") }}</th><th>{{ t("Stock") }}</th></tr></thead>
+        <tbody>
+        {% for h in panel.history.items %}
+          <tr><td class="small">{{ h.effective_from | local_time("%d %b %Y %H:%M") }}</td>
+            <td>{{ size_label(h.size_ml, pp.full_size_ml) }}</td>
+            <td class="num">{{ format_mmk(h.price_mmk) if h.price_mmk else t("not sold") }}</td>
+            <td>{{ t("yes") if h.in_stock else t("no") }}</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      {% if panel.history.pages > 1 %}{{ ui.pager(panel.history, "price-history") }}{% endif %}
+    </details>
+    {% endif %}
+  </section>
+
+  <section class="pane stack" id="pane-stock"{% if panel.tab != "stock" %} hidden{% endif %}>
+    {% set lv = panel.level %}
+    {% if lv %}
+    {% set st = need_status.get(pp.id, "ok") %}
+    <div class="stock-big"><b>{{ "%.1f" | format(lv.available_ml) }}</b> {{ t("ml left") }} <span class="badge st-{{ st }}">{{ t({"ok": "In stock", "low": "Low", "out": "Out"}[st]) }}</span></div>
+    <progress class="stock-bar st-{{ st }}" max="100" value="{{ panel.percent }}" aria-hidden="true"></progress>
+    <p class="small">{{ t("Can pour now:") }}
+      {% for p in panel.pour if p.size_ml %}<span class="chip">{{ p.size_ml }} ml {{ "✓" if p.in_stock else "✗" }}</span> {% endfor %}
+      <span class="chip">{{ t("Full bottle") }}: {{ "✓" if lv.sealed else t("none sealed") }}</span></p>
+    {% if user_role == "owner" %}
+    <div class="panel-actions">
+      <details class="panel-form" name="stock-form">
+        <summary class="button primary">+ {{ t("Add bottle") }}</summary>
+        {{ add_bottle_form(pp, back) }}
+      </details>
+      {% if panel.bottles %}
+      <details class="panel-form" name="stock-form">
+        <summary class="button">{{ t("Fix the amount") }}</summary>
+        <form method="post" action="/stock/adjust?back={{ (back ~ '&tab=stock') | urlencode }}" class="stack">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          {% if panel.bottles | length > 1 %}
+          <label>{{ t("Bottle") }} <select name="bottle_id">{% for b in panel.bottles %}<option value="{{ b.id }}">{{ b.size_ml }} ml · {{ t(b.status) }} · {{ "%.1f" | format(b.remaining_ml) }} ml</option>{% endfor %}</select></label>
+          {% else %}<input type="hidden" name="bottle_id" value="{{ panel.bottles[0].id }}">{% endif %}
+          <label>{{ t("Real ml left now") }} <input name="remaining_ml" inputmode="decimal" value="{{ '%.1f' | format(panel.bottles[0].remaining_ml) }}" required></label>
+          <label>{{ t("Why (count, spill, gift…)") }} <input name="reason" maxlength="200" required></label>
+          <div class="buttons"><button class="primary">{{ t("Save") }}</button></div>
+        </form>
+      </details>
+      {% endif %}
+    </div>
+    <details class="tech">
+      <summary class="small">{{ t("Bottles ({n})", n=panel.bottles | length) }}</summary>
+      <ul class="feed small">{% for b in panel.bottles %}<li>{{ b.size_ml }} ml · {{ t(b.status) }} · {{ "%.1f" | format(b.remaining_ml) }} ml{% if b.cost_mmk %} · {{ format_mmk(b.cost_mmk) }} ကျပ်{% endif %}
+        {% if b.status == "sealed" %}<form method="post" action="/stock/bottles/{{ b.id }}/open?back={{ (back ~ '&tab=stock') | urlencode }}" class="inline"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="link">{{ t("Open") }}</button></form>{% endif %}</li>{% endfor %}</ul>
+    </details>
+    <p class="small"><a href="/settings?section=inventory#history">{{ t("See what changed (history)") }}</a></p>
+    {% endif %}
+    {% else %}
+    <p>{{ t("Stock for this perfume is not counted yet.") }}</p>
+    {% if user_role == "owner" %}
+    <div class="panel-actions">
+      <details class="panel-form">
+        <summary class="button primary">{{ t("Start counting") }}</summary>
+        {{ add_bottle_form(pp, back) }}
+      </details>
+      <form method="post" action="/products/{{ pp.id }}/available" class="inline">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <input type="hidden" name="available" value="{{ '0' if panel.available else '1' }}">
+        <button class="available-switch" role="switch" aria-checked="{{ 'true' if panel.available else 'false' }}">{{ t("Available to sell") }} <span class="ios-toggle" aria-hidden="true"></span></button>
+      </form>
+    </div>
+    {% else %}<p class="small">{{ t("Available to sell") }}: <b>{{ t("yes") if panel.available else t("no") }}</b></p>{% endif %}
+    {% endif %}
+  </section>
+
+  <section class="pane stack" id="pane-nicks"{% if panel.tab != "nicks" %} hidden{% endif %}>
+    <p class="muted small">{{ t("Other names customers use for this perfume. The auto-reply uses them to know which perfume a message is about.") }}</p>
+    <div class="chips nick-chips">
+    {% for a in panel.aliases %}
+      <span class="chip nick">{{ a.alias_text }}
+        {%- if a.normalized_alias in panel.shared %} <span class="badge warn" title="{{ t('Also a nickname of another product, so the parser cannot decide') }}">{{ t("shared") }}</span>{% endif %}
+        {%- if a.source == "learned" and user_role == "owner" %}
+        <form method="post" action="/products/{{ pp.id }}/aliases/{{ a.id }}/delete" class="inline">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <button class="chip-x" aria-label="{{ t('Remove nickname') }} {{ a.alias_text }}">×</button>
+        </form>
+        {%- elif a.source != "learned" %} <span class="muted small" title="{{ t('from CSV') }}">·</span>{% endif %}</span>
+    {% else %}
+      <span class="muted">{{ t("No nicknames yet.") }}</span>
+    {% endfor %}
+    </div>
+    {% if user_role == "owner" %}
+    <form method="post" action="/products/{{ pp.id }}/aliases" class="inline-form">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <input name="alias" placeholder="{{ t('Add a nickname, e.g.') }} ဆော်ဗေ့" required aria-label="{{ t('New nickname') }}">
+      <button class="primary">{{ t("Add") }}</button>
+    </form>
+    {% else %}<p class="muted small">{{ t("New nicknames: teach them with the 📘 card on a message (the owner approves).") }}</p>{% endif %}
+    <p class="small">{{ t("Customers wrote this perfume {n} times.", n=panel.n_messages) }} <a href="/?intent=all&status=all&product={{ pp.id }}">{{ t("See the messages") }}</a></p>
+  </section>
+
+  <details class="tech panel-foot">
+    <summary class="small">{{ t("More about this perfume") }}</summary>
+    <p class="small muted">{{ t("active") if pp.active else t("inactive") }} · {{ t("from CSV") if pp.source == "seed" else t("added here") }}</p>
+    {% if user_role == "owner" %}
+    <form method="post" action="/products/{{ pp.id }}/active">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      {% if pp.active %}<button name="active" value="0" class="quiet">{{ t("Deactivate (stop matching it)") }}</button>
+      {% else %}<button name="active" value="1">{{ t("Activate") }}</button>{% endif %}
+    </form>
+    {% endif %}
+  </details>
+</aside>
+{% else %}<div id="panel" hidden></div>{% endif %}
+
+{% if dialog %}
+<div class="dialog-wrap">
+  <a class="dialog-backdrop" href="{{ here(dialog=None) }}" tabindex="-1" aria-hidden="true"></a>
+  <section class="dialog card stack" role="dialog" aria-modal="true" aria-labelledby="dialog-title">
+    <div class="panel-head">
+      <h2 id="dialog-title">{{ t({"add": "Add perfume", "prices": "Upload prices (Excel)", "stock-count": "Upload first stock count (Excel)", "vials": "Empty vials"}[dialog]) }}</h2>
+      <a class="panel-close" href="{{ here(dialog=None) }}" data-close aria-label="{{ t('Close') }}">×</a>
+    </div>
+    {% if error %}<p class="flash bad" role="alert">{{ tr(error) }}</p>{% endif %}
+    {% if dialog == "add" %}
+    <form method="post" action="/products" class="stack">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <div class="field-grid two">
+        <label>{{ t("Brand") }} <input name="brand" required autofocus></label>
+        <label>{{ t("Name") }} <input name="name" required></label>
+        {% for size in (2, 5, 10) %}<label>{{ t("{size} ml price (Ks)", size=size) }} <input name="price_{{ size }}" inputmode="numeric"></label>{% endfor %}
+        <label>{{ t("Full bottle price (Ks)") }} <input name="price_full" inputmode="numeric"></label>
+        <label class="span-all">{{ t("Nicknames (optional, comma between them)") }} <input name="nicknames"></label>
+      </div>
+      <div class="buttons"><button class="primary">{{ t("Add perfume") }}</button></div>
+    </form>
+    {% elif dialog == "prices" %}
+    <p class="muted small">{{ t("The current prices of every active product, in the same format as the upload. Edit it in Excel (or Google Sheets, then download as .xlsx).") }}</p>
+    <p><a class="button" href="/prices/export.xlsx">{{ t("Download current prices (.xlsx)") }}</a></p>
+    <form method="post" action="/prices/import" enctype="multipart/form-data" class="stack">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <label>{{ t("Price list (.xlsx, max 2 MB)") }}
+        <input type="file" name="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" required></label>
+      <div class="buttons"><button class="primary">{{ t("Check file") }}</button></div>
+      <p class="muted small">{{ t("You see a preview first. Nothing is saved until you press Confirm.") }}</p>
+    </form>
+    <details class="tech">
+      <summary class="small">{{ t("File format") }}</summary>
+      <table>
+        <thead><tr><th><code>brand</code></th><th><code>name</code></th><th><code>full_size_ml</code></th><th><code>full_price</code></th><th><code>2ml</code></th><th><code>5ml</code></th><th><code>10ml</code></th><th><code>in_stock</code></th></tr></thead>
+        <tbody><tr><td>Creed</td><td>Aventus</td><td>100</td><td>1,150,000</td><td>28,000</td><td>65,000</td><td>125,000</td><td><code>yes</code></td></tr></tbody>
+      </table>
+      <ul class="small">
+        <li>{{ t("Any header like 3ml or 15ml adds that decant size.") }}</li>
+        <li>{{ t("Empty price cell = that size is not sold. A size column missing from the file leaves that size unchanged.") }}</li>
+        <li><code>in_stock</code>: <code>yes</code> / <code>no</code> — {{ t("for the whole perfume; empty = unchanged.") }}</li>
+        <li>{{ t("A new brand + name adds a product. Names close to an existing product are shown for you to decide.") }}</li>
+      </ul>
+    </details>
+    {% if last_import %}<p class="muted small">{{ t("Last upload") }}: {{ last_import.created_at | local_time }} · {{ last_import.details.filename }} · {{ t("{n} price changes", n=last_import.details.prices_written) }}</p>{% endif %}
+    {% elif dialog == "stock-count" %}
+    <p class="small muted">{{ t("Download, fill the Bottles and Vials sheets, upload: you see a preview first. Importing adds stock; it never deletes.") }}</p>
+    <p><a class="button" href="/stock/export.xlsx">{{ t("Download stock") }}</a></p>
+    <form method="post" action="/stock/import" enctype="multipart/form-data" class="stack">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <label>{{ t("Excel file") }} <input type="file" name="file" accept=".xlsx" required></label>
+      <div class="buttons"><button class="primary">{{ t("Upload + preview") }}</button></div>
+    </form>
+    {% elif dialog == "vials" %}
+    <table class="cart-items">{% for v in vials %}<tr><td>{{ v.size_ml }} ml</td><td class="num">{{ v.count }}</td><td class="num small muted">{% if v.cost_each_mmk %}{{ format_mmk(v.cost_each_mmk) }} ကျပ်{% endif %}</td></tr>{% else %}<tr><td class="muted">{{ t("No vials entered: vials are not checked.") }}</td></tr>{% endfor %}</table>
+    <form method="post" action="/stock/vials?back={{ here(dialog='vials') | urlencode }}" class="stack">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <div class="field-grid">
+        <label>{{ t("Vial size (ml)") }} <input name="size_ml" inputmode="numeric" required></label>
+        <label>{{ t("Add (+) or remove (−)") }} <input name="change" inputmode="numeric" required></label>
+        <label>{{ t("Cost each (ကျပ်)") }} <input name="cost_each_mmk" inputmode="numeric"></label>
+      </div>
+      <div class="buttons"><button class="primary">{{ t("Save vials") }}</button></div>
+    </form>
+    {% endif %}
+  </section>
+</div>
 {% endif %}
 {% endblock %}

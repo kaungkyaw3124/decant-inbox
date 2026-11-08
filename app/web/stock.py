@@ -4,16 +4,14 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, File, Form, Request, Response, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse
 from itsdangerous import BadSignature, URLSafeTimedSerializer
-from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.inventory import excel, stock
-from app.models import AuditLog, Bottle, Product, User
+from app.models import AuditLog, Bottle, User
 from app.web.auth import current_user, owner_only, verify_csrf
-from app.web import paging
 from app.web.deps import _TZ, get_db, templates
-from app.web.inbox import flash
+from app.web.inbox import flash, safe_back
 
 router = APIRouter(prefix="/stock", dependencies=[Depends(current_user), Depends(verify_csrf)])
 MAX_UPLOAD = 2 * 1024 * 1024
@@ -31,25 +29,29 @@ def _number(value: str, whole: bool = True) -> float | int | None:
     return int(n) if whole else n
 
 
+def _back(request: Request) -> str:
+    """docs/SPEC-v5.6: forms in the Products panel / dialogs come back to it (?back=...), the rest to /stock."""
+    return safe_back(request.query_params.get("back", ""), "/stock")
+
+
 def _done(request: Request, db: Session, user: User, action: str, text: str, **details):
     db.add(AuditLog(user_id=user.id, action=action, details=details))
     db.commit()
     flash(request, text)
-    return RedirectResponse("/stock", status_code=303)
+    return RedirectResponse(_back(request), status_code=303)
 
 
 def _failed(request: Request, db: Session, text: str):
     db.rollback()
     flash(request, text)
-    return RedirectResponse("/stock", status_code=303)
+    return RedirectResponse(_back(request), status_code=303)
 
 
-@router.get("", response_class=HTMLResponse)
-def stock_page(request: Request, db: Session = Depends(get_db)):
-    history = paging.paginate(db, stock.history_query(), request)  # docs/SPEC-v5.4 X2
-    return templates.TemplateResponse(request, "stock.html", {
-        **stock.overview(db), "history": history, "products": db.scalars(select(Product).where(Product.active)
-                                                    .order_by(Product.brand, Product.name)).all()})
+@router.get("")
+def stock_page(user: User = Depends(current_user)):
+    """docs/SPEC-v5.6: stock is on the Products page now; the owner's overview (reorder list, value, history,
+    thresholds) is Settings -> Inventory."""
+    return RedirectResponse("/settings?section=inventory" if user.is_owner else "/products", status_code=303)
 
 
 @router.post("/bottles", dependencies=[Depends(owner_only)])
@@ -78,11 +80,20 @@ def open_(request: Request, bottle_id: int, db: Session = Depends(get_db), user:
 def adjust(request: Request, bottle_id: int, remaining_ml: str = Form(...), reason: str = Form(""),
            db: Session = Depends(get_db), user: User = Depends(current_user)):
     bottle = db.get(Bottle, bottle_id, with_for_update=True)
+    if bottle is None:
+        return _failed(request, db, "Bottle not found.")
     try:
         stock.adjust_bottle(db, bottle, _number(remaining_ml, whole=False), reason, user)
     except (stock.StockError, ValueError, TypeError) as exc:
         return _failed(request, db, str(exc) if isinstance(exc, stock.StockError) else "Numbers only, please.")
     return _done(request, db, user, "stock.adjust", "Stock adjusted.", bottle_id=bottle_id)
+
+
+@router.post("/adjust", dependencies=[Depends(owner_only)])
+def fix_amount(request: Request, bottle_id: int = Form(...), remaining_ml: str = Form(...), reason: str = Form(""),
+               db: Session = Depends(get_db), user: User = Depends(current_user)):
+    """The panel's "Fix the amount": the bottle is picked in the form (same rules as a bottle's Adjust)."""
+    return adjust(request, bottle_id, remaining_ml, reason, db, user)
 
 
 @router.post("/vials", dependencies=[Depends(owner_only)])

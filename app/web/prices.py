@@ -10,11 +10,11 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from itsdangerous import BadSignature, URLSafeTimedSerializer
-from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.models import AuditLog, User
+from app.web import catalog
 from app.pricing import excel
 from app.web.auth import current_user, owner_only, verify_csrf
 from app.web.deps import _TZ, get_db, templates
@@ -29,15 +29,10 @@ def _signer() -> URLSafeTimedSerializer:
     return URLSafeTimedSerializer(get_settings().web_secret_key.get_secret_value(), salt="price-import")
 
 
-def _last_import(db: Session) -> AuditLog | None:
-    return db.scalar(select(AuditLog).where(AuditLog.action == "prices.import")
-                     .order_by(AuditLog.id.desc()).limit(1))
-
-
 def _page(request: Request, db: Session, error: str | None = None, status_code: int = 200):
-    return templates.TemplateResponse(request, "prices.html", {
-        "error": error, "last_import": _last_import(db),
-    }, status_code=status_code)
+    """docs/SPEC-v5.6: the price list is the "Upload prices" dialog on the Products page."""
+    return catalog.products_page(request, db, db.get(User, request.session.get("user_id")), "prices", error,
+                                 status_code)
 
 
 def _preview(request: Request, sheet: excel.Sheet, plan: excel.Plan, filename: str,
@@ -50,9 +45,9 @@ def _preview(request: Request, sheet: excel.Sheet, plan: excel.Plan, filename: s
     }, status_code=status_code)
 
 
-@router.get("", response_class=HTMLResponse)
-def prices_page(request: Request, db: Session = Depends(get_db)):
-    return _page(request, db)
+@router.get("")
+def prices_page():
+    return RedirectResponse("/products?dialog=prices", status_code=303)
 
 
 @router.get("/export.xlsx")
@@ -103,4 +98,4 @@ async def confirm(request: Request, payload: str = Form(...), db: Session = Depe
     flash(request, f"Price list saved: {stats['products_added']} new products, "
                    f"{stats['products_updated']} updated, {stats['prices_written']} price changes"
                    + (f", {stats['costs_written']} bottle costs." if stats.get('costs_written') else "."))
-    return RedirectResponse("/prices", status_code=303)
+    return RedirectResponse("/products", status_code=303)

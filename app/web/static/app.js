@@ -224,7 +224,11 @@
       var help = document.getElementById("keys");
       if (help && window.bootstrap) window.bootstrap.Modal.getOrCreateInstance(help).show();
     } else if (e.key === "Escape") {
-      document.querySelectorAll("details[open]").forEach(function (d) { d.open = false; });
+      var open = document.querySelectorAll("details[open]");
+      // docs/SPEC-v5.6: Esc closes the Products dialog, then the side panel
+      var close = document.querySelector(".dialog [data-close]") || document.querySelector("#panel [data-close]");
+      if (open.length) open.forEach(function (d) { d.open = false; });
+      else if (close) close.click();
     } else if (/^(ArrowDown|ArrowUp|j|k)$/.test(e.key)) {
       var rows = Array.prototype.slice.call(document.querySelectorAll("a.chatrow"));
       if (!rows.length) return;
@@ -257,3 +261,18 @@
     if (dirty && a && !a.closest('form') && !confirm(box.dataset.unsaved)) { e.preventDefault(); e.stopImmediatePropagation(); }
   }, true);
 })();
+
+// docs/SPEC-v5.6-simple-products-page.md: the panel's tabs switch at once (the links still work without JS);
+// the More ▾ menu closes on a click outside it
+document.addEventListener('click', e => {
+  const tab = e.target.closest('#panel .panel-tabs a[data-tab]');
+  if (tab && !e.ctrlKey && !e.metaKey) {
+    e.preventDefault();
+    const panel = tab.closest('#panel');
+    panel.querySelectorAll('.panel-tabs a').forEach(a => a.toggleAttribute('aria-current', a === tab));
+    panel.querySelectorAll('.pane').forEach(p => { p.hidden = p.id !== 'pane-' + tab.dataset.tab; });
+    if (panel.querySelectorAll('.panel-tabs a[aria-current]').length) panel.querySelector('.panel-tabs a[aria-current]').setAttribute('aria-current', 'page');
+    history.replaceState(history.state, '', tab.href);
+  }
+  document.querySelectorAll('details.more-menu[open]').forEach(d => { if (!d.contains(e.target)) d.open = false; });
+});

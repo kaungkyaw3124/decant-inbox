@@ -105,7 +105,7 @@ def test_edit_parse_is_human_and_saves_alias(db, client):
     assert rows == [("rules", False), ("human", True)]
     assert alias == "learned"
     page = client.get("/messages/3").text
-    assert "edited" in page and "Alias “Aventus” added" in page
+    assert "edited" in page and "Nickname “Aventus” added" in page  # v5.6: "Nicknames" everywhere
 
 
 def customer_id(db, external_id: str) -> int:
