@@ -172,3 +172,4 @@ payments → Viber → reports. Each is a new module with its own tables.
    simple 7-item menu, plain words EN+MY, empty/error states) — docs/SPEC-v5.4-ui-ux-cleanup.md (goal X1-X8); needs 5.3 first. Status: moved to NEXT TASK 2026-11-06
 12. v5.5 HOTFIX layout (centre + full width, login centred) — docs/SPEC-v5.5-layout-hotfix.md (goal L1-L6). Status: moved to NEXT TASK 2026-11-08
 13. v5.6 ONE SIMPLE Products page (no tabs; side panel Prices/Stock/Nicknames; 2 buttons; More menu) — docs/SPEC-v5.6-simple-products-page.md (goal S1-S5; after 5.5). Status: moved to NEXT TASK 2026-11-08
+14. v5.7 (A) DATE filter chips on Orders/Payments/Customers/Sales (Yangon days, dates on rows) + (B) LIGHT CHAT: load 20 messages, older on scroll, no 4 s full re-render — docs/SPEC-v5.7-date-filter-and-light-chat.md (goal D1-D5). Status: TODO
