@@ -2552,3 +2552,67 @@ low panels and the 4 dialogs are gate pages now. Stock maths unchanged (5.1 test
    Old links /prices and /stock still open the right place.
 5. Fix one perfume's amount to 5 ml: the orange bar appears ("needs more stock"); "Show only these" shows only it.
 6. Esc closes the panel; the Back button reopens it.
+
+## 2026-11-08 — v5.7 (A) date filter chips + (B) light chat (docs/SPEC-v5.7-date-filter-and-light-chat.md)
+### A. Date filter
+- One helper (app/web/dates.py `date_range`) + one macro (`ui.date_chips`): **Today · Yesterday · 7 days · 30 days ·
+  All time · Pick dates…** (two native date boxes + Apply). URL `?range=…` or `?from=&to=`; works with Back, links,
+  the pager and the status tabs (tabs + "Show test orders" keep the range); a new range starts at page 1. Under the
+  chips: "Showing 12 orders · 6 Nov – 8 Nov · Clear".
+- The SHOP's days (settings timezone Asia/Yangon): "Today" starts 00:00 Yangon = 17:30 UTC the day before.
+  Orders = created; Payments = screenshot arrived (check created); Customers = last message; Sales = paid (its
+  existing logic; default stays Today; chips 7 / 30 days added, This week / This month kept).
+- Orders: status-tab counts follow the dates; every row shows "8 Nov, 3:12 pm" next to the age. Payments rows too.
+  Burmese: month names translated (Jan…Dec keys), 24-hour clock.
+- Reversed dates are swapped; unreadable dates are ignored with a note ("…all dates are shown"); never an error page.
+### B. Light chat
+- A chat opens with the **last 20 messages** (THREAD_SIZE = 20). At the top: "Load older messages" — scrolling up
+  (IntersectionObserver, after the chat has opened at the bottom) or the button fetches
+  `/chats/<id>/thread?before=<oldest>` (20 more) and puts them above **without moving the bubble being read**; one
+  day separator per day at the seam; at the end "Beginning of the conversation".
+- **No full re-draw any more.** The open chat keeps one hidden poller (#thread-poll, every 4 s while the live stream is
+  down; the SSE "thread" signal asks it at once): `?after=<newest id>&v=<version>` → **204** when nothing changed;
+  else only the new bubbles, the pending replies (sending / sent / failed / Sending in N s · Cancel) and the photo
+  bubbles whose state changed (photo loading, payment check) — app.js puts each part in place, only for bubbles that
+  are on the page. Scrolled up: a **"New message ↓"** pill instead of jumping. Typed text and the scroll stay.
+- A link to an old message (`#m123`, e.g. after "Show photo") loads everything down to it in ONE request
+  (`?before=…&to=123`) and scrolls to it.
+- Thread lists are queried only for the bubbles shown (no query for an empty list); the order step is computed once;
+  chat open = 42 queries (was 45+, 55 with 100 messages).
+
+### Numbers (scripts/perf_check.py on a copy of the live data + a 600-message test chat; Chromium, 150 ms RTT, 5 Mbit/s)
+| | before (M0) | after |
+|---|---|---|
+| open the 600-message chat (browser) | p50 1.04 s · p90 1.87 s | p50 0.67 s · p90 1.36 s |
+| bubbles drawn on open | 100 | 20 |
+| HTML of the open | 8 KB | 6 KB |
+| server time, 600-message chat | p50 242 ms · p90 432 ms | p50 211 ms · p90 473 ms (noisy: the browser runs on the same box) |
+| customer switch | p50 0.85 s · p90 1.28 s | p50 0.71 s · p90 0.82 s |
+| open chat, nothing changed | full thread HTML every 4 s (while a reply was pending) | 204, no body |
+Without the browser load (TestClient, same data): chat open server time p50 ≈ 200 ms (was ≈ 240 ms with 100 bubbles).
+
+**Goal status:** D1 ✅, D3 ✅, D4 ✅, D5 ✅. **D2 partly:** ≤ 20 bubbles ✅ and the thread no longer grows with the chat
+length ✅; but the chat page's server p90 is still above 200 ms — the rest of the page (chat list, Needs-you cards,
+customer panel, cart, step badge, base counts) makes ~40 small queries at ~2 ms each (a bare round trip is 0.9 ms).
+Same root cause as the 5.3 follow-up; next step for the planning chat: load the chat list and the customer panel in
+their own requests after the thread (or one combined query per panel).
+
+### 5.7 scoreboard
+| loop | failing | notes |
+|---|---|---|
+| M0 | — | 600-message chat: 100 bubbles, server p90 432 ms, full thread re-draw every 4 s while pending |
+| 1 (A) | 0 | 6 date tests (Yangon boundaries 17:29 / 17:31 UTC); pytest green; committed ad94d59 |
+| 2 (B) | chat flows 6 → 0 | CSP blocks wait_for_function (polled in Python); seed dated in the future; same-page #hash does not reload; #m jump in one request |
+| 3 | ui_check C7 4 → 0 | test chat dated in the past (Inbox page 1 unchanged); Sales form moved (inventory note "_moved_v5.7") |
+| 4 | 0 | pytest 909 passed, 1 skipped (new: test_v57_dates 6, test_v57_chat 6); UI gate 516 views 0 fails incl. chat flows |
+
+### OWNER TEST SCRIPT 5.7 (PC)
+1. Orders: click Today / Yesterday / 7 days / 30 days / All time — the list and the tab numbers change; each row shows
+   its date and time ("8 Nov, 3:12 pm"). Pick dates… → 1 Nov – 5 Nov → Apply. Press Back — the previous range returns.
+   The same chips on Payments, Customers and Sales.
+2. Open a customer with a long chat (your second account): it opens fast with the latest messages at the bottom.
+   Scroll to the top — older messages load above and the screen does not jump. Keep going until "Beginning of the
+   conversation".
+3. From the customer account send "test 1" while you are at the bottom: it appears by itself. Scroll up a bit and send
+   "test 2": a "New message ↓" pill appears; click it.
+4. Type half a reply and wait 10 seconds: your text stays; the chat does not flicker.
