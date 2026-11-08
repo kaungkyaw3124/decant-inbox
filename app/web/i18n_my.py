@@ -978,4 +978,11 @@ MY = {
     "Nickname added.": "နာမည်ပွား ထည့်ပြီး။", "That nickname already exists.": "ဒီနာမည်ပွား ရှိပြီးသား။",
     "Nickname too short.": "နာမည်ပွား တိုလွန်းတယ်။", "Nickname removed.": "နာမည်ပွား ဖျက်ပြီး။",
     "Prices: whole Ks only, more than 0.": "ဈေးနှုန်း: ကျပ် ဂဏန်းပြည့်ပဲ၊ 0 ထက်များရမယ်။", "Unknown size": "မသိတဲ့ ပမာဏ",
+    # docs/SPEC-v5.7: month names (the "day" / "when" filters) and the date filter
+    "Jan": "ဇန်နဝါရီ", "Feb": "ဖေဖော်ဝါရီ", "Mar": "မတ်", "Apr": "ဧပြီ", "May": "မေ", "Jun": "ဇွန်", "Jul": "ဇူလိုင်",
+    "Aug": "ဩဂုတ်", "Sep": "စက်တင်ဘာ", "Oct": "အောက်တိုဘာ", "Nov": "နိုဝင်ဘာ", "Dec": "ဒီဇင်ဘာ",
+    "Dates": "ရက်များ", "7 days": "၇ ရက်", "30 days": "၃၀ ရက်", "All time": "အားလုံး", "Pick dates…": "ရက် ရွေးမယ်…",
+    "Clear": "ဖယ်မယ်", "Showing {n} orders": "အော်ဒါ {n} ခု ပြနေ", "Showing {n} payments": "ငွေလွှဲ {n} ခု ပြနေ",
+    "Showing {n} customers": "ဖောက်သည် {n} ယောက် ပြနေ", "Show all dates": "ရက်အားလုံး ပြမယ်",
+    "Those dates could not be read, so all dates are shown.": "ဒီရက်တွေကို မဖတ်နိုင်လို့ ရက်အားလုံး ပြထားတယ်။",
 }

@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from app.models import AuditLog, User
 from app.orders import sales
 from app.pricing import costs
+from app.web import dates
 from app.web.auth import current_user, owner_only, verify_csrf
 from app.web.deps import get_db, templates
 from app.web.inbox import flash
@@ -30,7 +31,8 @@ def sales_page(request: Request, db: Session = Depends(get_db)):
     report = sales.report(db, key, first, last)
     return templates.TemplateResponse(request, "sales.html", {
         "r": report, "ranges": sales.RANGES, "chart": sales.chart(report), "query": _query(key, first, last),
-        "missing": sales.MISSING})
+        "missing": sales.MISSING, "chips": [(k, v) for k, v in sales.RANGES.items() if k != "custom"],
+        "dr": dates.DateRange(key, first, last, request, default="today")})  # docs/SPEC-v5.7: the shared chips
 
 
 @router.get("/export.xlsx")

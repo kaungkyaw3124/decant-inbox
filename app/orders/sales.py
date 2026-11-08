@@ -21,8 +21,8 @@ from app.models import Order, OrderItem, Product
 from app.models.orders import PAID_STATUSES
 from app.pricing.prices import size_label
 
-RANGES = {"today": "Today", "yesterday": "Yesterday", "week": "This week", "month": "This month",
-          "custom": "Custom"}
+RANGES = {"today": "Today", "yesterday": "Yesterday", "7d": "7 days", "30d": "30 days", "week": "This week",
+          "month": "This month", "custom": "Custom"}
 MAX_DAYS = 366
 MISSING = "—"
 
@@ -38,6 +38,10 @@ def today() -> date:
 def resolve(key: str, start: str = "", end: str = "", now_date: date | None = None) -> tuple[str, date, date]:
     """(range key, first day, last day). Unknown / broken input falls back to today."""
     d = now_date or today()
+    if start or end:  # docs/SPEC-v5.7: the shared "Pick dates…" form sends only from / to
+        key, start, end = "custom", start or end, end or start
+    if key in ("7d", "30d"):  # the last 7 / 30 shop days, today included
+        return key, d - timedelta(days=6 if key == "7d" else 29), d
     if key == "yesterday":
         return key, d - timedelta(days=1), d - timedelta(days=1)
     if key == "week":  # Monday to today

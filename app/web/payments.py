@@ -9,7 +9,7 @@ from app.models import AuditLog, Customer, Order, PaymentCheck, PaymentMethod, U
 from app.orders import address as address_rules
 from app.orders import cart, payments, testpay
 from app.replies import templates as replies
-from app.web import staff
+from app.web import dates, staff
 from app.web.auth import current_user, verify_csrf
 from app.web.deps import get_db, templates
 from app.web.inbox import flash
@@ -64,7 +64,9 @@ def reading_context(db: Session, check: PaymentCheck, order: Order, total: int) 
 
 @router.get("", response_class=HTMLResponse)
 def payment_list(request: Request, db: Session = Depends(get_db)):
-    return templates.TemplateResponse(request, "payments.html", {"rows": payments.to_check(db)})
+    dr = dates.date_range(request)  # docs/SPEC-v5.7 A: the day the screenshot arrived
+    return templates.TemplateResponse(request, "payments.html", {
+        "rows": payments.to_check(db, dr.where(PaymentCheck.created_at)), "dr": dr, "chips": dates.CHIPS})
 
 
 @router.get("/{check_id}", response_class=HTMLResponse)

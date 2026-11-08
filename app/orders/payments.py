@@ -15,7 +15,7 @@ owner's "Auto-approve test payments" ON (app/orders/testpay.py).
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import func, select, text
+from sqlalchemy import func, select, text, true
 from sqlalchemy.orm import Session
 
 from app.ai import screens
@@ -75,12 +75,12 @@ def scan(session: Session) -> int:
     return changed
 
 
-def to_check(session: Session) -> list[tuple[PaymentCheck, Order, Customer]]:
-    return session.execute(
-        select(PaymentCheck, Order, Customer).join(Order, Order.id == PaymentCheck.order_id)
-        .join(Customer, Customer.id == Order.customer_id)
-        .where(PaymentCheck.decision.in_(("pending", "several")), PaymentCheck.outbox_id.is_(None))
-        .order_by(PaymentCheck.id)).all()
+def to_check(session: Session, when=None) -> list[tuple[PaymentCheck, Order, Customer]]:
+    """when: an extra condition on PaymentCheck.created_at (the day the screenshot arrived; docs/SPEC-v5.7 A)."""
+    query = (select(PaymentCheck, Order, Customer).join(Order, Order.id == PaymentCheck.order_id)
+             .join(Customer, Customer.id == Order.customer_id)
+             .where(PaymentCheck.decision.in_(("pending", "several")), PaymentCheck.outbox_id.is_(None)))
+    return session.execute(query.where(when if when is not None else true()).order_by(PaymentCheck.id)).all()
 
 
 def request_screenshot(session: Session, check: PaymentCheck, user: User) -> None:

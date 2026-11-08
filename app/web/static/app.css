@@ -809,3 +809,16 @@ a.stock-link:hover .small { text-decoration: underline; }
 .page:has(> .side-panel) .list-row { flex-wrap: wrap; gap: 8px 16px; }
 .page:has(> .side-panel) .list-row .col-main { flex: 1 1 100%; }
 .page:has(> .side-panel) .list-row .col-wide { flex: 1 1 260px; }
+
+/* ---------- docs/SPEC-v5.7-date-filter-and-light-chat.md: date chips ---------- */
+.date-filter { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; margin-bottom: 8px; }
+.date-filter .tabs { margin: 0; }
+.pick-dates > summary { list-style: none; min-height: 36px; padding: 4px 12px; font-size: 14px; }
+.pick-dates > summary::-webkit-details-marker { display: none; }
+.pick-dates[open] { flex-basis: 100%; }
+.pick-dates[open] > summary { margin-bottom: 8px; }
+.pick-dates form { align-items: flex-end; gap: 10px; }
+.pick-dates label { display: flex; flex-direction: column; font-size: 13px; color: var(--muted); }
+.date-shown { margin: 0 0 12px; }
+time.when { white-space: nowrap; }
+@media (max-width: 767.98px) { .pick-dates > summary { min-height: 40px; } }

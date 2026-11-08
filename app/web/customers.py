@@ -11,7 +11,7 @@ from app import care
 from app.models import AuditLog, Customer, Order, User
 from app.web.auth import current_user, owner_only, verify_csrf
 from app.web.deps import get_db, templates
-from app.web import paging
+from app.web import dates, paging
 from app.web.inbox import flash, safe_back
 
 router = APIRouter(dependencies=[Depends(current_user), Depends(verify_csrf)])
@@ -27,9 +27,12 @@ def _customer(db: Session, customer_id: int) -> Customer:
 @router.get("/customers", response_class=HTMLResponse)
 def customers_page(request: Request, q: str = "", tag: str = "", city: str = "", sort: str = "spent",
                    db: Session = Depends(get_db)):
-    page = paging.paginate(db, care.customer_query(q, tag, city, sort), request)  # docs/SPEC-v5.4 X2
+    dr = dates.date_range(request)  # docs/SPEC-v5.7 A: the date of the customer's last message
+    page = paging.paginate(db, care.customer_query(q, tag, city, sort, dr.where if dr.active else None),
+                           request)  # docs/SPEC-v5.4 X2
     return templates.TemplateResponse(request, "customers.html", {
         "page": page, "rows": care.as_rows(db, page.items), "q": q, "tag": tag, "city": city, "sort": sort,
+        "dr": dr, "chips": dates.CHIPS,
         "colours": care.TAG_COLOURS, "cfg": care.settings(db)})
 
 

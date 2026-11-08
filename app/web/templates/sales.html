@@ -5,18 +5,8 @@
 {% macro pct(v) %}{% if v is none %}{{ missing }}{% else %}{{ "%.1f" | format(v) }}%{% endif %}{% endmacro %}
 {% block content %}
 {{ ui.page_head((t("Sales & profit") if user_role == "owner" else t("Sales")), t("Money from paid orders. Choose a day range at the top.")) }}
-<nav class="tabs" aria-label="{{ t('Date range') }}">
-  {% for key, label in ranges.items() if key != "custom" %}
-  <a href="/sales?range={{ key }}" {% if r.key == key %}aria-current="page"{% endif %}>{{ tr(label) }}</a>
-  {% endfor %}
-</nav>
-<form method="get" action="/sales" class="filters">
-  <input type="hidden" name="range" value="custom">
-  <label>{{ t("From") }} <input type="date" name="from" value="{{ r.first.isoformat() }}" required></label>
-  <label>{{ t("To") }} <input type="date" name="to" value="{{ r.last.isoformat() }}" required></label>
-  <button>{{ t("Show") }}</button>
-  <a class="button" href="/sales/export.xlsx?{{ query }}">⬇ {{ t("Export .xlsx") }}</a>
-</form>
+{{ ui.date_chips(dr, chips) }}
+<p class="buttons small"><a class="button" href="/sales/export.xlsx?{{ query }}">⬇ {{ t("Export .xlsx") }}</a></p>
 <p class="muted small">{{ tr(r.label) }} · {{ t("paid orders only (paid, packed, sent out, delivered), by the day they were paid (Yangon time).") }}</p>
 
 <section class="tiles">

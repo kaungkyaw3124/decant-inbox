@@ -105,7 +105,34 @@ def age(context, value: datetime | None) -> str:
     return f"{minutes // 60} {hour}" if minutes < 48 * 60 else f"{minutes // 1440} {day}"
 
 
+def _my(context) -> bool:
+    return context.get("lang") == "my"
+
+
+@pass_context
+def day(context, value) -> str:
+    """docs/SPEC-v5.7: "8 Nov" (Burmese: the month name translated). A datetime is turned into the shop's day."""
+    if value is None:
+        return ""
+    if isinstance(value, datetime):
+        value = value.astimezone(_TZ)
+    month = f"{value:%b}"
+    return f"{value.day} {i18n.translate(month, 'my') if _my(context) else month}"
+
+
+@pass_context
+def when(context, value: datetime | None) -> str:
+    """docs/SPEC-v5.7: the real date and time on a row, "8 Nov, 3:12 pm" (Burmese: 24-hour clock)."""
+    if value is None:
+        return ""
+    local = value.astimezone(_TZ)
+    clock = f"{local:%H:%M}" if _my(context) else f"{local.hour % 12 or 12}:{local:%M} {'am' if local.hour < 12 else 'pm'}"
+    return f"{day(context, local)}, {clock}"
+
+
 templates.env.filters["local_time"] = local_time
+templates.env.filters["day"] = day
+templates.env.filters["when"] = when
 templates.env.filters["age"] = age
 from app.web.perf import static_url  # noqa: E402 (docs/SPEC-v5.3 M1)
 

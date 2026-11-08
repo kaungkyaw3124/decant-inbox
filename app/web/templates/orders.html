@@ -5,11 +5,12 @@
 {{ ui.page_head(t("Orders"), t("Paid orders. Pack them, then press Sent out when the deli takes them, then Delivered.")) }}
 <nav class="tabs" aria-label="{{ t('Orders') }}">
   {% for key, (label, _, _) in tabs.items() %}
-  <a href="/orders?tab={{ key }}{% if show_test %}&show_test=1{% endif %}" {% if tab == key %}aria-current="page"{% endif %}>{{ tr(label) }}{% if counts.get(key) %} <span class="badge">{{ counts[key] }}</span>{% endif %}</a>
+  <a href="/orders?tab={{ key }}{% if show_test %}&show_test=1{% endif %}{% if dr.query %}&{{ dr.query }}{% endif %}" {% if tab == key %}aria-current="page"{% endif %}>{{ tr(label) }}{% if counts.get(key) %} <span class="badge">{{ counts[key] }}</span>{% endif %}</a>
   {% endfor %}
 </nav>
+{{ ui.date_chips(dr, chips, t("Showing {n} orders", n=page.total)) }}
 <p class="buttons small">{% if tab == "to_pack" and counts.get("to_pack") %}<a class="button primary chip" href="/orders/slips">🖨 {{ t("Print all to pack") }}</a>{% endif %}
-  <a class="button chip{% if show_test %} on{% endif %}" href="/orders?tab={{ tab }}{% if not show_test %}&show_test=1{% endif %}">🧪 {{ t("Show test orders") }}: {{ t("ON") if show_test else t("OFF") }}</a></p>
+  <a class="button chip{% if show_test %} on{% endif %}" href="/orders?tab={{ tab }}{% if not show_test %}&show_test=1{% endif %}{% if dr.query %}&{{ dr.query }}{% endif %}">🧪 {{ t("Show test orders") }}: {{ t("ON") if show_test else t("OFF") }}</a></p>
 {% if user_role == "owner" and test_open %}
   {% if confirm_clear %}
   <form method="post" action="/orders/clear-test" class="card stack problem" id="clear-test">
@@ -34,7 +35,8 @@
       <div class="meta">
         <span class="who"><a class="open-order" href="{{ page.url(open=o.id) }}" hx-boost="true" hx-target="#order-list" hx-select="#order-list" hx-swap="outerHTML" hx-push-url="true"><b>{% if o.status in locked_statuses %}🔒 {% endif %}{% if o.order_no %}#{{ order_label(o) }}{% else %}{{ t("Cart") }}{% endif %}</b></a>{% if o.is_test %} <span class="badge test">🧪 {{ t("test") }}</span>{% endif %} · <a href="/chats/{{ c.id }}">{{ c.display_name or c.username or t("Customer") }}</a></span>
         <span class="badge st-{{ o.status }}">{{ tr(status_labels.get(o.status, o.status)) }}</span>
-        <time title="{{ t('paid') }} {{ o.paid_at | local_time }}">{{ (o.paid_at or o.updated_at) | age }}</time>
+        <time class="when" datetime="{{ o.created_at.isoformat() }}" title="{{ t('paid') }} {{ o.paid_at | local_time }}">{{ o.created_at | when }}</time>
+        <span class="muted small">{{ (o.paid_at or o.updated_at) | age }}</span>
       </div>
       <p class="text">{% for i, p in v.lines %}{{ item_name(i, p) }}{% if not loop.last %}, {% endif %}{% endfor %}
         · <b>{{ format_mmk(o.total_mmk) }} ကျပ်</b></p>

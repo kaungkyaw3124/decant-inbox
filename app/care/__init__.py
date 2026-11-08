@@ -106,12 +106,17 @@ def set_tag(session: Session, customer_id: int, tag: str, on: bool, user: User) 
                                                              CustomerTag.tag == tag))
 
 
-def customer_query(q: str = "", tag: str = "", city: str = "", sort: str = "spent") -> Select:
-    """The Customers page: everyone who ever paid (and anyone matching the search)."""
+def customer_query(q: str = "", tag: str = "", city: str = "", sort: str = "spent", last_message=None) -> Select:
+    """The Customers page: everyone who ever paid (and anyone matching the search).
+    last_message: a condition on the date of the customer's last message (docs/SPEC-v5.7 A date chips)."""
     paid = _paid().subquery()
     totals = select(paid.c.customer_id, func.count().label("orders"), func.sum(paid.c.total_mmk).label("spent"),
                     func.max(paid.c.paid_at).label("last")).group_by(paid.c.customer_id).subquery()
     query = select(Customer, totals.c.orders, totals.c.spent, totals.c.last).join(totals, totals.c.customer_id == Customer.id)
+    if last_message is not None:
+        latest = (select(Message.customer_id, func.max(Message.received_at).label("at"))
+                  .group_by(Message.customer_id).subquery())
+        query = query.join(latest, latest.c.customer_id == Customer.id).where(last_message(latest.c.at))
     if q.strip():
         query = query.where(Customer.display_name.icontains(q.strip(), autoescape=True)
                             | Customer.username.icontains(q.strip(), autoescape=True))

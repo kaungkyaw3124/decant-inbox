@@ -28,7 +28,7 @@ import time
 
 PORT = 8766
 BASE = f"http://127.0.0.1:{PORT}"
-PAGES = ("/chats", "/orders", "/payments", "/stock", "/sales", "/settings")
+PAGES = ("/chats", "/orders", "/payments", "/products", "/sales", "/settings")
 RTT_MS, MBIT = 150, 5
 USER = "perf-check"
 SETTLED = """() => document.readyState === 'complete' && !document.querySelector('.htmx-request')
@@ -57,6 +57,44 @@ class Net:
         self.bytes = self.requests = 0
 
 
+LONG_CHAT = 600
+
+
+def seed_long_chat(session, external: str = "perf-long") -> int:
+    """docs/SPEC-v5.7 D2: a fake customer with 600 messages (every 25th a photo, some albums), never a real chat:
+    only in a throw-away database (the perf copy, the ui_check database)."""
+    from datetime import UTC, datetime, timedelta
+
+    from app.models import Customer, Message
+
+    customer = Customer(channel="telegram", external_user_id=external, display_name="Long chat (test)")
+    session.add(customer)
+    session.flush()
+    start = datetime.now(UTC) - timedelta(days=40)
+    for n in range(LONG_CHAT):
+        photo = n % 25 == 0
+        session.add(Message(
+            channel="telegram", external_chat_id=external, external_message_id=f"{external}-{n}",
+            customer_id=customer.id, raw_text="" if photo else f"message {n} " + "word " * (n % 7),
+            normalized_text=None, received_at=start + timedelta(minutes=97 * n),
+            direction="out" if n % 3 == 2 else "in", kind="photo" if photo else "text",
+            grouped_id=f"album-{n // 50}" if photo and n % 50 == 0 else None, media_size=120_000 if photo else None))
+    session.flush()
+    return customer.id
+
+
+def long_chat(page, net, customer_id: int) -> list[dict]:
+    """Open the 600-message chat 5 times (warm): seconds, KB, bubbles in the page, server ms (Server-Timing)."""
+    out = []
+    for _ in range(5):
+        r = timed(page, net, lambda: page.goto(f"{BASE}/chats/{customer_id}"), f"/chats/{customer_id}")
+        api = page.request.get(f"{BASE}/chats/{customer_id}")
+        r["server_ms"] = float(api.headers["server-timing"].rsplit("total;dur=", 1)[1])
+        r["bubbles"] = page.locator("#thread .bubble").count()
+        out.append(r)
+    return out
+
+
 def timed(page, net, action, url_part: str) -> dict:
     net.reset()
     started = time.perf_counter()
@@ -73,7 +111,7 @@ def click_menu(page, href: str):
     link.click()
 
 
-def run(browser, test_customer: int) -> dict:
+def run(browser, test_customer: int, long_customer: int) -> dict:
     context = browser.new_context(viewport={"width": 1440, "height": 900})
     page = context.new_page()
     net = Net(page)
@@ -102,6 +140,7 @@ def run(browser, test_customer: int) -> dict:
     page.locator("form.compose-box button.send-round").click()
     page.locator("#thread", has_text=text).wait_for()
     out["send"] = time.perf_counter() - started
+    out["long"] = long_chat(page, net, long_customer)
     context.close()
     return out
 
@@ -130,6 +169,7 @@ def main() -> None:
             test_customer = (s.scalar(select(Customer.id).where(Customer.is_tester).limit(1))
                              or s.scalar(select(Message.customer_id).where(Message.direction == "in")
                                          .order_by(Message.id.desc()).limit(1)))
+            long_customer = seed_long_chat(s)
         import uvicorn
         from playwright.sync_api import sync_playwright
 
@@ -142,7 +182,7 @@ def main() -> None:
             time.sleep(0.1)
         with sync_playwright() as p:
             browser = p.chromium.launch(env=libs_env())
-            runs = [run(browser, test_customer) for _ in range(3)]
+            runs = [run(browser, test_customer, long_customer) for _ in range(3)]
             browser.close()
         report(runs, perf.summary())
     finally:
@@ -168,6 +208,11 @@ def report(runs: list[dict], server: list[dict]) -> None:
           f"{pct([x['kb'] for x in sw], .5):.0f} KB, {pct([x['requests'] for x in sw], .5):.0f} requests (n={len(sw)})")
     sends = [r["send"] for r in runs]
     print(f"send reply -> bubble shown: p50 {pct(sends, .5):.2f} s, p90 {pct(sends, .9):.2f} s")
+    lc = [x for r in runs for x in r["long"]]
+    print(f"open the {LONG_CHAT}-message chat: p50 {pct([x['s'] for x in lc], .5):.2f} s, "
+          f"p90 {pct([x['s'] for x in lc], .9):.2f} s, {pct([x['kb'] for x in lc], .5):.0f} KB, "
+          f"server p50 {pct([x['server_ms'] for x in lc], .5):.0f} ms / p90 {pct([x['server_ms'] for x in lc], .9):.0f} ms, "
+          f"{pct([x['bubbles'] for x in lc], .5):.0f} bubbles (n={len(lc)})")
     print("\nserver time per route, ms (p50 / p90 / max, n):")
     for r in server:
         print(f"  {r['route']:<45} {r['p50']:7.0f} {r['p90']:7.0f} {r['max']:7.0f}  n={r['n']}")

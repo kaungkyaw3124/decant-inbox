@@ -13,8 +13,10 @@
   <input name="city" value="{{ city }}" placeholder="{{ t('City') }}" aria-label="{{ t('City') }}">
   <select name="sort" aria-label="{{ t('Sort') }}"><option value="spent" {% if sort == "spent" %}selected{% endif %}>{{ t("Most spent") }}</option>
     <option value="last" {% if sort == "last" %}selected{% endif %}>{{ t("Last order") }}</option></select>
+  {% if dr.query %}{% for k, v in dr.request.query_params.multi_items() if k in ("range", "from", "to") %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endfor %}{% endif %}
   <button class="primary">{{ t("Filter") }}</button>
 </form>
+{{ ui.date_chips(dr, chips, t("Showing {n} customers", n=page.total)) }}
 <div id="customer-list">
 <ul class="rows">
 {% for r in rows %}

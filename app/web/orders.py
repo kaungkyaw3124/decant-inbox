@@ -17,7 +17,7 @@ from app.orders import cart, change, delivery, followups, reports, steps, testpa
 from app.replies import templates as replies
 from app.web.auth import current_user, owner_only, verify_csrf
 from app.web.deps import get_db, templates
-from app.web import paging
+from app.web import dates, paging
 from app.web.inbox import flash, safe_back
 
 router = APIRouter(dependencies=[Depends(current_user), Depends(verify_csrf)])
@@ -53,6 +53,8 @@ def orders_page(request: Request, tab: str = "to_pack", show_test: str = "", con
     shown = (Order.is_test.is_(False) | (Order.cancel_note.is_distinct_from(testpay.CLEARED) & Order.is_test)
              if show_test else Order.is_test.is_(False))
     unpaid = tab in UNPAID_TABS
+    dr = dates.date_range(request)  # docs/SPEC-v5.7 A: the day the order was created (Yangon days)
+    shown = shown & dr.where(Order.created_at)
     query = select(Order, Customer).join(Customer, Customer.id == Order.customer_id).where(
         Order.status.in_(statuses), Order.order_no.is_(None) if unpaid else Order.order_no.is_not(None), shown)
     when = Order.updated_at if unpaid else Order.paid_at
@@ -63,7 +65,7 @@ def orders_page(request: Request, tab: str = "to_pack", show_test: str = "", con
                                                          if key in UNPAID_TABS else Order.order_no.is_not(None))).all())
               for key, (_, st, _) in TABS.items() if key in ("unpaid", "check", "to_pack", "to_send", "sent")}
     return templates.TemplateResponse(request, "orders.html", {
-        "page": page, "tab": tab, "tabs": TABS, "counts": counts, "status_labels": STATUS_LABELS, "show_test": bool(show_test),
+        "page": page, "tab": tab, "tabs": TABS, "counts": counts, "dr": dr, "chips": dates.CHIPS, "status_labels": STATUS_LABELS, "show_test": bool(show_test),
         "confirm_clear": bool(confirm_clear), "test_open": db.scalar(select(func.count()).select_from(Order).where(
             Order.is_test, Order.status.in_(delivery.CANCELLABLE))),
         "rows": [(o, c, cart.view(db, o)) for o, c in rows], "item_name": cart.item_name,

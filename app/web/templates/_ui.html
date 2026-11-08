@@ -43,3 +43,25 @@
 <div class="empty-state"><b>{{ title }}</b>{% if hint %}{{ hint }}{% endif %}
 {%- if href %}<br><a class="button" href="{{ href }}">{{ button }}</a>{% endif %}</div>
 {%- endmacro %}
+
+{# docs/SPEC-v5.7-date-filter-and-light-chat.md A: Today · Yesterday · 7 days · 30 days · All time · Pick dates…
+   (shop days, Asia/Yangon). dr = app.web.dates.DateRange; chips = (key, label) pairs; shown = "Showing 12 orders". #}
+{% macro date_chips(dr, chips, shown="") -%}
+<div class="date-filter">
+  <nav class="tabs date-chips" aria-label="{{ t('Dates') }}">
+    {% for key, label in chips %}<a href="{{ dr.url(key) }}"{% if dr.key == key %} aria-current="page"{% endif %}>{{ t(label) }}</a>{% endfor %}
+  </nav>
+  <details class="pick-dates"{% if dr.key == "custom" %} open{% endif %}>
+    <summary class="button{% if dr.key == 'custom' %} on{% endif %}">{{ t("Pick dates…") }}</summary>
+    <form method="get" action="{{ request.url.path }}" class="inline-form">
+      {% for k, v in dr.keep() %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endfor %}
+      <label>{{ t("From") }} <input type="date" name="from" value="{{ dr.first.isoformat() if dr.first else '' }}"></label>
+      <label>{{ t("To") }} <input type="date" name="to" value="{{ dr.last.isoformat() if dr.last else '' }}"></label>
+      <button class="primary">{{ t("Apply") }}</button>
+    </form>
+  </details>
+</div>
+{% if dr.note %}<p class="small problem-text">{{ t(dr.note) }}</p>{% endif %}
+{% if dr.active or shown %}<p class="small muted date-shown">{{ shown }}{% if dr.first %} · {{ dr.first | day }}{% if dr.last != dr.first %} – {{ dr.last | day }}{% endif %}{% endif %}
+  {%- if dr.active %} · <a href="{{ dr.url(dr.default) }}">{{ t("Clear") }}</a>{% endif %}</p>{% endif %}
+{%- endmacro %}
