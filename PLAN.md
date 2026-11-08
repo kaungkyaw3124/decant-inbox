@@ -3,6 +3,10 @@
 Read CLAUDE.md first. This file tracks where we are.
 
 ## NEXT TASK (written by the planning chat; Claude Code runs it with /next)
+Task: v5.5 HOTFIX layout: pages and login not centred / not full width on PC — docs/SPEC-v5.5-layout-hotfix.md (goal L1-L6).
+Status: TODO
+
+## PREVIOUS TASK
 Task: v5.4 UI/UX CLEAN-UP of the whole dashboard (shared page pattern, paging 10/20/50/100 on every long list, Settings by section,
 simple 7-item menu, plain words EN+MY, empty/error states) — docs/SPEC-v5.4-ui-ux-cleanup.md (goal X1-X8).
 Status: DONE 2026-11-06 — see REPORT.md
@@ -160,3 +164,4 @@ payments → Viber → reports. Each is a new module with its own tables.
    faster queries, nice-d tests, trusted-device login, keyboard — docs/SPEC-v5.3-performance-pc.md (goal P1-P5). Status: moved to NEXT TASK 2026-11-03
 11. v5.4 UI/UX CLEAN-UP of the whole dashboard (shared page pattern, paging 10/20/50/100 on every long list, Settings by section,
    simple 7-item menu, plain words EN+MY, empty/error states) — docs/SPEC-v5.4-ui-ux-cleanup.md (goal X1-X8); needs 5.3 first. Status: moved to NEXT TASK 2026-11-06
+12. v5.5 HOTFIX layout (centre + full width, login centred) — docs/SPEC-v5.5-layout-hotfix.md (goal L1-L6). Status: moved to NEXT TASK 2026-11-08
