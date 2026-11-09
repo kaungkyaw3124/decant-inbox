@@ -4,13 +4,13 @@ Read CLAUDE.md first. This file tracks where we are.
 
 ## NEXT TASK (written by the planning chat; Claude Code runs it with /next)
 Task: v5.8 SALES & profit on ONE screen (4 number boxes, per-day chart/table, per-size, per-perfume) + chat-speed follow-up — docs/SPEC-v5.8-sales-one-screen.md (goal Z1-Z5).
-Status: TODO
+Status: DONE 2026-11-09 — see REPORT.md
 
 ## PREVIOUS TASK
 Task: v5.7 (A) DATE filter chips on Orders/Payments/Customers/Sales + (B) LIGHT CHAT (20 messages, older on scroll, no 4 s full re-render) — docs/SPEC-v5.7-date-filter-and-light-chat.md (goal D1-D5).
 Status: DONE 2026-11-08 — see REPORT.md (D2 partly: chat-page server p90 still > 200 ms, follow-up)
 
-## RESUME HERE (updated 2026-11-08 by Claude Code)
+## RESUME HERE (updated 2026-11-09 by Claude Code)
 - v1-v4.12 DONE. AI AUTO, brake ON, ai_address ON, ai_screenshot OFF.
 - v4.13 hotfix (docs/SPEC-v4.13-hotfix.md) DONE + deployed 2026-10-17: Q0-Q5, R1-R6, evals PASS. Owner test 4.13
   pending (REPORT.md "OWNER TEST SCRIPT 4.13").
@@ -35,7 +35,7 @@ Status: DONE 2026-11-08 — see REPORT.md (D2 partly: chat-page server p90 still
 - v5.3 PC speed DONE + deployed 2026-11-06: static cache + versioned URLs, gzip, boosted menu, prefetch, SSE,
   trusted computer, keyboard; warm pages 0.2-0.5 s / 0 KB (was ~2.2 s / 680 KB), send 0.25 s. NOT met yet: customer
   switch p90 1.27 s (goal 0.5) and server p90 ≤ 200 ms (chat page ~49 queries) -> follow-up for the planning chat.
-- Owner tests pending: 4.13-4.21, 5.0-5.7 (REPORT.md).
+- Owner tests pending: 4.13-4.21, 5.0-5.8 (REPORT.md).
 - v5.4 UI/UX clean-up DONE + deployed 2026-11-06: page pattern, pager on every long list, Products + AI like the
   mockups, Settings in sections (Saved ✓, unsaved warning), 7-item menu, Orders list + detail, error page, glossary;
   887 tests, UI gate 384 views 0 fails. Decision asked (REPORT.md): redirect / to /chats? Owner test 5.4 pending.
@@ -47,6 +47,9 @@ Status: DONE 2026-11-08 — see REPORT.md (D2 partly: chat-page server p90 still
 - v5.7 DONE + deployed 2026-11-08: date chips on Orders/Payments/Customers/Sales (Yangon days, dates on rows);
   light chat (20 messages, older on scroll, poll 204 / only new bubbles, New message pill, #m jump); 909 tests,
   UI gate 516 views 0 fails. D2 partly met: chat-page server p90 > 200 ms (≈40 queries) -> follow-up. Owner test 5.7 pending.
+- v5.8 DONE + deployed 2026-11-09: Sales on one screen (4 boxes, per-day Chart|Table, per size, per perfume top 6,
+  C9 no-scroll gate); chat page 42 -> 26 queries (refcache), 600-message chat server p90 185 ms (203 with the test
+  browser on the box); 917 tests, UI gate 516 views. Owner test 5.8 pending.
 - NEXT: the QUEUE is empty — ask the planning chat for the next task.
 - Owner checks: `bash scripts/status.sh`; AI numbers at /ai.
 
@@ -86,6 +89,7 @@ Status: DONE 2026-11-08 — see REPORT.md (D2 partly: chat-page server p90 still
 | 29 | v5.5 (docs/SPEC-v5.5-layout-hotfix.md): layout hotfix: pages centred + full width on the PC, login centred, ui_check C8 | ✅ Done, live (owner test pending) |
 | 30 | v5.6 (docs/SPEC-v5.6-simple-products-page.md): ONE simple Products page: side panel Prices/Stock/Nicknames, 2 buttons, More menu, low-stock bar | ✅ Done, live (owner test pending) |
 | 31 | v5.7 (docs/SPEC-v5.7-date-filter-and-light-chat.md): date filter chips on list pages + light chat (20 messages, older on demand, no 4 s re-draw) | ✅ Done, live (D2 server p90 follow-up; owner test pending) |
+| 32 | v5.8 (docs/SPEC-v5.8-sales-one-screen.md): Sales & profit on one screen + chat page 26 queries (p90 ≤ 200 ms) | ✅ Done, live (owner test pending) |
 
 ## Phase 0 checklist
 - [x] Step 0: rollback safety net scripts in ~/hardening/
