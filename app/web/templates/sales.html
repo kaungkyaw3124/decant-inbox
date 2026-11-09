@@ -1,75 +1,125 @@
 {% extends "base.html" %}
 {% import "_ui.html" as ui with context %}
+{# docs/SPEC-v5.8-sales-one-screen.md (mockup docs/mockups/sales-one-screen.dc.html): everything on one screen.
+   Staff never see cost or profit (docs/SPEC-v4.md 4.4): not in boxes, columns, bars or tooltips. #}
 {% block title %}{{ t("Sales") }} · Decant Inbox{% endblock %}
+{% set owner = user_role == "owner" %}
 {% macro money(v) %}{% if v is none %}{{ missing }}{% else %}{{ format_mmk(v) }}{% endif %}{% endmacro %}
 {% macro pct(v) %}{% if v is none %}{{ missing }}{% else %}{{ "%.1f" | format(v) }}%{% endif %}{% endmacro %}
+{% macro tip(label, g) -%}
+{{ tr(label ~ ": " ~ format_mmk(g.revenue) ~ " ကျပ် · " ~ (g.orders | length) ~ " order(s)") }}{% if owner %} · {{ t("profit") }} {{ money(g.profit) }}{% endif %}
+{%- endmacro %}
+{% macro empty() %}<p class="empty-state small">{{ t("No paid orders in this range.") }}</p>{% endmacro %}
 {% block content %}
-{{ ui.page_head((t("Sales & profit") if user_role == "owner" else t("Sales")), t("Money from paid orders. Choose a day range at the top.")) }}
-{{ ui.date_chips(dr, chips) }}
-<p class="buttons small"><a class="button" href="/sales/export.xlsx?{{ query }}">⬇ {{ t("Export .xlsx") }}</a></p>
-<p class="muted small">{{ tr(r.label) }} · {{ t("paid orders only (paid, packed, sent out, delivered), by the day they were paid (Yangon time).") }}</p>
+<div class="page-head sales-head">
+  <div><h1>{{ t("Sales & profit") if owner else t("Sales") }}</h1>
+    <p class="page-sub">{{ r.first | day }}{% if r.last != r.first %} – {{ r.last | day }}{% endif %} {{ r.last.year }} · {{ t("paid orders only · by the day they were paid (Yangon time)") }}</p></div>
+  <div class="sales-tools">
+    {{ ui.date_chips(dr, chips, line=false) }}
+    <a class="button" href="/sales/export.xlsx?{{ query }}">{{ t("Export Excel") }}</a>
+  </div>
+</div>
 
-<section class="tiles">
-  <div class="tile"><span>{{ t("Revenue") }}</span><b>{{ format_mmk(r.total.revenue) }}</b><small>ကျပ်</small></div>
-  <div class="tile"><span>{{ t("Orders") }}</span><b>{{ r.total.orders | length }}</b></div>
-  <div class="tile"><span>{{ t("Items sold") }}</span><b>{{ r.total.items }}</b></div>
-  <div class="tile"><span>{{ t("ml sold") }}</span><b>{{ format_mmk(r.total.ml) }}</b></div>
-  {% if user_role == "owner" %}{# staff see revenue and orders only (docs/SPEC-v4.md 4.4) #}
-  <div class="tile"><span>{{ t("Cost") }}</span><b>{{ money(r.total.cost) }}</b><small>ကျပ်</small></div>
-  <div class="tile"><span>{{ t("Profit") }}</span><b>{{ money(r.total.profit) }}</b><small>ကျပ်</small></div>
-  <div class="tile"><span>{{ t("Profit %") }}</span><b>{{ pct(r.total.margin) }}</b></div>
+<section class="kpis{% if not owner %} two{% endif %}">
+  <div class="kpi rev"><span>{{ t("Revenue") }}</span><b>{{ format_mmk(r.total.revenue) }}</b> <small>{{ t("Ks") }}</small>
+    <p>{{ t("Average order {n} Ks", n=format_mmk(r.total.average)) }}</p></div>
+  {% if owner %}
+  <div class="kpi profit"><span>{{ t("Profit") }}</span><b>{{ money(r.total.profit) }}</b>{% if r.total.profit is not none %} <small>{{ t("Ks") }}</small>{% endif %}
+    <p class="good">{{ t("{p} of revenue", p=pct(r.total.margin)) }}</p></div>
+  <div class="kpi"><span>{{ t("Cost") }}</span><b>{{ money(r.total.cost) }}</b>{% if r.total.cost is not none %} <small>{{ t("Ks") }}</small>{% endif %}
+    <p>{{ t("perfume + vials") }}</p></div>
   {% endif %}
-  <div class="tile"><span>{{ t("Average order") }}</span><b>{{ format_mmk(r.total.average) }}</b><small>ကျပ်</small></div>
+  <div class="kpi"><span>{{ t("Orders") }}</span><b>{{ r.total.orders | length }}</b>
+    <p>{{ t("{n} items · {ml} ml poured", n=r.total.items, ml=format_mmk(r.total.ml)) }}</p></div>
 </section>
-{% if r.total.missing_cost and user_role == "owner" %}
-<p class="card notice small">{{ t("Profit {missing}: some items have no cost — add bottle_cost in the price list (and the vial cost per size in Settings).", missing=missing) }} <a href="/prices">{{ t("Price list") }} →</a>
+
+{% if r.total.missing_cost and owner %}
+<div class="warn-bar sales-warn" role="status">
+  <span><b>{{ t("Profit may look too high:") }}</b> {{ t("{n} items have no cost yet — add bottle_cost in the price list.", n=r.total.missing_items) }}</span>
+  <span class="warn-actions">
   {% if r.missing_orders %}
   <form method="post" action="/sales/fill-costs" class="inline">
     <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="range" value="{{ r.key }}">
     <input type="hidden" name="from" value="{{ r.first.isoformat() }}"><input type="hidden" name="to" value="{{ r.last.isoformat() }}">
-    <button class="link">{{ t("Use today's costs for {n} order(s) already paid", n=r.missing_orders) }}</button>
-  </form>{% endif %}</p>
+    <button class="link">{{ t("Use today's costs for {n} orders", n=r.missing_orders) }}</button>
+  </form>{% endif %}
+  <a href="/products">{{ t("Products") }}</a></span>
+</div>
 {% endif %}
 
-{% if r.days | length > 1 %}
-<section class="card">
-  <h2>{{ t("Revenue per day") }}</h2>
-  <svg class="bar-chart" viewBox="0 0 {{ chart.w }} {{ chart.h }}" role="img" aria-label="{{ t('Revenue per day') }}, {{ t('highest') }} {{ format_mmk(chart.peak) }} ကျပ်">
-    <line class="axis" x1="0" x2="{{ chart.w }}" y1="{{ chart.base }}" y2="{{ chart.base }}"></line>
-    {% for b in chart.bars %}
-    <g class="bar"><title>{{ tr(b.title) }}</title>
-      <rect class="hit" x="{{ b.hx }}" y="0" width="{{ b.hw }}" height="{{ chart.h }}"></rect>
-      {% if b.h %}<rect class="mark" x="{{ b.x }}" y="{{ b.y }}" width="{{ b.w }}" height="{{ b.h }}" rx="2"></rect>{% endif %}
-      {% if b.label %}<text x="{{ b.cx }}" y="{{ chart.h - 6 }}" text-anchor="middle">{{ b.label }}</text>{% endif %}
-    </g>
+<div class="sales-grid">
+<section class="card sales-card" id="per-day">
+  <div class="card-head">
+    <h2>{{ t("Per day") }}</h2>
+    <div class="card-tools">
+      {% if view == "chart" %}<span class="legend"><i class="sw rev"></i>{{ t("Revenue") }}</span>{% if owner %}<span class="legend"><i class="sw profit"></i>{{ t("Profit") }}</span>{% endif %}{% endif %}
+      <nav class="tabs" aria-label="{{ t('Per day') }}">
+        <a href="{{ view_url('chart') }}"{% if view == "chart" %} aria-current="page"{% endif %}>{{ t("Chart") }}</a>
+        <a href="{{ view_url('table') }}"{% if view == "table" %} aria-current="page"{% endif %}>{{ t("Table") }}</a>
+      </nav>
+    </div>
+  </div>
+  {% if not r.total.orders %}{{ empty() }}
+  {% elif view == "chart" %}
+  <div class="day-chart" role="img" aria-label="{{ t('Revenue per day') }}">
+    {% for b in bars %}
+    {% set label = (b.start.strftime("%a %d %b") if not weekly else b.start.strftime("%d %b") ~ " – " ~ b.end.strftime("%d %b")) %}
+    <div class="day-col" title="{{ tip(label, b.g) }}">
+      <span class="day-amount">{% if b.g.revenue %}{{ b.short }}{% endif %}</span>
+      <div class="day-bars"><i class="bar rev bh-{{ b.rev_h }}"></i>{% if owner %}<i class="bar profit bh-{{ b.prof_h }}"></i>{% endif %}</div>
+      <span class="day-label">{% if weekly %}{{ b.start | day }}{% else %}<b>{{ t(b.start.strftime("%a")) }}</b>{{ b.start.day }}{% endif %}</span>
+    </div>
     {% endfor %}
-    <text class="peak" x="2" y="10">{{ format_mmk(chart.peak) }} ကျပ်</text>
-  </svg>
-</section>
-{% endif %}
-
-{% macro table(title, first, rows, show_ml=true) %}
-<section class="card">
-  <h2>{{ title }}</h2>
+  </div>
+  {% if weekly %}<p class="small muted">{{ t("More than 31 days: one bar per week (Monday first).") }}</p>{% endif %}
+  {% else %}
   <div class="scroll">
   <table class="sales">
-    <thead><tr><th>{{ first }}</th><th class="num">{{ t("Orders") }}</th><th class="num">{{ t("Qty") }}</th>{% if show_ml %}<th class="num">ml</th>{% endif %}<th class="num">{{ t("Revenue") }}</th>{% if user_role == "owner" %}<th class="num">{{ t("Cost") }}</th><th class="num">{{ t("Profit") }}</th>{% endif %}</tr></thead>
+    <thead><tr><th>{{ t("Day") }}</th><th class="num">{{ t("Orders") }}</th><th class="num">{{ t("Qty") }}</th><th class="num">ml</th><th class="num">{{ t("Revenue") }}</th>{% if owner %}<th class="num">{{ t("Cost") }}</th><th class="num">{{ t("Profit") }}</th>{% endif %}</tr></thead>
     <tbody>
-    {% for label, g in rows %}
-      <tr><td>{{ label }}</td><td class="num">{{ g.orders | length }}</td><td class="num">{{ g.items }}</td>{% if show_ml %}<td class="num">{{ format_mmk(g.ml) }}</td>{% endif %}<td class="num">{{ format_mmk(g.revenue) }}</td>{% if user_role == "owner" %}<td class="num">{{ money(g.cost) }}</td><td class="num">{{ money(g.profit) }}</td>{% endif %}</tr>
-    {% else %}
-      <tr><td colspan="7" class="empty">{{ t("No paid orders.") }}</td></tr>
-    {% endfor %}
+    {% for d, g in r.days %}{% if g.orders or r.days | length <= 31 %}
+      <tr><td>{{ d.strftime("%a %d %b") if lang != "my" else d | day }}</td><td class="num">{{ g.orders | length }}</td><td class="num">{{ g.items }}</td><td class="num">{{ format_mmk(g.ml) }}</td><td class="num">{{ format_mmk(g.revenue) }}</td>{% if owner %}<td class="num">{{ money(g.cost) }}</td><td class="num">{{ money(g.profit) }}</td>{% endif %}</tr>
+    {% endif %}{% endfor %}
     </tbody>
-    <tfoot><tr><th>{{ t("Total") }}</th><th class="num">{{ r.total.orders | length }}</th><th class="num">{{ r.total.items }}</th>{% if show_ml %}<th class="num">{{ format_mmk(r.total.ml) }}</th>{% endif %}<th class="num">{{ format_mmk(r.total.revenue) }}</th>{% if user_role == "owner" %}<th class="num">{{ money(r.total.cost) }}</th><th class="num">{{ money(r.total.profit) }}</th>{% endif %}</tr></tfoot>
+    <tfoot><tr><th>{{ t("Total") }}</th><th class="num">{{ r.total.orders | length }}</th><th class="num">{{ r.total.items }}</th><th class="num">{{ format_mmk(r.total.ml) }}</th><th class="num">{{ format_mmk(r.total.revenue) }}</th>{% if owner %}<th class="num">{{ money(r.total.cost) }}</th><th class="num">{{ money(r.total.profit) }}</th>{% endif %}</tr></tfoot>
   </table>
   </div>
+  {% endif %}
 </section>
-{% endmacro %}
-{% set day_rows = [] %}{% for d, g in r.days %}{% if g.orders or r.days | length <= 31 %}{% set _ = day_rows.append((d.strftime("%a %d %b" if lang != "my" else "%d %b"), g)) %}{% endif %}{% endfor %}
-{{ table(t("Per day"), t("Day"), day_rows) }}
-{% set perfume_rows = [] %}{% for g in r.perfumes %}{% set _ = perfume_rows.append((g.label, g)) %}{% endfor %}
-{{ table(t("Per perfume (by revenue)"), t("Perfume"), perfume_rows) }}
-{% set size_rows = [] %}{% for g in r.sizes %}{% set _ = size_rows.append((tr(g.label), g)) %}{% endfor %}
-{{ table(t("Per size"), t("Size"), size_rows) }}
+
+<section class="card sales-card" id="per-size">
+  <div class="card-head"><h2>{{ t("Per size") }}</h2></div>
+  {% for g in r.sizes %}
+  <div class="size-row">
+    <div class="size-top"><b>{{ tr(g.label) }}</b><span>{{ t("{rev} Ks · {n} sold", rev=format_mmk(g.revenue), n=g.items) }}</span></div>
+    <div class="size-bar"><span class="hbar"><i class="bw-{{ (100 * g.revenue / size_peak) | round | int if size_peak else 0 }}"></i></span>
+      {%- if owner %}<span class="small muted">{% if g.profit is none %}{{ t("profit") }} {{ missing }}{% else %}{{ t("profit {n} Ks", n=format_mmk(g.profit)) }}{% endif %}</span>{% endif %}</div>
+  </div>
+  {% else %}{{ empty() }}{% endfor %}
+</section>
+</div>
+
+{% set cols = 7 if owner else 5 %}
+{% macro perfume_row(g) -%}
+<div class="prow" role="row"><span role="cell">{{ g.label }}</span><span role="cell" class="num">{{ g.orders | length }}</span><span role="cell" class="num">{{ g.items }}</span><span role="cell" class="num">{{ format_mmk(g.ml) }}</span>
+  <span role="cell" class="num rev-cell"><span class="hbar thin"><i class="bw-{{ (100 * g.revenue / perfume_peak) | round | int if perfume_peak else 0 }}"></i></span>{{ format_mmk(g.revenue) }}</span>
+  {%- if owner %}<span role="cell" class="num">{{ money(g.cost) }}</span><span role="cell" class="num">{{ money(g.profit) }}</span>{% endif %}</div>
+{%- endmacro %}
+<section class="card sales-card" id="per-perfume">
+  <div class="card-head"><h2>{{ t("Per perfume · best sellers first") }}</h2></div>
+  {% if r.perfumes %}
+  <div class="scroll">
+  <div class="ptable{% if not owner %} staff{% endif %}" role="table" aria-label="{{ t('Per perfume · best sellers first') }}">
+    <div class="prow phead" role="row"><span role="columnheader">{{ t("Perfume") }}</span><span role="columnheader" class="num">{{ t("Orders") }}</span><span role="columnheader" class="num">{{ t("Qty") }}</span><span role="columnheader" class="num">ml</span><span role="columnheader" class="num">{{ t("Revenue") }}</span>{% if owner %}<span role="columnheader" class="num">{{ t("Cost") }}</span><span role="columnheader" class="num">{{ t("Profit") }}</span>{% endif %}</div>
+    {% for g in r.perfumes[:top] %}{{ perfume_row(g) }}{% endfor %}
+    {% if r.perfumes | length > top %}
+    <details class="more-perfumes">
+      <summary class="link">{{ t("Show all {n} perfumes", n=r.perfumes | length) }}</summary>
+      {% for g in r.perfumes[top:] %}{{ perfume_row(g) }}{% endfor %}
+    </details>
+    {% endif %}
+  </div>
+  </div>
+  {% else %}{{ empty() }}{% endif %}
+</section>
 {% endblock %}

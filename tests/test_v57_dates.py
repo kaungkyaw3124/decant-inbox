@@ -110,5 +110,6 @@ def test_sales_chips_keep_today_default_and_accept_picked_dates(shop, db, fixed_
     assert sales.resolve("today", "2026-11-05", "2026-11-01", TODAY) == ("custom", date(2026, 11, 1), date(2026, 11, 5))
     page = client.get("/sales").text
     assert 'class="tabs date-chips"' in page and '<a href="/sales" aria-current="page">Today</a>' in page
-    assert 'href="/sales?range=7d"' in page and 'href="/sales?range=week"' in page  # old chips kept
+    assert 'href="/sales?range=7d"' in page and 'href="/sales?range=month"' in page  # v5.8: the mockup's chips
+    assert client.get("/sales?range=week").status_code == 200  # This week: still by URL
     assert client.get("/sales?from=2026-11-01&to=2026-11-05").status_code == 200

@@ -136,6 +136,21 @@ def build_database() -> dict[str, int]:
     from scripts.perf_check import seed_long_chat  # docs/SPEC-v5.7 D2/D3: a 600-message chat
     with SessionLocal.begin() as s:
         ids["long"] = seed_long_chat(s, "ui-long", end=datetime(2026, 1, 1, tzinfo=UTC))  # older than the other test messages
+    with engine.begin() as c:  # docs/SPEC-v5.8 C9: a week of sales (3 perfumes, 3 sizes, one item without a cost)
+        cust = c.execute(text("SELECT id FROM customers ORDER BY id LIMIT 1")).scalar()
+        for name in ("Test Perfume A", "Test Perfume B", "Test Perfume C"):  # 6 perfumes: the per-perfume card is full
+            c.execute(text("INSERT INTO products (brand, name, source, full_size_ml) VALUES ('Test', :n, 'manual', 100)"),
+                      {"n": name})
+        pids = [r for r, in c.execute(text("SELECT id FROM products ORDER BY id LIMIT 6"))]
+        for n in range(14):
+            oid = c.execute(text("INSERT INTO orders (customer_id, status, phones, order_no, total_mmk, paid_at) VALUES "
+                                 "(:c, 'delivered', '{}', nextval('order_no_seq'), 38000, now() - make_interval(days => :d)) "
+                                 "RETURNING id"), {"c": cust, "d": n % 7}).scalar()
+            size, full = ((5, False), (10, False), (None, True))[n % 3]
+            c.execute(text("INSERT INTO order_items (order_id, product_id, size_ml, is_full_bottle, quantity, unit_price_mmk, "
+                           "unit_cost_mmk) VALUES (:o, :p, :s, :f, 1, :price, :cost)"),
+                      {"o": oid, "p": pids[n % 6], "s": size, "f": full, "price": 380000 if full else 18000 + 1000 * n,
+                       "cost": None if n == 3 else (250000 if full else 9000)})
     ids["low"] = sauvage
     ids["untracked"] = scalar(engine, "SELECT id FROM products WHERE name = 'Y Eau de Parfum'")
     ids["practice"] = 1
@@ -656,6 +671,34 @@ def chat_flows(browser) -> list[str]:
     return problems
 
 
+C9_SIZES = ((1440, 900, 1.0), (1920, 1080, 1.0), (1280, 720, 1.35))  # (width, height, page height allowed / window)
+
+
+def c9(browser) -> list[str]:
+    """docs/SPEC-v5.8 Z1: Sales fits the window — 1440x900 and 1920x1080 no vertical page scroll, 1280x720 at most one
+    short scroll — for owner + staff, en + my, a week with sales and an empty range. Screenshots ui-shots/5.8/."""
+    problems, shots = [], SHOTS / "5.8"
+    shots.mkdir(parents=True, exist_ok=True)
+    for role, username in (("owner", "owner"), ("staff", "staff1")):
+        context = browser.new_context()
+        page = context.new_page()
+        log_in(page, username)
+        for lang in ("en", "my"):
+            set_language(page, lang)
+            for width, height, allowed in C9_SIZES:
+                page.set_viewport_size({"width": width, "height": height})
+                for name, url in (("week", "/sales?range=7d"), ("empty", "/sales?from=2020-01-01&to=2020-01-07")):
+                    page.goto(f"http://127.0.0.1:{PORT}{url}")
+                    page.wait_for_function("document.fonts.status === 'loaded'")
+                    if role == "owner" and name == "week":
+                        page.screenshot(path=shots / f"sales-{lang}-{width}.png", full_page=True)
+                    tall = page.evaluate("document.documentElement.scrollHeight")
+                    if tall > height * allowed + 1:
+                        problems.append(f"sales {name} {role} {lang} {width}x{height}: page {tall}px tall")
+        context.close()
+    return problems
+
+
 def c8(browser, targets) -> list[str]:
     """C8 at 1440 / 1920 / 2560 px, English, owner + staff, every full page and the login page."""
     problems, shots = [], SHOTS / "5.5"
@@ -749,6 +792,10 @@ def run(quick: bool, save_inventory: bool, only_widths: tuple[int, ...] = (), sh
             for problem in c8(browser, targets):
                 failures += 1
                 lines.append("FAIL C8 " + problem)
+            if not only_pages or "sales" in only_pages:
+                for problem in c9(browser):
+                    failures += 1
+                    lines.append("FAIL C9 " + problem)
         if not save_inventory and not only_pages:  # the flows need every page
             for problem in pc_flows(browser) + chat_flows(browser) + u4_flows(browser) + s1_flows(browser):
                 failures += 1

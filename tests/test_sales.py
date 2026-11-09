@@ -55,7 +55,7 @@ def test_c1_only_paid_orders_by_yangon_day(shop, db, tmp_path, monkeypatch):
     assert report(date(2026, 10, 15), date(2026, 10, 15)).total.revenue == 18000
 
     page = client.get("/sales?range=custom&from=2026-10-14&to=2026-10-15").text
-    assert "36,000" in page and "Revenue per day" in page and "<svg" in page
+    assert "36,000" in page and "Revenue per day" in page and 'class="day-chart"' in page  # v5.8: HTML bars
     assert "Sun 15 Oct: 18,000 ကျပ် · 1 order(s)" not in page  # 15 Oct 2026 is a Thursday
     assert "Thu 15 Oct: 18,000 ကျပ် · 1 order(s)" in page
     assert client.get("/sales").status_code == 200 and client.get("/sales?range=month").status_code == 200
@@ -106,7 +106,10 @@ def test_c5_export_matches_page(shop, db, tmp_path, monkeypatch):
     paid_order(client, token, db, tmp_path, monkeypatch, "91", 1)
     paid_order(client, token, db, tmp_path, monkeypatch, "92", 2)
     page = client.get("/sales?range=week").text
-    tiles = dict(re.findall(r'<div class="tile"><span>([^<]+)</span><b>([^<]+)</b>', page))
+    # v5.8: four boxes (Revenue, Profit, Cost, Orders); items and profit % are their sub-lines
+    tiles = dict(re.findall(r'<div class="kpi[^"]*"><span>([^<]+)</span><b>([^<]+)</b>', page))
+    tiles["Items sold"] = re.search(r"(\d+) items · [\d,]+ ml poured", page).group(1)
+    tiles["Profit %"] = re.search(r"([\d.]+%) of revenue", page).group(1)
     r = client.get("/sales/export.xlsx?range=week")
     assert r.headers["content-disposition"].startswith('attachment; filename="sales-')
     wb = load_workbook(io.BytesIO(r.content))

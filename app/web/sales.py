@@ -15,6 +15,10 @@ from app.web.deps import get_db, templates
 from app.web.inbox import flash
 
 router = APIRouter(prefix="/sales", dependencies=[Depends(current_user), Depends(verify_csrf)])
+CHIPS = ("today", "yesterday", "7d", "30d", "month")  # docs/SPEC-v5.8 (This week stays reachable by URL / Pick dates)
+VIEWS = ("chart", "table")
+VIEW_COOKIE = "sales_view"
+TOP_PERFUMES = 6
 
 
 def _query(key: str, first, last) -> str:
@@ -29,10 +33,20 @@ def sales_page(request: Request, db: Session = Depends(get_db)):
     q = request.query_params
     key, first, last = sales.resolve(q.get("range", "today"), q.get("from", ""), q.get("to", ""))
     report = sales.report(db, key, first, last)
-    return templates.TemplateResponse(request, "sales.html", {
-        "r": report, "ranges": sales.RANGES, "chart": sales.chart(report), "query": _query(key, first, last),
-        "missing": sales.MISSING, "chips": [(k, v) for k, v in sales.RANGES.items() if k != "custom"],
+    view = q.get("view") if q.get("view") in VIEWS else request.cookies.get(VIEW_COOKIE)  # docs/SPEC-v5.8: Chart | Table
+    view = view if view in VIEWS else "chart"
+    bars, weekly = sales.day_bars(report)
+    response = templates.TemplateResponse(request, "sales.html", {
+        "r": report, "ranges": sales.RANGES, "query": _query(key, first, last), "missing": sales.MISSING,
+        "chips": [(k, sales.RANGES[k]) for k in CHIPS], "bars": bars, "weekly": weekly, "view": view,
+        "size_peak": max((g.revenue for g in report.sizes), default=0),
+        "perfume_peak": max((g.revenue for g in report.perfumes), default=0), "top": TOP_PERFUMES,
+        "view_url": lambda v: "/sales?" + urlencode({**dict(q), "view": v}),
         "dr": dates.DateRange(key, first, last, request, default="today")})  # docs/SPEC-v5.7: the shared chips
+    if q.get("view") in VIEWS and request.cookies.get(VIEW_COOKIE) != view:  # remember the choice (only the word)
+        response.set_cookie(VIEW_COOKIE, view, max_age=31536000, path="/sales", httponly=True, samesite="lax",
+                            secure=request.url.scheme == "https")
+    return response
 
 
 @router.get("/export.xlsx")

@@ -74,6 +74,7 @@ class Group:
     revenue: int = 0
     known_cost: int = 0
     missing_cost: bool = False
+    missing_items: int = 0  # items without a cost (docs/SPEC-v5.8: "N items have no cost yet")
 
     def add(self, order_id: int, qty: int, ml: int, revenue: int, cost: int | None) -> None:
         self.orders.add(order_id)
@@ -82,6 +83,7 @@ class Group:
         self.revenue += revenue
         if cost is None:
             self.missing_cost = True
+            self.missing_items += qty
         else:
             self.known_cost += cost
 
@@ -159,31 +161,48 @@ def unstamped_orders(session: Session, first: date, last: date) -> list[Order]:
         OrderItem.removed_at.is_(None), OrderItem.unit_cost_mmk.is_(None)).distinct()))
 
 
-# ---------- chart (inline SVG, no libraries) ----------
+# ---------- docs/SPEC-v5.8: per-day bars (HTML, heights in whole %), per week when the range is long ----------
 
-CHART_W, CHART_H, CHART_TOP, CHART_BOTTOM = 600, 170, 14, 22
+MAX_DAY_BARS = 31
 
 
-def chart(r: Report) -> dict:
-    """Bars of revenue per day, positioned for the template."""
-    n = len(r.days)
-    peak = max((g.revenue for _, g in r.days), default=0)
-    slot = CHART_W / max(n, 1)
-    width = max(min(slot * 0.7, 48), 2)
-    every = max(1, round(n / 12))  # at most ~12 day labels
-    plot_h = CHART_H - CHART_TOP - CHART_BOTTOM
+def short(amount: int) -> str:
+    """1,446,000 -> "1.4M", 212,000 -> "212k" (the label above a bar; the tooltip has the full number)."""
+    if amount >= 1_000_000:
+        return f"{amount / 1_000_000:.1f}M"
+    return f"{round(amount / 1000)}k" if amount >= 1000 else str(amount)
+
+
+def day_bars(r: Report) -> tuple[list[dict], bool]:
+    """(bars, per_week): one bar pair per day, or per week (Monday first) for more than 31 days."""
+    groups: list[tuple[date, date, list[Group]]] = []
+    weekly = len(r.days) > MAX_DAY_BARS
+    for day, g in r.days:
+        start = day - timedelta(days=day.weekday()) if weekly else day
+        if groups and groups[-1][0] == start:
+            groups[-1][2].append(g)
+            groups[-1] = (start, day, groups[-1][2])
+        else:
+            groups.append((start, day, [g]))
+    sums = []
+    for start, end, gs in groups:
+        total = Group("")
+        for g in gs:
+            total.orders |= g.orders
+            total.items += g.items
+            total.ml += g.ml
+            total.revenue += g.revenue
+            total.known_cost += g.known_cost
+            total.missing_cost |= g.missing_cost
+        sums.append((start, end, total))
+    peak = max((t.revenue for _, _, t in sums), default=0)
     bars = []
-    for i, (day, g) in enumerate(r.days):
-        h = plot_h * g.revenue / peak if peak else 0
-        if g.revenue and h < 2:
-            h = 2
-        x = slot * i + (slot - width) / 2
-        bars.append({"x": round(x, 1), "y": round(CHART_TOP + plot_h - h, 1), "w": round(width, 1),
-                     "h": round(h, 1), "cx": round(x + width / 2, 1),
-                     "hx": round(slot * i, 1), "hw": round(slot, 1),  # hover target = the whole slot
-                     "label": f"{day:%d}" if i % every == 0 else "",
-                     "title": f"{day:%a %d %b}: {g.revenue:,} ကျပ် · {len(g.orders)} order(s)"})
-    return {"w": CHART_W, "h": CHART_H, "base": CHART_TOP + plot_h, "bars": bars, "peak": peak}
+    for start, end, t in sums:
+        profit = max(t.profit or 0, 0)
+        bars.append({"start": start, "end": end, "g": t, "short": short(t.revenue),
+                     "rev_h": round(100 * t.revenue / peak) if peak else 0,
+                     "prof_h": round(100 * profit / peak) if peak else 0})
+    return bars, weekly
 
 
 # ---------- export ----------

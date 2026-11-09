@@ -987,4 +987,17 @@ MY = {
     "Those dates could not be read, so all dates are shown.": "ဒီရက်တွေကို မဖတ်နိုင်လို့ ရက်အားလုံး ပြထားတယ်။",
     "Load older messages": "အရင်စာများ ထပ်ပြမယ်", "Beginning of the conversation": "စကားဝိုင်း အစ",
     "New message": "စာအသစ်",
+    # docs/SPEC-v5.8: Sales on one screen
+    "paid orders only · by the day they were paid (Yangon time)": "ငွေချေပြီး အော်ဒါများသာ · ငွေချေတဲ့နေ့အလိုက် (ရန်ကုန်အချိန်)",
+    "Export Excel": "Excel ထုတ်မယ်", "Ks": "ကျပ်", "Average order {n} Ks": "အော်ဒါ ပျမ်းမျှ {n} ကျပ်",
+    "{p} of revenue": "ဝင်ငွေရဲ့ {p}", "perfume + vials": "ရေမွှေး + ပုလင်းငယ်",
+    "{n} items · {ml} ml poured": "ပစ္စည်း {n} ခု · {ml} ml ခွဲထည့်ပြီး",
+    "Profit may look too high:": "အမြတ် များနေသလို ထင်ရနိုင်တယ်:",
+    "{n} items have no cost yet — add bottle_cost in the price list.": "ပစ္စည်း {n} ခုမှာ ကုန်ကျစရိတ် မရှိသေး — ဈေးစာရင်းထဲ ပုလင်းဝယ်ဈေး ထည့်ပါ။",
+    "Use today's costs for {n} orders": "အော်ဒါ {n} ခုအတွက် ဒီနေ့ ကုန်ကျစရိတ် သုံးမယ်",
+    "Chart": "ဂရပ်", "Table": "ဇယား", "profit": "အမြတ်", "No paid orders in this range.": "ဒီရက်တွေမှာ ငွေချေပြီး အော်ဒါ မရှိပါ။",
+    "More than 31 days: one bar per week (Monday first).": "ရက် ၃၁ ထက်များလို့ တစ်ပတ်ကို တစ်တိုင် (တနင်္လာနေ့ စ)။",
+    "{rev} Ks · {n} sold": "{rev} ကျပ် · {n} ခု ရောင်းပြီး", "profit {n} Ks": "အမြတ် {n} ကျပ်",
+    "Per perfume · best sellers first": "ရေမွှေးအလိုက် · အရောင်းရဆုံး အရင်", "Show all {n} perfumes": "ရေမွှေး {n} မျိုးလုံး ပြမယ်",
+    "Mon": "တနင်္လာ", "Tue": "အင်္ဂါ", "Wed": "ဗုဒ္ဓဟူး", "Thu": "ကြာသပတေး", "Fri": "သောကြာ", "Sat": "စနေ", "Sun": "တနင်္ဂနွေ",
 }

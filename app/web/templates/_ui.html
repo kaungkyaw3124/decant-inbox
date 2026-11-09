@@ -46,7 +46,7 @@
 
 {# docs/SPEC-v5.7-date-filter-and-light-chat.md A: Today · Yesterday · 7 days · 30 days · All time · Pick dates…
    (shop days, Asia/Yangon). dr = app.web.dates.DateRange; chips = (key, label) pairs; shown = "Showing 12 orders". #}
-{% macro date_chips(dr, chips, shown="") -%}
+{% macro date_chips(dr, chips, shown="", line=true) -%}
 <div class="date-filter">
   <nav class="tabs date-chips" aria-label="{{ t('Dates') }}">
     {% for key, label in chips %}<a href="{{ dr.url(key) }}"{% if dr.key == key %} aria-current="page"{% endif %}>{{ t(label) }}</a>{% endfor %}
@@ -62,6 +62,6 @@
   </details>
 </div>
 {% if dr.note %}<p class="small problem-text">{{ t(dr.note) }}</p>{% endif %}
-{% if dr.active or shown %}<p class="small muted date-shown">{{ shown }}{% if dr.first %} · {{ dr.first | day }}{% if dr.last != dr.first %} – {{ dr.last | day }}{% endif %}{% endif %}
+{% if line and (dr.active or shown) %}<p class="small muted date-shown">{{ shown }}{% if dr.first %} · {{ dr.first | day }}{% if dr.last != dr.first %} – {{ dr.last | day }}{% endif %}{% endif %}
   {%- if dr.active %} · <a href="{{ dr.url(dr.default) }}">{{ t("Clear") }}</a>{% endif %}</p>{% endif %}
 {%- endmacro %}
