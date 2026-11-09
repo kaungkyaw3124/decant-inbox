@@ -2684,3 +2684,51 @@ machine.**
 3. If the orange bar shows, click "Use today's costs" — profit updates.
 4. Log in as staff: only Revenue and Orders, no cost or profit anywhere.
 5. Open a chat with a long history: it opens fast.
+
+## 2026-11-10 — v5.8.1 HOTFIX: the final summary goes out WITH the payment info (docs/SPEC-v5.8.1-hotfix-final-summary.md)
+Live case 2026-11-10 00:32 (order #1005): the customer changed the phone before paying and got only items + total +
+accounts — he never saw the phone / address he was paying for.
+What changed:
+- **One builder, one message.** cart.payment_text() (used by every route: confirm / "yes" / returning customer,
+  change by rules or by the AI, new phone / address answers, "total changed", the test code path, the dashboard
+  "Payment info" composer) now always sends: item lines + total, **ဖုန်း: {phones}** (the order's phones, max 3),
+  **လိပ်စာ: {address}**, the payment accounts, and the new footer
+  "အချက်အလက်အားလုံး မှန်ရင် ငွေလွှဲပြီး transaction id ပါတဲ့ screenshot လေး ပို့ပေးပါနော်။".
+  New editable templates payment_summary_phone / payment_summary_address (Settings → Auto-reply → reply texts);
+  payment_info_footer has the new default — an owner's own edited footer is kept (edits live in reply_templates).
+- **No "updated" line any more** in front of payment info ("လိပ်စာ ပြင်ပြီးပါပြီ – …" / "ဖုန်းနံပါတ် ပြင်ပြီးပါပြီ – …");
+  the templates stay for a change that cannot send payment info.
+- **Change while waiting for the payment** (waiting_payment, no screenshot): the whole message again with the new
+  values (was: only the "updated" line + the reminder). Nothing new = no action, so never twice for the same change;
+  payment_info_sent_at is not reset (reminder / auto-cancel timers keep counting).
+- The short reminder ("ငွေလွှဲပြီးရင် … screenshot ပို့ပေးပါနော်။") is never added after a payment-info message (it
+  ends with its own sentence; before, the old footer and the reminder were the same words).
+- "ချိန်း" (= change) is understood like "ပြောင်း" — the live customer wrote "ဖုန်းနံပါတ်ချိန်းချင်ပါတယ်", which was
+  read as a plain phone (added, not replaced) while waiting for the payment. Parser version rules-14; the change
+  words are also cleaned out of an address written in the same message ("…ချိန်းချင်ပါတယ် 0922… လိပ်စာ ပြောင်းချင်ပါတယ်
+  34 Sanchaung" → address "34 Sanchaung").
+- Tap safety check: the cart panel lets the admin correct the address before tapping; the "လိပ်စာ: …" line is left
+  out of the reply fingerprint (the docstring always said "the address may be edited").
+- Locked orders (photo_received / paid / packed / sent_out / delivered): unchanged (hold reply + Needs you).
+
+Tests: new tests/test_v581_summary.py (7: returning "yes", the live case exactly, address change + both in one
+message, change after payment info sent once, rules = AI text, missing address still asks, templates + kept custom
+footer). Changed because the spec changes the message (old expectations of the "updated" line / short reminder /
+old footer): test_v48_change_info (h1 ×2, h2, h4, h5, h7), test_v410_interruptions (matrix codes pay, pay+, pay-,
+changed, addr, phone+; j2 owner story; j3 checks the new footer), test_cart (whole flow: payment info + "phone 3"
+now gets the whole message), test_auto (last line / startswith). Simulator: new live-1110-phone-change-final-summary;
+05_changes change-address-waiting-payment now expects the address line instead of "ပြင်ပြီးပါပြီ".
+Checks: pytest 925 collected — 924 passed, 1 skipped (one run had the quick UI test's "live update within 6 s" time out
+under load; it passed alone and in the next full run — recorded here, not changed). Simulator: 219 scenarios,
+automatic 100 % (322/322), 0 wrong, 0 silent (one new AI answer recorded for the live scenario, $0.0005). UI gate
+516 views, 0 fails. Live data (read-only): the builder gives the phone + address lines and the new footer.
+Deployed: decant-web + decant-parser restarted (the parser worker sends the automatic replies).
+
+### OWNER TEST SCRIPT 5.8.1 (second Telegram account)
+1. Order "Ultra Male 10ml" (or any perfume) → the bot lists the cart and asks "ဖုန်း …၊ လိပ်စာ … ကိုပဲ ပို့ပေးရမလား။".
+2. Reply "ဖုန်းနံပါတ်ချိန်းချင်ပါတယ် 09222222222" → ONE message: item, total, "ဖုန်း: 09222222222", "လိပ်စာ: …",
+   KPay / AYA, "အချက်အလက်အားလုံး မှန်ရင် ငွေလွှဲပြီး transaction id ပါတဲ့ screenshot လေး ပို့ပေးပါနော်။" — and NO
+   "phone updated" line.
+3. Reply "လိပ်စာ ပြောင်းချင်ပါတယ် No. 34, Sample Rd, Mandalay" BEFORE paying → the full message again with the new address.
+4. Pay with the test code → the order is paid. Try to change the address now → the polite "order confirmed, we'll
+   check" message (unchanged).
