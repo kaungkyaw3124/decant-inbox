@@ -36,4 +36,22 @@ PLAN.md under "## NEXT TASK". Do it now:
 8. Finish with a short summary for the owner in simple English: what changed, how to test it, and
    anything the owner must do (e.g. a value to put in .env — never print secrets).
 Stop and ask the owner only if something needs their decision, a sudo command, a login code or a secret.
+## ONE /next DOES THE WHOLE QUEUE (owner 2026-11-09: "I type /next once and it must do every job")
+The owner must never have to type /next twice. Your turn must not end while there is still work:
+- **Never end your turn (never write a final message) while a test suite, build or other background shell is
+  running, or while a QUEUE item is still TODO.** A message like "I'll continue when the suite passes" ends the
+  turn and the work silently stops until the owner types again. That is the bug to avoid.
+- **Waiting for a long job:** start it in the background with output to a log and its PID in a file
+  (`nice -n 19 pytest ... > /tmp/suite.log 2>&1 & echo $! > /tmp/suite.pid`), then BLOCK in the foreground, in
+  a loop, until it ends: `timeout 590 tail --pid=$(cat /tmp/suite.pid) -f /dev/null; kill -0 $(cat /tmp/suite.pid)
+  2>/dev/null && echo STILL_RUNNING || echo FINISHED` — repeat while it says STILL_RUNNING (each call waits up to
+  ~10 minutes; the harness limit is 600 s). Or use the Monitor tool on the log with an until-loop. Do small
+  useful work (next part, REPORT draft) while it runs, but come back and read the result yourself.
+- When a task is DONE (REPORT.md written, PLAN.md marked DONE, pushed, deployed, web service restarted), look at
+  the QUEUE at once and start the next TODO item in the same turn. Repeat until the QUEUE has no TODO item.
+- The only reasons to stop: the QUEUE is empty; something needs the owner (a decision that cannot be undone, sudo,
+  a login code, a secret); the usage limit. In those cases write the question in REPORT.md and PLAN.md
+  "RESUME HERE" first, then stop with ONE clear sentence saying what you need.
+- Keep PLAN.md "RESUME HERE" current after every part, so if the session is interrupted a fresh /next continues
+  exactly there.
 Arguments from the owner (optional): $ARGUMENTS
