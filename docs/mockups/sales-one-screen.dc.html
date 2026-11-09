@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Sales and profit on one screen</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+<style>
+body{margin:0}
+a{color:#0A5BD8;text-decoration:none}a:hover{text-decoration:underline}
+button{font-family:inherit;cursor:pointer}
+</style>
+</helmet>
+<div style="min-height: 940px; display: flex; flex-wrap: wrap; background: #F2F2F7; color: #000; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', Inter, system-ui, sans-serif; font-size: 15px">
+
+<aside style="width: 220px; flex: none; box-sizing: border-box; padding: 24px 10px 16px; background: #FBFBFD; border-right: 1px solid #E5E5EA; display: flex; flex-direction: column; gap: 4px">
+<div style="font-size: 20px; font-weight: 700; padding: 0 10px 18px">Decant</div>
+<a href="#" style="display: flex; align-items: center; gap: 12px; padding: 9px 10px; border-radius: 10px; color: #1C1C1E"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#007AFF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.4A8 8 0 1 1 21 12z"/></svg><span style="flex: 1">Chats</span></a>
+<a href="#" style="display: flex; align-items: center; gap: 12px; padding: 9px 10px; border-radius: 10px; color: #1C1C1E"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#007AFF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 8l-9-5-9 5v8l9 5 9-5V8z"/><path d="M3 8l9 5 9-5M12 13v8"/></svg><span style="flex: 1">Orders</span><span style="font-size: 12px; font-weight: 600; background: #FF3B30; color: #fff; border-radius: 10px; padding: 1px 7px">3</span></a>
+<a href="#" style="display: flex; align-items: center; gap: 12px; padding: 9px 10px; border-radius: 10px; color: #1C1C1E"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#007AFF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="5" width="19" height="14" rx="2.5"/><path d="M2.5 10h19"/></svg><span style="flex: 1">Payments</span></a>
+<a href="#" style="display: flex; align-items: center; gap: 12px; padding: 9px 10px; border-radius: 10px; color: #1C1C1E"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#007AFF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6M16 5.5a3.2 3.2 0 0 1 0 6M18.5 14.5c1.9.8 3 2.6 3 5.5"/></svg><span style="flex: 1">Customers</span></a>
+<a href="#" style="display: flex; align-items: center; gap: 12px; padding: 9px 10px; border-radius: 10px; color: #1C1C1E"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#007AFF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3s6 6.2 6 10.5A6 6 0 0 1 6 13.5C6 9.2 12 3 12 3z"/></svg><span style="flex: 1">Products</span></a>
+<a href="#" style="display: flex; align-items: center; gap: 12px; padding: 9px 10px; border-radius: 10px; background: #007AFF; color: #fff; font-weight: 600"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 20V11M12 20V4M19 20v-6"/></svg><span style="flex: 1">Sales</span></a>
+<div style="flex: 1"></div>
+<div style="display: flex; align-items: center; justify-content: space-between; background: #fff; border-radius: 12px; padding: 10px 12px; margin-bottom: 6px"><span>Auto-reply</span><span style="width: 48px; height: 28px; border-radius: 14px; background: #34C759; display: flex; align-items: center; justify-content: flex-end; padding: 0 2px; box-sizing: border-box"><span style="width: 24px; height: 24px; border-radius: 12px; background: #fff"></span></span></div>
+<a href="#" style="display: flex; align-items: center; gap: 12px; padding: 9px 10px; border-radius: 10px; color: #1C1C1E"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#007AFF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></svg><span style="flex: 1">Settings</span></a>
+</aside>
+
+<main style="flex: 999 1 560px; min-width: 0; box-sizing: border-box; padding: 24px 40px 28px">
+<div style="max-width: 1440px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px">
+
+<div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px">
+<div style="display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 14px">
+<h1 style="margin: 0; font-size: 30px; line-height: 1.15; font-weight: 700; letter-spacing: -0.5px">Sales &amp; profit</h1>
+<span style="color: #6C6C70; font-size: 14px">3 – 9 Nov 2026 · paid orders only · by the day they were paid (Yangon time)</span>
+</div>
+<div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center">
+<div style="display: flex; background: #E3E3E8; border-radius: 10px; padding: 2px">
+<button style="border: 0; background: transparent; padding: 8px 12px; font-size: 14px; color: #3C3C43">Today</button>
+<button style="border: 0; background: transparent; padding: 8px 12px; font-size: 14px; color: #3C3C43">Yesterday</button>
+<button style="border: 0; background: #fff; border-radius: 8px; padding: 8px 12px; font-size: 14px; font-weight: 600; box-shadow: 0 1px 2px rgba(0,0,0,.12)">7 days</button>
+<button style="border: 0; background: transparent; padding: 8px 12px; font-size: 14px; color: #3C3C43">30 days</button>
+<button style="border: 0; background: transparent; padding: 8px 12px; font-size: 14px; color: #3C3C43">This month</button>
+</div>
+<button style="height: 38px; border: 1px solid #D1D1D6; border-radius: 10px; background: #fff; color: #0A5BD8; font-size: 14px; font-weight: 600; padding: 0 14px">Pick dates…</button>
+<button style="height: 38px; border: 1px solid #D1D1D6; border-radius: 10px; background: #fff; color: #1C1C1E; font-size: 14px; font-weight: 600; padding: 0 14px">Export Excel</button>
+</div>
+</div>
+
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px">
+<div style="background: #fff; border: 1px solid #E5E5EA; border-radius: 14px; padding: 14px 16px; border-top: 3px solid #007AFF"><div style="font-size: 13px; color: #6C6C70">Revenue</div><div style="font-size: 28px; font-weight: 700; margin-top: 2px">1,446,000 <span style="font-size: 14px; font-weight: 500; color: #6C6C70">Ks</span></div><div style="font-size: 13px; color: #6C6C70; margin-top: 2px">Average order 46,645 Ks</div></div>
+<div style="background: #fff; border: 1px solid #E5E5EA; border-radius: 14px; padding: 14px 16px; border-top: 3px solid #34C759"><div style="font-size: 13px; color: #6C6C70">Profit</div><div style="font-size: 28px; font-weight: 700; margin-top: 2px">525,000 <span style="font-size: 14px; font-weight: 500; color: #6C6C70">Ks</span></div><div style="font-size: 13px; color: #1F7A3A; font-weight: 600; margin-top: 2px">36.3% of revenue</div></div>
+<div style="background: #fff; border: 1px solid #E5E5EA; border-radius: 14px; padding: 14px 16px"><div style="font-size: 13px; color: #6C6C70">Cost</div><div style="font-size: 28px; font-weight: 700; margin-top: 2px">921,000 <span style="font-size: 14px; font-weight: 500; color: #6C6C70">Ks</span></div><div style="font-size: 13px; color: #6C6C70; margin-top: 2px">perfume + vials</div></div>
+<div style="background: #fff; border: 1px solid #E5E5EA; border-radius: 14px; padding: 14px 16px"><div style="font-size: 13px; color: #6C6C70">Orders</div><div style="font-size: 28px; font-weight: 700; margin-top: 2px">31</div><div style="font-size: 13px; color: #6C6C70; margin-top: 2px">38 items · 199 ml poured</div></div>
+</div>
+
+<div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; background: #FFF4E5; border: 1px solid #FFE1B8; border-radius: 12px; padding: 9px 14px; color: #8A4B00; font-size: 14px"><span><strong>Profit may look too high:</strong> 3 items have no cost yet.</span><a href="#" style="font-weight: 600; color: #8A4B00; text-decoration: underline">Use today's costs for 3 orders</a></div>
+
+<div style="display: flex; flex-wrap: wrap; gap: 14px; align-items: stretch">
+
+<section style="flex: 3 1 560px; min-width: 0; background: #fff; border: 1px solid #E5E5EA; border-radius: 16px; padding: 16px 18px; display: flex; flex-direction: column; gap: 10px">
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap">
+<h2 style="margin: 0; font-size: 16px; font-weight: 600">Per day</h2>
+<div style="display: flex; align-items: center; gap: 14px">
+<span style="font-size: 12px; color: #3C3C43; display: inline-flex; align-items: center; gap: 5px"><span style="width: 10px; height: 10px; border-radius: 3px; background: #007AFF; display: inline-block"></span>Revenue</span>
+<span style="font-size: 12px; color: #3C3C43; display: inline-flex; align-items: center; gap: 5px"><span style="width: 10px; height: 10px; border-radius: 3px; background: #34C759; display: inline-block"></span>Profit</span>
+<div style="display: flex; background: #E3E3E8; border-radius: 9px; padding: 2px">
+<button onClick="{{showChart}}" style="border: 0; border-radius: 7px; padding: 5px 12px; font-size: 13px; background: {{chartBg}}; font-weight: {{chartFw}}; color: #1C1C1E">Chart</button>
+<button onClick="{{showTable}}" style="border: 0; border-radius: 7px; padding: 5px 12px; font-size: 13px; background: {{tableBg}}; font-weight: {{tableFw}}; color: #1C1C1E">Table</button>
+</div>
+</div>
+</div>
+
+<sc-if value="{{isChart}}" hint-placeholder-val="{{ true }}">
+<div style="display: flex; align-items: flex-end; gap: 10px; height: 210px; padding-top: 6px; border-bottom: 1px solid #E5E5EA">
+<sc-for list="{{days}}" as="d" hint-placeholder-count="7">
+<div style="flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%">
+<div style="font-size: 12px; color: #3C3C43; font-weight: 600; margin-bottom: 4px">{{d.revK}}</div>
+<div style="display: flex; align-items: flex-end; gap: 3px; width: 100%; justify-content: center">
+<div style="width: 38%; max-width: 34px; border-radius: 5px 5px 0 0; background: #007AFF; height: {{d.revH}}px"></div>
+<div style="width: 38%; max-width: 34px; border-radius: 5px 5px 0 0; background: #34C759; height: {{d.profH}}px"></div>
+</div>
+</div>
+</sc-for>
+</div>
+<div style="display: flex; gap: 10px">
+<sc-for list="{{days}}" as="d" hint-placeholder-count="7">
+<div style="flex: 1; min-width: 0; text-align: center; font-size: 12px; color: #3C3C43"><div style="font-weight: 600">{{d.dow}}</div><div style="color: #6C6C70">{{d.date}}</div></div>
+</sc-for>
+</div>
+</sc-if>
+
+<sc-if value="{{isTable}}" hint-placeholder-val="{{ false }}">
+<div style="overflow-x: auto">
+<div style="min-width: 520px; font-size: 14px">
+<div style="display: flex; gap: 8px; padding: 8px 0; font-size: 12px; font-weight: 600; letter-spacing: .4px; text-transform: uppercase; color: #6C6C70; border-bottom: 1px solid #E5E5EA"><div style="flex: 1.4">Day</div><div style="flex: 0.7; text-align: right">Orders</div><div style="flex: 0.6; text-align: right">Qty</div><div style="flex: 0.6; text-align: right">ml</div><div style="flex: 1.2; text-align: right">Revenue</div><div style="flex: 1.2; text-align: right">Cost</div><div style="flex: 1.2; text-align: right">Profit</div></div>
+<sc-for list="{{days}}" as="d" hint-placeholder-count="7">
+<div style="display: flex; gap: 8px; padding: 7px 0; border-bottom: 1px solid #F0F0F3"><div style="flex: 1.4">{{d.dow}} {{d.date}}</div><div style="flex: 0.7; text-align: right">{{d.orders}}</div><div style="flex: 0.6; text-align: right">{{d.qty}}</div><div style="flex: 0.6; text-align: right">{{d.ml}}</div><div style="flex: 1.2; text-align: right">{{d.rev}}</div><div style="flex: 1.2; text-align: right">{{d.cost}}</div><div style="flex: 1.2; text-align: right; font-weight: 600; color: #1F7A3A">{{d.prof}}</div></div>
+</sc-for>
+<div style="display: flex; gap: 8px; padding: 8px 0; font-weight: 700"><div style="flex: 1.4">Total</div><div style="flex: 0.7; text-align: right">31</div><div style="flex: 0.6; text-align: right">38</div><div style="flex: 0.6; text-align: right">199</div><div style="flex: 1.2; text-align: right">1,446,000</div><div style="flex: 1.2; text-align: right">921,000</div><div style="flex: 1.2; text-align: right; color: #1F7A3A">525,000</div></div>
+</div>
+</div>
+</sc-if>
+</section>
+
+<section style="flex: 2 1 340px; min-width: 0; background: #fff; border: 1px solid #E5E5EA; border-radius: 16px; padding: 16px 18px; display: flex; flex-direction: column; gap: 12px">
+<h2 style="margin: 0; font-size: 16px; font-weight: 600">Per size</h2>
+<sc-for list="{{sizes}}" as="s" hint-placeholder-count="4">
+<div>
+<div style="display: flex; justify-content: space-between; align-items: baseline; font-size: 14px"><span style="font-weight: 600">{{s.label}}</span><span style="color: #3C3C43">{{s.rev}} Ks · {{s.qty}} sold</span></div>
+<div style="margin-top: 6px; height: 8px; border-radius: 4px; background: #EDEDF0"><div style="height: 8px; border-radius: 4px; background: #007AFF; width: {{s.pct}}"></div></div>
+<div style="margin-top: 3px; font-size: 12px; color: #6C6C70">profit {{s.prof}} Ks</div>
+</div>
+</sc-for>
+</section>
+</div>
+
+<section style="background: #fff; border: 1px solid #E5E5EA; border-radius: 16px; padding: 16px 18px; display: flex; flex-direction: column; gap: 6px; overflow-x: auto">
+<div style="display: flex; align-items: center; justify-content: space-between"><h2 style="margin: 0; font-size: 16px; font-weight: 600">Per perfume · best sellers first</h2>
+<button onClick="{{toggleAll}}" style="border: 0; background: transparent; color: #0A5BD8; font-size: 14px; font-weight: 600">{{allLabel}}</button></div>
+<div style="min-width: 760px; font-size: 14px">
+<div style="display: flex; gap: 12px; padding: 8px 0; font-size: 12px; font-weight: 600; letter-spacing: .4px; text-transform: uppercase; color: #6C6C70; border-bottom: 1px solid #E5E5EA"><div style="flex: 2.2">Perfume</div><div style="flex: 0.6; text-align: right">Orders</div><div style="flex: 0.5; text-align: right">Qty</div><div style="flex: 0.5; text-align: right">ml</div><div style="flex: 2; text-align: right">Revenue</div><div style="flex: 1; text-align: right">Cost</div><div style="flex: 1; text-align: right">Profit</div></div>
+<sc-for list="{{perfumes}}" as="p" hint-placeholder-count="7">
+<div style="display: flex; align-items: center; gap: 12px; padding: 7px 0; border-bottom: 1px solid #F0F0F3"><div style="flex: 2.2; font-weight: 600">{{p.name}}</div><div style="flex: 0.6; text-align: right">{{p.orders}}</div><div style="flex: 0.5; text-align: right">{{p.qty}}</div><div style="flex: 0.5; text-align: right">{{p.ml}}</div>
+<div style="flex: 2; display: flex; align-items: center; justify-content: flex-end; gap: 10px"><div style="flex: 1; height: 6px; border-radius: 3px; background: #EDEDF0; max-width: 140px"><div style="height: 6px; border-radius: 3px; background: #007AFF; width: {{p.pct}}"></div></div><span style="min-width: 76px; text-align: right">{{p.rev}}</span></div>
+<div style="flex: 1; text-align: right; color: #3C3C43">{{p.cost}}</div><div style="flex: 1; text-align: right; font-weight: 600; color: #1F7A3A">{{p.prof}}</div></div>
+</sc-for>
+</div>
+</section>
+
+</div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":940}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const st = this.state || {};
+    const view = st.view || 'chart';
+    const all = !!st.all;
+    const fmt = (n) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    const dayDef = [
+      ['Tue', '3 Nov', 4, 5, 24, 182000, 66000],
+      ['Wed', '4 Nov', 6, 7, 37, 245000, 89000],
+      ['Thu', '5 Nov', 2, 3, 13, 96000, 34000],
+      ['Fri', '6 Nov', 7, 8, 44, 310000, 113000],
+      ['Sat', '7 Nov', 3, 4, 18, 128000, 47000],
+      ['Sun', '8 Nov', 6, 7, 37, 274000, 99000],
+      ['Mon', '9 Nov', 3, 4, 26, 211000, 77000]
+    ];
+    const peak = 310000;
+    const days = dayDef.map((d) => ({
+      dow: d[0], date: d[1], orders: d[2], qty: d[3], ml: d[4],
+      rev: fmt(d[5]), cost: fmt(d[5] - d[6]), prof: fmt(d[6]),
+      revK: Math.round(d[5] / 1000) + 'k',
+      revH: Math.max(2, Math.round(d[5] / peak * 150)),
+      profH: Math.max(2, Math.round(d[6] / peak * 150))
+    }));
+    const sizeDef = [['2 ml', 120000, 12, 41000], ['5 ml', 410000, 13, 150000], ['10 ml', 560000, 11, 205000], ['Full bottle', 356000, 2, 129000]];
+    const sizes = sizeDef.map((s) => ({ label: s[0], rev: fmt(s[1]), qty: s[2], prof: fmt(s[3]), pct: Math.round(s[1] / 560000 * 100) + '%' }));
+    const pDef = [
+      ['Stronger With You Intensely', 9, 11, 54, 412000, 156000],
+      ['Bleu de Chanel Eau de Parfum', 6, 8, 42, 318000, 121000],
+      ['Aventus', 3, 4, 28, 275000, 88000],
+      ['Sauvage Eau de Parfum', 5, 6, 32, 190000, 70000],
+      ['Good Girl', 4, 4, 22, 126000, 44000],
+      ['Miss Dior', 2, 2, 11, 75000, 26000],
+      ['Hawas Ice', 2, 2, 5, 28000, 13000],
+      ['Acqua di Gio Profumo', 1, 1, 3, 14000, 5000],
+      ['Stronger With You', 1, 1, 2, 8000, 2000]
+    ];
+    const shown = all ? pDef : pDef.slice(0, 6);
+    const perfumes = shown.map((p) => ({
+      name: p[0], orders: p[1], qty: p[2], ml: p[3], rev: fmt(p[4]), cost: fmt(p[4] - p[5]), prof: fmt(p[5]),
+      pct: Math.round(p[4] / 412000 * 100) + '%'
+    }));
+    return {
+      days: days, sizes: sizes, perfumes: perfumes,
+      isChart: view === 'chart', isTable: view === 'table',
+      chartBg: view === 'chart' ? '#fff' : 'transparent', chartFw: view === 'chart' ? 600 : 400,
+      tableBg: view === 'table' ? '#fff' : 'transparent', tableFw: view === 'table' ? 600 : 400,
+      showChart: () => this.setState({ view: 'chart' }),
+      showTable: () => this.setState({ view: 'table' }),
+      allLabel: all ? 'Show top 6 only' : 'Show all 9 perfumes',
+      toggleAll: () => this.setState({ all: !all })
+    };
+  }
+}
+</script>
+</body>
+</html>
