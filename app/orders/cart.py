@@ -405,14 +405,18 @@ def closing_line(session: Session, order: Order, texts: dict[str, str]) -> str:
 
 
 def payment_text(session: Session, order: Order, texts: dict[str, str], changed: bool = False) -> str:
-    """changed: the order changed after payment info was sent (docs/SPEC-v4.10-interruptions.md):
-    "စုစုပေါင်း အသစ် … ကျပ်ပါ။" instead of the normal total line."""
+    """The ONE payment-info message every route sends (docs/SPEC-v5.8.1): items, total, the order's phones (max 3)
+    and address, the payment accounts, "if everything is correct, send the screenshot". changed: the order changed
+    after payment info was sent (docs/SPEC-v4.10-interruptions.md): "စုစုပေါင်း အသစ် … ကျပ်ပါ။" as the total line."""
     cart = view(session, order)
     methods = session.scalars(select(PaymentMethod).where(PaymentMethod.active)
                               .order_by(PaymentMethod.sort_order, PaymentMethod.id)).all()
+    phones, where = (order.phones or [])[:MAX_PHONES], order_address(order)
     return "\n".join(
         item_lines(session, order, texts)
         + [render(texts["cart_total_changed" if changed else "payment_total"], total=format_mmk(cart.total))]
+        + ([render(texts["payment_summary_phone"], phones=", ".join(phones))] if phones else [])
+        + ([render(texts["payment_summary_address"], address=where)] if where else [])
         + [render(texts["payment_method_line"], name=m.name, account_number=m.account_number,
                   account_name=m.account_name) for m in methods]
         + [texts["payment_info_footer"]])

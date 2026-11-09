@@ -1000,4 +1000,7 @@ MY = {
     "{rev} Ks · {n} sold": "{rev} ကျပ် · {n} ခု ရောင်းပြီး", "profit {n} Ks": "အမြတ် {n} ကျပ်",
     "Per perfume · best sellers first": "ရေမွှေးအလိုက် · အရောင်းရဆုံး အရင်", "Show all {n} perfumes": "ရေမွှေး {n} မျိုးလုံး ပြမယ်",
     "Mon": "တနင်္လာ", "Tue": "အင်္ဂါ", "Wed": "ဗုဒ္ဓဟူး", "Thu": "ကြာသပတေး", "Fri": "သောကြာ", "Sat": "စနေ", "Sun": "တနင်္ဂနွေ",
+    # docs/SPEC-v5.8.1: the final summary lines in the payment info
+    "Payment info: phone line (all phones of the order)": "ငွေလွှဲအချက်အလက်: ဖုန်းစာကြောင်း (အော်ဒါရဲ့ ဖုန်းအားလုံး)",
+    "Payment info: address line": "ငွေလွှဲအချက်အလက်: လိပ်စာစာကြောင်း",
 }

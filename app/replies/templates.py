@@ -86,8 +86,13 @@ TEMPLATES: tuple[TemplateDef, ...] = (
     TemplateDef("payment_method_line", "Payment info: one line per payment method",
                 "{name} – {account_number} ({account_name})",
                 {"name": "KPay", "account_number": "09 123 456 789", "account_name": "Daw Example"}),
+    # docs/SPEC-v5.8.1: payment info always shows the final phone + address, so the customer checks them before paying
+    TemplateDef("payment_summary_phone", "Payment info: phone line (all phones of the order)", "ဖုန်း: {phones}",
+                {"phones": "09222222222"}),
+    TemplateDef("payment_summary_address", "Payment info: address line", "လိပ်စာ: {address}",
+                {"address": "No. 12, Example St"}),
     TemplateDef("payment_info_footer", "Payment info: last line",
-                "ငွေလွှဲပြီးရင် transaction id ပါတဲ့ screenshot ပို့ပေးပါနော်။", {}),
+                "အချက်အလက်အားလုံး မှန်ရင် ငွေလွှဲပြီး transaction id ပါတဲ့ screenshot လေး ပို့ပေးပါနော်။", {}),
     # docs/SPEC-v4.10-interruptions.md: interruptions while we wait for something; locked paid orders
     TemplateDef("resume_payment", "Resume line while waiting for the payment (added after other answers)",
                 "ငွေလွှဲပြီးရင် transaction id ပါတဲ့ screenshot ပို့ပေးပါနော်။", {}),

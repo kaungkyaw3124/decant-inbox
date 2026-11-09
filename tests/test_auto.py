@@ -9,7 +9,7 @@ from sqlalchemy import text
 from app.core.db import SessionLocal
 from app.orders import auto
 from app.parser.worker import run_batch
-from tests.test_cart import deliver, shop  # noqa: F401  (fixture)
+from tests.test_cart import FOOTER, deliver, shop  # noqa: F401  (fixture)
 from tests.test_messaging import add, customer_id, scalar
 from tests.test_web import client, log_in  # noqa: F401  (fixture)
 
@@ -98,7 +98,7 @@ def test_whole_order_flow_automatic(shop, db):
     assert [s.splitlines()[-1] for s in sent] == [
         "ဝယ်ယူမယ်ဆိုရင် ဖုန်းနံပါတ် ပို့ပေးပါနော်။",
         "ဖုန်းနံပါတ် 09777123456 ရပါပြီ။ ပို့ပေးရမယ့် လိပ်စာ ပို့ပေးပါနော်။",
-        "ငွေလွှဲပြီးရင် transaction id ပါတဲ့ screenshot ပို့ပေးပါနော်။",
+        FOOTER,  # docs/SPEC-v5.8.1: the payment info's last line
     ]
     with db.connect() as c:
         assert c.execute(text("SELECT status, address, phones FROM orders")).one() == \
@@ -242,7 +242,7 @@ def test_step_4d_more_items_returning_customer_and_speed(shop, db):
     assert deliver(db) == ["ဆက်သွယ်ရန် ဖုန်းနံပါတ် ပို့ပေးပါနော်။"]
     say(6, "09 777 123 456")
     auto.run_once()
-    assert deliver(db)[0].endswith("ငွေလွှဲပြီးရင် transaction id ပါတဲ့ screenshot ပို့ပေးပါနော်။")
+    assert deliver(db)[0].endswith(FOOTER)
 
     # the same customer orders again: list asks to confirm the saved phone & address
     client.post(f"/chats/{customer_id(db, '91')}/cart/cancel", data={"csrf": token})
@@ -251,7 +251,8 @@ def test_step_4d_more_items_returning_customer_and_speed(shop, db):
     assert deliver(db)[0].endswith("ဖုန်း 09777123456၊ လိပ်စာ အမှတ် 5, စမ်းချောင်း ကိုပဲ ပို့ပေးရမလား။")
     say(8, "ဟုတ်ကဲ့")
     auto.run_once()
-    assert deliver(db)[0].startswith("• Sauvage Eau de Parfum 5ml – 20,000 ကျပ်\nစုစုပေါင်း 20,000 ကျပ်ပါ။\nKPay")
+    sent = deliver(db)[0]  # docs/SPEC-v5.8.1: phone + address lines between the total and the accounts
+    assert sent.startswith("• Sauvage Eau de Parfum 5ml – 20,000 ကျပ်\nစုစုပေါင်း 20,000 ကျပ်ပါ။\nဖုန်း: ") and "\nKPay" in sent
 
     # speed settings
     assert 'name="quiet_s" type="number" step="0.1" min="0" max="30" value="0.7"' in client.get("/settings").text

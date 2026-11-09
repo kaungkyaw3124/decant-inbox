@@ -41,7 +41,7 @@ from dataclasses import dataclass, field, replace
 
 from rapidfuzz import fuzz
 
-PARSER_VERSION = "rules-13"
+PARSER_VERSION = "rules-14"  # docs/SPEC-v5.8.1: ချိန်း = change
 NEEDS_REVIEW_BELOW = 0.6  # dashboard shows results under this as "needs review"
 FUZZY_THRESHOLD = 88      # rapidfuzz partial_ratio, 0-100
 FUZZY_MIN_ALIAS_LEN = 5   # shorter aliases match too much by accident
@@ -96,14 +96,15 @@ PRODUCT_INTENTS = ("buy", "ask_price", "ask_stock", "remove")
 ORDER_START_RE = _rx("မှာချင်", "ဝယ်ချင်လို့", r"order\s*တင်(?:ချင်|မယ်)", r"အော်ဒါ\s*တင်(?:ချင်|မယ်)", "မှာလို့ရ",
                      _w(r"(?:i\s+)?want\s+to\s+order"), _w(r"can\s+i\s+order"), _w(r"i(?:'d|\s+would)\s+like\s+to\s+order"))
 # Changing the delivery address / phone (docs/SPEC-v4.8-change-info.md). Checked before "address".
-CHANGE_ADDRESS_RE = _rx(r"လိပ်စာ\s*(?:ကို\s*)?ပြောင်း", r"လိပ်စာ\s*အသစ်", r"လိပ်စာ\s*မှား", r"တခြား\s*လိပ်စာ",
+# ချိန်း = ပြောင်း (change): the 2026-11-10 live case wrote "ဖုန်းနံပါတ်ချိန်းချင်ပါတယ်" (docs/SPEC-v5.8.1).
+CHANGE_ADDRESS_RE = _rx(r"လိပ်စာ\s*(?:ကို\s*)?(?:ပြောင်း|ချိန်း)", r"လိပ်စာ\s*အသစ်", r"လိပ်စာ\s*မှား", r"တခြား\s*လိပ်စာ",
                         r"ဒီ\s*လိပ်စာ\s*(?:မ\s*)?(?:ဟုတ်ဘူး|မဟုတ်)", _w(r"(?:change|new|wrong|different)\s+(?:the\s+|my\s+)?address"),
                         _w(r"address\s+change"))
-CHANGE_PHONE_RE = _rx(r"ဖုန်း\s*(?:နံပါတ်\s*)?(?:ကို\s*)?ပြောင်း", r"ဖုန်း\s*(?:နံပါတ်\s*)?အသစ်", r"ဖုန်း\s*(?:နံပါတ်\s*)?မှား",
+CHANGE_PHONE_RE = _rx(r"ဖုန်း\s*(?:နံပါတ်\s*)?(?:ကို\s*)?(?:ပြောင်း|ချိန်း)", r"ဖုန်း\s*(?:နံပါတ်\s*)?အသစ်", r"ဖုန်း\s*(?:နံပါတ်\s*)?မှား",
                       r"တခြား\s*ဖုန်း", _w(r"(?:change|new|wrong|different)\s+(?:the\s+|my\s+)?(?:phone|number|ph)"))
-CHANGE_BOTH_RE = _rx(r"(?:လိပ်စာ|ဖုန်း(?:နံပါတ်)?)\s*(?:နဲ့|နှင့်|ရော|ကော)\s*(?:လိပ်စာ|ဖုန်း(?:နံပါတ်)?)\s*(?:ရော|ကော|ပါ)?\s*ပြောင်း",
+CHANGE_BOTH_RE = _rx(r"(?:လိပ်စာ|ဖုန်း(?:နံပါတ်)?)\s*(?:နဲ့|နှင့်|ရော|ကော)\s*(?:လိပ်စာ|ဖုန်း(?:နံပါတ်)?)\s*(?:ရော|ကော|ပါ)?\s*(?:ပြောင်း|ချိန်း)",
                      _w(r"(?:change|new)\s+(?:address\s+and\s+phone|phone\s+and\s+address)"))
-CHANGE_ANY_RE = _rx(r"^\s*ပြောင်း(?:မယ်|ချင်)")  # "I'll change it" (what is not said: unclear)
+CHANGE_ANY_RE = _rx(r"^\s*(?:ပြောင်း|ချိန်း)(?:မယ်|ချင်)")  # "I'll change it" (what is not said: unclear)
 # "I paid" without a screenshot (docs/SPEC-v4.10-interruptions.md); "လွှဲပြီးရင်" (= when you have paid) is not
 PAYMENT_SENT_RE = _rx(r"လွှဲ(?:\s*လိုက်)?\s*(?:ပြီး\s*(?:ပါ\s*)?ပြီ|(?:ပါ\s*)?ပြီ(?!း))", r"ငွေ\s*ပို့(?:\s*လိုက်)?\s*ပြီ(?:\s*ပါ)?",
                       r"ပေးချေ(?:\s*လိုက်)?\s*ပြီ", _w(r"(?:i\s+)?(?:have\s+)?(?:paid|transferred)"), _w(r"money\s+sent"),
@@ -228,7 +229,7 @@ def replace_words(text: str) -> bool:
 # What is left of an address once these are removed must still say WHERE (rules-7).
 _ADDRESS_KEYWORDS_RE = _rx(
     r"ဒီ\s*လိပ်စာ\s*(?:ကို|ကိုပဲ)?", r"လိပ်စာ\s*(?:အသစ်)?\s*(?:က|ကို|ပါ)?", r"(?:ကို\s*)?ပို့\s*(?:ပေး)?\s*(?:ပါ|မယ်)?",
-    r"ဒီ\s*ကို", r"ပြောင်း(?:ချင်|မယ်)?(?:ပါ)?(?:တယ်)?", r"မှားနေ(?:တယ်)?", r"အသစ်",
+    r"ဒီ\s*ကို", r"(?:ပြောင်း|ချိန်း)(?:ချင်|မယ်)?(?:ပါ)?(?:တယ်)?", r"မှားနေ(?:တယ်)?", r"အသစ်",
     _w(r"(?:this|new|my|the|change|wrong)?\s*address"), _w("send"), _w("to"), _w("here"), _w("pls"), _w("please"),
     r"နော်", r"ရှင့်", r"ရှင်", r"ခင်ဗျာ", r"ခင်ဗျ", r"ဗျ", r"ပါ", r"တယ်", r"လေး", r"ဖုန်း(?:နံပါတ်)?", _w("phone"))
 _ADDRESS_CONTENT_RE = _rx(r"\d", r"\S{2,}လမ်း", r"ရပ်ကွက်", r"မြို့နယ်", r"အိမ်", r"တိုက်", r"ကွက်", r"ဈေး", r"ဘုရား",

@@ -16,7 +16,7 @@ from app.learning import patterns
 from app.orders import auto, cart
 from app.parser.worker import run_batch
 from scripts.ai_auto_now import switch
-from tests.test_cart import PAYMENT_FOOTER, deliver, shop  # noqa: F401  (fixture)
+from tests.test_cart import PAYMENT_FOOTER, deliver, shop, summary  # noqa: F401  (fixture)
 from tests.test_messaging import add, customer_id, scalar
 from tests.test_payments import photo, waiting_for_payment
 from tests.test_prices import run_import, xlsx
@@ -163,7 +163,8 @@ def test_m2_waiting_for_payment_sends_payment_info_with_the_new_total(auto_ai, s
     now_msg(db, "stw intensely မယူတော့ဘူး sauvage edp 10ml ယူမယ်")
     [reply] = deliver(db)
     assert reply == ("Stronger With You Intensely ကို ဖြုတ်လိုက်ပါပြီ။\n• Sauvage Eau de Parfum 10ml – 38,000 ကျပ်\n"
-                     f"စုစုပေါင်း အသစ် 38,000 ကျပ်ပါ။\n{PAYMENT_FOOTER}")
+                     f"စုစုပေါင်း အသစ် 38,000 ကျပ်ပါ။\n{summary('09777123456, 09444555666', 'No. 12, Bahan')}"
+                     f"{PAYMENT_FOOTER}")  # docs/SPEC-v5.8.1: phone + address in the payment info
     assert scalar(db, "SELECT status || ' ' || total_mmk FROM orders") == "waiting_payment 38000"
 
 

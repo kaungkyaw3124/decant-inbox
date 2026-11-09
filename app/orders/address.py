@@ -186,6 +186,8 @@ _ASK_WORDS = re.compile(r"(?:(?:ဒီ\s*)?ကို\s*)?ပို့\s*(?:ပ�
 # "ဖုန်းနံပါတ်က", "ဖုန်း:", "ph:", "phone -", "tel" (the number itself is removed before)
 _PHONE_LEAD = re.compile(r"(?:ဖုန်းနံပါတ်|ဖုန်း)\s*(?:ကတော့|က)?\s*[:：\-–]?|(?<![a-z])(?:phone|ph|tel)(?:\s*no)?\.?\s*"
                          r"[:：\-–]?(?![a-z])", re.IGNORECASE)
+# "ဖုန်းနံပါတ်ချိန်းချင်ပါတယ်", "လိပ်စာ ပြောင်းချင်ပါတယ်": the wish to change, not part of the address (docs/SPEC-v5.8.1)
+_CHANGE_WORDS = re.compile(r"(?:(?:ဖုန်းနံပါတ်|ဖုန်း|လိပ်စာ)\s*(?:ကို\s*)?)?(?:ပြောင်း|ချိန်း)\s*(?:ချင်|မယ်)?\s*(?:ပါ)?\s*(?:တယ်)?")
 _TRAILING_PARTICLES = re.compile(r"(?:\s*" + _PARTICLES + r"|\s+က)\s*[။.!]*\s*$")
 
 
@@ -195,7 +197,7 @@ def clean(text: str) -> str:
     from app.orders import cart  # late import: cart imports this module
 
     text = strip_phones(to_unicode(text or "")).replace("[PHONE]", " ").replace("[NUMBER]", " ")
-    text = _ASK_WORDS.sub(" ", _PHONE_LEAD.sub(" ", text))
+    text = _ASK_WORDS.sub(" ", _PHONE_LEAD.sub(" ", _CHANGE_WORDS.sub(" ", text)))
     text = re.sub(r"[ \t]+", " ", text)
     text = re.sub(r"\s*\n\s*", ", ", text)
     text = re.sub(r"\s*([,၊])\s*", r"\1 ", text)  # "no(121) ,73" -> "no(121), 73"

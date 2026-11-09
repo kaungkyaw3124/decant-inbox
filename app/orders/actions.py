@@ -105,8 +105,12 @@ class Suggestion:
         return "\n\n".join(t for t in (self.text, self.note) if t)
 
 
-def fingerprint(kind: str, text: str | None) -> str:
-    """What the admin approves: the action and the exact reply (the address may be edited)."""
+def fingerprint(kind: str, text: str | None, texts: dict[str, str] | None = None) -> str:
+    """What the admin approves: the action and the exact reply (the address may be edited: since docs/SPEC-v5.8.1 the
+    payment info shows it, so its "လိပ်စာ: …" line is left out of the comparison)."""
+    prefix = (texts or {}).get("payment_summary_address", "").split("{address}")[0]
+    if text and prefix.strip():
+        text = "\n".join(line for line in text.split("\n") if not line.startswith(prefix))
     return hashlib.sha256(json.dumps([kind, text]).encode()).hexdigest()[:16]
 
 
@@ -814,15 +818,15 @@ def _contact(session: Session, message: Message, customer: Customer, order: Orde
         else:
             text, reply_kind, suffix = _ask_next(session, order, texts)
             label += suffix
-        if updated:  # "လိပ်စာ ပြင်ပြီးပါပြီ – …" first, then payment info / the next question
-            text, reply_kind = "\n".join(updated + ([text] if text else [])), reply_kind or "contact"
-            label += " + confirm the change" if reply_kind == "contact" else ""
-    elif order.status == "waiting_payment":  # payment info already sent: not again (amount unchanged)
-        if updated:
+        if updated and not text:  # nothing else to say (e.g. a problem blocks payment info): confirm the change
             text, reply_kind, label = "\n".join(updated), "contact", label + " + confirm the change"
-        elif added:
-            text, reply_kind = render(texts["phone_added"], phone=", ".join(added)), "contact"
-            label += " + reply"
+        # docs/SPEC-v5.8.1: no "updated" line before payment info: the message itself shows the new phone / address
+    elif order.status == "waiting_payment" and not cart.payment_problems(session, order):
+        # docs/SPEC-v5.8.1 (replaces 4.8 "only the confirmation line"): the whole message again with the new values
+        text, reply_kind, label = cart.payment_text(session, order, texts), "payment_info", label + " + 💳 payment info again"
+        # (payment_info_sent_at stays: the reminder / auto-cancel timers keep counting from the first payment info)
+    elif order.status == "waiting_payment" and updated:
+        text, reply_kind, label = "\n".join(updated), "contact", label + " + confirm the change"
     elif order.status in change.AFTER_PAYMENT and updated:
         text, reply_kind, label = "\n".join(updated), "contact", label + " + confirm the change"
     if (new_address and old_address and new_address != old_address) or (replace_phone and phones_new_on_order):
@@ -949,7 +953,7 @@ def suggest(session: Session, message: Message, result: ParseResult | None, text
         outcome.note = ("📘 learned (waiting approval): " + ", ".join(describe(p, session) for p in waiting)
                         + ". " + outcome.note).strip()
     return Suggestion(outcome.kind, outcome.label, outcome.text, outcome.note,
-                      fingerprint(outcome.kind, outcome.text), _edit_url(message, outcome), outcome.address,
+                      fingerprint(outcome.kind, outcome.text, texts), _edit_url(message, outcome), outcome.address,
                       bool(waiting))
 
 
@@ -979,7 +983,7 @@ def perform(session: Session, message: Message, expect: str, user: User | None, 
         _with_greeting(session, outcome, message.customer_id, texts, decided_at or now)
         outcome.text, resumed = steps.with_resume(session, outcome.kind, outcome.text, message.customer_id, texts,
                                                   decided_at or now)
-    if outcome is None or fingerprint(outcome.kind, outcome.text) != expect:
+    if outcome is None or fingerprint(outcome.kind, outcome.text, texts) != expect:
         raise Refused("Not sent: the reply changed (price, cart or parse). Check and try again.")
     review = session.scalar(select(MessageReview).where(MessageReview.message_id == message.id))
     outcome.undo["review"] = review.status if review else "new"

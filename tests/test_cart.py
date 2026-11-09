@@ -20,7 +20,13 @@ from tests.test_web import client, log_in  # noqa: F401  (fixture)
 SAUVAGE = ["Dior", "Sauvage Eau de Parfum", 100, 420000, None, 20000, 38000, "yes"]
 Y_SOLD_OUT = ["Yves Saint Laurent", "Y Eau de Parfum", 100, 380000, 8000, 18000, 34000, "no"]
 START = datetime.now(UTC) - timedelta(hours=1)
-PAYMENT_FOOTER = "KPay – 09000000001 (Test Shop)\nငွေလွှဲပြီးရင် transaction id ပါတဲ့ screenshot ပို့ပေးပါနော်။"
+FOOTER = "အချက်အလက်အားလုံး မှန်ရင် ငွေလွှဲပြီး transaction id ပါတဲ့ screenshot လေး ပို့ပေးပါနော်။"  # docs/SPEC-v5.8.1
+PAYMENT_FOOTER = f"KPay – 09000000001 (Test Shop)\n{FOOTER}"
+
+
+def summary(phones: str, address: str) -> str:
+    """docs/SPEC-v5.8.1: payment info shows the order's phone(s) and address between the total and the accounts."""
+    return f"ဖုန်း: {phones}\nလိပ်စာ: {address}\n"
 
 
 def say(db, n: int, body: str, customer: str = "91") -> int:
@@ -135,15 +141,17 @@ def test_whole_flow_phone_first_with_undo(shop, db):
     tap(client, token, address, address="No. 12, Bahan Road, Bahan", back=f"/chats/{cid}?tab=cart")
     assert order_row(db)[:3] == ("waiting_payment", 18000, "No. 12, Bahan Road, Bahan")
     assert deliver(db) == ["• Stronger With You Intensely 5ml – 18,000 ကျပ်\nစုစုပေါင်း 18,000 ကျပ်ပါ။\n"
-                           + PAYMENT_FOOTER]
+                           + summary("09777123456, 09444555666", "No. 12, Bahan Road, Bahan") + PAYMENT_FOOTER]
 
-    # a later message with another number: added as phone 3, short reply
+    # a later message with another number: added as phone 3; docs/SPEC-v5.8.1: the whole payment info again (the
+    # customer sees every phone before paying) instead of "added" + the resume line
     third = say(db, 6, "ph 09 111 222 333 လည်းရပါတယ်")
-    assert button(client, third)[0] == "📞 Save phone + reply"
+    assert button(client, third)[0] == "📞 Save phone + 💳 payment info again"
     tap(client, token, third)
     assert phones(db) == ["09777123456", "09444555666", "09111222333"]
-    # docs/SPEC-v4.10-interruptions.md: + the resume line (still waiting for the payment screenshot)
-    assert deliver(db) == ["ဖုန်းနံပါတ် 09111222333 ကိုလည်း ထည့်ထားပါပြီ။\nငွေလွှဲပြီးရင် transaction id ပါတဲ့ screenshot ပို့ပေးပါနော်။"]
+    assert deliver(db) == ["• Stronger With You Intensely 5ml – 18,000 ကျပ်\nစုစုပေါင်း 18,000 ကျပ်ပါ။\n"
+                           + summary("09777123456, 09444555666, 09111222333", "No. 12, Bahan Road, Bahan")
+                           + PAYMENT_FOOTER]
     assert button(client, say(db, 7, "09 999 888 777")) is None  # max 3 numbers: use the cart panel
 
 

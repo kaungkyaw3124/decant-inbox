@@ -2410,6 +2410,33 @@
 52
 ]
 },
+"d7a2c073b16a003d4566edd7": {
+"data": {
+"address": {
+"city": "Mandalay",
+"confidence": 0.99,
+"full_text": "No. 34, Sample Rd, Mandalay",
+"house_no": "No. 34",
+"is_change_request": true,
+"landmark": null,
+"missing": [],
+"street": "Sample Rd",
+"township": null,
+"ward_or_quarter": null
+},
+"confidence": 0.99,
+"draft_answer": null,
+"intent": "change_info",
+"items": [],
+"learn": [],
+"reason": "Requests an address change and provides house number, street, and city."
+},
+"tokens": [
+4122,
+0,
+163
+]
+},
 "d7dec45a6c5dacedd1555c08": {
 "data": {
 "address": null,

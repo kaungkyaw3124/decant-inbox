@@ -102,8 +102,8 @@ def with_resume(session: Session, kind: str, text: str | None, customer_id: int,
                 now: datetime) -> tuple[str | None, bool]:
     """(the reply, with the resume line if one is due; whether it was added). Call it with the state
     AFTER the action (inside the preview savepoint / the real transaction)."""
-    if not text or kind in NO_RESUME_KINDS:
-        return text, False
+    if not text or kind in NO_RESUME_KINDS or texts["payment_info_footer"] in text:
+        return text, False  # (docs/SPEC-v5.8.1: payment info ends with its own "send the screenshot" sentence)
     line = resume_text(session, step(session, customer_id), texts)
     if not line or line.strip() in text or (texts["address_invalid_note"] in text and "လိပ်စာ" in line):
         return text, False  # nothing pending, or the reply asks for it already (4.20: "the full address")

@@ -121,3 +121,30 @@
       expect: {reply: auto, contains: ["မင်္ဂလာပါ"]}
     - say: "1 million 10ml ရှိလား"
       expect: {reply: auto, contains: ["1 Million 10ml က 26,000 ကျပ်ပါ"]}
+
+# docs/SPEC-v5.8.1: the 2026-11-10 00:32 case (retold with TEST data): a returning customer changes the phone before
+# paying -> ONE message with items, total, phone, address, accounts and the confirm sentence (no "updated" line);
+# a later address change -> the same full message again with the new address.
+- id: live-1110-phone-change-final-summary
+  hand: true
+  tags: [live, change, phone, address]
+  setup: {saved: true}
+  turns:
+    - say: "Eros 10ml ယူမယ်"
+      expect:
+        reply: auto
+        contains: ["ကိုပဲ ပို့ပေးရမလား"]
+    - say: "ဖုန်းနံပါတ်ချိန်းချင်ပါတယ် 09222222222"
+      expect:
+        reply: auto
+        contains: ["Eros", "ဖုန်း: 09222222222", "လိပ်စာ: ", "KPay – 09000000001", "အချက်အလက်အားလုံး မှန်ရင်"]
+        not_contains: ["ပြင်ပြီးပါပြီ"]
+        phone: "09222222222"
+        status: waiting_payment
+    - say: "လိပ်စာ ပြောင်းချင်ပါတယ် No. 34, Sample Rd, Mandalay"
+      expect:
+        reply: auto
+        contains: ["ဖုန်း: 09222222222", "လိပ်စာ: No. 34, Sample Rd", "KPay – 09000000001", "အချက်အလက်အားလုံး မှန်ရင်"]
+        not_contains: ["ပြင်ပြီးပါပြီ"]
+        status: waiting_payment
+

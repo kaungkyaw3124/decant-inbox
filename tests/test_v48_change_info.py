@@ -12,7 +12,7 @@ from app.ai.providers import FakeProvider
 from app.orders import auto
 from app.parser.worker import run_batch
 from tests.test_after_payment import auto_on, paid_order, tap as status_tap
-from tests.test_cart import PAYMENT_FOOTER, button, deliver, order_row, phones, shop, tap  # noqa: F401
+from tests.test_cart import PAYMENT_FOOTER, button, summary, deliver, order_row, phones, shop, tap  # noqa: F401
 from tests.test_messaging import add, scalar
 from tests.test_payments import waiting_for_payment
 from tests.test_web import client, log_in  # noqa: F401  (fixture)
@@ -20,7 +20,12 @@ from tests.test_web import client, log_in  # noqa: F401  (fixture)
 OLD = "No. 5, Sanchaung"
 LIST_END = f"ဖုန်း 09111222333၊ လိပ်စာ {OLD} ကိုပဲ ပို့ပေးရမလား။"
 STW_10 = "• Stronger With You Intensely 10ml – 33,000 ကျပ်\nစုစုပေါင်း 33,000 ကျပ်ပါ။\n"
-PAYMENT = STW_10 + PAYMENT_FOOTER
+
+
+def pay(phones: str, address: str) -> str:
+    """The one payment-info message (docs/SPEC-v5.8.1): no "updated" line, the new values are in it."""
+    return STW_10 + summary(phones, address) + PAYMENT_FOOTER
+
 ASK_ADDRESS = "ပို့ပေးရမယ့် လိပ်စာအသစ် ပို့ပေးပါနော်။"
 ASK_PHONE = "ဖုန်းနံပါတ်အသစ် ပို့ပေးပါနော်။"
 ASK_BOTH = "လိပ်စာအသစ်နဲ့ ဖုန်းနံပါတ် ပို့ပေးပါနော်။"
@@ -85,7 +90,7 @@ def test_h1_live_bug_change_address_then_new_address(returning, db):
     assert intent(db, new) == "address"
     assert button(client, new)[0] == "✅ 📍 Replace address + 💳 send payment info"
     tap(client, token, new)
-    assert deliver(db) == ["လိပ်စာ ပြင်ပြီးပါပြီ – ဗဟန်း ရွှေဂုံတိုင်လမ်း အမှတ် 5\n" + PAYMENT]
+    assert deliver(db) == [pay("09111222333", "ဗဟန်း ရွှေဂုံတိုင်လမ်း အမှတ် 5")]
     assert order_row(db, "92") == ("waiting_payment", 33000, "ဗဟန်း ရွှေဂုံတိုင်လမ်း အမှတ် 5", ["09111222333"])
     assert customer_address(db) == "ဗဟန်း ရွှေဂုံတိုင်လမ်း အမှတ် 5" and change_wanted(db) is None
     page = client.get(f"/chats/{cid}?tab=cart").text
@@ -99,7 +104,7 @@ def test_h1_live_bug_in_auto_mode(returning, db):
     assert deliver(db) == [ASK_ADDRESS]
     reply(db, "ဗဟန်း ရွှေဂုံတိုင်လမ်း အမှတ် ၅")
     auto.run_once(datetime.now(UTC) + timedelta(seconds=5))
-    assert deliver(db) == ["လိပ်စာ ပြင်ပြီးပါပြီ – ဗဟန်း ရွှေဂုံတိုင်လမ်း အမှတ် 5\n" + PAYMENT]
+    assert deliver(db) == [pay("09111222333", "ဗဟန်း ရွှေဂုံတိုင်လမ်း အမှတ် 5")]
 
 
 def test_h1_undo_restores_everything(returning, db):
@@ -151,7 +156,7 @@ def test_h2_this_address_replaces_without_asking(returning, db):
     mid = reply(db, "ဒီလိပ်စာကိုပို့ပေးပါ - လှိုင် ပြည်လမ်း ၁၀")
     assert intent(db, mid) == "address"
     tap(client, token, mid)
-    assert deliver(db) == ["လိပ်စာ ပြင်ပြီးပါပြီ – လှိုင် ပြည်လမ်း 10\n" + PAYMENT]
+    assert deliver(db) == [pay("09111222333", "လှိုင် ပြည်လမ်း 10")]
     assert order_row(db, "92")[:3] == ("waiting_payment", 33000, "လှိုင် ပြည်လမ်း 10")
     assert customer_address(db) == "လှိုင် ပြည်လမ်း 10"
 
@@ -181,8 +186,7 @@ def test_h4_no_then_phone_and_address(returning, db):
     assert deliver(db) == [ASK_BOTH] and change_wanted(db) == "unclear"
     new = reply(db, "09444555666 ဗဟန်း ၅လမ်း အမှတ် ၇")
     tap(client, token, new)
-    assert deliver(db) == ["လိပ်စာ ပြင်ပြီးပါပြီ – ဗဟန်း 5လမ်း အမှတ် 7\nဖုန်းနံပါတ် ပြင်ပြီးပါပြီ – 09444555666\n"
-                           + PAYMENT]
+    assert deliver(db) == [pay("09444555666", "ဗဟန်း 5လမ်း အမှတ် 7")]
     assert order_row(db, "92") == ("waiting_payment", 33000, "ဗဟန်း 5လမ်း အမှတ် 7", ["09444555666"])
     assert phones(db, "92") == ["09444555666", "09111222333"] and customer_address(db) == "ဗဟန်း 5လမ်း အမှတ် 7"
 
@@ -203,8 +207,9 @@ def test_h5_change_after_payment_info_no_resend(shop, db, tmp_path, monkeypatch)
     tap(client, token, reply(db, "လိပ်စာ ပြောင်းချင်ပါတယ်", customer="91"))
     assert deliver(db) == [ASK_ADDRESS]
     tap(client, token, reply(db, "ဒဂုံ ၃လမ်း အမှတ် ၉", customer="91"))
-    # the line + the resume line (4.10), payment info NOT again
-    assert deliver(db) == ["လိပ်စာ ပြင်ပြီးပါပြီ – ဒဂုံ 3လမ်း အမှတ် 9\nငွေလွှဲပြီးရင် transaction id ပါတဲ့ screenshot ပို့ပေးပါနော်။"]
+    # docs/SPEC-v5.8.1 (was 4.8 "the line + the resume line"): the whole payment info again with the new address
+    assert deliver(db) == ["• Stronger With You Intensely 5ml – 18,000 ကျပ်\nစုစုပေါင်း 18,000 ကျပ်ပါ။\n"
+                           + summary("09777123456, 09444555666", "ဒဂုံ 3လမ်း အမှတ် 9") + PAYMENT_FOOTER]
     assert order_row(db, "91")[:3] == ("waiting_payment", 18000, "ဒဂုံ 3လမ်း အမှတ် 9")
     assert scalar(db, "SELECT payment_info_sent_at FROM orders") == sent_at
     # the order confirmation (after the payment is approved) shows the NEW address
@@ -266,12 +271,12 @@ def test_h7_change_phone_replaces_then_plain_number_adds(returning, db):
     tap(client, token, mid)
     assert deliver(db) == [ASK_PHONE] and change_wanted(db) == "phone"
     tap(client, token, reply(db, "09444555666"))
-    assert deliver(db) == ["ဖုန်းနံပါတ် ပြင်ပြီးပါပြီ – 09444555666\n" + PAYMENT]
+    assert deliver(db) == [pay("09444555666", OLD)]
     assert order_row(db, "92") == ("waiting_payment", 33000, OLD, ["09444555666"])
     assert phones(db, "92") == ["09444555666", "09111222333"]  # new = phone 1, old kept as phone 2
     # a plain new number without change words is ADDED (as before)
     tap(client, token, reply(db, "09777888999"))
-    assert deliver(db) == ["ဖုန်းနံပါတ် 09777888999 ကိုလည်း ထည့်ထားပါပြီ။\nငွေလွှဲပြီးရင် transaction id ပါတဲ့ screenshot ပို့ပေးပါနော်။"]  # + resume line (4.10)
+    assert deliver(db) == [pay("09444555666, 09111222333, 09777888999", OLD)]  # docs/SPEC-v5.8.1: all again
     assert phones(db, "92") == ["09444555666", "09111222333", "09777888999"]
 
 

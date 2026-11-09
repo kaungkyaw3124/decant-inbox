@@ -60,8 +60,8 @@
   turns:
     - say: "လိပ်စာပြောင်းချင်တယ်"
       expect: {reply: auto, contains: ["လိပ်စာအသစ်"]}
-    - say: "အမှတ် 18 ၊ ဗိုလ်တထောင်လမ်း ၊ ကမာရွတ်"
-      expect: {reply: auto, contains: ["လိပ်စာ ပြင်ပြီးပါပြီ"]}
+    - say: "အမှတ် 18 ၊ ဗိုလ်တထောင်လမ်း ၊ ကမာရွတ်"  # docs/SPEC-v5.8.1: the whole payment info with the new address
+      expect: {reply: auto, contains: ["လိပ်စာ: ", "ကမာရွတ်", "KPay"], not_contains: ["ပြင်ပြီးပါပြီ"]}
 
 - id: change-paid-order-locked
   hand: true

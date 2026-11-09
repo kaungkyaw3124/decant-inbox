@@ -12,7 +12,7 @@ from app.orders import auto
 from app.parser.worker import run_batch
 from tests.matrix_v410 import MESSAGES, OLD_ADDRESS, STATES, make_state, send
 from tests.test_after_payment import auto_on
-from tests.test_cart import PAYMENT_FOOTER, deliver, shop  # noqa: F401  (fixture)
+from tests.test_cart import FOOTER, PAYMENT_FOOTER, deliver, shop, summary  # noqa: F401  (fixture)
 from tests.test_messaging import add, scalar
 from tests.test_payments import downloaded, photo, waiting_for_payment
 from tests.test_prices import run_import, xlsx
@@ -38,8 +38,13 @@ ASK_SCREENSHOT = "transaction id ပါတဲ့ screenshot လေး ပို�
 CHOOSE = ("အရင်က ယူထားတာတွေပါ –\n1. Stronger With You Intensely 5ml\n2. Sauvage Eau de Parfum 10ml\n"
           "ဘယ်ဟာလဲ နံပါတ်လေး ပြောပေးပါနော်။")
 CART_LIST = f"{STW_5}\n{SAUVAGE_10}\nစုစုပေါင်း 56,000 ကျပ်ပါ။"
-PAYMENT_56 = f"{CART_LIST}\n{PAYMENT_FOOTER}"
 ADDRESS_NEW = "ဗဟန်း ရွှေဂုံတိုင်လမ်း အမှတ် 5"
+
+
+def _summary(r) -> str:
+    """docs/SPEC-v5.8.1: payment info shows the order's phones (max 3) and address, as they are after the action."""
+    return summary(", ".join(r.open_phones[:3]), r.open_address)
+
 # the step the shop waits for, by state: the resume line added after an answer to something else
 RESUME = {"cart": RETURNING, "need_phone": ASK_PHONE_CART, "need_address": ASK_ADDRESS,
           "waiting_new_info": ASK_NEW_ADDRESS, "waiting_payment": RESUME_PAY}
@@ -99,10 +104,10 @@ OUTCOMES = {
     "sent": "the 4.9 greeting with the sent-out date",
     "askphone": "address saved; ask the phone",
     "pay": "contact complete: payment info",
-    "changed": "“address changed” + payment info (4.8)",
-    "addr": "“address changed” + the resume line (payment info not sent again)",
+    "changed": "address changed: payment info with the new address (5.8.1: no “changed” line)",
+    "addr": "address changed while waiting: the whole payment info again (5.8.1)",
     "phone": "phone saved + ask the address",
-    "phone+": "phone added + the resume line",
+    "phone+": "phone added while waiting: the whole payment info again (5.8.1)",
     "asknew": "ask for the new address (4.8)",
     "shot": "“send the screenshot”",
     "check": "“we'll check” (the screenshot is in Payments)",
@@ -154,7 +159,7 @@ def check(state: str, message: str, code: str, r) -> None:
     elif code in ("pay+", "pay-"):
         lines = [STW_5, SAUVAGE_10, SAUVAGE_5] if code == "pay+" else [SAUVAGE_10]
         total = "76,000" if code == "pay+" else "38,000"
-        assert one == "\n".join([*lines, f"စုစုပေါင်း အသစ် {total} ကျပ်ပါ။", PAYMENT_FOOTER])
+        assert one == "\n".join([*lines, f"စုစုပေါင်း အသစ် {total} ကျပ်ပါ။"]) + "\n" + _summary(r) + PAYMENT_FOOTER
         assert (r.open_status, r.open_items) == ("waiting_payment", len(lines))
     elif code in ("hold", "holdcard"):
         assert one == HOLD
@@ -191,19 +196,19 @@ def check(state: str, message: str, code: str, r) -> None:
         assert one == "ဆက်သွယ်ရန် ဖုန်းနံပါတ် ပို့ပေးပါနော်။"
         assert r.open_address == ADDRESS_NEW
     elif code == "pay":
-        assert one == f"{PAYMENT_56}"
+        assert one == f"{CART_LIST}\n{_summary(r)}{PAYMENT_FOOTER}"
         assert r.open_status == "waiting_payment"
     elif code == "changed":
-        assert one == f"လိပ်စာ ပြင်ပြီးပါပြီ – {ADDRESS_NEW}\n{PAYMENT_56}"
+        assert one == f"{CART_LIST}\n{_summary(r)}{PAYMENT_FOOTER}" and ADDRESS_NEW in one
         assert (r.open_status, r.open_address) == ("waiting_payment", ADDRESS_NEW)
     elif code == "addr":
-        assert one == f"လိပ်စာ ပြင်ပြီးပါပြီ – {ADDRESS_NEW}\n{RESUME_PAY}"
+        assert one == f"{CART_LIST}\n{_summary(r)}{PAYMENT_FOOTER}" and ADDRESS_NEW in one
         assert (r.open_status, r.open_address) == ("waiting_payment", ADDRESS_NEW)
     elif code == "phone":
         assert one == f"ဖုန်းနံပါတ် 09444555666 ရပါပြီ။ {ASK_ADDRESS}"
         assert "09444555666" in r.open_phones
     elif code == "phone+":
-        assert one == f"ဖုန်းနံပါတ် 09444555666 ကိုလည်း ထည့်ထားပါပြီ။\n{RESUME_PAY}"
+        assert one == f"{CART_LIST}\n{_summary(r)}{PAYMENT_FOOTER}" and "09444555666" in one
         assert "09444555666" in r.open_phones and r.open_status == "waiting_payment"
     elif code == "asknew":
         assert one == ASK_NEW_ADDRESS
@@ -260,13 +265,13 @@ def test_j2_owner_story(shop, db, tmp_path, monkeypatch):
     _msg(db, 1, "liquid brun 10ml လည်းယူမယ်")
     [text1] = deliver(db)
     assert text1 == ("• Stronger With You Intensely 5ml – 18,000 ကျပ်\n• Liquid Brun 10ml – 15,000 ကျပ်\n"
-                     f"စုစုပေါင်း အသစ် 33,000 ကျပ်ပါ။\n{PAYMENT_FOOTER}")
+                     f"စုစုပေါင်း အသစ် 33,000 ကျပ်ပါ။\n{summary('09777123456, 09444555666', 'No. 12, Bahan')}{PAYMENT_FOOTER}")
     assert _open(db)[:2] == ("waiting_payment", 33000)
     _msg(db, 2, "လိပ်စာ ပြောင်းချင်ပါတယ်", minutes=1)
     assert deliver(db) == [ASK_NEW_ADDRESS]
     _msg(db, 3, "ဗဟန်း ရွှေဂုံတိုင်လမ်း အမှတ် ၅", minutes=2)
     [text3] = deliver(db)
-    assert text3.startswith(f"လိပ်စာ ပြင်ပြီးပါပြီ – {ADDRESS_NEW}")
+    assert f"လိပ်စာ: {ADDRESS_NEW}" in text3 and text3.endswith(FOOTER)  # 5.8.1: the whole payment info again
     assert _open(db)[2] == ADDRESS_NEW
     _msg(db, 4, "hi", minutes=3)
     [text4] = deliver(db)
@@ -332,7 +337,7 @@ def test_j3_no_resume_when_the_reply_asks_for_the_step(shop, db):
     make_state(db, "waiting_payment")
     auto_on(db)
     r = send(db, "remove")  # payment info again: it already says "send the screenshot"
-    assert r.replies[0].count(RESUME_PAY) == 1
+    assert r.replies[0].count(FOOTER) == 1 and RESUME_PAY not in r.replies[0]  # 5.8.1: its own footer, no resume line
 
 
 def test_j3_admin_reply_gets_the_resume_line_as_suggestion(shop, db):
