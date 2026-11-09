@@ -18,6 +18,7 @@ from app.learning import cards, patterns
 from app.orders import actions, address, auto, cart, followups, payments, unknown
 from app.replies import compose, faq
 from app.replies import templates as replies
+from app.web import refcache
 from app.web.auth import current_user, owner_only, verify_csrf
 from app.web.deps import get_db
 from app.web.inbox import detail_url, flash, safe_back
@@ -381,8 +382,10 @@ def needs_you_cached(owner: bool = True, max_age: float | None = None) -> dict:
     Computed in its own session: the cached rows are detached and shared read-only (the models have no lazy
     relationships, so nothing loads later)."""
     max_age = CACHE_SECONDS if max_age is None else max_age
-    with SessionLocal() as session:
-        mark = tuple(session.execute(_FINGERPRINT).one())
+    def take() -> tuple:
+        with SessionLocal() as session:
+            return tuple(session.execute(_FINGERPRINT).one())
+    mark = refcache.once("needs_you", take)  # the chat page and the menu badge share it (docs/SPEC-v5.8 B)
 
     def fresh(hit) -> bool:
         return (hit is not None and hit[1] == mark and hit[0] >= _cleared_at

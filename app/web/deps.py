@@ -57,17 +57,23 @@ def _template_context(request: Request) -> dict:
     if request.session.get("user_id"):  # the switch and the badges are on every page
         from sqlalchemy import func, select
 
-        from app.learning import patterns
-        from app.models import Order, User
-        from app.orders import auto, payments  # late import: avoids an import cycle at startup
+        from app.models import LearnedPattern, Order, PaymentCheck, User
+        from app.orders import auto  # late import: avoids an import cycle at startup
+
+        def count(model, *where):
+            return select(func.count()).select_from(model).where(*where).scalar_subquery()
 
         with SessionLocal() as session:
-            auto_on, payments_open = auto.enabled(session), payments.count_open(session)
-            to_pack = session.scalar(select(func.count()).select_from(Order).where(Order.status == "paid"))
-            row = session.execute(select(User.role, User.language).where(User.id == request.session["user_id"])).first()
+            auto_on = auto.enabled(session)  # one cheap row; not refcache (its fingerprint costs more on light pages)
+            # docs/SPEC-v5.8 B: the badges and the user's role + language in ONE query (they are on every page);
+            # same conditions as payments.count_open() and patterns.pending_count()
+            row = session.execute(select(
+                User.role, User.language, count(Order, Order.status == "paid"),
+                count(PaymentCheck, PaymentCheck.decision.in_(("pending", "several")), PaymentCheck.outbox_id.is_(None)),
+                count(LearnedPattern, LearnedPattern.status == "pending"),
+            ).where(User.id == request.session["user_id"])).first()
             if row:
-                role, lang = row
-            to_learn = patterns.pending_count(session)
+                role, lang, to_pack, payments_open, to_learn = row
             needs = needs_count(session, role) if role else 0
     t, tr, code = i18n.for_lang(lang)
     return {"csrf": mask_csrf(csrf_token(request)), "flash": request.session.pop("flash", None),

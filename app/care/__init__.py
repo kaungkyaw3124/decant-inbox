@@ -69,7 +69,7 @@ def profile(session: Session, customer: Customer) -> Profile:
     """Paid orders only (test and cancelled orders excluded)."""
     orders = session.scalars(_paid([customer.id]).order_by(Order.paid_at)).all()
     items = session.execute(select(OrderItem, Product).join(Product, Product.id == OrderItem.product_id).where(
-        OrderItem.order_id.in_([o.id for o in orders]), OrderItem.removed_at.is_(None))).all()
+        OrderItem.order_id.in_([o.id for o in orders]), OrderItem.removed_at.is_(None))).all() if orders else []
     perfumes = Counter()
     sizes = Counter()
     for i, p in items:
@@ -146,9 +146,8 @@ def customer_rows(session: Session, q: str = "", tag: str = "", city: str = "", 
 # ---------- opt-out ----------
 
 def opted_out(session: Session, customer_id: int) -> bool:
-    if session.get(CareOptOut, customer_id) is not None:
-        return True
-    return bool(session.scalar(select(exists().where(
+    """An admin switched it off, or the customer wrote stop / unsubscribe / ... (one query)."""
+    return bool(session.scalar(select(exists().where(CareOptOut.customer_id == customer_id) | exists().where(
         Message.customer_id == customer_id, Message.direction == "in",
         Message.raw_text.op("~*")(r"(^|[^a-z])(stop|unsubscribe)([^a-z]|$)|မပို့နဲ့|မပို့ပါနဲ့|မလိုချင်တော့ဘူး")))))
 

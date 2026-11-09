@@ -13,7 +13,7 @@ from pathlib import Path
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
-from sqlalchemy import exists, func, select, tuple_
+from sqlalchemy import String, case, cast, exists, false, func, literal, select, tuple_, union_all
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
@@ -30,7 +30,7 @@ from app.pricing.prices import current_prices
 from app.replies import compose
 from app.replies import templates as replies
 from app import care
-from app.web import staff
+from app.web import refcache, staff
 from app.web.auth import current_user, verify_csrf
 from app.web.deps import get_db, templates
 from app.web.inbox import flash
@@ -69,8 +69,7 @@ ORDER_SEG = tuple(PILLS)
 
 def who_sent(db: Session, boxes) -> dict[int, tuple[str, str | None]]:
     """outbox id -> ("auto" | "hold" | "person", staff name): a row without a person is the bot's."""
-    people = {b.created_by for b in boxes if b.created_by}
-    names = dict(db.execute(select(User.id, User.username).where(User.id.in_(people))).all()) if people else {}
+    names = refcache.get("usernames", lambda s: dict(s.execute(select(User.id, User.username)).all()))  # a few staff
     return {b.id: ("hold" if b.reply_kind in HOLD_KINDS else "auto" if b.created_by is None or b.reply_kind == "faq"
                    else "person",
                    names.get(b.created_by)) for b in boxes}
@@ -113,12 +112,19 @@ def chat_list_context(db: Session, user: User, seg: str = "all", q: str = "", pa
         query = query.where(found)
     if seg == "orders":
         query = query.where(exists().where(Order.customer_id == Customer.id, Order.status.in_(ORDER_SEG)))
-    first = []
-    if page == 1:
-        first = db.execute(query.where(Customer.id.in_(needing)).order_by(Message.received_at, Message.id)).all()
-    rows = [] if seg == "needs" else db.execute(
-        query.where(Customer.id.not_in(needing)).order_by(Message.received_at.desc(), Message.id.desc())
-        .limit(LIST_SIZE + 1).offset((page - 1) * LIST_SIZE)).all()
+    is_needing = Customer.id.in_(list(needing)) if needing else false()
+    if page == 1:  # one query: the needing customers first (longest waiting first), then the most recent
+        query = query.where(is_needing) if seg == "needs" else query
+        found_rows = db.execute(query.order_by(
+            case((is_needing, 0), else_=1), case((is_needing, Message.received_at)).asc(),
+            case((is_needing, Message.id)).asc(), Message.received_at.desc(), Message.id.desc())
+            .limit(len(needing) + LIST_SIZE + 1)).all()
+        first = [r for r in found_rows if r[0].id in needing]
+        rows = [r for r in found_rows if r[0].id not in needing]
+    else:
+        first, rows = [], [] if seg == "needs" else db.execute(
+            query.where(~is_needing).order_by(Message.received_at.desc(), Message.id.desc())
+            .limit(LIST_SIZE + 1).offset((page - 1) * LIST_SIZE)).all()
     more = len(rows) > LIST_SIZE
     rows = first + rows[:LIST_SIZE]
     ids = [c.id for c, _ in rows]
@@ -174,11 +180,14 @@ def _window(db: Session, customer_id: int, before: int | None = None, after: int
 def _photo_states(db: Session, customer_id: int) -> tuple[list[int], list]:
     """Photo bubbles that can still change by themselves (photo loading, payment check): the newest photos and the
     last downloads of this chat. Returns (message ids, their states)."""
-    loads = db.execute(select(MediaDownload.message_id, MediaDownload.status).join(Message).where(
-        Message.customer_id == customer_id).order_by(MediaDownload.message_id.desc()).limit(10)).all()
-    checks = db.execute(select(PaymentCheck.message_id, PaymentCheck.id, PaymentCheck.decision).join(
+    loads_q = (select(MediaDownload.message_id, MediaDownload.status, literal(None).label("decision")).join(Message)
+               .where(Message.customer_id == customer_id).order_by(MediaDownload.message_id.desc()).limit(10))
+    checks_q = (select(PaymentCheck.message_id, cast(PaymentCheck.id, String), PaymentCheck.decision).join(
         Message, Message.id == PaymentCheck.message_id).where(Message.customer_id == customer_id)
-        .order_by(PaymentCheck.id.desc()).limit(THREAD_SIZE)).all()
+        .order_by(PaymentCheck.id.desc()).limit(THREAD_SIZE))
+    rows = db.execute(union_all(loads_q.subquery().select(), checks_q.subquery().select())).all()  # one query
+    loads = [(m, status) for m, status, decision in rows if decision is None]
+    checks = [(m, int(cid), decision) for m, cid, decision in rows if decision is not None]
     ids = sorted({m for m, _ in loads} | {m for m, _, _ in checks})  # a photo with no download and no check is fixed
     return ids, [list(map(list, loads)), list(map(list, checks))]
 
@@ -246,6 +255,12 @@ def thread_context(db: Session, customer: Customer, messages: list | None = None
     return ctx
 
 
+def _products_and_sizes(db: Session) -> tuple[list[Product], list[int]]:
+    """Active products for the composer + every decant size on sale (cached: app.web.refcache)."""
+    products = db.scalars(select(Product).where(Product.active).order_by(Product.brand, Product.name)).all()
+    return products, sorted({p.size_ml for ps in current_prices(db).values() for p in ps if p.size_ml})
+
+
 def _price_items(request: Request) -> list[compose.PriceItem]:
     items = []
     for n in range(1, compose.MAX_PRICE_ITEMS + 1):
@@ -260,7 +275,7 @@ def chat(request: Request, customer_id: int, db: Session = Depends(get_db), user
     customer = get_customer(db, customer_id)
     step = steps.step(db, customer_id)  # once: the resume line and the step badge both need it
     mode = request.query_params.get("compose", "custom")
-    texts = replies.load(db)
+    texts = dict(refcache.get("replies", replies.load))
     greet = compose.needs_greeting(db, customer_id)
     result = compose.Composed()
     items: list[compose.PriceItem] = []
@@ -291,8 +306,7 @@ def chat(request: Request, customer_id: int, db: Session = Depends(get_db), user
         resume = steps.resume_text(db, step, texts)
         if resume:
             result.text += "\n" + resume
-    products = db.scalars(select(Product).where(Product.active).order_by(Product.brand, Product.name)).all()
-    sizes = sorted({p.size_ml for ps in current_prices(db).values() for p in ps if p.size_ml})
+    products, sizes = refcache.get("chat_products", _products_and_sizes)
     from app.web.auto import for_customer, needs_you_cached  # late import: auto imports this module's neighbours
     from app.web.learning import card_context
 
@@ -302,17 +316,19 @@ def chat(request: Request, customer_id: int, db: Session = Depends(get_db), user
              + [mine["waiting_cards"][m.id] for _, m, _ in mine["waiting"] if m.id in mine["waiting_cards"]])
     past = db.scalars(select(Order).where(Order.customer_id == customer_id, Order.order_no.is_not(None))
                       .order_by(Order.id.desc()).limit(10)).all()
+    thread = thread_context(db, customer)
     return templates.TemplateResponse(request, "chat.html", {
         **chat_list_context(db, user, request.query_params.get("seg", "all"), active=customer_id, found=found),
         **card_context(db, shown, user), "mine": mine, "past_orders": past, "initials": initials(customer),
         "city": ((customer.address_parts or {}).get("city") or "").split(",")[0],
-        "methods": db.scalars(select(PaymentMethod).where(PaymentMethod.active).order_by(PaymentMethod.sort_order)).all(),
+        "methods": refcache.get("methods", lambda s: s.scalars(select(PaymentMethod).where(PaymentMethod.active)
+                                                              .order_by(PaymentMethod.sort_order)).all()),
         "may_decide": staff.may_decide_payments(db, user),
         "profile": care.profile(db, customer), "colours": care.TAG_COLOURS,  # docs/SPEC-v5.2 P1
-        **thread_context(db, customer), **cart_context(db, customer, texts, step), "mode": mode, "result": result,
+        **thread, **cart_context(db, customer, texts, step), "mode": mode, "result": result,
         "greet": greet, "tab": request.query_params.get("tab", "chat"),
         "items": items + [compose.PriceItem(0, "all")] * (compose.MAX_PRICE_ITEMS - len(items)),
-        "products": products, "sizes": sizes, "can_send": has_written(db, customer_id),
+        "products": products, "sizes": sizes, "can_send": any(m.direction == "in" for m in thread["messages"]) or has_written(db, customer_id),
         "key": secrets.token_urlsafe(16), "tg_link": telegram_link(customer), "max_text": MAX_TEXT,
         "paused_until": auto.paused_until(db, customer),
     })

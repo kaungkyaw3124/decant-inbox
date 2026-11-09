@@ -21,6 +21,7 @@ from app.replies import templates as replies
 from app.web.auth import current_user, owner_only, verify_csrf
 from app.web import paging
 from app.web.deps import get_db, templates
+from app.web import refcache
 from app.web.inbox import detail_url, flash, get_message, products_for_select, safe_back
 
 router = APIRouter(dependencies=[Depends(current_user), Depends(verify_csrf)])
@@ -37,7 +38,8 @@ def card_context(db: Session, shown: list | None = None, user: User | None = Non
         for card in shown or []:
             if card is not None:
                 previews[card.message.id] = cards.preview(db, card, user)
-    return {"all_products": [p for p in products_for_select(db) if p.active], "intent_choices": cards.INTENT_CHOICES,
+    return {"all_products": [p for p in refcache.get("products_select", products_for_select) if p.active],
+            "intent_choices": cards.INTENT_CHOICES,
             "action_choices": cards.ACTION_CHOICES, "previews": previews}
 
 

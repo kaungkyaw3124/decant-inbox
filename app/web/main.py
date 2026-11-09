@@ -29,7 +29,7 @@ from app.web import (
     prices, sales, settings as settings_pages, stock, users,
 )
 from app.alerts import service as alerts
-from app.web import live, paging, perf, trust, twostep
+from app.web import live, paging, perf, refcache, trust, twostep
 from app.web.auth import (
     FormExpired, LoginRequired, authenticate, client_ip, current_user, failed, locked_out, login, verify_csrf,
 )
@@ -42,6 +42,7 @@ if settings.web_secret_key is None:
 app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
 app.middleware("http")(trust.renew)  # inside the session middleware: it needs request.session (docs/SPEC-v5.3 M5)
 app.middleware("http")(paging.remember_per)  # docs/SPEC-v5.4 X2: the chosen list size
+app.middleware("http")(refcache.per_request)  # docs/SPEC-v5.8 B: one reference-data fingerprint per request
 app.add_middleware(
     SessionMiddleware,
     secret_key=settings.web_secret_key.get_secret_value(),
@@ -117,6 +118,7 @@ async def security_headers(request: Request, call_next):
     response = await call_next(request)
     if request.method not in ("GET", "HEAD"):
         auto_pages.forget_needs_you()  # docs/SPEC-v5.3 M4: the admin's own change shows at once
+        refcache.forget()
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["Referrer-Policy"] = "same-origin"

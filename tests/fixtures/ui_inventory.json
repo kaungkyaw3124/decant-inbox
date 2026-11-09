@@ -17,6 +17,9 @@
   "sales: link /sales?range=today -> /sales (Today is the default; the chip links there)",
   "chat: hx /chats/<id>/thread (4 s full re-draw) -> #thread-poll ?after=&v= (204 when nothing changed) + #older ?before= (20 older messages)"
  ],
+ "_moved_v5.8": [
+  "docs/SPEC-v5.8: sales: link /sales?range=week (This week chip) -> not a chip any more (mockup: Today · Yesterday · 7 days · 30 days · This month); /sales?range=week still works by URL and Pick dates…"
+ ],
  "inbox-owner": [
   "status 200",
   "button language=my",
@@ -631,7 +634,6 @@
   "link /sales?range=30d",
   "link /sales?range=7d",
   "link /sales?range=month",
-  "link /sales?range=week",
   "link /sales?range=yesterday",
   "link /settings",
   "link /users"
@@ -2423,7 +2425,6 @@
   "link /sales?range=30d",
   "link /sales?range=7d",
   "link /sales?range=month",
-  "link /sales?range=week",
   "link /sales?range=yesterday"
  ],
  "prices-staff": [

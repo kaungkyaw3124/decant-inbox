@@ -20,12 +20,10 @@ def needs_greeting(session: Session, customer_id: int, now: datetime | None = No
     """Greet only if we have not messaged this customer in the last 6 h (from the
     dashboard or from the phone)."""
     since = (now or datetime.now(UTC)) - GREETING_GAP
-    sent = session.scalar(select(exists().where(
-        Message.customer_id == customer_id, Message.direction == "out", Message.received_at >= since)))
-    queued = session.scalar(select(exists().where(
+    return not session.scalar(select(exists().where(  # one query
+        Message.customer_id == customer_id, Message.direction == "out", Message.received_at >= since) | exists().where(
         Outbox.customer_id == customer_id, Outbox.status.in_(("queued", "sending", "sent")),
         Outbox.created_at >= since)))
-    return not (sent or queued)
 
 
 def with_greeting(body: str, texts: dict[str, str], greet: bool) -> str:
