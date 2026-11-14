@@ -23,7 +23,7 @@ from sqlalchemy.orm import Session
 from app.alerts import bot
 from app.core.config import BASE_DIR
 from app.core.db import SessionLocal
-from app.models import AppSetting, AutoRun, Order
+from app.models import AppSetting, AutoRun, Customer, Order, Outbox
 
 log = logging.getLogger("alerts")
 SETTING, STATE = "alerts", "alerts_state"
@@ -31,14 +31,16 @@ TYPES = {  # type -> label (Settings page)
     "service": "Service down", "waiting": "Customer waiting more than 5 min", "payment": "Payment to check",
     "ai": "AI key refused / no credit", "backup": "Backup failed", "disk": "Disk more than 85 % full",
     "tunnel": "New dashboard link", "login": "Login from a new device", "summary": "Daily summary at 21:00",
+    "send_failed": "Reply failed", "queue": "Reply queue long",  # docs/SPEC-v5.9 B3 / B6
 }
-RESOLVES = ("service", "backup", "disk", "ai")  # a "resolved" line when fixed (not for each answered customer)
+RESOLVES = ("service", "backup", "disk", "ai", "queue")  # a "resolved" line when fixed (not for each answered customer)
 WAIT_ALERT = timedelta(minutes=5)
 SAME_AGAIN = timedelta(minutes=30)
 PER_HOUR = 20
 SUMMARY_HOUR = 21
 DISK_FULL = 0.85
 TUNNEL_FILE = BASE_DIR / "TUNNEL_URL"
+FAILED_FOR = timedelta(hours=24)  # a failed reply alerts while nothing reached the customer after it
 
 
 def settings(session: Session) -> dict:
@@ -77,11 +79,19 @@ def problems(session: Session, now: datetime, preview: bool) -> dict[str, tuple[
     found: dict[str, tuple[str, str]] = {}
     for check in run_checks(session):
         if not check.ok:
-            kind = "backup" if check.name == "backup" else "disk" if check.name == "disk" else "service"
+            kind = {"backup": "backup", "disk": "disk", "reply queue": "queue"}.get(check.name, "service")
             found[f"check:{check.name}"] = (kind, f"❌ {check.name}: {check.detail}")
     disk = shutil.disk_usage(BASE_DIR)
     if disk.used / disk.total > DISK_FULL:
         found["disk"] = ("disk", f"💾 Disk {disk.used / disk.total:.0%} full ({disk.free // 2**30} GiB free)")
+    for box, c in session.execute(  # docs/SPEC-v5.9 B3: one alert per customer whose newest reply failed
+            select(Outbox, Customer).join(Customer, Customer.id == Outbox.customer_id)
+            .where(Outbox.status == "failed", Outbox.created_at >= now - FAILED_FOR)
+            .order_by(Outbox.id)).all():
+        later = session.scalar(select(func.count()).select_from(Outbox).where(
+            Outbox.customer_id == c.id, Outbox.id > box.id, Outbox.status == "sent"))
+        if not later:
+            found[f"send_failed:{c.id}"] = ("send_failed", f"❌ Reply to {_name(c)} failed: {(box.error or '')[:80]}")
     items = needs_you(session, now)
     for c, m, held in items["waiting"]:
         if now - m.received_at >= WAIT_ALERT:

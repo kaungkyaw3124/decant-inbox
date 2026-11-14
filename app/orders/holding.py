@@ -13,7 +13,7 @@ import logging
 import re
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import exists, func, select
+from sqlalchemy import and_, exists, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.core.db import SessionLocal
@@ -28,6 +28,7 @@ LOOKBACK = timedelta(minutes=30)  # older messages (history imports, a long outa
 ONCE_PER = timedelta(minutes=10)
 HAND_QUIET = timedelta(minutes=10)
 WAITING_FOR = timedelta(hours=24)  # Needs you "⏰ customer waiting"
+STUCK_SENDING = timedelta(minutes=2)  # docs/SPEC-v5.9 B1: a reply "sending" longer than this is no answer
 # a person handles these; a reply must never promise a refund / replacement (docs/SPEC-v4.20 A4)
 COMPLAINT_RE = re.compile(
     r"ယို(?:နေ|ထွက်|ကျ)|ကွဲ(?:နေ|သွား|ပြီး)|ပျက်(?:နေ|သွား)|မှား(?:ပို့|ရောက်)|ပစ္စည်း\s*မှား|မတူ(?:ဘူး|ပါဘူး)|"
@@ -52,9 +53,11 @@ def is_small_talk(text: str | None) -> bool:
 
 def _answered(session: Session, message: Message):
     """Something went (or is going) to the customer after this message, or someone handled it."""
+    fresh_sending = and_(Outbox.status == "sending",
+                         func.coalesce(Outbox.claimed_at, Outbox.created_at) >= func.now() - STUCK_SENDING)
     return (session.scalar(select(exists().where(
         Outbox.customer_id == message.customer_id, Outbox.created_at >= message.received_at,
-        Outbox.status.in_(("queued", "sending", "sent"))))) or session.scalar(select(exists().where(
+        or_(Outbox.status.in_(("queued", "sent")), fresh_sending)))) or session.scalar(select(exists().where(
             Message.customer_id == message.customer_id, Message.direction == "out",
             Message.received_at >= message.received_at))) or session.scalar(select(exists().where(
                 QuickAction.message_id == message.id, QuickAction.undone_at.is_(None)))) or session.scalar(
@@ -86,9 +89,16 @@ def silent(session: Session, now: datetime) -> list[Message]:
         seen.add(m.customer_id)  # only the newest message of a customer counts
         if m.received_at > now - WAIT and not for_a_person(session, m):
             continue  # still being answered automatically (quiet window, AI): the 10 s safety net
-        if not _answered(session, m) and _waiting_customer(session, m):
+        if not _answered(session, m) and _waiting_customer(session, m) and not last_reply_failed(session, m.customer_id):
             found.append(m)
     return found
+
+
+def last_reply_failed(session: Session, customer_id: int) -> bool:
+    """docs/SPEC-v5.9 B3: our newest reply to this customer failed (blocked, privacy, retries used up): the
+    watchdog sends nothing more; the failed reply is in Needs you and the owner got an alert."""
+    return session.scalar(select(Outbox.status).where(Outbox.customer_id == customer_id)
+                          .order_by(Outbox.id.desc()).limit(1)) == "failed"
 
 
 def for_a_person(session: Session, message: Message) -> bool:

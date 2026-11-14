@@ -393,8 +393,12 @@ def needs_you_cached(owner: bool = True, max_age: float | None = None) -> dict:
 
     if fresh(hit := _cache.get(owner)):
         return hit[2]
+    arrived = time.monotonic()
     with _cache_lock:  # one computation at a time; the others wait and take its result
-        if fresh(hit := _cache.get(owner)):
+        hit = _cache.get(owner)
+        # docs/SPEC-v5.9 B7: computed after this request arrived = as new as this request needs (a burst of new
+        # messages changes the fingerprint every moment: without this, 30 waiting pages compute it 30 times)
+        if fresh(hit) or (hit is not None and hit[0] >= arrived and hit[0] >= _cleared_at):
             return hit[2]
         started = time.monotonic()
         with SessionLocal() as session:

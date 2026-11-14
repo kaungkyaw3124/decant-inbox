@@ -17,6 +17,7 @@ from urllib.parse import urlencode, urlsplit
 from fastapi import Depends, FastAPI, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
+from sqlalchemy.exc import TimeoutError as SAPoolTimeout
 from sqlalchemy.orm import Session
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.gzip import GZipMiddleware
@@ -39,6 +40,7 @@ settings = get_settings()
 if settings.web_secret_key is None:
     sys.exit("WEB_SECRET_KEY is missing in .env (see .env.example)")
 
+log = logging.getLogger("web")
 app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
 app.middleware("http")(trust.renew)  # inside the session middleware: it needs request.session (docs/SPEC-v5.3 M5)
 app.middleware("http")(paging.remember_per)  # docs/SPEC-v5.4 X2: the chosen list size
@@ -81,6 +83,14 @@ def redirect_to_login(request: Request, exc: LoginRequired):
     if request.headers.get("hx-request"):  # make htmx do a full-page redirect
         return HTMLResponse("", headers={"HX-Redirect": "/login"})
     return RedirectResponse(f"/login?next={exc.next_url}", status_code=303)
+
+
+@app.exception_handler(SAPoolTimeout)
+def pool_full(request: Request, exc: SAPoolTimeout):
+    """docs/SPEC-v5.9 B7: the database pool stayed full for db_pool_timeout s: say so, count it (/health)."""
+    health.pool_timeouts += 1
+    log.warning("database pool full: %s %s", request.method, request.url.path)
+    return HTMLResponse("Busy, please try again in a moment.", status_code=503)
 
 
 @app.exception_handler(FormExpired)

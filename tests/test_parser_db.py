@@ -14,9 +14,9 @@ from tests.test_seed_catalog import write_csvs
 NOW = datetime(2026, 10, 10, 12, 0, tzinfo=UTC)
 
 
-def add_message(msg_id: int, body: str) -> None:
+def add_message(msg_id: int, body: str, when: datetime = NOW) -> None:
     with SessionLocal.begin() as s:
-        save_message(s, ChatMessage("42", str(msg_id), "42", None, "Ko", body, NOW))
+        save_message(s, ChatMessage("42", str(msg_id), "42", None, "Ko", body, when))
 
 
 def results(engine) -> list[tuple]:
@@ -87,7 +87,8 @@ def test_worker_reparses_when_catalog_changes(db, tmp_path):
     from app.parser.worker import reparse_if_catalog_changed
 
     seed(write_csvs(tmp_path))
-    add_message(1, "aventus 10ml ရှိလား")
+    add_message(1, "aventus 10ml ရှိလား", datetime.now(UTC))  # docs/SPEC-v5.9 B4: the worker re-parses 14 days
+    add_message(2, "aventus 10ml ရှိလား")  # older: keeps its result (scripts/reparse_all.py re-parses all)
     run_batch()
     fp = reparse_if_catalog_changed(None)
     assert reparse_if_catalog_changed(fp) == fp  # no change -> nothing to do
@@ -97,4 +98,4 @@ def test_worker_reparses_when_catalog_changes(db, tmp_path):
             "SELECT id, 'aventus', 'aventus', 'learned' FROM products WHERE brand = 'Dior'"
         ))
     assert reparse_if_catalog_changed(fp) != fp
-    assert [r[2] for r in results(db) if r[6]] == ["Sauvage Eau de Parfum"]
+    assert sorted((r[0], r[2]) for r in results(db) if r[6]) == [(1, "Sauvage Eau de Parfum"), (2, None)]

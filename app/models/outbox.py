@@ -18,8 +18,9 @@ MEDIA_DIR = BASE_DIR / "secrets" / "media"  # downloaded photos (dir 700, git-ig
 
 class Outbox(Base):
     """Messages an admin chose to send. Only the listener (the one process that uses the
-    Telegram session) sends them: queued -> sending -> sent | failed. A row stuck in
-    "sending" (crash during the send) is never retried automatically, to avoid doubles."""
+    Telegram session) sends them: queued -> sending -> sent | failed. A row stuck in "sending" (crash during
+    the send) is recovered by app/listener/sender.py recover_stuck(): found in the chat -> sent; not found ->
+    queued again once (recovered_at); docs/SPEC-v5.9 B1."""
 
     __tablename__ = "outbox"
     __table_args__ = (
@@ -43,6 +44,8 @@ class Outbox(Base):
     send_after: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), default=func.now())
     source_message_id: Mapped[int | None] = mapped_column(ForeignKey("messages.id"), index=True)  # quick reply to
     previous_review_status: Mapped[str | None] = mapped_column(String(16))  # restored by Undo
+    claimed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))  # last "sending" (v5.9 B1)
+    recovered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))  # re-queued after a crash
 
 
 class MediaDownload(Base):

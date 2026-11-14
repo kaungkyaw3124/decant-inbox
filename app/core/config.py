@@ -18,6 +18,9 @@ class Settings(BaseSettings):
     db_name: str = "product_requests"
     db_user: str = "appuser"
     db_password: SecretStr
+    db_pool_size: int = 10  # docs/SPEC-v5.9 B7: worker / listener / alerts; the web unit sets 20 / 20
+    db_max_overflow: int = 10
+    db_pool_timeout: float = 10.0
 
     # Telegram (Phase 2). Optional here so DB-only scripts run without them.
     tg_api_id: int | None = None

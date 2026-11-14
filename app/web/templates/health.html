@@ -12,6 +12,7 @@
     </tbody>
   </table>
   <p class="muted small">{{ t("Last message received") }}: {{ tr(last_message) }} · {{ t("{n} messages stored.", n=total) }}</p>
+  <p class="muted small" id="db-pool">{{ t("Database pool") }}: {{ pool.status }} · {{ t("full-pool waits since start") }}: {{ pool.timeouts }}</p>
 </section>
 <section class="card" id="speed">
   <h2>{{ t("Speed: first reply (last 24 h)") }}</h2>

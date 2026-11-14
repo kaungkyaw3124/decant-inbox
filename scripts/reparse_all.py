@@ -7,6 +7,7 @@ Prints counts only, never message text.
 """
 import argparse
 from collections import Counter
+from datetime import datetime
 
 from sqlalchemy import select
 
@@ -18,7 +19,10 @@ from app.parser.service import load_aliases, load_full_sizes, load_known_words, 
 CHUNK = 500
 
 
-def reparse_all(dry_run: bool = False) -> Counter:
+def reparse_all(dry_run: bool = False, since: datetime | None = None, chunk: int = CHUNK,
+                between=None) -> Counter:
+    """since: only messages received from then on (the worker: last 14 days, docs/SPEC-v5.9 B4);
+    between(): called after every chunk (the worker answers live customers meanwhile)."""
     stats: Counter = Counter()
     last_id = 0
     with SessionLocal() as session:
@@ -30,8 +34,9 @@ def reparse_all(dry_run: bool = False) -> Counter:
         session = SessionLocal()
         try:
             messages = list(session.scalars(
-                select(Message).where(Message.id > last_id, Message.direction == "in")
-                .order_by(Message.id).limit(CHUNK)
+                select(Message).where(Message.id > last_id, Message.direction == "in",
+                                      *([Message.received_at >= since] if since else []))
+                .order_by(Message.id).limit(chunk)
             ))
             if not messages:
                 return stats
@@ -41,6 +46,8 @@ def reparse_all(dry_run: bool = False) -> Counter:
             session.rollback() if dry_run else session.commit()
         finally:
             session.close()
+        if between is not None:
+            between()
 
 
 def main() -> None:

@@ -11,6 +11,8 @@ ExecStart=%h/telegram-product-requests/.venv/bin/uvicorn app.web.main:app --host
 Restart=always
 RestartSec=10
 Environment=PYTHONUNBUFFERED=1
+# docs/SPEC-v5.9 B7: ~40 request threads share the database pool
+Environment=DB_POOL_SIZE=20 DB_MAX_OVERFLOW=20
 UMask=0077
 NoNewPrivileges=yes
 

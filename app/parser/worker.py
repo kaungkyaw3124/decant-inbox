@@ -10,8 +10,9 @@ import argparse
 import logging
 import time
 from concurrent.futures import ThreadPoolExecutor
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
+from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 
 from app.ai import graduation, screens, service as ai
@@ -28,17 +29,28 @@ from app.parser.service import (
 from scripts.reparse_all import reparse_all
 
 log = logging.getLogger("parser")
-BATCH = 200
+BATCH = 50  # docs/SPEC-v5.9 B5: a batch is time-boxed, then the replies / watchdog run
+BATCH_SECONDS = 1.0
 HEARTBEAT_SECONDS = 30
 HOUSEKEEPING_SECONDS = 600
 FOLLOWUP_SECONDS = 60
-_failed: set[int] = set()  # retried after a restart, so one bad row cannot block the queue
+REPARSE_DAYS = 14  # docs/SPEC-v5.9 B4: older messages keep their result (scripts/reparse_all.py does all)
+REPARSE_CHUNK = 20  # ~70 ms per message: a chunk holds live customers up ~1.5 s at most
+RETRY_FAILED = 600.0  # a message that failed to parse is tried again after 10 min (it waits in Needs you)
+_failed: dict[int, float] = {}  # message id -> monotonic time of the failure
+more_waiting = False  # the last run_batch() stopped early (time box / full batch): loop again without sleeping
 
 
-def run_batch() -> int:
-    """Parse up to BATCH unparsed messages. Returns how many were parsed."""
+def run_batch(live_only: bool = False) -> int:
+    """Parse up to BATCH unparsed messages (at most ~BATCH_SECONDS). Returns how many were parsed.
+    live_only: only messages of the last 10 minutes (between the chunks of a re-parse)."""
+    global more_waiting
+    started = time.monotonic()
+    more_waiting = False
+    for message_id in [m for m, at in _failed.items() if started - at >= RETRY_FAILED]:
+        del _failed[message_id]
     with SessionLocal() as session:
-        ids = unparsed_message_ids(session, BATCH, _failed)
+        ids = unparsed_message_ids(session, BATCH, set(_failed), live_only)
         if not ids:
             return 0
         aliases = load_aliases(session)  # reloaded per batch: dashboard may add aliases
@@ -46,6 +58,7 @@ def run_batch() -> int:
         known_words = load_known_words(session)
         phrases = load_phrases(session)
     done = 0
+    more_waiting = len(ids) == BATCH
     for message_id in ids:
         try:
             with SessionLocal.begin() as session:
@@ -54,23 +67,37 @@ def run_batch() -> int:
         except IntegrityError:
             log.info("message=%s already parsed by another process", message_id)
         except Exception:
-            _failed.add(message_id)
+            _failed[message_id] = time.monotonic()
             log.exception("failed to parse message=%s", message_id)
+        if time.monotonic() - started >= BATCH_SECONDS:
+            more_waiting = True
+            break
     return done
 
 
-def catalog_fingerprint() -> int:
+# Everything the parser reads (products, aliases, learned patterns): one query, a hash made by Postgres
+_FINGERPRINT = text("""SELECT md5(
+  coalesce((SELECT string_agg(concat_ws(',', id, brand, name, active, full_size_ml), '|' ORDER BY id)
+            FROM products), '') || '#' ||
+  coalesce((SELECT string_agg(concat_ws(',', id, product_id, normalized_alias), '|' ORDER BY id)
+            FROM product_aliases), '') || '#' ||
+  coalesce((SELECT string_agg(concat_ws(',', id, kind, normalized_text, product_id, intent, status), '|' ORDER BY id)
+            FROM learned_patterns WHERE kind <> 'not_stocked'), ''))""")
+
+
+def catalog_fingerprint() -> str:
     with SessionLocal() as session:
-        return hash((frozenset(load_aliases(session)), frozenset(load_full_sizes(session).items()),
-                     frozenset(load_known_words(session).items()), patterns.fingerprint(session)))
+        return session.scalar(_FINGERPRINT)
 
 
-def reparse_if_catalog_changed(last: int | None) -> int:
-    """Products/aliases edited in the dashboard (or re-seeded) -> re-parse everything.
-    Also runs once at start, to catch changes made while the worker was down."""
+def reparse_if_catalog_changed(last: str | None, between=None) -> str:
+    """Products/aliases edited in the dashboard (or re-seeded) -> re-parse the last REPARSE_DAYS days, in chunks,
+    with between() (the live round) after each chunk. Also runs once at start, to catch changes made while the
+    worker was down."""
     current = catalog_fingerprint()
     if current != last:
-        stats = reparse_all()
+        stats = reparse_all(since=datetime.now(UTC) - timedelta(days=REPARSE_DAYS), chunk=REPARSE_CHUNK,
+                            between=between)
         log.info("catalog changed, re-parsed: %s", dict(stats))
     return current
 
@@ -201,6 +228,25 @@ def main() -> None:
     waiter = Waiter("new_message")
     fingerprint = None
     last_beat = last_chores = last_follow_up = 0.0
+
+    def live_round(live_only: bool = False) -> int:
+        """New messages, payments, AI, auto replies, the silence watchdog, the heartbeat. Also between the
+        chunks of a re-parse (live_only: no backlog then), so live customers never wait for it (docs/SPEC-v5.9
+        B4/B5)."""
+        nonlocal last_beat
+        if time.monotonic() - last_beat >= HEARTBEAT_SECONDS:
+            beat("parser", PARSER_VERSION)
+            last_beat = time.monotonic()
+        parsed = run_batch(live_only)
+        if parsed:
+            log.info("parsed %d messages", parsed)
+        scan_payments()
+        read_screenshots()
+        understand_with_ai()
+        auto.run_once()  # auto mode (does nothing while it is switched off)
+        catch_silence()
+        return parsed
+
     while True:
         if time.monotonic() - last_chores >= HOUSEKEEPING_SECONDS:
             housekeeping()
@@ -208,20 +254,16 @@ def main() -> None:
         if time.monotonic() - last_follow_up >= FOLLOWUP_SECONDS:
             follow_up()
             last_follow_up = time.monotonic()
-        if time.monotonic() - last_beat >= HEARTBEAT_SECONDS:
-            beat("parser", PARSER_VERSION)
-            last_beat = time.monotonic()
-        fingerprint = reparse_if_catalog_changed(fingerprint)
-        parsed = run_batch()
-        if parsed:
-            log.info("parsed %d messages", parsed)
-            continue  # there may be more
-        scan_payments()
-        read_screenshots()
-        understand_with_ai()
-        auto.run_once()  # auto mode (does nothing while it is switched off)
-        catch_silence()
+        try:
+            fingerprint = reparse_if_catalog_changed(fingerprint, lambda: live_round(live_only=True))
+        except Exception:
+            log.exception("re-parse failed")
+        parsed = live_round()
+        if more_waiting:
+            continue  # more are waiting: no sleep (the rest of the round ran already)
         if args.once:
+            if parsed:
+                continue
             AI_POOL.shutdown(wait=True)
             return
         waiter.wait(sleep_for(args.interval))

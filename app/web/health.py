@@ -9,7 +9,7 @@ from sqlalchemy import and_, exists, func, select, text
 from sqlalchemy.orm import Session
 
 from app.core.config import BASE_DIR
-from app.models import Message, ParseResult, ServiceHeartbeat
+from app.models import Message, Outbox, ParseResult, ServiceHeartbeat
 from app.orders import speed
 from app.web import perf
 from app.web.auth import current_user
@@ -24,6 +24,9 @@ MAX_UNPARSED_AGE = timedelta(minutes=5)
 MAX_BACKUP_AGE = timedelta(hours=26)
 MIN_FREE_DISK = 0.10
 PAGE_GOAL_MS = 200  # docs/SPEC-v5.3 P3: server time per page p90
+MAX_QUEUE_AGE = timedelta(seconds=90)  # docs/SPEC-v5.9 B6: oldest reply waiting to go out
+STUCK_SENDING = timedelta(minutes=2)  # docs/SPEC-v5.9 B1
+pool_timeouts = 0  # docs/SPEC-v5.9 B7: requests that found the database pool full (this process, since start)
 
 
 @dataclass
@@ -69,6 +72,8 @@ def run_checks(db: Session) -> list[Check]:
         "empty" if count == 0 else f"{count} waiting, oldest {ago(now - oldest)}",
     ))
 
+    checks.append(reply_queue(db, now))
+
     backups = list_backups()
     if not backups:
         checks.append(Check("backup", False, "no backup yet"))
@@ -82,6 +87,19 @@ def run_checks(db: Session) -> list[Check]:
     free = disk.free / disk.total
     checks.append(Check("disk", free >= MIN_FREE_DISK, f"{disk.free // 2**30} GiB free ({free:.0%})"))
     return checks
+
+
+def reply_queue(db: Session, now: datetime) -> Check:
+    """docs/SPEC-v5.9 B6: replies due but not sent yet (the 1 msg / 3 s limit), and B1: replies stuck "sending"."""
+    count, oldest = db.execute(select(func.count(), func.min(Outbox.send_after))
+                               .where(Outbox.status == "queued", Outbox.send_after <= func.now())).one()
+    stuck = db.scalar(select(func.count()).select_from(Outbox).where(
+        Outbox.status == "sending", func.coalesce(Outbox.claimed_at, Outbox.created_at) < func.now() - STUCK_SENDING))
+    age = now - oldest if count else timedelta(0)
+    detail = "0 waiting" if not count else f"{count} waiting, oldest {ago(age)}"
+    if stuck:
+        detail += f", {stuck} stuck while sending"
+    return Check("reply queue", age <= MAX_QUEUE_AGE and not stuck, detail)
 
 
 @router.get("/healthz", response_class=PlainTextResponse)
@@ -100,4 +118,5 @@ def health(request: Request, db: Session = Depends(get_db)):
         "total": db.scalar(select(func.count()).select_from(Message)),
         "speed": speed.summary(db, datetime.now(UTC) - timedelta(hours=24), datetime.now(UTC)),  # docs/SPEC-v4.18 S0
         "pages": perf.summary()[:15], "page_goal_ms": PAGE_GOAL_MS,  # docs/SPEC-v5.3 M0
+        "pool": {"status": db.get_bind().pool.status(), "timeouts": pool_timeouts},  # docs/SPEC-v5.9 B7
     })

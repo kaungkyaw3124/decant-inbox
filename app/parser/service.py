@@ -9,7 +9,7 @@ AUTO mode) are kept the same way: they were already acted on.
 from dataclasses import astuple
 from datetime import timedelta
 
-from sqlalchemy import exists, select, update
+from sqlalchemy import exists, func, select, update
 from sqlalchemy.orm import Session
 
 from app.models import Message, ParseItem, ParseResult, Product, ProductAlias
@@ -49,12 +49,16 @@ def load_known_words(session: Session) -> dict[int, frozenset[str]]:
                           [a for a in load_aliases(session) if a.learned_id is None])
 
 
-def unparsed_message_ids(session: Session, limit: int, skip: set[int] = frozenset()) -> list[int]:
+def unparsed_message_ids(session: Session, limit: int, skip: set[int] = frozenset(), live_only: bool = False) -> list[int]:
     has_result = exists().where(ParseResult.message_id == Message.id, ParseResult.is_current)
     query = select(Message.id).where(~has_result, Message.direction == "in")  # only customers' messages
     if skip:
         query = query.where(Message.id.not_in(skip))
-    return list(session.scalars(query.order_by(Message.id).limit(limit)))
+    # docs/SPEC-v5.9 B5: live messages (last 10 min) before a history import / backlog, each group in order
+    live = Message.received_at >= func.now() - timedelta(minutes=10)
+    if live_only:
+        query = query.where(live)
+    return list(session.scalars(query.order_by(live.desc(), Message.id).limit(limit)))
 
 
 def current_result(session: Session, message_id: int) -> ParseResult | None:
