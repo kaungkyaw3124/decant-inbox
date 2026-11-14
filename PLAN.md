@@ -10,7 +10,7 @@ Status: TODO
 Task: v5.8.1 HOTFIX final summary: after a phone/address change (and always) send ONE message with items, total, phone, address, payment accounts + "if correct, send screenshot" — docs/SPEC-v5.8.1-hotfix-final-summary.md.
 Status: DONE 2026-11-10 — see REPORT.md
 
-## RESUME HERE (updated 2026-11-10 by Claude Code)
+## RESUME HERE (updated 2026-11-14 by Claude Code)
 - v1-v4.12 DONE. AI AUTO, brake ON, ai_address ON, ai_screenshot OFF.
 - v4.13 hotfix (docs/SPEC-v4.13-hotfix.md) DONE + deployed 2026-10-17: Q0-Q5, R1-R6, evals PASS. Owner test 4.13
   pending (REPORT.md "OWNER TEST SCRIPT 4.13").
@@ -53,7 +53,11 @@ Status: DONE 2026-11-10 — see REPORT.md
 - v5.8.1 hotfix DONE + deployed 2026-11-10: payment info = one message with items, total, phone(s), address,
   accounts + "if correct, send the screenshot", also after every phone/address change (no "updated" line);
   ချိန်း = change (rules-14); 925 tests, simulator 219 scenarios 0 wrong / 0 silent. Owner test 5.8.1 pending.
-- NEXT: the QUEUE is empty — ask the planning chat for the next task.
+- v5.9 reliability IN PROGRESS (2026-11-14): fixes B1-B7 + tests/chaos T1-T9 + tests/test_v59_reliability.py committed
+  (fa24535). Left: proof run on b663059 (worktree in the session scratchpad), full suite, real-speed
+  scripts/load_test.py numbers, live migration c6f2a8d4e915 (backup first), deploy (copy deploy/systemd/decant-web.service
+  with scripts/install_services.sh: DB_POOL_SIZE=20), REPORT. Open: T8 p90 ≤ 1 s for 30 pages at once is not
+  reachable on 2 CPUs (each page 0.06-0.17 s alone; 30 at once 2.6-4.4 s even without load) -> owner decision.
 - Owner checks: `bash scripts/status.sh`; AI numbers at /ai.
 
 ## Status
