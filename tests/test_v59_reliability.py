@@ -85,6 +85,12 @@ def test_stuck_row_requeued_once_then_failed(db):
     assert asyncio.run(sender.recover_stuck(Offline())) == {"requeued": 1}
     stick()
     assert asyncio.run(sender.recover_stuck(Offline())) == {"failed": 1}  # never a second blind resend
+    old = queue(db, "an hour ago", key="old")
+    with SessionLocal.begin() as s:  # stuck long ago (e.g. before a long outage): stale, never sent this late
+        s.execute(text("UPDATE outbox SET status = 'sending', claimed_at = now() - interval '1 hour' WHERE id = :i"),
+                  {"i": old})
+    assert asyncio.run(sender.recover_stuck(Offline())) == {"failed": 1}
+    assert scalar(db, "SELECT error FROM outbox WHERE id = :i", i=old).startswith("stuck while sending for too long")
 
 
 def test_stuck_row_left_alone_when_telegram_cannot_tell(db):

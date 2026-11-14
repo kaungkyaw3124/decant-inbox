@@ -39,6 +39,7 @@ RETRY_DELAYS = (10, 30, 90)
 TRANSIENT = (TimeoutError, ConnectionError, OSError, errors.ServerError, errors.TimedOutError)
 # docs/SPEC-v5.9 B1: a row "sending" longer than this was interrupted (crash / restart / deploy)
 STUCK_AFTER = timedelta(seconds=90)
+RESEND_WITHIN = timedelta(minutes=15)  # an older stuck reply is stale: failed (Needs you), never sent this late
 RECOVER_EVERY = 60.0
 
 
@@ -194,7 +195,8 @@ def _saved_copy(outbox_id: int, customer_id: int, text: str, since: datetime) ->
 
 
 def _finish_recovered(outbox_id: int, message_id: int | None, sent=None, customer_id=None, user_id=None) -> str:
-    """Found in the chat -> sent; not found -> queued again once; twice -> failed (never a double send)."""
+    """Found in the chat -> sent; not found -> queued again once (if claimed < RESEND_WITHIN ago); twice / too
+    old -> failed (never a double send, never a stale reply)."""
     if sent is not None:
         with SessionLocal.begin() as s:
             message_id, _ = insert_message(s, ChatMessage(
@@ -210,9 +212,13 @@ def _finish_recovered(outbox_id: int, message_id: int | None, sent=None, custome
         if message_id is not None:
             row.status, row.sent_at, row.sent_message_id, row.error = "sent", datetime.now(UTC), message_id, None
             return "sent"
-        if row.recovered_at is None:
+        claimed = row.claimed_at or row.created_at
+        if row.recovered_at is None and datetime.now(UTC) - claimed < RESEND_WITHIN:
             row.status, row.recovered_at, row.error = "queued", datetime.now(UTC), "re-queued after a restart"
             return "requeued"
+        if row.recovered_at is None:
+            row.status, row.error = "failed", "stuck while sending for too long; not sent again automatically"
+            return "failed"
         row.status, row.error = "failed", "interrupted twice while sending; check the chat before sending again"
         return "failed"
 
