@@ -361,7 +361,7 @@ def test_t8_tabs_and_pages_during_burst(chaos, tmp_path):
         stop.set()
         for b in browsers:
             b.http.close()
-        assert all(c == 200 for c in codes), (codes, browsers[0].get("/").headers.get("location"), browsers[0].cookie[:20])
+        assert all(c == 200 for c in codes), (codes, (tmp_path / "web.log").read_text()[-3000:])
         assert len(streams_ok) == 20 and all(streams_ok)
         assert percentile(times, 90) <= 1.0, sorted(round(t, 2) for t in times)
         logs = (tmp_path / "web.log").read_text()

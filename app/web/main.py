@@ -5,6 +5,7 @@ Usage: .venv/bin/uvicorn app.web.main:app --host 127.0.0.1 --port 8080 --no-acce
 (client IP comes from CF-Connecting-IP via auth.client_ip, not from uvicorn's proxy headers)
 (no access log: inbox search terms are customer text and must not be logged)
 """
+import asyncio
 import hashlib
 import logging
 import secrets
@@ -138,6 +139,20 @@ async def security_headers(request: Request, call_next):
     # docs/SPEC-v5.3 M1: static files from the browser cache; pages with customer data never stored
     response.headers["Cache-Control"] = perf.cache_control(request) if response.status_code < 400 else "no-store"
     return response
+
+
+PAGES_AT_ONCE = 10  # docs/SPEC-v5.9 B7: more page requests wait here, before they take a database connection
+_pages = asyncio.Semaphore(PAGES_AT_ONCE)
+
+
+@app.middleware("http")
+async def limit_pages(request: Request, call_next):
+    """30 tabs reloading at once on 2 CPUs: same total work, but no request holds a pooled connection while it
+    only waits for the CPU, so the pool never runs dry (live streams and static files are not counted)."""
+    if request.url.path.startswith(("/events", "/static/")):
+        return await call_next(request)
+    async with _pages:
+        return await call_next(request)
 
 
 app.middleware("http")(perf.timing)  # outermost: times everything (docs/SPEC-v5.3 M0)
