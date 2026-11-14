@@ -295,6 +295,12 @@ MY = {
     "last heartbeat {ago} ({info})": "နောက်ဆုံး သတင်းပို့ {ago} ({info})", "{n}s ago": "{n} စက္ကန့်က",
     "{n} min ago": "{n} မိနစ်က", "{n} h ago": "{n} နာရီက", "{n} days ago": "{n} ရက်က",
     "{n} waiting, oldest {ago}": "{n} စောင် စောင့်နေ၊ အဟောင်းဆုံး {ago}",
+    # docs/SPEC-v5.9: reply queue, stuck sends, database pool, alert types
+    "reply queue": "ပို့ရန် စာတန်း", "0 waiting": "စောင့်နေတာ မရှိ",
+    "{n} waiting, oldest {ago}, {k} stuck while sending": "{n} စောင် စောင့်နေ၊ အဟောင်းဆုံး {ago}၊ {k} စောင် ပို့ရင်း ရပ်နေ",
+    "0 waiting, {k} stuck while sending": "စောင့်နေတာ မရှိ၊ {k} စောင် ပို့ရင်း ရပ်နေ",
+    "Database pool": "ဒေတာဘေ့စ် ချိတ်ဆက်မှု", "full-pool waits since start": "ပြည့်လို့ စောင့်ရတာ (ပြန်စကတည်းက)",
+    "Reply failed": "ပြန်စာ ပို့မရ", "Reply queue long": "ပို့ရန် စာတန်း ရှည်နေ",
     "{name}, {ago}, {size} KiB, {n} kept": "{name}၊ {ago}၊ {size} KiB၊ {n} ခု သိမ်းထား", "{n} GiB free ({pct})": "{n} GiB လွတ် ({pct})",
 
     # ---------- learning ----------

@@ -36,6 +36,7 @@ HOUSEKEEPING_SECONDS = 600
 FOLLOWUP_SECONDS = 60
 REPARSE_DAYS = 14  # docs/SPEC-v5.9 B4: older messages keep their result (scripts/reparse_all.py does all)
 REPARSE_CHUNK = 20  # ~70 ms per message: a chunk holds live customers up ~1.5 s at most
+AUTO_SECONDS = 2.0  # docs/SPEC-v5.9 B5: auto replies time-boxed too, then the watchdog
 RETRY_FAILED = 600.0  # a message that failed to parse is tried again after 10 min (it waits in Needs you)
 _failed: dict[int, float] = {}  # message id -> monotonic time of the failure
 more_waiting = False  # the last run_batch() stopped early (time box / full batch): loop again without sleeping
@@ -243,8 +244,12 @@ def main() -> None:
         scan_payments()
         read_screenshots()
         understand_with_ai()
-        auto.run_once()  # auto mode (does nothing while it is switched off)
+        global more_waiting
+        busy = more_waiting
+        if auto.run_once(budget=AUTO_SECONDS).get("more"):  # auto mode (does nothing while it is switched off)
+            busy = True
         catch_silence()
+        more_waiting = busy
         return parsed
 
     while True:

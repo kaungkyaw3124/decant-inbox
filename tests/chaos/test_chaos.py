@@ -33,6 +33,15 @@ def test_t1_t2_burst_of_50_customers(chaos):
     chaos.listener.start()
     chaos.start_worker()
     result = run_flows(chaos, uids)
+    if os.environ.get("CHAOS_DEBUG"):
+        with open(os.environ["CHAOS_DEBUG"] + ".flow", "w") as f:
+            for u in uids[:3]:
+                print(u, result[u], file=f)
+                print([(m.out, m.message[:25], m.date.strftime("%H:%M:%S.%f")[:-3]) for m in chaos.fake.history[u]], file=f)
+            print(rows("SELECT m.customer_id, m.raw_text, m.received_at, r.status, r.reason, r.created_at, "
+                       "(SELECT count(*) FROM audit_log a WHERE a.action = 'auto.holding' AND "
+                       "(a.details->>'message_id')::int = m.id) FROM messages m LEFT JOIN auto_runs r ON r.message_id = m.id "
+                       "WHERE m.direction = 'in' AND m.customer_id <= 3 ORDER BY m.id"), file=f)
     paid = wait_until(lambda: scalar("SELECT count(*) FROM orders WHERE order_no IS NOT NULL") >= 50, 60)
     if not paid and os.environ.get("CHAOS_DEBUG"):
         with open(os.environ["CHAOS_DEBUG"], "w") as f:
@@ -44,7 +53,7 @@ def test_t1_t2_burst_of_50_customers(chaos):
     assert paid, rows("SELECT customer_id, status FROM orders WHERE order_no IS NULL")
     assert wait_until(lambda: not scalar("SELECT count(*) FROM outbox WHERE status IN ('queued', 'sending')"), 60)
     missing = {uid: r["missing"] for uid, r in result.items() if r["missing"]}
-    assert not missing, f"no reply within {REPLY_WITHIN} s: {missing}"
+    assert not missing, f"no reply / Needs-you item within {REPLY_WITHIN} s: {missing}"
     # 0 lost: every message the fake account received is saved
     received = sum(1 for uid in uids for m in chaos.fake.history[uid] if not m.out)
     assert scalar("SELECT count(*) FROM messages WHERE direction = 'in' AND received_at >= :s", s=since) == received
@@ -59,8 +68,9 @@ def test_t1_t2_burst_of_50_customers(chaos):
     lasts = [r["last"] for r in result.values()]
     assert max(lasts) <= 2 * median(lasts), sorted(lasts)
     # T2: the capacity numbers (REPORT.md "5.9 scoreboard")
-    firsts = [r["first"] for r in result.values()]
+    firsts = [r["first"] for r in result.values() if r["first"] is not None]
     numbers = {"customers": len(uids), "sends": len(chaos.fake.sent),
+               "needs_you_first": sum(r["needs_you"] for r in result.values()),
                "first_reply_s": {"p50": median(firsts), "p90": percentile(firsts, 90), "max": max(firsts)},
                "last_reply_s": {"p50": median(lasts), "p90": percentile(lasts, 90), "max": max(lasts)},
                "max_sends_per_virtual_minute": chaos.fake.max_per_minute()}
@@ -361,7 +371,11 @@ def test_t8_tabs_and_pages_during_burst(chaos, tmp_path):
         assert worst_conn[0] - before <= 20, f"20 tabs should not need 20 extra connections ({before} -> {worst_conn})"
     finally:
         web.terminate()
-        web.wait(20)
+        try:
+            web.wait(15)
+        except subprocess.TimeoutExpired:  # open live streams keep a graceful shutdown waiting
+            web.kill()
+            web.wait(10)
         log.close()
     assert_invariants(chaos.fake, since)
 

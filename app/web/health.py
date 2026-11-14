@@ -102,6 +102,12 @@ def reply_queue(db: Session, now: datetime) -> Check:
     return Check("reply queue", age <= MAX_QUEUE_AGE and not stuck, detail)
 
 
+def _pool(db: Session) -> dict:
+    pool = db.get_bind().pool
+    return {"used": pool.checkedout(), "size": pool.size(), "overflow": getattr(pool, "_max_overflow", 0),
+            "timeouts": pool_timeouts}
+
+
 @router.get("/healthz", response_class=PlainTextResponse)
 def healthz(db: Session = Depends(get_db)):
     """For scripts/monitors: 200 if everything is fine, else 503. Names and status only."""
@@ -118,5 +124,5 @@ def health(request: Request, db: Session = Depends(get_db)):
         "total": db.scalar(select(func.count()).select_from(Message)),
         "speed": speed.summary(db, datetime.now(UTC) - timedelta(hours=24), datetime.now(UTC)),  # docs/SPEC-v4.18 S0
         "pages": perf.summary()[:15], "page_goal_ms": PAGE_GOAL_MS,  # docs/SPEC-v5.3 M0
-        "pool": {"status": db.get_bind().pool.status(), "timeouts": pool_timeouts},  # docs/SPEC-v5.9 B7
+        "pool": _pool(db),  # docs/SPEC-v5.9 B7
     })

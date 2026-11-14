@@ -21,6 +21,7 @@ AI (docs/SPEC-v4.6-ai.md): in AUTO AI mode an unsure message waits for the AI's 
 parse result (method "ai") is acted on only while the AI mode is AUTO.
 """
 import logging
+import time
 import random
 import threading
 import re
@@ -382,9 +383,12 @@ def next_due(now: datetime) -> float | None:
     return min(future) if future else None
 
 
-def run_once(now: datetime | None = None) -> dict[str, int]:
-    """One pass over undecided messages (each in its own transaction). Returns counts."""
+def run_once(now: datetime | None = None, budget: float | None = None) -> dict[str, int]:
+    """One pass over undecided messages (each in its own transaction). Returns counts.
+    budget: stop after about this many seconds, {"more": 1} in the counts (docs/SPEC-v5.9 B5: the worker runs
+    the silence watchdog between, so in a burst "please wait" still goes out on time)."""
     now = now or datetime.now(UTC)
+    started = time.monotonic()
     from app.ai import settings as ai_settings  # late import: ai -> orders
 
     with SessionLocal() as session:
@@ -404,4 +408,7 @@ def run_once(now: datetime | None = None) -> dict[str, int]:
             key = "replied" if not outcome.startswith("skipped") else "skipped"
             stats[key] = stats.get(key, 0) + 1
             log.info("auto message=%s %s", message_id, outcome)
+        if budget is not None and time.monotonic() - started >= budget and message_id != ids[-1]:
+            stats["more"] = 1
+            break
     return stats

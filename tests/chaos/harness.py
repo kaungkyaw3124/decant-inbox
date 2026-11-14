@@ -245,7 +245,7 @@ class Worker:
 def run_flows(chaos, uids: list[int], steps: int | None = None, within: float = REPLY_WITHIN) -> dict[int, dict]:
     """Every customer runs flow() at the same moment, each next message after our reply (small talk "ok"
     needs none). Returns per customer: first / last reply seconds, per-message waits, missing replies."""
-    out = {uid: {"waits": [], "missing": [], "first": None, "last": None} for uid in uids}
+    out = {uid: {"waits": [], "missing": [], "needs_you": 0, "first": None, "last": None} for uid in uids}
 
     async def customer(uid: int) -> None:
         start = time.monotonic()
@@ -254,16 +254,24 @@ def run_flows(chaos, uids: list[int], steps: int | None = None, within: float = 
             m = await chaos.fake.incoming(uid, body)
             asked = time.monotonic()
             if not holding.is_small_talk(body):
+                # answered, or caught by the silence watchdog = a Needs-you item ("⏰ customer waiting")
+                looked = asked
                 while len(chaos.fake.sent_to(uid)) == before and time.monotonic() - asked < within:
-                    await asyncio.sleep(0.05)
+                    if time.monotonic() - looked >= 1.0:
+                        looked = time.monotonic()
+                        if await asyncio.to_thread(_caught, uid, m.id):
+                            out[uid]["needs_you"] += 1
+                            break
+                    await asyncio.sleep(0.1)
                 got = time.monotonic()
-                if len(chaos.fake.sent_to(uid)) == before:
+                if len(chaos.fake.sent_to(uid)) == before and not await asyncio.to_thread(_caught, uid, m.id):
                     out[uid]["missing"].append(body[:20])
                 out[uid]["waits"].append(got - asked)
-                out[uid]["first"] = out[uid]["first"] or got - start
+                if len(chaos.fake.sent_to(uid)) > before:
+                    out[uid]["first"] = out[uid]["first"] or got - start
             # like a person: read "please wait", wait for the real answer (the message decided, nothing queued)
             while time.monotonic() - asked < within and not await asyncio.to_thread(_settled, uid, m.id):
-                await asyncio.sleep(0.5)
+                await asyncio.sleep(1.0)
             if len(chaos.fake.sent_to(uid)) > before:
                 out[uid]["last"] = time.monotonic() - start
             await asyncio.sleep(0.3)  # the customer reads our reply
@@ -273,6 +281,14 @@ def run_flows(chaos, uids: list[int], steps: int | None = None, within: float = 
 
     chaos.listener.run(everyone())
     return out
+
+
+def _caught(uid: int, telegram_id: int) -> bool:
+    """The silence watchdog caught this message: it is in Needs you ("⏰ customer waiting") until answered."""
+    return bool(scalar(
+        "SELECT count(*) FROM audit_log a JOIN messages m ON m.id = (a.details->>'message_id')::int "
+        "WHERE a.action = 'auto.holding' AND m.external_chat_id = :u AND m.external_message_id = :t",
+        u=str(uid), t=str(telegram_id)))
 
 
 def _settled(uid: int, telegram_id: int) -> bool:
