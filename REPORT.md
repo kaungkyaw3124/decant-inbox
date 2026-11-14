@@ -2732,3 +2732,123 @@ Deployed: decant-web + decant-parser restarted (the parser worker sends the auto
 3. Reply "လိပ်စာ ပြောင်းချင်ပါတယ် No. 34, Sample Rd, Mandalay" BEFORE paying → the full message again with the new address.
 4. Pay with the test code → the order is paid. Try to change the address now → the polite "order confirmed, we'll
    check" message (unchanged).
+
+## 2026-11-14 — v5.9 RELIABILITY UNDER LOAD (docs/SPEC-v5.9-reliability-under-load.md)
+Owner's worry: "another system printed 7-8 of 14 items under a burst". Same class of bug looked for here: every one
+of the planning chat's 7 suspects was real and is now reproduced by a test that FAILS on the old code (b663059).
+
+What changed (all behind the same Telegram rules: only the listener sends, 1 msg / 3 s, 20 / min, never first):
+- **B1 stuck "sending"** — outbox has `claimed_at` / `recovered_at` (migration c6f2a8d4e915, live DB backed up
+  first, down/up tested). The sender loop (at start and every minute, between sends, so nothing of its own is in
+  flight) looks at rows "sending" > 90 s: our own copy already saved by the listener, or the same text in the chat's
+  last 20 messages (read-only get_messages) → **sent** (linked, never resent); not found → **queued again once**;
+  a second time, or stuck longer than 15 min → **failed** (Needs you + alert; never a late or double send); offline /
+  Telegram error → left alone, /health shows "N stuck while sending" and the alert service sends "reply queue".
+  The silence watchdog no longer counts a "sending" row older than 2 min as an answer.
+- **B2 lost messages** — the listener retries a failed save 3× (0.5 / 1 / 2 s) and runs a **gap fill** at start and
+  every 5 min: last 30 messages of the 30 most recent private chats (read-only get_dialogs / get_messages), same
+  idempotent save_message(); logs counts only. Late messages are parsed and answered as normal.
+- **B3 send errors** — timeouts / network / Telegram server errors retry after 10 s, 30 s, 90 s (stays "queued"
+  with send_after); privacy / blocked / bad peer / unknown entity fail at once. A failed reply is in Needs you
+  ("failed sends", as before) and is a new alert **"Reply failed"** (one per customer, Settings → Alerts). The
+  watchdog sends nothing more to a customer whose newest reply failed.
+- **B4 re-parse freeze** — an alias / learned-phrase change re-parses only the **last 14 days**, in chunks of 20
+  (~70 ms per message), with the live round (new messages, auto replies, watchdog, heartbeat) between chunks. The
+  catalog fingerprint is ONE query (Postgres md5 over products, aliases, learned patterns). Full re-parse =
+  `scripts/reparse_all.py` as before.
+- **B5 batch first** — a parse batch is max 50 messages / ~1 s, the auto-reply pass max ~2 s, then the rest of the
+  loop runs (found by T1 in the full suite: in a 50-customer burst the 10-s watchdog waited behind a 15-60 s auto
+  pass, so even "please wait" came late); messages of the last
+  10 min are parsed before a backlog (history import). A message that failed to parse is retried after 10 min (was:
+  only after a restart; meanwhile it is a "⏰ customer waiting" item through the watchdog).
+- **B6 fairness + visibility** — the sender takes the customer who got our last message longest ago first (a
+  customer's own replies stay in order; reminders still after replies); a refused row no longer delays the next one
+  by 0.5 s. **/health "reply queue"**: waiting count + age of the oldest (+ stuck); fails (and /healthz 503) when the
+  oldest waits > 90 s; new alert **"Reply queue long"** with a ✅ resolved line.
+- **B7 database** — pool from settings: worker / listener / alerts 10 + 10, the web unit 20 + 20
+  (deploy/systemd/decant-web.service `DB_POOL_SIZE=20 DB_MAX_OVERFLOW=20`), timeout 10 s; a full pool returns
+  503 "Busy", is logged and counted on /health ("full-pool waits since start"). Live updates: ONE listening
+  connection and one snapshot per 2 s shared by all open tabs (was one connection + one snapshot per tab), max 3
+  streams per user (a 4th tab keeps its own polling). The "Needs you" cache: a page that waited for a computation
+  started after it arrived takes that result (a burst no longer makes 30 waiting pages compute it 30 times).
+  At most 10 page requests work at once (the rest wait before they take a connection): found by T8 — 30
+  CPU-starved pages held their connections while waiting for the CPU and the 20 + 20 pool ran dry ("database pool
+  full", 503). Live streams and static files are not counted.
+
+### Proof: the new chaos tests on the OLD code (b663059)
+| Test | Old code | Why (bug) |
+|---|---|---|
+| T3 crash before / after the send | FAIL ×2 | reply left "sending" forever (B1) |
+| T4 every 5th send times out | FAIL | 2 customers lost replies after one timeout (B3) |
+| T5 database down 20 s | FAIL | messages never saved (B2) |
+| T6 40 messages while the listener is stopped | FAIL | never saved (B2) |
+| T7 5,000 old messages + alias edit | FAIL | no live reply within 60 s during the re-parse (B4/B5) |
+| T8 20 tabs + 30 pages during a burst | FAIL | "QueuePool limit" errors in the web log (B7) |
+| T1 burst, T9 double approve | pass | no bug there (approve() locks the order row) |
+
+### 5.9 scoreboard
+| Loop | Chaos tests failing | Invariants broken | p90 time to last reply (T1, fast clock) |
+|---|---|---|---|
+| 0 (old code) | 7 of 9 (T3 ×2, T4-T8) | stuck "sending", lost messages | — |
+| 1 | T1 (test customer moved on after "please wait"), T5 (test sent the same question twice), T7 (5-11 s), T8 (cookie name) | duplicate (test data) | — |
+| 2 | T7 still 5-6 s → chunk 100 → 20, live-only parsing between chunks, 1 s batch box | — | 245 s |
+| 3 | full suite: T1 (in the suite run the silence watchdog waited behind a 15-60 s auto pass → auto pass time-boxed 2 s, watchdog every round), T8 (+ web stop timeout in the test), 2 i18n (new words) | 0 | — |
+| 4 | T8: a non-200 page in the full suite = "database pool full" → max 10 page requests at once | 0 | 305 s (126 of 250 messages got the Needs-you "⏰ waiting" item first) |
+| 5 | T8 p90 page time only (see "Open"); no pool errors | 0 | — |
+
+### T2 capacity numbers
+- **Real speed** (`scripts/load_test.py --customers 50`, real limits, fake Telegram, 854 s): 272 sends, max **20 per
+  minute**, 0 missing replies. Time to FIRST reply p50 **81 s**, p90 **142 s**, max 158 s; time to the LAST reply
+  (whole order: price → cart → phone → address + payment info → test code → confirmation) p50 **714 s**, p90 836 s,
+  max 851 s.
+- **Capacity: about 3.7 complete orders per minute at the current limits** (each order needs ~5.4 of our messages;
+  20 messages / min). A single question (one reply) = up to 20 customers per minute. When 50 people write at the
+  same second, the last of them waits ~2.5 min for a first answer (the "please wait" reply after 10 s also uses the
+  same 20 / min).
+- Fast clock (pytest T1, send limits ×60): the worker is the limit then: ~0.27 s and ~80 queries per auto decision
+  (≈ 3.7 decisions / s, `unknown.learned_not_stocked` is 25 % of it) — 10× faster than the send limit, so not the
+  bottleneck live. Whole flow p50 287 s, p90 305 s; half of the messages were first caught by the watchdog
+  (Needs you "⏰ waiting" + one "please wait" per 10 min) and answered later.
+
+### Open (needs the owner / planning chat)
+**T8 "p90 page time ≤ 1 s for 30 page requests at once" is not reachable on this server.** Each page alone takes
+0.06-0.17 s (warm); 30 requests at the same instant need ~4.5 s of CPU in the one web process (2 CPUs, Python), so
+even with no burst they finish after 2.6-4.4 s (p90 4.4 s); during the T1 burst 6-16 s. All the other T8 checks
+pass (no pool errors, every page 200, all 20 live streams open, the web process stays within its pool, the 20 tabs
+need ONE extra connection, not 20). The test keeps the spec's 1 s check, so it fails until one of:
+(a) accept "30 pages at once ≈ 4-5 s; each page alone ≤ 0.2 s" and change T8 to 30 pages over ~10 s,
+(b) a bigger VPS (≥ 6 CPUs) + 3 web workers, or
+(c) a planned page-speed task (needs_you / chat page cost).
+
+### Tests and checks
+- New: tests/chaos/ (harness.py: FakeTelegram, real listener loop + real worker main loop in threads, virtual send
+  clock, assert_invariants after every test) with T1-T9 (9 tests, ~15 min), tests/test_v59_reliability.py (11:
+  fair order, refused row, retry/permanent, stuck row found / re-queued once / too old / offline, /health line,
+  alert types + resolved line, 3 streams per user, failed parse retried after 10 min, pool-full counter).
+  scripts/load_test.py (real speed, own `<db>_chaos` database). The chaos tests use the pytest scratch database
+  `<db>_test` (the load test uses `<db>_chaos`); nothing touches the live database or the real session.
+- Changed: tests/test_parser_db.py worker re-parse test (the spec now re-parses 14 days: an old message keeps its
+  result).
+- Full suite: **945 collected — 943 passed, 1 skipped, 1 failed = T8's p90 page-time check** (see "Open").
+- Simulator: 219 scenarios, automatic 100 % (322/322), 0 wrong, 0 silent. UI gate quick: 32 views, 0 fails. Migration c6f2a8d4e915: live DB backed up (product_requests_2026-11-14T2112Z.dump),
+  down/up tested on a scratch DB, applied.
+- Deployed 2026-11-14 23:26: decant-web (new unit: DB_POOL_SIZE=20 / DB_MAX_OVERFLOW=20), decant-parser,
+  decant-listener, decant-alerts restarted (the tunnel was NOT restarted: same dashboard link). /healthz all ok incl.
+  the new "reply queue: ok". The listener's first gap fill saved 8 messages that were never in the database — all
+  from Feb-Aug 2026 (older than the 30-day history import), so nothing was answered (auto replies only look at the
+  last 24 h); they now show in those chats' history.
+
+### OWNER TEST SCRIPT 5.9 (live system, second Telegram account; about 15 minutes)
+1. Dashboard → **Health**: the new line **"reply queue — 0 waiting"** (✅), and under the table "Database pool: … ·
+   full-pool waits since start: 0".
+2. From the second account send 5 short messages in a row: "price stw intensely 5ml", "10ml?", "ok", "2ml ရော",
+   "ဘယ်လောက်လဲ" → every message that needs an answer gets one within about a minute; none is missing in the chat
+   ("ok" needs none).
+3. Send "price aventus 10ml" and at once, in the server terminal: `systemctl --user restart decant-listener` →
+   the reply still arrives **once** (not twice, not never; if the restart hit the moment of sending, it comes within
+   ~2 minutes).
+4. `systemctl --user stop decant-listener`, send 3 messages from the second account, wait 2 minutes,
+   `systemctl --user start decant-listener` → within 6 minutes (usually seconds: the gap fill runs at start) all 3
+   messages show in the dashboard chat and are answered.
+5. Health shows no "stuck while sending". **Settings → Alerts** lists **"Reply failed"** and **"Reply queue long"**
+   (both ON; they reach your phone once the alert bot is set up — v5.0, ALERT_BOT_TOKEN / ALERT_CHAT_ID in .env).

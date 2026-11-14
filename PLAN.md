@@ -4,7 +4,7 @@ Read CLAUDE.md first. This file tracks where we are.
 
 ## NEXT TASK (written by the planning chat; Claude Code runs it with /next)
 Task: v5.9 RELIABILITY UNDER LOAD (stuck sending, lost messages, send retries, re-parse freeze, queue visibility, DB pool) + chaos/stress tests T1-T9 — docs/SPEC-v5.9-reliability-under-load.md (goal R1-R5).
-Status: TODO
+Status: DONE 2026-11-14 — see REPORT.md (one open item for the owner: T8 "30 pages at once p90 ≤ 1 s" is not reachable on 2 CPUs)
 
 ## PREVIOUS TASK
 Task: v5.8.1 HOTFIX final summary: after a phone/address change (and always) send ONE message with items, total, phone, address, payment accounts + "if correct, send screenshot" — docs/SPEC-v5.8.1-hotfix-final-summary.md.
@@ -35,7 +35,7 @@ Status: DONE 2026-11-10 — see REPORT.md
 - v5.3 PC speed DONE + deployed 2026-11-06: static cache + versioned URLs, gzip, boosted menu, prefetch, SSE,
   trusted computer, keyboard; warm pages 0.2-0.5 s / 0 KB (was ~2.2 s / 680 KB), send 0.25 s. NOT met yet: customer
   switch p90 1.27 s (goal 0.5) and server p90 ≤ 200 ms (chat page ~49 queries) -> follow-up for the planning chat.
-- Owner tests pending: 4.13-4.21, 5.0-5.8.1 (REPORT.md).
+- Owner tests pending: 4.13-4.21, 5.0-5.9 (REPORT.md).
 - v5.4 UI/UX clean-up DONE + deployed 2026-11-06: page pattern, pager on every long list, Products + AI like the
   mockups, Settings in sections (Saved ✓, unsaved warning), 7-item menu, Orders list + detail, error page, glossary;
   887 tests, UI gate 384 views 0 fails. Decision asked (REPORT.md): redirect / to /chats? Owner test 5.4 pending.
@@ -53,11 +53,14 @@ Status: DONE 2026-11-10 — see REPORT.md
 - v5.8.1 hotfix DONE + deployed 2026-11-10: payment info = one message with items, total, phone(s), address,
   accounts + "if correct, send the screenshot", also after every phone/address change (no "updated" line);
   ချိန်း = change (rules-14); 925 tests, simulator 219 scenarios 0 wrong / 0 silent. Owner test 5.8.1 pending.
-- v5.9 reliability IN PROGRESS (2026-11-14): fixes B1-B7 + tests/chaos T1-T9 + tests/test_v59_reliability.py committed
-  (fa24535). Left: proof run on b663059 (worktree in the session scratchpad), full suite, real-speed
-  scripts/load_test.py numbers, live migration c6f2a8d4e915 (backup first), deploy (copy deploy/systemd/decant-web.service
-  with scripts/install_services.sh: DB_POOL_SIZE=20), REPORT. Open: T8 p90 ≤ 1 s for 30 pages at once is not
-  reachable on 2 CPUs (each page 0.06-0.17 s alone; 30 at once 2.6-4.4 s even without load) -> owner decision.
+- v5.9 reliability DONE + deployed 2026-11-14: stuck "sending" recovered (found -> sent, else re-queued once, never a
+  double / late send), send retries 10/30/90 s + "Reply failed" alert, listener save retry + gap fill (start + 5 min),
+  14-day chunked re-parse, time-boxed parse / auto passes, fair send order, /health "reply queue" + "Reply queue long"
+  alert, shared live hub, pools 20+20 web / 10+10 others, max 10 pages at once. Chaos T1-T9 (fail on b663059 as the
+  spec asks), real-speed capacity ≈ 3.7 full orders / min. 945 tests: 943 pass, 1 skip, 1 FAIL = T8 p90 page time.
+  OWNER DECISION (REPORT.md "Open"): accept 30 pages at once ≈ 4-5 s (change T8), or a bigger VPS, or a page-speed task.
+  Owner test 5.9 pending.
+- NEXT: the QUEUE is empty — ask the planning chat for the next task (and the T8 decision).
 - Owner checks: `bash scripts/status.sh`; AI numbers at /ai.
 
 ## Status
@@ -98,6 +101,7 @@ Status: DONE 2026-11-10 — see REPORT.md
 | 31 | v5.7 (docs/SPEC-v5.7-date-filter-and-light-chat.md): date filter chips on list pages + light chat (20 messages, older on demand, no 4 s re-draw) | ✅ Done, live (D2 server p90 follow-up; owner test pending) |
 | 32 | v5.8 (docs/SPEC-v5.8-sales-one-screen.md): Sales & profit on one screen + chat page 26 queries (p90 ≤ 200 ms) | ✅ Done, live (owner test pending) |
 | 33 | v5.8.1 (docs/SPEC-v5.8.1-hotfix-final-summary.md): hotfix — final summary (phone, address) in every payment-info message | ✅ Done, live (owner test pending) |
+| 34 | v5.9 (docs/SPEC-v5.9-reliability-under-load.md): reliability under load, chaos tests T1-T9, capacity numbers | ✅ Done, live (owner test pending; T8 p90 needs an owner decision) |
 
 ## Phase 0 checklist
 - [x] Step 0: rollback safety net scripts in ~/hardening/
